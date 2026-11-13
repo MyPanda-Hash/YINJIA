@@ -570,13 +570,25 @@ export const menuTree = [
         // 特采单(2026-09-21 建,2026-10-19 迁出):独立面板 QC_TC_IN / 独立表 qc_tc_in / 前缀 TCI,
         // 同一张 YJ-QR-60 表单 —— 用户口径「特采单归供应链的采购管理的目录下,不要在品质管理的目录下」,
         // 菜单已搬到 智能供应链 > 采购管理 > 单据(本组只剩检验与检验要求)。
-        // 检验目录(2026-09-22):QC_CATALOG 单单据面板(方式对照 RD_PROGRESS),《品质资料 2026.09.19.xlsx》检验目录页签一比一。
+        // 待检验目录(2026-09-22 建为「检验目录」,2026-11-11 改名):QC_CATALOG 单单据面板(方式对照 RD_PROGRESS),
+        // 《品质资料 2026.09.19.xlsx》检验目录页签一比一;改名后**只显示待检验(正在检验中)的行**,
+        // 已完成检验的记录到下面的「检验数据记录明细表」查(面板编码/路径/权限一个字节没动)。
         code: 'incoming', title: '来料品质', children: [
+          // 品质流程监控(2026-11-12 用户口径「流程监控:从送料->检验单->入库……主要要显示物料批号和物料编码」):
+          // 页面级虚拟面板 QC_FLOW(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由,菜单/路由显式注册。
+          // 一行 = 送料暂收单的一条物料行(= 一个来料批次),右侧 送料 → 检验 → 入库 三节点带单号/状态/日期;
+          // 点节点跳对应面板定位该单,**没有该面板查看权时只提示不跳**。
+          { code: 'qcFlowMonitor', title: '品质流程监控', path: '/qc/flowMonitor', icon: 'DataLine', panelCode: 'QC_FLOW' },
           { code: 'qcInsp', title: '来料检验单', path: '/panelx/list/QC_INSP', icon: 'Search', panelCode: 'QC_INSP', operationName: '新增流程' },
-          { code: 'qcCatalog', title: '检验目录', path: '/panelx/list/QC_CATALOG', icon: 'Notebook', panelCode: 'QC_CATALOG' },
+          { code: 'qcCatalog', title: '待检验目录', path: '/panelx/list/QC_CATALOG', icon: 'Notebook', panelCode: 'QC_CATALOG' },
           // 检验数据记录(2026-09-22):纸张式检验报告 YJ-QR-96,版式对照《品质资料 2026.09.19.xlsx》「检验数据记录模版」;
-          // 检验目录行上的批次号 📄 可按物料批次查阅本面板的报告。
+          // 待检验目录行上的批次号 📄 可按物料批次查阅本面板的报告。
           { code: 'qcInspRec', title: '检验数据记录', path: '/panelx/list/QC_INSP_REC', icon: 'Document', panelCode: 'QC_INSP_REC', operationName: '新增流程' },
+          // 检验数据记录明细表(2026-11-11 用户口径):检验数据记录的可查询明细表 —— 一行 = 一条检验数据记录,
+          // 带 来料检验单号+行号 / 检验数据记录单号 / 采购订单号+行号 / 送料暂收单号+行号 / 采购入库单号+行号;
+          // 前两个可点跳转,后三组只显示不跳(「只有上面两个才用」),50 行一页。
+          // 平表只读报表:视图 v_qc_insp_rec_detail,见 tools/migrate-qc-pending-detail-20261111.sql。
+          { code: 'qcInspRecDetail', title: '检验数据记录明细表', path: '/panelx/list/QC_INSP_REC_DETAIL', icon: 'Tickets', panelCode: 'QC_INSP_REC_DETAIL' },
           // 来料检验要求(2026-09-22):《品质资料 2026.09.19.xlsx》折叠棉~PP棉 7 张检验要求表,
           // 档案式整表面板(规格书式页签+Excel 复刻表格,非翻页单据),行按物料类别分流 7 页签
           { code: 'qcInspReq', title: '来料检验要求', path: '/panelx/list/QC_INSP_REQ', icon: 'Grid', panelCode: 'QC_INSP_REQ' },

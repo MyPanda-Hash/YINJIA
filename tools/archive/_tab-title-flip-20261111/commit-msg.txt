@@ -1,0 +1,27 @@
+fix: 页签名字反复横跳 —— 缓存实例不再按别人的路由改标题/取数
+
+用户报障(2026-11-11):打开多个单据页签后,同一个页签位置的名称在
+「销售订单」/「销售订单明细表」之间来回跳。
+
+根因:PortalLayout 按 route.path 做 keep-alive key,每个页签一份实例(为了切页签
+保住未保存的填写),但 route 是全局共享的 —— 被缓存的旧实例照样跟着别人的导航
+重算 panelCode/code、跑完所有 route 派生 watch、按别人的面板码取数;loadCrg() 拿
+到面板名后写的是 `tabs.find(x => x.path === route.path)` 即**当前正显示的那个页签**
+⇒ 两边配置请求乱序返回时互相盖名,就是名字横跳。PanelxForm 的
+`cur.title = 面板名-单号` 同一份病。
+
+修法:
+- PanelxList / PanelxForm 各加实例私有快照 ownPath(创建时的 route.path,与
+  keep-alive key 同口径)+ ownPanelCode + isFrontPage(),"要不要干活"一律用它判;
+- 面板切换 watch、?docNo= / ?new= / 批注 / 批号锁 / RD 七状态 / 仓库档案等 10 处
+  route 派生 watch:非前台实例直接跳过(不再按别人的面板码清空+取数);
+- applyPanelTitle() 只写 ownPath 那条页签且必须在前台;loadCrg() 响应回来再核对
+  「面板码没变 + 仍是前台」,不符整份丢弃;配置拿不到(403)时不写标题,保住菜单名;
+- stores/tabs.js 新增 tabKey():页签身份一律剥掉 query —— 此前 restoreCurrentTab()
+  传 route.fullPath(?code=),去重失效会生成两个同名页签;
+- unsavedGuard 登记/注销键改用 ownPath(卸载时 route.path 已指向别人,会注销错键)。
+
+验收(ego 浏览器 + CDP 注入 400ms 延迟放大竞态,脚本与截图见
+tools/archive/_tab-title-flip-20261111/):round-03 复现横跳;round-04 同条件 12 次
+快速互点全 OK;round-06/07 切走再回单号与表单页签名不变;round-08 打包版 8090 同
+样 PASS;round-09 关页签/重开无重名。前端单测 1649 全过(vite build 通过)。

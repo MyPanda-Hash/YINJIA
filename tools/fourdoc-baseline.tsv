@@ -58,7 +58,7 @@ ord	panel_code	col_name	label	place	seq	data_type	width	flags	alias	ref_panel	re
 57	QC_RECV	折扣%	折扣%	detail	330	小数	80	E--V		GFDA	mc	mc				
 58	QC_RECV	预计到货日期	预计到货日期	detail	340	日期	120	E--V		GFDA	mc	mc				
 59	QC_RECV	备注	备注	detail	350	文本	200	E--V		GFDA	mc	mc				
-60	QC_RECV	现存量	现存量	detail	360	小数	90	E-H-		GFDA	mc	mc				
+60	QC_RECV	现存量	现存量	detail	360	小数	90	---V		GFDA	mc	mc			Current inventory	
 61	QC_RECV	仓库	仓库	detail	370	文本	120	E-H-		GFDA	mc	mc				
 62	QC_RECV	折扣金额	折扣金额	detail	380	小数	100	E-H-		GFDA	mc	mc				
 63	QC_RECV	条码	条码	query,detail	390	文本	140	E-H-		GFDA	mc	mc				
@@ -120,9 +120,10 @@ ord	panel_code	col_name	label	place	seq	data_type	width	flags	alias	ref_panel	re
 49	QC_INSP	部门名称	部门名称	detail	250	文本	100	E-H-		GFDA	mc	mc			Department Name	
 50	QC_INSP	审核人	审核人	header	260	参照	90	---V		EMP	员工名称	员工名称			Approved by	
 51	QC_INSP	入库单号	入库单号	detail	260	文本	130	---V		GFDA	mc	mc			Receipt No.	
-52	QC_INSP	审核时间	审核时间	header	270	文本	140	---V		GFDA	mc	mc			Approved at	
-53	QC_INSP	仓库代码	仓库代码	detail	270	文本	120	E-H-		GFDA	mc	mc			Warehouse Code	
-54	QC_INSP	批次键	批次键	header	280	整数	80	--H-		GFDA	mc	mc				
+52	QC_INSP	现存量	现存量	detail	265	小数	100	--H-							Current inventory	
+53	QC_INSP	审核时间	审核时间	header	270	文本	140	---V		GFDA	mc	mc			Approved at	
+54	QC_INSP	仓库代码	仓库代码	detail	270	文本	120	E-H-		GFDA	mc	mc			Warehouse Code	
+55	QC_INSP	批次键	批次键	header	280	整数	80	--H-		GFDA	mc	mc				
 1	QC_RETURN	单据编号	单据编号	query,header	10	文本	140	-R-V							Document Number	
 2	QC_RETURN	单据日期	单据日期	query,header	20	日期	120	ER-V							Document Date	
 3	QC_RETURN	物料编码	物料编码	query,detail	20	参照	120	ER-V		INV	存货编码	存货名称			Material Code	
@@ -143,24 +144,25 @@ ord	panel_code	col_name	label	place	seq	data_type	width	flags	alias	ref_panel	re
 18	QC_RETURN	计量单位	计量单位	detail	90	参照	90	E--V		UOM	计量单位名称	计量单位名称			Unit of measurement	
 19	QC_RETURN	经手人	经手人	header	100	参照	100	E--V		EMP	员工名称	员工名称			Person in charge	
 20	QC_RETURN	采购订单行号	采购订单行号	detail	100	文本	110	E--V								
-21	QC_RETURN	单据状态	单据状态	query,header	110	文本	90	---V							Doc status	
-22	QC_RETURN	不良原因	不良原因	query,detail	110	参照	150	E--V		REJECT	不合格原因	不合格原因				
-23	QC_RETURN	审核人	审核人	header	120	参照	90	---V		EMP	员工名称	员工名称			Approved by	
-24	QC_RETURN	报废数量	报废数量	detail	120	小数	100	E-H-								
-25	QC_RETURN	审核时间	审核时间	header	130	文本	140	---V							Approved at	
-26	QC_RETURN	剩余数量	剩余数量	detail	130	小数	100	E-H-								
-27	QC_RETURN	备注	备注	header,detail	140	文本	220	E--V							Remark	
-28	QC_RETURN	附件1	附件1	header	150	附件	220	E--V								
-29	QC_RETURN	附件2	附件2	header	160	附件	220	E--V								
-30	QC_RETURN	附件3	附件3	header	170	附件	220	E--V								
-31	QC_RETURN	附件4	附件4	header	180	附件	220	E--V								
-32	QC_RETURN	附件5	附件5	header	190	附件	220	E--V								
-33	QC_RETURN	附件6	附件6	header	200	附件	220	E--V								
-34	QC_RETURN	批次号	批次号	detail	206	文本	150	---V								
-35	QC_RETURN	ERP单号	ERP单号	header	300	文本	130	---V								
-36	QC_RETURN	是否已转ERP	是否已转ERP	header	310	文本	130	---V								
-37	QC_RETURN	转ERP操作人	转ERP操作人	header	320	文本	130	---V								
-38	QC_RETURN	转ERP时间	转ERP时间	header	330	文本	130	---V								
+21	QC_RETURN	现存量	现存量	detail	105	小数	100	--H-							Current inventory	
+22	QC_RETURN	单据状态	单据状态	query,header	110	文本	90	---V							Doc status	
+23	QC_RETURN	不良原因	不良原因	query,detail	110	参照	150	E--V		REJECT	不合格原因	不合格原因				
+24	QC_RETURN	审核人	审核人	header	120	参照	90	---V		EMP	员工名称	员工名称			Approved by	
+25	QC_RETURN	报废数量	报废数量	detail	120	小数	100	E-H-								
+26	QC_RETURN	审核时间	审核时间	header	130	文本	140	---V							Approved at	
+27	QC_RETURN	剩余数量	剩余数量	detail	130	小数	100	E-H-								
+28	QC_RETURN	备注	备注	header,detail	140	文本	220	E--V							Remark	
+29	QC_RETURN	附件1	附件1	header	150	附件	220	E--V								
+30	QC_RETURN	附件2	附件2	header	160	附件	220	E--V								
+31	QC_RETURN	附件3	附件3	header	170	附件	220	E--V								
+32	QC_RETURN	附件4	附件4	header	180	附件	220	E--V								
+33	QC_RETURN	附件5	附件5	header	190	附件	220	E--V								
+34	QC_RETURN	附件6	附件6	header	200	附件	220	E--V								
+35	QC_RETURN	批次号	批次号	detail	206	文本	150	---V								
+36	QC_RETURN	ERP单号	ERP单号	header	300	文本	130	---V								
+37	QC_RETURN	是否已转ERP	是否已转ERP	header	310	文本	130	---V								
+38	QC_RETURN	转ERP操作人	转ERP操作人	header	320	文本	130	---V								
+39	QC_RETURN	转ERP时间	转ERP时间	header	330	文本	130	---V								
 1	PURCHASE_IN	存货编码	存货编码	query,detail	10	参照	120	ER-V		INV	存货编码	存货名称			Inventory Code	
 2	PURCHASE_IN	单据日期	单据日期	query,header	10	日期	140	ER-V							Document Date	
 3	PURCHASE_IN	单据编号	单据编号	query,header	20	文本	140	ER-V							Document Number	
@@ -194,135 +196,135 @@ ord	panel_code	col_name	label	place	seq	data_type	width	flags	alias	ref_panel	re
 31	PURCHASE_IN	行号	行号	detail	160	文本	120	E-H-							Line No.	
 32	PURCHASE_IN	采购订单号	采购订单号	header	160	文本	140	E--V							Purchase Order Number	
 33	PURCHASE_IN	现存量	现存量	detail	170	小数	110	E--V							Current inventory	
-34	PURCHASE_IN	来源单据	来源单据	query,header	170	文本	110	E-H-							Source doc	
-35	PURCHASE_IN	创建时间	创建时间	header	180	日期	130	E--V							Created at	
-36	PURCHASE_IN	商品id	商品id	detail	180	文本	120	E-H-								
-37	PURCHASE_IN	来源单号	来源单号	query,header	190	文本	120	E-H-							Source no.	
-38	PURCHASE_IN	仓库	仓库	detail	190	参照	140	ER-V		WH	仓库名称	仓库名称				
-39	PURCHASE_IN	仓位编码	仓位	detail	195	参照	120	E--V		WHLOC	仓位编码	仓位编码	仓库=$仓库		Bin	
-40	PURCHASE_IN	单据关闭状态	单据关闭状态	header	200	文本	130	E-H-								
-41	PURCHASE_IN	商品是否多单位	商品是否多单位	detail	200	文本	120	E-H-								
-42	PURCHASE_IN	商品是否序列号	商品是否序列号	detail	210	文本	120	E-H-								
-43	PURCHASE_IN	销售订单号	销售订单号	query,header	210	文本	130	E-H-							Sales order no.	
-44	PURCHASE_IN	经手人编码	经手人编码	header	220	文本	130	E-H-							Handler code	
-45	PURCHASE_IN	商品是否辅助属性	商品是否辅助属性	detail	220	文本	120	E-H-								
-46	PURCHASE_IN	交货方式	交货方式	header	230	文本	130	E--V								
-47	PURCHASE_IN	商品是否保质期	商品是否保质期	detail	230	文本	120	E-H-								
-48	PURCHASE_IN	交货方式编码	交货方式编码	header	240	文本	130	E-H-								
-49	PURCHASE_IN	商品是否批次	商品是否批次	detail	240	文本	120	E-H-								
-50	PURCHASE_IN	结算状态	结算状态	header	250	文本	130	E--V								
-51	PURCHASE_IN	仓库id	仓库id	detail	250	文本	120	E-H-								
-52	PURCHASE_IN	修改时间	修改时间	header	260	日期	130	E-H-								
-53	PURCHASE_IN	仓库启用仓位管理	仓库启用仓位管理	detail	260	文本	120	E-H-								
-54	PURCHASE_IN	创建人	创建人	header	270	文本	130	E-H-								
-55	PURCHASE_IN	仓位id	仓位id	detail	270	文本	120	E-H-								
-56	PURCHASE_IN	修改人	修改人	header	280	文本	130	E-H-								
-57	PURCHASE_IN	源单行号	采购订单行号	detail	290	文本	110	E--V								
-58	PURCHASE_IN	批次号	批次号	query,header	290	文本	160	---V								
-59	PURCHASE_IN	辅助属性id	辅助属性id	detail	300	文本	120	E-H-								
-60	PURCHASE_IN	ERP单号	ERP单号	header	300	文本	120	---V								
-61	PURCHASE_IN	转ERP操作人	转ERP操作人	header	310	文本	100	---V								
-62	PURCHASE_IN	批次号	批次号	detail	310	文本	150	---V								
-63	PURCHASE_IN	辅助属性名称	辅助属性名称	detail	320	文本	120	E-H-								
-64	PURCHASE_IN	转ERP时间	转ERP时间	header	320	日期	130	---V								
-65	PURCHASE_IN	辅助属性编码	辅助属性编码	detail	330	文本	120	E-H-								
-66	PURCHASE_IN	是否已转ERP	是否已转ERP	header	330	文本	80	--H-								
-67	PURCHASE_IN	部门	部门	header	340	参照	130	E-H-		DEPT	部门名称	部门名称			Department	
-68	PURCHASE_IN	辅助属性1id	辅助属性1id	detail	340	文本	120	E-H-								
-69	PURCHASE_IN	部门编码	部门编码	header	350	参照	130	E-H-		DEPT	部门编码	部门名称			Department Code	
-70	PURCHASE_IN	辅助属性1名称	辅助属性1名称	detail	350	文本	120	E-H-								
-71	PURCHASE_IN	客户	客户	header	360	文本	130	E-H-							Customer	
-72	PURCHASE_IN	辅助属性1编码	辅助属性1编码	detail	360	文本	120	E-H-								
-73	PURCHASE_IN	客户编码	客户编码	header	370	文本	130	E-H-							Customer Code	
-74	PURCHASE_IN	辅助属性2id	辅助属性2id	detail	370	文本	120	E-H-								
-75	PURCHASE_IN	联系人电话	联系人电话	header	380	文本	130	E--V								
-76	PURCHASE_IN	辅助属性2名称	辅助属性2名称	detail	380	文本	120	E-H-								
-77	PURCHASE_IN	联系人国家名称	联系人国家名称	header	390	文本	130	E-H-								
-78	PURCHASE_IN	辅助属性2编码	辅助属性2编码	detail	390	文本	120	E-H-								
-79	PURCHASE_IN	联系人国家编码	联系人国家编码	header	400	文本	130	E-H-								
-80	PURCHASE_IN	辅助属性3id	辅助属性3id	detail	400	文本	120	E-H-								
-81	PURCHASE_IN	联系人省份名称	联系人省份名称	header	410	文本	130	E-H-								
-82	PURCHASE_IN	辅助属性3名称	辅助属性3名称	detail	410	文本	120	E-H-								
-83	PURCHASE_IN	联系人省份编码	联系人省份编码	header	420	文本	130	E-H-								
-84	PURCHASE_IN	辅助属性3编码	辅助属性3编码	detail	420	文本	120	E-H-								
-85	PURCHASE_IN	联系人市区名称	联系人市区名称	header	430	文本	130	E-H-								
-86	PURCHASE_IN	条形码	条形码	detail	430	文本	120	E-H-								
-87	PURCHASE_IN	联系人市区编码	联系人市区编码	header	440	文本	130	E-H-								
-88	PURCHASE_IN	产地	产地	detail	440	文本	120	E-H-								
-89	PURCHASE_IN	联系人区县名称	联系人区县名称	header	450	文本	130	E-H-								
-90	PURCHASE_IN	注册证号	注册证号	detail	450	文本	120	E-H-								
-91	PURCHASE_IN	联系人区县编码	联系人区县编码	header	460	文本	130	E-H-								
-92	PURCHASE_IN	生产许可证	生产许可证	detail	460	文本	120	E-H-								
-93	PURCHASE_IN	联系地址	联系地址	header	470	文本	130	E-H-								
-94	PURCHASE_IN	保质期到期日	保质期到期日	detail	470	日期	120	E-H-								
-95	PURCHASE_IN	付款方式	付款方式	header	480	文本	130	E-H-							Payment Method	
-96	PURCHASE_IN	有效期至	有效期至	detail	480	文本	120	E-H-								
-97	PURCHASE_IN	预付金额	预付金额	header	490	文本	130	E-H-								
-98	PURCHASE_IN	保质期类型	保质期类型	detail	490	文本	120	E-H-								
-99	PURCHASE_IN	付款账户	付款账户	header	500	文本	130	E-H-								
-100	PURCHASE_IN	保质期	保质期	detail	500	文本	120	E-H-								
-101	PURCHASE_IN	保险金额	保险金额	header	510	文本	130	E-H-								
-102	PURCHASE_IN	序列号清单	序列号清单	detail	510	文本	120	E-H-								
-103	PURCHASE_IN	到期日	到期日	header	520	日期	130	E--V								
-104	PURCHASE_IN	序列号流转ID	序列号流转ID	detail	520	文本	120	E-H-								
-105	PURCHASE_IN	结算期限编码	结算期限编码	header	530	文本	130	E-H-								
-106	PURCHASE_IN	基本单位id	基本单位id	detail	530	文本	120	E-H-								
-107	PURCHASE_IN	结算期限	结算期限	header	540	文本	130	E-H-								
-108	PURCHASE_IN	基本单位名称	基本单位名称	detail	540	文本	120	E-H-								
-109	PURCHASE_IN	发货人	发货人	header	550	文本	130	E-H-							Shipper	
-110	PURCHASE_IN	基本单位编码	基本单位编码	detail	550	文本	120	E-H-								
-111	PURCHASE_IN	发货电话	发货电话	header	560	文本	130	E-H-								
-112	PURCHASE_IN	单位id	单位id	detail	560	文本	120	E-H-								
-113	PURCHASE_IN	发货地址	发货地址	header	570	文本	130	E-H-								
-114	PURCHASE_IN	单位编码	单位编码	detail	570	文本	120	E-H-								
-115	PURCHASE_IN	发货国家名称	发货国家名称	header	580	文本	130	E-H-								
-116	PURCHASE_IN	辅助单位id	辅助单位id	detail	580	文本	120	E-H-								
-117	PURCHASE_IN	发货国家编码	发货国家编码	header	590	文本	130	E-H-								
-118	PURCHASE_IN	辅助单位编码	辅助单位编码	detail	590	文本	120	E-H-								
-119	PURCHASE_IN	发货省份名称	发货省份名称	header	600	文本	130	E-H-								
-120	PURCHASE_IN	换算率2	换算率2	detail	600	文本	120	E-H-								
-121	PURCHASE_IN	发货省份编码	发货省份编码	header	610	文本	130	E-H-								
-122	PURCHASE_IN	基本数量	基本数量	detail	610	文本	120	E-H-								
-123	PURCHASE_IN	发货市区名称	发货市区名称	header	620	文本	130	E-H-								
-124	PURCHASE_IN	库存基本数量	库存基本数量	detail	620	文本	120	E-H-								
-125	PURCHASE_IN	发货市区编码	发货市区编码	header	630	文本	130	E-H-								
-126	PURCHASE_IN	默认浮动数量	默认浮动数量	detail	630	文本	120	E-H-								
-127	PURCHASE_IN	发货区县名称	发货区县名称	header	640	文本	130	E-H-								
-128	PURCHASE_IN	辅助换算系数	辅助换算系数	detail	640	文本	120	E-H-								
-129	PURCHASE_IN	发货区县编码	发货区县编码	header	650	文本	130	E-H-								
-130	PURCHASE_IN	换算系数	换算系数	detail	650	文本	120	E-H-								
-131	PURCHASE_IN	仓库编码	仓库编码	header	660	参照	130	E-H-		WH	仓库编码	仓库名称			Warehouse Code	
-132	PURCHASE_IN	折扣额	折扣额	detail	660	文本	120	E-H-								
-133	PURCHASE_IN	仓位	仓位	header	670	文本	130	E-H-								
-134	PURCHASE_IN	源单编号	源单编号	detail	670	文本	120	E-H-								
-135	PURCHASE_IN	仓位编码	仓位编码	header	680	文本	130	E-H-								
-136	PURCHASE_IN	源单类型id	源单类型id	detail	680	文本	120	E-H-								
-137	PURCHASE_IN	源单类型名称	源单类型名称	detail	690	文本	120	E-H-								
-138	PURCHASE_IN	批次键	批次键	header	690	整数	80	--H-								
-139	PURCHASE_IN	源单类型编码	源单类型编码	detail	700	文本	120	E-H-								
-140	PURCHASE_IN	单据状态_bill_status	单据状态_bill_status	header	700	文本	130	E-H-								
-141	PURCHASE_IN	源单内部id	源单内部id	detail	710	文本	120	E-H-								
-142	PURCHASE_IN	审核时间_audit_time	审核时间_audit_time	header	710	日期	130	E-H-								
-143	PURCHASE_IN	源单日期	源单日期	detail	720	日期	120	E-H-								
-144	PURCHASE_IN	创建人编码	创建人编码	header	730	文本	130	E-H-								
-145	PURCHASE_IN	源单分录id	源单分录id	detail	730	文本	120	E-H-								
-146	PURCHASE_IN	分录结算状态	分录结算状态	detail	740	文本	120	E-H-								
-147	PURCHASE_IN	修改人编码	修改人编码	header	750	文本	130	E-H-								
-148	PURCHASE_IN	折扣率%	折扣率%	detail	750	文本	120	E-H-								
-149	PURCHASE_IN	成本视图	成本视图	detail	760	文本	120	E-H-								
-150	PURCHASE_IN	审核人_auditor_name	审核人_auditor_name	header	760	文本	130	E-H-								
-151	PURCHASE_IN	单位成本视图	单位成本视图	detail	770	文本	120	E-H-								
-152	PURCHASE_IN	审核人编码	审核人编码	header	780	文本	130	E-H-								
-153	PURCHASE_IN	退货数量	退货数量	detail	780	文本	120	E-H-								
-154	PURCHASE_IN	价税合计本位币	价税合计本位币	detail	790	文本	120	E-H-								
-155	PURCHASE_IN	未结算金额本位币	未结算金额本位币	header	800	文本	130	E-H-								
-156	PURCHASE_IN	是否赠品	是否赠品	detail	800	文本	120	E-H-								
-157	PURCHASE_IN	送检数量	送检数量	detail	810	小数	100	--H-								
-158	PURCHASE_IN	付款方式编码	付款方式编码	header	820	文本	130	E-H-								
-159	PURCHASE_IN	部门名称	部门名称	detail	820	文本	120	--H-							Department Name	
-160	PURCHASE_IN	生产日期	生产日期	detail	830	日期	110	--H-								
-161	PURCHASE_IN	付款账户编码	付款账户编码	header	840	文本	130	E-H-								
-162	PURCHASE_IN	仓库名称_sp_name	仓库名称_sp_name	detail	840	文本	120	E-H-								
-163	PURCHASE_IN	换算率_conversion_rate	换算率_conversion_rate	detail	850	文本	120	E-H-								
-164	PURCHASE_IN	本次结算金额本位币	本次结算金额本位币	detail	860	文本	120	E-H-								
-165	PURCHASE_IN	备注	备注	detail	870	文本	200	---V								
+34	PURCHASE_IN	创建时间	创建时间	header	180	日期	130	E--V							Created at	
+35	PURCHASE_IN	商品id	商品id	detail	180	文本	120	E-H-								
+36	PURCHASE_IN	仓库	仓库	detail	190	参照	140	ER-V		WH	仓库名称	仓库名称				
+37	PURCHASE_IN	仓位编码	仓位	detail	195	参照	120	E--V		WHLOC	仓位编码	仓位编码	仓库=$仓库		Bin	
+38	PURCHASE_IN	单据关闭状态	单据关闭状态	header	200	文本	130	E-H-								
+39	PURCHASE_IN	商品是否多单位	商品是否多单位	detail	200	文本	120	E-H-								
+40	PURCHASE_IN	商品是否序列号	商品是否序列号	detail	210	文本	120	E-H-								
+41	PURCHASE_IN	销售订单号	销售订单号	query,header	210	文本	130	E-H-							Sales order no.	
+42	PURCHASE_IN	经手人编码	经手人编码	header	220	文本	130	E-H-							Handler code	
+43	PURCHASE_IN	商品是否辅助属性	商品是否辅助属性	detail	220	文本	120	E-H-								
+44	PURCHASE_IN	交货方式	交货方式	header	230	文本	130	E--V								
+45	PURCHASE_IN	商品是否保质期	商品是否保质期	detail	230	文本	120	E-H-								
+46	PURCHASE_IN	交货方式编码	交货方式编码	header	240	文本	130	E-H-								
+47	PURCHASE_IN	商品是否批次	商品是否批次	detail	240	文本	120	E-H-								
+48	PURCHASE_IN	结算状态	结算状态	header	250	文本	130	E--V								
+49	PURCHASE_IN	仓库id	仓库id	detail	250	文本	120	E-H-								
+50	PURCHASE_IN	修改时间	修改时间	header	260	日期	130	E-H-								
+51	PURCHASE_IN	仓库启用仓位管理	仓库启用仓位管理	detail	260	文本	120	E-H-								
+52	PURCHASE_IN	创建人	创建人	header	270	文本	130	E-H-								
+53	PURCHASE_IN	仓位id	仓位id	detail	270	文本	120	E-H-								
+54	PURCHASE_IN	修改人	修改人	header	280	文本	130	E-H-								
+55	PURCHASE_IN	源单行号	采购订单行号	detail	290	文本	110	E--V								
+56	PURCHASE_IN	批次号	批次号	query,header	290	文本	160	---V								
+57	PURCHASE_IN	辅助属性id	辅助属性id	detail	300	文本	120	E-H-								
+58	PURCHASE_IN	ERP单号	ERP单号	header	300	文本	120	---V								
+59	PURCHASE_IN	转ERP操作人	转ERP操作人	header	310	文本	100	---V								
+60	PURCHASE_IN	批次号	批次号	detail	310	文本	150	---V								
+61	PURCHASE_IN	辅助属性名称	辅助属性名称	detail	320	文本	120	E-H-								
+62	PURCHASE_IN	转ERP时间	转ERP时间	header	320	日期	130	---V								
+63	PURCHASE_IN	辅助属性编码	辅助属性编码	detail	330	文本	120	E-H-								
+64	PURCHASE_IN	是否已转ERP	是否已转ERP	header	330	文本	80	--H-								
+65	PURCHASE_IN	部门	部门	header	340	参照	130	E-H-		DEPT	部门名称	部门名称			Department	
+66	PURCHASE_IN	辅助属性1id	辅助属性1id	detail	340	文本	120	E-H-								
+67	PURCHASE_IN	部门编码	部门编码	header	350	参照	130	E-H-		DEPT	部门编码	部门名称			Department Code	
+68	PURCHASE_IN	辅助属性1名称	辅助属性1名称	detail	350	文本	120	E-H-								
+69	PURCHASE_IN	客户	客户	header	360	文本	130	E-H-							Customer	
+70	PURCHASE_IN	辅助属性1编码	辅助属性1编码	detail	360	文本	120	E-H-								
+71	PURCHASE_IN	客户编码	客户编码	header	370	文本	130	E-H-							Customer Code	
+72	PURCHASE_IN	辅助属性2id	辅助属性2id	detail	370	文本	120	E-H-								
+73	PURCHASE_IN	联系人电话	联系人电话	header	380	文本	130	E--V								
+74	PURCHASE_IN	辅助属性2名称	辅助属性2名称	detail	380	文本	120	E-H-								
+75	PURCHASE_IN	联系人国家名称	联系人国家名称	header	390	文本	130	E-H-								
+76	PURCHASE_IN	辅助属性2编码	辅助属性2编码	detail	390	文本	120	E-H-								
+77	PURCHASE_IN	联系人国家编码	联系人国家编码	header	400	文本	130	E-H-								
+78	PURCHASE_IN	辅助属性3id	辅助属性3id	detail	400	文本	120	E-H-								
+79	PURCHASE_IN	联系人省份名称	联系人省份名称	header	410	文本	130	E-H-								
+80	PURCHASE_IN	辅助属性3名称	辅助属性3名称	detail	410	文本	120	E-H-								
+81	PURCHASE_IN	联系人省份编码	联系人省份编码	header	420	文本	130	E-H-								
+82	PURCHASE_IN	辅助属性3编码	辅助属性3编码	detail	420	文本	120	E-H-								
+83	PURCHASE_IN	联系人市区名称	联系人市区名称	header	430	文本	130	E-H-								
+84	PURCHASE_IN	条形码	条形码	detail	430	文本	120	E-H-								
+85	PURCHASE_IN	联系人市区编码	联系人市区编码	header	440	文本	130	E-H-								
+86	PURCHASE_IN	产地	产地	detail	440	文本	120	E-H-								
+87	PURCHASE_IN	联系人区县名称	联系人区县名称	header	450	文本	130	E-H-								
+88	PURCHASE_IN	注册证号	注册证号	detail	450	文本	120	E-H-								
+89	PURCHASE_IN	联系人区县编码	联系人区县编码	header	460	文本	130	E-H-								
+90	PURCHASE_IN	生产许可证	生产许可证	detail	460	文本	120	E-H-								
+91	PURCHASE_IN	联系地址	联系地址	header	470	文本	130	E-H-								
+92	PURCHASE_IN	保质期到期日	保质期到期日	detail	470	日期	120	E-H-								
+93	PURCHASE_IN	付款方式	付款方式	header	480	文本	130	E-H-							Payment Method	
+94	PURCHASE_IN	有效期至	有效期至	detail	480	文本	120	E-H-								
+95	PURCHASE_IN	预付金额	预付金额	header	490	文本	130	E-H-								
+96	PURCHASE_IN	保质期类型	保质期类型	detail	490	文本	120	E-H-								
+97	PURCHASE_IN	付款账户	付款账户	header	500	文本	130	E-H-								
+98	PURCHASE_IN	保质期	保质期	detail	500	文本	120	E-H-								
+99	PURCHASE_IN	保险金额	保险金额	header	510	文本	130	E-H-								
+100	PURCHASE_IN	序列号清单	序列号清单	detail	510	文本	120	E-H-								
+101	PURCHASE_IN	到期日	到期日	header	520	日期	130	E--V								
+102	PURCHASE_IN	序列号流转ID	序列号流转ID	detail	520	文本	120	E-H-								
+103	PURCHASE_IN	结算期限编码	结算期限编码	header	530	文本	130	E-H-								
+104	PURCHASE_IN	基本单位id	基本单位id	detail	530	文本	120	E-H-								
+105	PURCHASE_IN	结算期限	结算期限	header	540	文本	130	E-H-								
+106	PURCHASE_IN	基本单位名称	基本单位名称	detail	540	文本	120	E-H-								
+107	PURCHASE_IN	发货人	发货人	header	550	文本	130	E-H-							Shipper	
+108	PURCHASE_IN	基本单位编码	基本单位编码	detail	550	文本	120	E-H-								
+109	PURCHASE_IN	发货电话	发货电话	header	560	文本	130	E-H-								
+110	PURCHASE_IN	单位id	单位id	detail	560	文本	120	E-H-								
+111	PURCHASE_IN	发货地址	发货地址	header	570	文本	130	E-H-								
+112	PURCHASE_IN	单位编码	单位编码	detail	570	文本	120	E-H-								
+113	PURCHASE_IN	发货国家名称	发货国家名称	header	580	文本	130	E-H-								
+114	PURCHASE_IN	辅助单位id	辅助单位id	detail	580	文本	120	E-H-								
+115	PURCHASE_IN	发货国家编码	发货国家编码	header	590	文本	130	E-H-								
+116	PURCHASE_IN	辅助单位编码	辅助单位编码	detail	590	文本	120	E-H-								
+117	PURCHASE_IN	发货省份名称	发货省份名称	header	600	文本	130	E-H-								
+118	PURCHASE_IN	换算率2	换算率2	detail	600	文本	120	E-H-								
+119	PURCHASE_IN	发货省份编码	发货省份编码	header	610	文本	130	E-H-								
+120	PURCHASE_IN	基本数量	基本数量	detail	610	文本	120	E-H-								
+121	PURCHASE_IN	发货市区名称	发货市区名称	header	620	文本	130	E-H-								
+122	PURCHASE_IN	库存基本数量	库存基本数量	detail	620	文本	120	E-H-								
+123	PURCHASE_IN	发货市区编码	发货市区编码	header	630	文本	130	E-H-								
+124	PURCHASE_IN	默认浮动数量	默认浮动数量	detail	630	文本	120	E-H-								
+125	PURCHASE_IN	发货区县名称	发货区县名称	header	640	文本	130	E-H-								
+126	PURCHASE_IN	辅助换算系数	辅助换算系数	detail	640	文本	120	E-H-								
+127	PURCHASE_IN	发货区县编码	发货区县编码	header	650	文本	130	E-H-								
+128	PURCHASE_IN	换算系数	换算系数	detail	650	文本	120	E-H-								
+129	PURCHASE_IN	仓库编码	仓库编码	header	660	参照	130	E-H-		WH	仓库编码	仓库名称			Warehouse Code	
+130	PURCHASE_IN	折扣额	折扣额	detail	660	文本	120	E-H-								
+131	PURCHASE_IN	仓位	仓位	header	670	文本	130	E-H-								
+132	PURCHASE_IN	源单编号	源单编号	detail	670	文本	120	E-H-								
+133	PURCHASE_IN	仓位编码	仓位编码	header	680	文本	130	E-H-								
+134	PURCHASE_IN	源单类型id	源单类型id	detail	680	文本	120	E-H-								
+135	PURCHASE_IN	源单类型名称	源单类型名称	detail	690	文本	120	E-H-								
+136	PURCHASE_IN	批次键	批次键	header	690	整数	80	--H-								
+137	PURCHASE_IN	源单类型编码	源单类型编码	detail	700	文本	120	E-H-								
+138	PURCHASE_IN	单据状态_bill_status	单据状态_bill_status	header	700	文本	130	E-H-								
+139	PURCHASE_IN	源单内部id	源单内部id	detail	710	文本	120	E-H-								
+140	PURCHASE_IN	审核时间_audit_time	审核时间_audit_time	header	710	日期	130	E-H-								
+141	PURCHASE_IN	源单日期	源单日期	detail	720	日期	120	E-H-								
+142	PURCHASE_IN	创建人编码	创建人编码	header	730	文本	130	E-H-								
+143	PURCHASE_IN	源单分录id	源单分录id	detail	730	文本	120	E-H-								
+144	PURCHASE_IN	分录结算状态	分录结算状态	detail	740	文本	120	E-H-								
+145	PURCHASE_IN	修改人编码	修改人编码	header	750	文本	130	E-H-								
+146	PURCHASE_IN	折扣率%	折扣率%	detail	750	文本	120	E-H-								
+147	PURCHASE_IN	成本视图	成本视图	detail	760	文本	120	E-H-								
+148	PURCHASE_IN	审核人_auditor_name	审核人_auditor_name	header	760	文本	130	E-H-								
+149	PURCHASE_IN	单位成本视图	单位成本视图	detail	770	文本	120	E-H-								
+150	PURCHASE_IN	审核人编码	审核人编码	header	780	文本	130	E-H-								
+151	PURCHASE_IN	退货数量	退货数量	detail	780	文本	120	E-H-								
+152	PURCHASE_IN	价税合计本位币	价税合计本位币	detail	790	文本	120	E-H-								
+153	PURCHASE_IN	未结算金额本位币	未结算金额本位币	header	800	文本	130	E-H-								
+154	PURCHASE_IN	是否赠品	是否赠品	detail	800	文本	120	E-H-								
+155	PURCHASE_IN	送检数量	送检数量	detail	810	小数	100	--H-								
+156	PURCHASE_IN	付款方式编码	付款方式编码	header	820	文本	130	E-H-								
+157	PURCHASE_IN	部门名称	部门名称	detail	820	文本	120	--H-							Department Name	
+158	PURCHASE_IN	生产日期	生产日期	detail	830	日期	110	--H-								
+159	PURCHASE_IN	付款账户编码	付款账户编码	header	840	文本	130	E-H-								
+160	PURCHASE_IN	仓库名称_sp_name	仓库名称_sp_name	detail	840	文本	120	E-H-								
+161	PURCHASE_IN	换算率_conversion_rate	换算率_conversion_rate	detail	850	文本	120	E-H-								
+162	PURCHASE_IN	本次结算金额本位币	本次结算金额本位币	detail	860	文本	120	E-H-								
+163	PURCHASE_IN	备注	备注	detail	870	文本	200	---V								
+164	PURCHASE_IN	来源单据	来源	header	900	文本	130	--H-							Source	
+165	PURCHASE_IN	来源单号	来源单号	header	910	文本	150	--H-							Source no.	

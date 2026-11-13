@@ -256,6 +256,14 @@ public class InvCostService {
      * <p>失败不阻断启动(与①同风格):异常一律 catch 住记一行 warn。
      */
     private void reconcileStockOnStartup() {
+        // 2026-11-10 起:库存数量**以金蝶真实账套为准**(deploy/sync-stock.mjs 每 5 分钟把
+        // inv_inventory_ims 的现存量覆盖到 kucun.yl)。此时"结存 == Σ流水"必然长期不成立
+        // (流水是 MES 本地单据的累计,金蝶是新真源),再按流水比对只会每次都刷 1000+ 条
+        // 无意义告警 ⇒ 改为「结存 == 最近一轮金蝶快照」。
+        if (erpStockAuthoritative()) {
+            reconcileAgainstErpSnapshot();
+            return;
+        }
         try {
             // 一条 UNION ALL 直接算净额(inh 正 / outh 负):串起来比两个单表方法再相减更不容易错
             List<Map<String, Object>> flow = jdbc.queryForList(
@@ -310,11 +318,59 @@ public class InvCostService {
         }
     }
 
+    /**
+     * 库存是否已切到"金蝶为准"(存在快照行即视为已切换)。
+     *
+     * <p>为什么用表的存在性当开关、不引入配置项:同步器(deploy/sync-stock.mjs)一跑起来就会
+     * 写 erp_stock_snapshot;没配同步的库(演示/新建)自然没有行,自动落回"结存 == Σ流水"的旧口径。
+     * 也就是说**行为跟着数据走**,不会出现"配置忘了开、自检却按新口径张嘴"的半吊子状态。
+     */
+    private boolean erpStockAuthoritative() {
+        try {
+            List<Map<String, Object>> r = jdbc.queryForList(
+                    "SELECT TOP 1 1 AS ok FROM dbo.erp_stock_snapshot");
+            return !r.isEmpty();
+        } catch (Exception e) {
+            return false; // 表不存在(未部署同步器)
+        }
+    }
+
+    /**
+     * 金蝶口径的启动自检:结存(kucun.yl)必须等于**最近一轮金蝶快照**的数量。
+     *
+     * <p>口径来源(2026-11-10 用户口径「我们想要以金蝶的库存数量为准」):同步器每 5 分钟把
+     * inv_inventory_ims 覆盖进 kucun,并把当轮逐键数量写进 erp_stock_snapshot ⇒ 启动时拿快照
+     * 逐键核一遍即可。差异的正常来源是**两次同步之间 MES 本地审核了单据**(库存已扣、金蝶还没收到),
+     * 这类差异会由下一轮同步抹平,数量本身也可在 `kucun.差异数量`(计算列)实时看到。
+     */
+    private void reconcileAgainstErpSnapshot() {
+        try {
+            Map<String, Object> r = jdbc.queryForMap(
+                    "SELECT (SELECT COUNT(*) FROM dbo.erp_stock_snapshot) AS snap,"
+                            + " (SELECT MAX(同步时间) FROM dbo.erp_stock_snapshot) AS at,"
+                            + " (SELECT COUNT(*) FROM dbo.kucun k JOIN dbo.erp_stock_snapshot s"
+                            + "    ON k.wzdm = s.物料编码 AND k.ckdm = s.仓库编码"
+                            + "   AND ISNULL(k.lot_no,'') = ISNULL(s.批号,'')"
+                            + "  WHERE ISNULL(k.asp_cancel,'N') <> 'Y'"
+                            + "    AND ABS(CAST(ISNULL(k.yl,0) AS decimal(18,4)) - s.金蝶数量) > 0.0001) AS bad");
+            int snap = ((Number) r.get("snap")).intValue();
+            int bad = ((Number) r.get("bad")).intValue();
+            Object at = r.get("at");
+            if (bad == 0) {
+                log.info("[库存对账] 库存以金蝶为准:{} 个键与最近一轮快照({})完全一致", snap, at);
+            } else {
+                log.warn("[库存对账] 库存以金蝶为准:{} 个键与最近一轮快照({})不一致 ——"
+                        + "多为两次同步之间 MES 审核了单据(下一轮同步会抹平),逐键看 kucun.差异数量", bad, at);
+            }
+        } catch (Exception e) {
+            log.warn("[库存对账] 金蝶口径自检跳过:{}", e.getMessage());
+        }
+    }
+
     /** 对账键:`物料编码|仓库编码|批号`(null 统一成字面量 "null",与流水侧口径一致) */
     private static String key3(Object a, Object b, Object c) {
         return String.valueOf(a) + '|' + b + '|' + c;
     }
-
     private static BigDecimal num(Object o) {
         return o instanceof BigDecimal d ? d : new BigDecimal(String.valueOf(o == null ? 0 : o));
     }

@@ -29,6 +29,9 @@
         <div class="title">
           <span class="no">{{ isEdit ? (form['单据编号'] || form['锭号'] || form['编号'] || '') : tt('（新增）') }}</span>
           <el-tag v-if="form['单据状态']" size="small" :type="statusTag(form['单据状态'])" :class="{ 'st-done': form['单据状态'] === '已完成' }">{{ tt(form['单据状态']) }}</el-tag>
+          <!-- 来源提示(2026-11-11 第三版,用户口径「不需要跳转」):只显示,不点、不跳面板;
+               采购入库单表头的「来源 / 来源单号」两列隐藏,信息挂在单号这里 -->
+          <span v-if="sourceHint" class="doc-source" :class="{ 'doc-source-empty': sourceHint.empty }" :title="sourceHintTitle">{{ sourceHintText }}</span>
         </div>
       </div>
 
@@ -384,6 +387,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['saved'])
 import { tt } from '@/i18n'
+import { sourceHintOf, sourceHintText as sourceHintTextOf, sourceHintTitle as sourceHintTitleOf, hasHiddenSourceColumn } from '@core/panel/sourceHint'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Back, Plus, Delete, ArrowDown, Search } from '@element-plus/icons-vue'
 import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
@@ -401,7 +405,7 @@ import ScanFillDialog from './ScanFillDialog.vue'
 import StdLibManager from './StdLibManager.vue'
 // 「删除」结果提示口径(2026-11-04):只认服务端回写的真实状态,不许无条件报"已删除"
 import { deleteOutcome } from './deleteOutcome.js'
-import { erpOutcome, erpOutcomeText, erpFailureOutcome, ERP_CALL_TIMEOUT_MS } from './erpOutcome.js'
+import { erpOutcome, erpOutcomeText, erpFailureOutcome, ERP_CALL_TIMEOUT_MS, ERP_BUSY_KEY, ERP_UNAUDIT_WARN, erpClickBlocked } from './erpOutcome.js'
 
 const engine = usePanelRuntime()
 const { SHORTCUTS } = engine
@@ -413,7 +417,7 @@ const { user, tabs: tabsStore, locale: localeStore } = useAppContext()
 // 语言热切换:轻量重拉字段标签与按钮组(仅换显示定义),
 // 表单输入值/明细数据/页签状态全部保留(meta.code 键不随语言变化)。
 watch(() => localeStore.locale, async () => {
-  if (!panelCode.value) return
+  if (!panelCode.value || !isFrontPage()) return
   try {
     const payload = isEdit.value
       ? await engine.getFormDescriptor({ panelCode: panelCode.value, code: code.value })
@@ -431,7 +435,34 @@ const operationName = computed(() => route.query.operationName || '新增流程'
 const code = computed(() => props.codeProp || route.query.code)
 const isEdit = computed(() => !!code.value)
 
+/**
+ * 本实例「自己的」页签路径(实例私有快照)+ 「我现在是不是前台页签」。
+ *
+ * 🔴 与 PanelxList 同源的问题(2026-11-11「打开多个单,这个单的名字反复横跳」):
+ *   PortalLayout 按 `route.path` 做 keep-alive key ⇒ 每个表单页签一份实例,而 `route` 是全局共享的。
+ *   被缓存的旧表单实例照样跟着别人的路由变化重算 panelCode/code 并调 load() ——
+ *   于是它按**别人的面板**取回单据,再把「面板名-单号」写到 route.path 指向的页签标题上。
+ *   ⇒ 是否干活 / 改哪个页签,一律用本快照判。
+ */
+const ownPath = ref(String(route.path || ''))
+/** 本实例是不是**前台页签**(= 当前路由就是本实例承载的页面) */
+function isFrontPage() {
+  return !ownPath.value || route.path === ownPath.value
+}
+
 const form = reactive({})
+/**
+ * 单号旁的「来源」提示(2026-11-11 第三版:「**不需要跳转**」—— 纯提示,点了没反应)。
+ * 取表头两条隐藏列(`来源` = 来源面板名,`来源单号` = 那张单的编号);
+ * 没有上游单据的老单显示「无上游单据」,而不是留空。
+ * 只在「来源是隐藏列」的面板上挂(采购入库单);`来源` 本来是可见字段的面板(如 ASM_BOM)不重复挂。
+ */
+const sourceHint = computed(() => {
+  if (!hasHiddenSourceColumn(meta.value)) return null
+  return sourceHintOf(form)
+})
+const sourceHintText = computed(() => (sourceHint.value ? sourceHintTextOf(sourceHint.value, tt) : ''))
+const sourceHintTitle = computed(() => (sourceHint.value ? sourceHintTitleOf(sourceHint.value, tt) : ''))
 const meta = ref([])
 const detailDef = ref(null)
 const detailData = reactive({})
@@ -543,6 +574,12 @@ function filterGroups(raw) {
 
 const loading = ref(false)
 const saving = ref(false)
+/**
+ * 转ERP 推送中(2026-11-12 客户报障「转ERP 反应好慢,点了两下就生成两个入库单」)。
+ * 表单页的转ERP 与列表页同款:推送期间按钮置灰 + 再点只弹提示。
+ * 服务端 KingdeePushService.pushDocument 另有单号级互斥,兜住前端管不到的情况(两个标签页/两台电脑)。
+ */
+const erpPushing = ref(false)
 const payloadCache = ref(null)
 const approvalVisible = ref(false)
 const approvalNo = ref('')
@@ -673,7 +710,10 @@ function confirmSelect() {
   const sourceNos = [...new Set(selectRows.value.map((r) => r['单据编号'] || r['编号'] || '').filter(Boolean))]
   if (sourceNos.length) {
     if (cfg.sourceNoField) form[cfg.sourceNoField] = sourceNos.join('、')
-    if (form['来源单据'] === undefined && form['匹配来源单号'] === undefined) form['来源单据'] = cfg.title || '选单'
+    // 来源单据:采购入库单 2026-11-11 起把它正名为「来源」并挪到表头末尾(其余面板仍叫「来源单据」),
+    // 故按**本面板实际登记的键**写,不写死 —— 写死会让改名那张单的键落不下去(保存时被丢弃)。
+    const srcDocKey = ['来源', '来源单据'].find((k) => visibleFormMeta.value.some((f) => f.code === k))
+    if (srcDocKey && form[srcDocKey] === undefined && form['匹配来源单号'] === undefined) form[srcDocKey] = cfg.title || '选单'
   }
   // 明细行来源：默认选中行；配置 detailRows 时（如工序汇报单选生产工单）对每个选中单据取工序明细合并（对齐 T+ 选单带出工序行）
   let srcRows = selectRows.value
@@ -766,6 +806,8 @@ function fieldLocked(r) {
 
 function isDisabled(action) {
   const s = status.value
+  // 转ERP 正在推送中(连金蝶,十几秒很常见):这一次没结束前不许再点 —— 重复点击 = 重复入库
+  if (erpClickBlocked(action, erpPushing.value)) return true
   const map = {
     保存: !editable.value,
     保存新增: !editable.value,
@@ -799,6 +841,9 @@ function isDisabled(action) {
  */
 function disabledReason(action) {
   const s = status.value
+  // 转ERP 推送中:说清"正在推,别重复点"(否则只是灰着,用户以为按钮坏了)。
+  // 必须排在 saving 之前 —— 转ERP 也走 saving 那套 finally,不排前面只会说成"正在保存"
+  if (erpClickBlocked(action, erpPushing.value)) return tt(ERP_BUSY_KEY)
   if (saving.value) return tt('正在保存，请稍候')
   // 新增态还没建单:审核/弃审/删除/修改都点不动,原因不是状态而是「这张单还不存在」
   if (!isEdit.value) return tt('该单据尚未保存') + '，' + '「' + tt(action) + '」' + tt('不可用')
@@ -1141,6 +1186,8 @@ function validate() {
 }
 
 async function load() {
+  // 缓存实例(不是前台页签)不取数:panelCode/code 都是路由派生值,取回来的是别人页签的单据
+  if (!isFrontPage()) return
   loading.value = true
   try {
     const configPromise = engine.getPanelConfig(panelCode.value).catch(() => null)
@@ -1179,11 +1226,14 @@ async function load() {
     // 页签标题 = 面板名-单据号（新单显示 面板名-新增），便于多单据区分（弹窗嵌入模式跳过）
     if (!props.embedded) {
       const no = isEdit.value ? (form['单据编号'] || form['锭号'] || form['编号'] || '') : '新增'
-      // 复用顶部 tabsStore
-      const cur = tabsStore.tabs.find((x) => x.path === route.path)
-      if (cur) cur.title = (payload.panelName || '表单') + '-' + no
-      // 页面标题 = 真实面板名（路由 meta.title 是通用占位，配置加载后覆盖）
-      document.title = (payload.panelName || '表单') + ' · YINJIA-MES'
+      // 复用顶部 tabsStore。只写**本实例自己**那个页签,且必须仍是前台页签 ——
+      // 缓存实例按 route.path 找人,会把别人的页签改成自己的名字(2026-11-11 名字横跳)
+      if (isFrontPage()) {
+        const cur = tabsStore.tabs.find((x) => x.path === ownPath.value)
+        if (cur) cur.title = (payload.panelName || '表单') + '-' + no
+        // 页面标题 = 真实面板名（路由 meta.title 是通用占位，配置加载后覆盖）
+        document.title = (payload.panelName || '表单') + ' · YINJIA-MES'
+      }
     }
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || '加载失败')
@@ -1197,6 +1247,9 @@ async function onButton(action) {
   // 2026-08-25：灰按钮（disabled）点击不执行；
   // 2026-10-13：改为「不执行 + 说清为什么点不动」(与列表页同口径)
   if (isDisabled(action)) { warnDisabled(action); return }
+  // 转ERP 未结束前再点一律拦下(2026-11-12 客户报障「点两下生成两个入库单」);
+  // isDisabled 已置灰,这里再拦一道防"置灰样式还没刷新就被连点"的竞态。
+  if (erpClickBlocked(action, erpPushing.value)) { ElMessage.warning(tt(ERP_BUSY_KEY)); return }
   if (APPROVE_ACTIONS.includes(action) && !user.isAdmin && !user.approvePanels.includes(panelCode.value)) {
     return ElMessage.warning('当前角色无审批权限')
   }
@@ -1291,8 +1344,17 @@ async function onButton(action) {
     }
   } else if (action === '弃审') {
     if (status.value !== '已审核') return ElMessage.warning(tt('仅已审核状态可弃审'))
+    // 已转过 ERP 的单据弃审:确认框里把"先去金蝶删掉那张"说清(2026-11-12 用户口径:
+    // 弃审→审核→重推是正常流程,MES 改错就靠它;但旧单不清就会在金蝶留两张)
+    const erpNo = String(form['ERP单号'] || '').trim()
+    const pushed = String(form['是否已转ERP'] || '') === '是' || erpNo !== ''
     try {
-      await ElMessageBox.confirm(tt('确认弃审该单据？弃审后需重新审核。'), tt('弃审确认'), { type: 'warning' })
+      await ElMessageBox.confirm(
+        pushed
+          ? tt(ERP_UNAUDIT_WARN).replace('{no}', erpNo || '—')
+          : tt('确认弃审该单据？弃审后需重新审核。'),
+        tt('弃审确认'), { type: 'warning' },
+      )
     } catch (e) {
       return
     }
@@ -1340,6 +1402,8 @@ async function onButton(action) {
     return
   }
   saving.value = true
+  // 转ERP 推送期间置"进行中":按钮随即置灰(见 isDisabled/disabledReason),连点不会发第二次请求
+  if (action === '转ERP') erpPushing.value = true
   try {
     const rd = { ...form }
     if (tabs.value.length) rd.detail = { ...detailData }
@@ -1416,6 +1480,8 @@ async function onButton(action) {
     else ElMessage.error(msg)
   } finally {
     saving.value = false
+    // 无论成败都要放开:卡在 true 会让转ERP 按钮永久点不动
+    if (action === '转ERP') erpPushing.value = false
   }
 }
 
@@ -1553,6 +1619,10 @@ watch(() => [panelCode.value, code.value], () => {
   scanVisible.value = false
   // 2026-08-20：关闭页签/切走时 panelCode 变 undefined——不触发加载
   if (!panelCode.value || panelCode.value === 'undefined') return
+  // 🔴 不是本实例的页面(路由已切到别的页签)⇒ 不重载:缓存实例读到的 panelCode/code 是**别人**的,
+  //   照它 load() 会取回别的单据、再把别人的页签改成"面板名-单号"(2026-11-11 名字横跳)。
+  //   真正切回本页时这条 watch 会再触发一次,照常重载。
+  if (!isFrontPage()) return
   // 路由参数变化（同组件切换面板）时关闭所有弹窗，防止 append-to-body 弹窗残留
   selectVisible.value = false
   selVisible.value = false
@@ -1681,6 +1751,24 @@ watch(() => [panelCode.value, code.value], () => {
   font-size: 16px;
   font-weight: 700;
   color: #222;
+}
+/* 来源提示(2026-11-11):采购入库单的「来源 / 来源单号」不再占表头格子,挂成单号旁的一条提示 */
+.doc-source {
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 8px;
+  color: #0f766e;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  font-weight: 400;
+  white-space: nowrap;
+}
+/* 第三版用户口径「不需要跳转」:提示只是提示,不可点。
+   有来源 = 绿;没有上游单据 = 灰。 */
+.doc-source-empty {
+  color: #6b7280;
+  background: #f3f4f6;
+  border-color: #e5e7eb;
 }
 .fields {
   display: block;

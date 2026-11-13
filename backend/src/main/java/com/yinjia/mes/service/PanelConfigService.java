@@ -628,6 +628,18 @@ public class PanelConfigService {
         // 后端「新增」建单时已写库,但前端新建后的**本地草稿对象**是空的 ——
         // 不下发就会出现"库里是保密、屏幕上却空着"的错位(本轮实测)。
         if (!def.headDefaults().isEmpty()) metadata.put("headDefaults", def.headDefaults());
+        // 状态闸门 + 查询条件区默认收起(2026-11-11,见 PanelDef.statusGate / collapseQueryBar):
+        //   检验数据记录明细表要「默认只列已完成检验,勾选后才含正在检验中」——闸门本体在
+        //   QueryService 里执行(服务端强制),这里只把声明下发给前端,用来渲染那个复选框;
+        //   collapseQueryBar 让条件区默认收起(用户口径「表头做个收缩」)。
+        PanelRegistry.PanelDef.StatusGate gate = def.statusGate();
+        if (gate != null) {
+            Map<String, Object> gm = new LinkedHashMap<>();
+            gm.put("field", gate.field());
+            gm.put("value", gate.value());
+            metadata.put("statusGate", gm);
+        }
+        if (def.collapseQueryBar()) metadata.put("collapseQueryBar", true);
         // 生单动作 → 目标面板(前端据此判断该动作是否走"分批送料对话框":目标面板配了批次号即分批)
         Map<String, Object> pushTargets = new LinkedHashMap<>();
         for (Map<String, Object> g : buttonGroups) {
@@ -1467,6 +1479,12 @@ public class PanelConfigService {
             {"行号", "销售订单行号"},
             // 送料批次号(2026-09-20 分批送料 P0):同名直通,逐站下传(暂收→检验→入库/退回)
             {"批次号", "批次号"},
+            // 采购链「现存量」沿链贯通(2026-11-12 用户口径:采购订单→送料暂收→检验/退料/特采→采购入库
+            // 全流程都要有这个信息,可以隐藏但要保留字段)。同名映射**本来就能带**,但它是按来源 seq
+            // 先到先得、上限 14 条 —— 暂收行的现存量 seq 360 排在最后,必然被挤爆(实测 QC_INSP 侧的
+            // detailMap 14 条里根本没有它),故用同义词兜底登记(同义词循环不占那 14 条名额)。
+            // 值口径:金蝶采购订单行 inv_qty = 制单时的库存快照,非实时库存(见 deploy/金蝶采购订单现存量口径.md)。
+            {"现存量", "现存量"},
             // 计划层(销售订单 → 生产工单)的产品口径换名
             {"存货编码", "产品编码"}, {"存货名称", "产品名称"},
             {"数量", "订单数量"},

@@ -1,6 +1,82 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '免检跳过': 'Exento (omitido)',
+    '该物料免检，不需要来料检验（送料审核后可直接生成采购入库单）': 'Este material está exento de inspección (tras aprobar la recepción puede crear la entrada de compra directamente)',
+    '该批次还没有采购入库单：在送料暂收单上点「生成检验或入库单」即可直达入库（免检物料不需要检验）': 'Este lote aún no tiene entrada de compra: en el albarán pulse "Generar inspección / entrada" para crearla directamente (los materiales exentos no requieren inspección)',
+    '还没有送料暂收单': 'Aún no hay albarán de recepción',
+    '还没有来料检验单': 'Aún no hay inspección de entrada',
+    '还没有暂收退回单': 'Aún no hay devolución',
+    '还没有特采单': 'Aún no hay concesión',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '退货': 'Devolución',
+    '待退货': 'Pendiente de devolución',
+    '待特采': 'Pendiente de concesión',
+    '显示已隐藏': 'Mostrar ocultos',
+    '已隐藏': 'Ocultos',
+    '已转ERP': 'Enviado a ERP',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '部分不合格': 'Parcialmente no conforme',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '送检': 'Enviado',
+    '金蝶同步导入的采购入库单没有 MES 来源单号，只能按批号推定匹配；推不到就显示未生成': 'Las entradas sincronizadas de Kingdee no traen número de origen MES; solo se pueden cruzar por lote. Si no coincide, se muestra «No creado»',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '需检验': 'Requiere inspección',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '仅需检验': 'Solo requieren inspección',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '来料性质': 'Tipo de entrada',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '品质流程监控': 'Monitor del proceso de calidad',
+    '物料批号': 'Lote del material',
+    '物料批号与物料编码': 'Lote y código de material',
+    '供应商与采购订单': 'Proveedor y pedido',
+    '搜索单号、物料编码、物料批号或供应商': 'Buscar n.º, código, lote o proveedor',
+    '批次行数': 'Filas de lote',
+    '停留': 'Permanencia',
+    '停留天数': 'Días en espera',
+    '天': 'd',
+    '免检': 'Exento',
+    '匹配方式': 'Coincidencia',
+    '检验单行': 'Línea de inspección',
+    '批号推定': 'Estimado por lote',
+    '实收': 'Recibido',
+    '异常': 'Anomalía',
+    '待检': 'Pendiente de inspección',
+    '待入库': 'Pendiente de entrada',
+    '入库': 'Entrada',
+    '合格数量': 'Cantidad conforme',
+    '不合格数量': 'Cantidad no conforme',
+    '当前环节': 'Etapa actual',
+    '未填批号': 'Sin lote',
+    '该物料免检，不需要来料检验': 'Este material está exento de inspección',
+    '该环节还没有单据': 'Aún no hay documento en esta etapa',
+    '点击跳转到': 'Clic para abrir',
+    '点节点跳转到对应单据；没有该面板权限时不可跳转': 'Haga clic en un nodo para abrir el documento; requiere permiso del panel',
+    '没有符合条件的批次': 'No hay lotes que coincidan',
+    '送料 → 检验 → 入库': 'Recepción → Inspección → Entrada',
+    '绿=已审核/已完成': 'Verde = Auditado/Completado',
+    '蓝=待办': 'Azul = Pendiente',
+    '橙=审批中': 'Naranja = En aprobación',
+    '红=作废/不合格': 'Rojo = Anulado/No conforme',
+    '无查看该面板的权限': 'Sin permiso para ver este panel',
+
     // 结案回正(2026-10-18):外部程序直连库误写已结案时的恢复入口
     '结案回正': 'Revertir cierre',
     '没有需要回正的结案行': 'No hay órdenes por revertir',
@@ -331,6 +407,20 @@ export default {
     '打印标识卡': 'Imprimir tarjetas de identificación',
     '当前单据没有可打印的明细行': 'No hay líneas de detalle imprimibles en el documento actual',
     '打印材料码': 'Imprimir etiquetas QR de material',
+    '联系方式': 'Teléfono',
+    '需方联系人': 'Contacto del comprador',
+    '选择或输入联系人': 'Elija o escriba un contacto',
+    '选择或输入联系方式': 'Elija o escriba un teléfono',
+    '这两个会印在「需方」框里；填了名单里没有的名字或电话，打印时会自动存进下拉选项': 'Ambos se imprimen en el recuadro «Comprador»; un nombre o teléfono no listado se guarda al imprimir',
+    '每箱数量': 'Cantidad por caja',
+    '零头不足一箱，已自动出卡': 'la caja parcial no llega a una caja completa y se imprime automáticamente',
+    '请填写每箱数量（必填）': 'Introduzca la cantidad por caja (obligatorio)',
+    '按每箱数量算出的标签张数过多（{n} 张），请核对每箱数量': 'Demasiadas etiquetas para esa cantidad por caja ({n}); revísela',
+    '有零头箱：整批不是每箱数量的整数倍，零头箱会单独出一张卡（卡面印零头数量）': 'Caja parcial: la cantidad no es múltiplo de la cantidad por caja; se imprime una etiqueta propia para la caja parcial',
+    '标签张数': 'Etiquetas',
+    '每箱': 'Por caja',
+    '整箱': 'Cajas completas',
+    '零头箱': 'Caja parcial',
     '打印订单无金额': 'Imprimir pedido sin importes',
     '请先勾选要导出的商品': 'Seleccione primero los artículos a exportar',
     '请先勾选要打印的仓位': 'Seleccione primero las ubicaciones a imprimir',
@@ -412,6 +502,23 @@ export default {
     '来料品质': 'Calidad de entrada',
     '来料检验单': 'Hoja de inspección de entrada',
     '检验目录': 'Catálogo de inspección',
+    '待检验目录': 'Inspecciones pendientes',
+    '检验数据记录明细表': 'Detalle de registros de inspección',
+    '查询定位': 'Localizar fila',
+    '数据定位': 'Localizador de filas',
+    '按物料/批次等条件在本单的行里定位': 'Localizar una fila de este documento por material / lote / estado',
+    '按物料/批次/检验状态等条件在本单的行里定位（不换单据）': 'Localizar una fila de este documento por material / lote / estado (sin cambiar de documento)',
+    '匹配': 'coincidencias',
+    '清除定位': 'Quitar localizador',
+    '清除定位，显示全部待检验行': 'Quitar el localizador y mostrar todas las filas pendientes',
+    '没有匹配的行，点上面的「清除定位」看全部待检验行': 'Ninguna fila coincide: pulse «Quitar localizador» arriba para ver todas las pendientes',
+    '没有匹配的行，请调整条件或点「清除定位」': 'Ninguna fila coincide: ajuste las condiciones o pulse «Quitar localizador»',
+    '已定位': 'Localizadas',
+    '显示全部状态': 'Mostrar todos los estados',
+    '默认只显示已完成检验，勾选后一并显示正在检验中': 'Por defecto solo se muestran las inspecciones completadas; marque para incluir las que están en curso',
+    '收起条件': 'Ocultar filtros',
+    '展开条件': 'Mostrar filtros',
+    '收起或铺开表头的查询条件': 'Contraer o expandir la fila de filtros del encabezado',
     '暂收退料单': 'Devolución de mercancía temporal',
     '生产异常分析报告': 'Informe de Análisis de Anomalías de Producción',
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----
@@ -2024,9 +2131,12 @@ export default {
     '库存台账需选择一个仓库和一种存货': 'El libro mayor de inventario debe elegir un almacén y un inventario',
     '以下为已审核且未转入ERP的单据，勾选后点击"开始转ERP"': 'Los siguientes son documentos que han sido revisados y no transferidos a ERP, haga clic en "Iniciar ERP" después de marcar',
     '开始转ERP': 'Empieza a ERP',
-    '该单据已转入ERP（{no}），不可重复转入；如需重新转ERP，请先「弃审」再「审核」': 'Este documento ya fue transferido a ERP ({no}) y no puede transferirse de nuevo. Para volver a transferirlo, anule primero la aprobación y vuelva a aprobarlo.',
+    '该单据已转入ERP（{no}），不可重复转入；如需重新转ERP，请先「弃审」再「审核」': 'Este documento ya fue transferido a ERP ({no}) y no puede transferirse de nuevo. Para volver a transferirlo: anule la aprobación, vuelva a aprobarla y elimine el documento anterior en Kingdee; de lo contrario quedarán dos en Kingdee.',
     '批量转ERP完成：成功{ok}，已转跳过{skip}，失败{fail}': 'Transferencia por lotes a ERP completada: correctos {ok}, ya transferidos omitidos {skip}, fallidos {fail}',
     '转ERP请求超时：服务端可能仍在推送，请稍后刷新列表确认「是否已转ERP」后再操作，不要立刻重复点': 'La solicitud de transferencia a ERP agotó el tiempo: el servidor puede seguir transfiriendo. Actualice la lista más tarde y compruebe "Transferido a ERP" antes de volver a actuar; no haga clic de nuevo de inmediato.',
+    '该单据正在转ERP（正在连金蝶推送，通常十几秒），请勿重复点击；完成后列表会自动显示 ERP 单号': "Este documento se está transfiriendo a ERP (conectando con Kingdee, normalmente unos segundos). No haga clic de nuevo; el número ERP aparecerá en la lista al terminar",
+    '确认弃审该单据？本单已转过ERP（{no}）：请先在金蝶删除那张单据，再修改 → 审核 → 重新转ERP，否则金蝶侧会有两张': "¿Anular la aprobación de este documento? Ya fue transferido a ERP ({no}): elimine primero ese documento en Kingdee y luego modifique → apruebe → transfiera de nuevo; de lo contrario quedarán dos en Kingdee.",
+    '批量转ERP正在执行，请等待本批完成，勿重复点击': "La transferencia por lotes a ERP está en ejecución; espere a que termine este lote y no vuelva a hacer clic",
     '供应商/客户': 'Proveedor/cliente',
     '暂无已审核且未转ERP的单据': 'No hay documentos auditados y no transferidos a ERP',
     '材料二维码标签': 'Etiqueta de código QR de material',

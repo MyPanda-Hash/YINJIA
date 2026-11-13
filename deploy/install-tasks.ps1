@@ -1,7 +1,8 @@
 ﻿<#
   一键注册两个计划任务(幂等,可重复执行):
-    1) JdySalOrderSync        每5分钟增量同步(销售+采购,仅已审核,近31天窗口)
-    2) JdySalOrderSyncMonthly 每月1日02:00全量复核(兜底时间窗之外的遗漏)
+    1) JdySalOrderSync        每5分钟:**金蝶库存现存量 + 档案/订单增量**(一个入口跑完,
+                              库存部分 3~4 s 跑在前面;见 sync.mjs 头部说明)
+    2) JdySalOrderSyncMonthly 每月1日02:00全量复核(兜底时间窗之外的遗漏;**不含库存**)
   用法(建议管理员 PowerShell):
     powershell -ExecutionPolicy Bypass -File .\install-tasks.ps1
   说明:
@@ -9,6 +10,7 @@
     - Settings 已含 StartWhenAvailable(关机期间错过的运行在开机后补跑)
     - ExecutionTimeLimit 1 小时:任何卡住的实例最多挡 1 小时,不会锁死一整天
     - 本脚本改写自实测配置(PS 5.1 无 -Monthly 触发器,故用 XML 注册)
+    - 2026-11-10:曾单独注册的 JdyStockSync 已合并进 ① —— 本脚本会自动删掉遗留的同名任务
 #>
 param(
   [string]$TaskDir = $PSScriptRoot
@@ -85,6 +87,15 @@ $xmlMonthly = @"
 </Task>
 "@
 
+# 2026-11-10:库存同步**已并入 sync.mjs**(用户口径「库存同步能不能和商品同步脚本写在一起」)
+#   ⇒ 不再单开一个 JdyStockSync 任务,一个 5 分钟任务跑完「库存 + 档案/订单」。
+#   只想要库存时可以手工:node sync-stock.mjs(闸门/日志与前像都在它自己身上)。
+#   若历史上注册过 JdyStockSync(旧版脚本),本脚本会把它删掉,避免两处同时改库存。
+if (Get-ScheduledTask -TaskName 'JdyStockSync' -ErrorAction SilentlyContinue) {
+  Unregister-ScheduledTask -TaskName 'JdyStockSync' -Confirm:$false
+  Write-Host '✓ 已移除旧任务 JdyStockSync(库存已并入 JdySalOrderSync → sync.mjs)'
+}
+
 Register-FromXml 'JdySalOrderSync' $xmlFrequent
 Register-FromXml 'JdySalOrderSyncMonthly' $xmlMonthly
-Write-Host '完成:两个计划任务已注册(删除任务:Unregister-ScheduledTask -TaskName <名称> -Confirm:$false)'
+Write-Host '完成:两个计划任务已注册(库存随 JdySalOrderSync 一起跑;删除任务:Unregister-ScheduledTask -TaskName <名称> -Confirm:$false)'

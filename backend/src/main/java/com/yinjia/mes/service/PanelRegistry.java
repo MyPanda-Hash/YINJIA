@@ -277,6 +277,52 @@ public class PanelRegistry {
         public String moduleName() {
             return moduleGroup == null || moduleGroup.isBlank() ? "其他" : moduleGroup;
         }
+
+        /**
+         * **状态闸门声明**(yj_panel.config 的 {@code "statusGate"},2026-11-11 起):
+         * 写法 {@code {"statusGate":{"field":"检验状态","value":"已完成检验"}}}。
+         *
+         * <p>语义:该面板的**列表取数默认只返回 {@code field = value} 的行**;前端勾了
+         * 「含…」那个复选框会带 {@code condition._statusScope='all'} 把闸门放开。
+         * 闸门在**服务端**生效(QueryService),所以查询弹窗/高级筛选/关键字/翻页/导出
+         * 都拿不到被闸住的行 —— 前端改 DOM 也绕不过去。
+         *
+         * <p>现役唯一消费者:检验数据记录明细表(QC_INSP_REC_DETAIL,用户口径
+         * 「默认不显示正在检验中的,只显示已完成检验的,只有勾选后才显示出来,
+         * 查询也是一样,没勾选之前查询不出来」)。
+         *
+         * <p>声明式(与 fixedItems/uniqueKeys 同一条规矩):换面板/换字段只改这一行 JSON。
+         * 解析失败返回 null(宁可不闸,也不能让面板打不开)。
+         */
+        public StatusGate statusGate() {
+            if (config == null || !config.contains("statusGate")) return null;
+            try {
+                com.fasterxml.jackson.databind.JsonNode n = CONFIG_JSON.readTree(config).path("statusGate");
+                if (!n.isObject()) return null;
+                String field = n.path("field").asText("").trim();
+                String value = n.path("value").asText("").trim();
+                if (field.isEmpty() || value.isEmpty()) return null;
+                return new StatusGate(field, value);
+            } catch (Exception ex) {
+                org.slf4j.LoggerFactory.getLogger(PanelRegistry.class)
+                        .warn("[statusGate] 面板 {} 的 config 解析失败(状态闸门不生效):{}", code, ex.getMessage());
+                return null;
+            }
+        }
+
+        /** 状态闸门(见 {@link #statusGate()});field = 字段标签(数据键),value = 只放行的取值 */
+        public record StatusGate(String field, String value) {}
+
+        /**
+         * **查询条件区默认收起**声明(yj_panel.config 的 {@code "collapseQueryBar": true},2026-11-11 起):
+         * 该面板打开时把内联查询条件(表头那一排条件格)收起来,只留一个「条件」开关,
+         * 点一下才铺开 —— 用户口径「表头做个收缩」(条件多、一行放不下时表格太挤)。
+         * 不声明 = 保持原样(条件区常显),其它面板行为一字不变。
+         */
+        public boolean collapseQueryBar() {
+            return config != null && config.contains("collapseQueryBar")
+                    && config.matches("(?s).*\"collapseQueryBar\"\\s*:\\s*true.*");
+        }
         public List<FieldDef> fieldsAt(String place) {
             return fields.stream().filter(f -> f.inPlace(place)).toList();
         }

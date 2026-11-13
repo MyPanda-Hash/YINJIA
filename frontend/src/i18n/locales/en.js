@@ -45,6 +45,78 @@ export default {
     logout: 'Sign out',
   },
   biz: {
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '免检跳过': 'Exempt (skipped)',
+    '该物料免检，不需要来料检验（送料审核后可直接生成采购入库单）': 'This item is inspection-exempt, so no incoming inspection is needed (after the receiving note is audited you can create the purchase receipt directly)',
+    '该批次还没有采购入库单：在送料暂收单上点「生成检验或入库单」即可直达入库（免检物料不需要检验）': 'This batch has no purchase receipt yet: open the receiving note and click "Generate inspection / receipt" to create the receipt directly (inspection-exempt items skip inspection)',
+    '还没有送料暂收单': 'No receiving note yet',
+    '还没有来料检验单': 'No incoming inspection yet',
+    '还没有暂收退回单': 'No return note yet',
+    '还没有特采单': 'No concession yet',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '退货': 'Return',
+    '待退货': 'To return',
+    '待特采': 'To concede',
+    '显示已隐藏': 'Show hidden',
+    '已转ERP': 'Pushed to ERP',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '部分不合格': 'Partially failed',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '金蝶同步导入的采购入库单没有 MES 来源单号，只能按批号推定匹配；推不到就显示未生成': 'Purchase receipts synced from Kingdee carry no MES source number, so they can only be matched by lot no.; if no match, the step shows “Not created”',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '需检验': 'Need inspection',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '仅需检验': 'Inspection required only',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '来料性质': 'Incoming type',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '品质流程监控': 'Quality Process Monitor',
+    '物料批号': 'Material lot no.',
+    '物料批号与物料编码': 'Lot no. & item code',
+    '供应商与采购订单': 'Supplier & PO',
+    '搜索单号、物料编码、物料批号或供应商': 'Search no. / item code / lot no. / supplier',
+    '批次行数': 'Batch rows',
+    '停留': 'Dwell',
+    '免检': 'Exempt',
+    '匹配方式': 'Match',
+    '检验单行': 'Inspection line',
+    '批号推定': 'Inferred by lot',
+    '实收': 'Received',
+    '异常': 'Abnormal',
+    '待检': 'To inspect',
+    '待入库': 'To put away',
+    '未填批号': 'No lot no.',
+    '该物料免检，不需要来料检验': 'This item is inspection-exempt; no incoming inspection needed',
+    '该环节还没有单据': 'No document at this step yet',
+    '点击跳转到': 'Click to open',
+    '点节点跳转到对应单据；没有该面板权限时不可跳转': 'Click a node to open that document; requires permission for that panel',
+    '没有符合条件的批次': 'No matching batches',
+    '送料 → 检验 → 入库': 'Receipt → Inspection → Put-away',
+    '绿=已审核/已完成': 'Green = Audited / Done',
+    '蓝=待办': 'Blue = To do',
+    '橙=审批中': 'Orange = In approval',
+    '红=作废/不合格': 'Red = Void / Failed',
+
+    // ---- 库存口径提示(2026-11-10「库存数量以金蝶真实账套为准」;见 core/views/stockHint.js)----
+    "库存以金蝶为准：本单需「转ERP」并在金蝶审核后才会改变库存（最长 5 分钟同步）":
+      "Stock follows Kingdee: this document changes stock only after 「Transfer to ERP」 and approval in Kingdee (sync within 5 minutes)",
+    "库存以金蝶为准：调拨/盘点不推送金蝶，本单不改变库存（只留流水）":
+      "Stock follows Kingdee: transfers/stocktakes are not pushed to Kingdee, so this document does not change stock (ledger only)",
     // ---- 产品规格书封面右上角编号标识(2026-10-19)----
     "产品编号：": "Product No.:",
     // ---- 扫码领料(条码管理 → 扫码领料,2026-10-18)----
@@ -237,6 +309,9 @@ export default {
     '已打印': 'Printed',
     '剩余可打': 'Remaining printable',
     '本次打印数量': 'Print qty this time',
+    '每箱': 'Per box',
+    '整箱': 'Full boxes',
+    '零头箱': 'Partial box',
     '已打印记录（本订单）': 'Print records (this order)',
     '打印单号': 'Print No.',
     '打印量': 'Printed qty',
@@ -389,6 +464,9 @@ export default {
     '单据编号': 'Document no.',
     '编号': 'No.',
     '来源': 'Source',
+    '无上游单据': 'No upstream document',
+    '没有暂收/检验/特采上游单据(早期直接录入或 ERP 单号形态的老单)':
+      'No upstream receipt / inspection / concession document (early direct entry or an ERP-numbered legacy document)',
     '查看': 'View',
     '打开': 'Open',
     '查询产品': 'Query Products',
@@ -613,6 +691,11 @@ export default {
     '计划完工日期': 'Planned Finish',
     '确认将': 'Confirm to set',
     '每箱数量': 'Qty / Box',
+    '零头不足一箱，已自动出卡': 'the partial box is under a full box; its label is printed automatically',
+    '请填写每箱数量（必填）': 'Please enter the qty per box (required)',
+    '按每箱数量算出的标签张数过多（{n} 张），请核对每箱数量': 'Too many labels from this qty per box ({n}); please check it',
+    '有零头箱：整批不是每箱数量的整数倍，零头箱会单独出一张卡（卡面印零头数量）': 'Partial box: the batch is not a multiple of the qty per box; one extra label is printed for the partial box (showing its qty)',
+    '标签张数': 'Labels',
     '日产能': 'Daily Capacity',
 
     // 工单排产·明细列+取消结案/追溯/打印工单(2026-09-23,旧系统 ProSchedList 对齐)
@@ -917,6 +1000,11 @@ export default {
     '完工': 'Completed',
     // 固定版式单据打印按钮(2026-09-23:银嘉采购订单/退货单,版式文字为纸面事实不翻译,按钮/提示入翻译层)
     '打印采购订单': 'Print Purchase Order',
+    '联系方式': 'Phone',
+    '需方联系人': 'Buyer contact',
+    '选择或输入联系人': 'Pick or type a contact',
+    '选择或输入联系方式': 'Pick or type a phone',
+    '这两个会印在「需方」框里；填了名单里没有的名字或电话，打印时会自动存进下拉选项': 'Both are printed in the Buyer box; a name or phone not in the list is saved into the dropdown when you print',
     '打印退货单': 'Print Return Note',
     '请先选择一张单据': 'Select a document first',
     '未取到单据数据': 'Document data not found',
@@ -1387,6 +1475,30 @@ export default {
     '来料品质': 'Incoming Quality',
     '来料检验单': 'Incoming Inspection Sheet',
     '检验目录': 'Inspection Catalog',
+    // ---- 2026-11-11 检验目录 → 待检验目录(只显示待检验的行) + 新增「检验数据记录明细表」----
+    '待检验目录': 'Pending Inspections',
+    '检验数据记录明细表': 'Inspection Record Details',
+    '查询定位': 'Find row',
+    '数据定位': 'Row locator',
+    '按物料/批次等条件在本单的行里定位': 'Locate a row in this document by material / batch / status',
+    '按物料/批次/检验状态等条件在本单的行里定位（不换单据）': 'Locate a row in this document by material / batch / status (stays on this document)',
+    '匹配': 'matched',
+    '清除定位': 'Clear locator',
+    '清除定位，显示全部待检验行': 'Clear the locator and show all pending rows',
+    '没有匹配的行，点上面的「清除定位」看全部待检验行': 'No matching row — click “Clear locator” above to see all pending rows',
+    '没有匹配的行，请调整条件或点「清除定位」': 'No matching row — adjust the conditions or click “Clear locator”',
+    '已定位': 'Located',
+    '显示全部状态': 'Show all statuses',
+    '默认只显示已完成检验，勾选后一并显示正在检验中': 'Only "Inspection Completed" rows are listed by default; check to include in-progress ones as well',
+    '收起条件': 'Hide filters',
+    '展开条件': 'Show filters',
+    '收起或铺开表头的查询条件': 'Collapse or expand the header filter row',
+    '暂无待检验记录，暂收单生单生成检验单后自动带入': 'No pending inspection — rows are added automatically when a temporary receipt generates an inspection sheet',
+    '目录记录由检验单生单自动生成、不可手工修改；本表只列待检验（正在检验中）的行，已完成检验的记录请到「检验数据记录明细表」查询。': 'Catalog records are generated automatically when the inspection sheet is created and cannot be edited by hand; this sheet lists only pending (in progress) rows — completed inspections are found in "Inspection Record Details".',
+    '取消完成后该目录行回到「正在检验中」（会重新出现在待检验目录里），之后才可反审核挂靠的检验单与检验数据记录。确定取消完成吗？': 'After cancelling, this catalog row returns to “In Progress” (it will show up in Pending Inspections again); only then can the linked inspection sheet and inspection data record be un-audited. Cancel completion?',
+    '该行没有关联的检验目录记录，无法取消完成': 'This row has no linked catalog record, so completion cannot be cancelled',
+    '取消完成并回弹为正在检验中（之后才可反审核挂靠的检验单与检验数据记录）': 'Cancel completion and roll back to In Progress (then the linked inspection sheet and inspection data record can be un-audited)',
+    '点击跳转到该单据': 'Click to open this document',
     // ---- 检验数据记录纸张式检验报告(QcInspRecSheet:YJ-QR-96 检验报告) ----
     '检验数据记录': 'Inspection Data Record',
     '检验报告': 'Inspection Report',
@@ -1394,6 +1506,27 @@ export default {
     '检验项': 'Inspection Item',
     '检测标准': 'Test Standard',
     '检测结果': 'Test Result',
+    // 处理意见标准库清空后直接手填(2026-11-11 用户口径「不需要先写样例,自己手动填写就行」)
+    '直接输入处理意见': 'Type the disposition',
+    // 来料检验要求:自定义字段必须「一个父目录 + 两个子目录」(2026-11-11 用户口径)
+    '父目录': 'Parent group',
+    '子目录1': 'Sub-column 1',
+    '子目录2': 'Sub-column 2',
+    '选择或输入父目录名(必填)': 'Pick or type the parent group name (required)',
+    '第一个子目录名(中文,禁 . % / ( ) 空格)': 'First sub-column name (Chinese; no . % / ( ) or spaces)',
+    '第二个子目录名(与子目录1成一对)': 'Second sub-column name (pairs with sub-column 1)',
+    '必须一个父目录带两个子目录:子目录1 与 子目录2 一次添加':
+      'One parent group must carry two sub-columns: sub-column 1 and sub-column 2 are created together',
+    '该表还没有父目录：直接输入一个名字（回车）即可新建': 'This sheet has no parent group yet: type a name and press Enter to create one',
+    '请先填写父目录名称': 'Please fill in the parent group name first',
+    '请把子目录1、子目录2 都填上': 'Please fill in both sub-column 1 and sub-column 2',
+    '两个子目录不能同名': 'The two sub-columns cannot have the same name',
+    // 检测结果固定五格(2026-11-11 用户口径):五个格子的显示名,数据键仍是中文 结果1..结果5
+    '结果1': 'Result 1',
+    '结果2': 'Result 2',
+    '结果3': 'Result 3',
+    '结果4': 'Result 4',
+    '结果5': 'Result 5',
     '单项判定': 'Item Judgement',
     '物料批次': 'Material Batch',
     '来料日期': 'Arrival Date',
@@ -3723,6 +3856,9 @@ export default {
     '{actor} 提交了「{panelName} {docNo}」，等待您审批。': '{actor} submitted "{panelName} {docNo}"; awaiting your approval.',
     '您提交的「{panelName} {docNo}」已由 {actor} 审批通过。': 'Your "{panelName} {docNo}" was approved by {actor}.',
     '您提交的「{panelName} {docNo}」被 {actor} 驳回。意见：{opinion}': 'Your "{panelName} {docNo}" was rejected by {actor}. Comment: {opinion}',
+    // 审批结果 → 单据上的检验人(2026-11-11 用户口径「审批通过和驳回也要有消息提示对应的检验人」)
+    '您检验的「{panelName} {docNo}」已由 {actor} 审批通过。': 'The "{panelName} {docNo}" you inspected was approved by {actor}.',
+    '您检验的「{panelName} {docNo}」被 {actor} 驳回。意见：{opinion}': 'The "{panelName} {docNo}" you inspected was rejected by {actor}. Comment: {opinion}',
     '{actor} 申请修改「{panelName} {docNo}」，等待您审批。': '{actor} requested a modification of "{panelName} {docNo}"; awaiting your approval.',
     '{actor} 申请删除「{panelName} {docNo}」，等待您审批。': '{actor} requested deletion of "{panelName} {docNo}"; awaiting your approval.',
     '删除申请已通过': 'Deletion request approved',
@@ -5683,9 +5819,12 @@ export default {
     '生成制程检验单失败': 'Failed to create the in-process inspection sheet',
     '制程检验记录表': 'In-Process Inspection Record',
     '选择一条生产工单行（工单号 + 工单行号唯一确定）生成制程检验单草稿；已建单的行会标出来，重复选择不会重复建单。': 'Pick one production work order line (uniquely identified by work order no. + line no.) to create an in-process inspection sheet draft. Lines that already have a sheet are marked, and picking them again will not create a duplicate.',
-    '该单据已转入ERP（{no}），不可重复转入；如需重新转ERP，请先「弃审」再「审核」': 'This document has already been pushed to ERP ({no}) and cannot be pushed again. To push it again, first un-approve it and then approve it again.',
+    '该单据已转入ERP（{no}），不可重复转入；如需重新转ERP，请先「弃审」再「审核」': 'This document has already been pushed to ERP ({no}) and cannot be pushed again. To push it again: un-approve, approve again, and delete the old document in Kingdee — otherwise Kingdee will hold two.',
     '批量转ERP完成：成功{ok}，已转跳过{skip}，失败{fail}': 'Batch push to ERP finished: succeeded {ok}, already pushed and skipped {skip}, failed {fail}',
     '转ERP请求超时：服务端可能仍在推送，请稍后刷新列表确认「是否已转ERP」后再操作，不要立刻重复点': 'ERP push timed out: the server may still be pushing. Refresh the list later and check "Pushed to ERP" before acting again — do not click again right away.',
+    '该单据正在转ERP（正在连金蝶推送，通常十几秒），请勿重复点击；完成后列表会自动显示 ERP 单号': "This document is being pushed to ERP (connecting to Kingdee, usually 10-20 seconds). Please do not click again; the ERP number will appear in the list when it finishes",
+    '确认弃审该单据？本单已转过ERP（{no}）：请先在金蝶删除那张单据，再修改 → 审核 → 重新转ERP，否则金蝶侧会有两张': "Un-approve this document? It was already pushed to ERP ({no}): first delete that document in Kingdee, then edit → approve → push again — otherwise Kingdee will hold two.",
+    '批量转ERP正在执行，请等待本批完成，勿重复点击': "Batch push to ERP is running; wait for this batch to finish and do not click again",
     '制程检验单(成型产出)': 'Process inspection (moulding output)',
     '生产扫码登记': 'Production Scan Registration',
     '实验室记录手机登记': 'Lab Records Mobile Entry',

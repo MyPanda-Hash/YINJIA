@@ -37,6 +37,10 @@ public class MessageService {
     public static final String APPROVAL_APPROVED = "APPROVAL_APPROVED";
     /** 消息码:审批驳回 → 制单人 */
     public static final String APPROVAL_REJECTED = "APPROVAL_REJECTED";
+    /** 消息码:审批通过 → **单据上的检验人**(2026-11-11 用户口径「审批通过和驳回也要有消息提示对应的检验人」) */
+    public static final String APPROVAL_APPROVED_INSPECTOR = "APPROVAL_APPROVED_INSPECTOR";
+    /** 消息码:审批驳回 → **单据上的检验人**(同上) */
+    public static final String APPROVAL_REJECTED_INSPECTOR = "APPROVAL_REJECTED_INSPECTOR";
     /** 消息码:申请修改 → 管理员 */
     public static final String MODIFY_REQUESTED = "MODIFY_REQUESTED";
     /** 消息码:申请删除 → 管理员 */
@@ -136,6 +140,40 @@ public class MessageService {
         }
     }
 
+    /**
+     * 单据上的「检验人 / 检验员」列 → 账号(2026-11-11 用户口径:
+     * 「审批通过和驳回也要有消息提示对应的检验人」)。
+     *
+     * <p>为什么不能直接用 {@link #authorOf}:制单人 = 建这张单的账号,
+     * 而纸面上的「检验人/检验员」是**这一单实际做检验的人**(检验单由自动生单建出来时,
+     * 建单人往往是系统/别人,检验人另有人在)—— 审批结果要落在真正干活的人手上。
+     *
+     * <p>列名各表不同(检验报告=检验人;首件/制程/组装成品/出厂报告=检验员),
+     * 按表里实际存在的列顺序取第一个非空的。表里没有这类列 ⇒ 返回空串(调用方按"没这个人"处理)。
+     */
+    public String inspectorOf(String headTable, String docNo) {
+        try {
+            List<String> cols = jdbc.queryForList(
+                    "SELECT name FROM sys.columns WHERE object_id = OBJECT_ID(?) AND name IN (N'检验人', N'检验员', N'检测人', N'化验人')",
+                    String.class, headTable);
+            if (cols.isEmpty()) return "";
+            // 固定优先级:检验人 > 检验员 > 检测人 > 化验人(同表既有检验人又有检验员时以检验人为准)
+            List<String> order = List.of("检验人", "检验员", "检测人", "化验人");
+            for (String want : order) {
+                if (!cols.contains(want)) continue;
+                List<String> vals = jdbc.queryForList(
+                        "SELECT TOP 1 [" + want + "] FROM " + headTable
+                                + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                        String.class, docNo);
+                String v = vals.isEmpty() || vals.get(0) == null ? "" : String.valueOf(vals.get(0)).trim();
+                if (!v.isEmpty()) return v;
+            }
+            return "";
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
     // ==================== 发送 ====================
 
     /** 发送消息(展开收件人;失败不影响调用方) */
@@ -173,8 +211,70 @@ public class MessageService {
 
     /** 便捷:按面板审批人发送(排除操作者自己) */
     public int sendToApprovers(String panelCode, String code, String docNo, Map<String, Object> params, String actor) {
-        List<String> targets = approversOf(panelCode).stream().filter((a) -> !a.equals(actor)).toList();
+        List<String> configured = approvalNotifyTargets(panelCode);
+        List<String> targets = (configured.isEmpty() ? approversOf(panelCode) : configured)
+                .stream().filter((a) -> !a.equals(actor)).toList();
         return send(targets, code, panelCode, docNo, params, actor);
+    }
+
+    /**
+     * 面板级「待审批通知只发给谁」(2026-11-11 用户口径:「如果我只想这个数据记录通知 fm 要怎么才能做到」)。
+     *
+     * <p>配置位置 = {@code yj_panel.config} 的 JSON 键 {@code approvalNotify},值是账号数组:
+     * <pre>{"approvalNotify":["fm"]}</pre>
+     * 配了它,该面板的「提交审批」消息**只发给这些人**(管理员也不再自动带),审批权本身不受影响 ——
+     * 「谁能审批」仍由 {@code yj_role_panel.can_approve} 决定,两者刻意分开:很多场景是
+     * 「多人都能审,但只在某个人的消息里提醒」。
+     *
+     * <p>没配(或配成空数组/解析失败)⇒ 维持原口径:管理员 ∪ 该面板所有 can_approve 角色的账号。
+     *
+     * @return 配置的账号列表;未配置返回空列表(调用方据此判断走哪条口径)
+     */
+    public List<String> approvalNotifyTargets(String panelCode) {
+        try {
+            String raw = registry.panel(panelCode).config();
+            if (raw == null || !raw.contains("approvalNotify")) return List.of();
+            com.fasterxml.jackson.databind.JsonNode node =
+                    JSON.readTree(raw).path("approvalNotify");
+            if (!node.isArray()) return List.of();
+            List<String> out = new ArrayList<>();
+            for (com.fasterxml.jackson.databind.JsonNode n : node) {
+                String u = n.asText("").trim();
+                if (!u.isEmpty()) out.add(u);
+            }
+            return out;
+        } catch (Exception e) {
+            log.warn("approvalNotify 解析失败(按未配置处理): panel={} err={}", panelCode, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * 纸面「检验人/检验员」格里的值 → 收件账号(2026-11-11)。
+     *
+     * <p>⚠ 这一格在库里**两种写法都有**(历史遗留):有的单写账号({@code admin}),
+     * 有的单写姓名({@code 系统管理员}/{@code 钟芳云},新增时按登录人 real_name 写入)
+     * ⇒ 一律先按 username 精确匹配,匹配不到再按 real_name 匹配(重名就都发,通常只有一个人)。
+     */
+    public List<String> accountsOf(String who) {
+        if (who == null || who.isBlank()) return List.of();
+        String w = who.trim();
+        try {
+            List<String> byName = jdbc.queryForList(
+                    "SELECT username FROM yj_user WHERE username = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    String.class, w);
+            if (!byName.isEmpty()) return byName;
+            return jdbc.queryForList(
+                    "SELECT username FROM yj_user WHERE real_name = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    String.class, w);
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    /** 单据上的「检验人/检验员」格 → 收件账号列表(见 {@link #inspectorOf} 与 {@link #accountsOf}) */
+    public List<String> inspectorAccounts(String headTable, String docNo) {
+        return accountsOf(inspectorOf(headTable, docNo));
     }
 
     /** 便捷:发给制单人(排除操作者自己) */
@@ -212,6 +312,13 @@ public class MessageService {
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> r : rows) {
             Map<String, Object> m = new LinkedHashMap<>(r);
+            // 时间列转 LocalDateTime 再出:JdbcTemplate 给的是 java.sql.Timestamp,Jackson 会按 UTC
+            // 序列化成 "...Z"/带偏移的串 ⇒ 前端 slice 出来比本地时间**早 8 小时**
+            // (2026-11-11 实测:库里 11:37:53 的消息在弹层显示 03:37:53)。LocalDateTime 没有时区,
+            // 序列化就是库里那份"墙上时间",与页面其它时间口径一致。
+            for (String k : List.of("创建时间", "读取时间")) {
+                if (m.get(k) instanceof java.sql.Timestamp ts) m.put(k, ts.toLocalDateTime());
+            }
             m.put("params", parseParams(r.get("参数")));
             m.remove("参数");
             out.add(m);

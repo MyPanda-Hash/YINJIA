@@ -36,6 +36,30 @@
         <span v-if="overRatioPct != null" class="pup-ratio">{{ tt('超送比例') }} {{ overRatioPct }}%</span>
       </div>
 
+      <!-- 需方联系人 / 联系方式(2026-11-11 用户口径「还有需方的联系人和联系方式改为打印前先弹窗。
+           下拉选择名字和联系方式。可以新增」):
+           只在**有金额**版式出现 —— 送货单(无金额)下方不再印供方/需方框,选了也没人用。
+           下拉选项来自系统参数 pu_order.buyer_contacts;选了不在名单里的人/电话,确认打印时自动加进名单。 -->
+      <div v-if="showAmount" class="pup-buyer">
+        <span class="pup-chip pup-buyer-item">
+          {{ tt('需方联系人') }}：
+          <el-select v-model="buyerName" size="small" filterable allow-create default-first-option clearable
+            class="pup-buyer-sel" :placeholder="tt('选择或输入联系人')" @change="onBuyerChange">
+            <el-option v-for="c in buyerContacts" :key="c['姓名'] + '|' + (c['联系方式'] || '')"
+              :label="c['姓名']" :value="c['姓名']" />
+          </el-select>
+        </span>
+        <span class="pup-chip pup-buyer-item">
+          {{ tt('联系方式') }}：
+          <el-select v-model="buyerPhone" size="small" filterable allow-create default-first-option clearable
+            class="pup-buyer-tel" :placeholder="tt('选择或输入联系方式')">
+            <el-option v-for="c in buyerContacts" :key="'t' + c['姓名'] + '|' + (c['联系方式'] || '')"
+              :label="c['联系方式'] || c['姓名']" :value="c['联系方式']" />
+          </el-select>
+        </span>
+        <span class="pup-tip">{{ tt('这两个会印在「需方」框里；填了名单里没有的名字或电话，打印时会自动存进下拉选项') }}</span>
+      </div>
+
       <el-table ref="tableRef" :data="rows" row-key="__key" border size="small" :height="mainTableHeight"
         @selection-change="onPicked">
         <el-table-column type="selection" width="42" />
@@ -323,6 +347,57 @@ function amountOf(row) {
 }
 /** 当前打印版式(服务端口径:有金额/无金额) */
 const fmtLabel = () => (showAmount.value ? '有金额' : '无金额')
+
+/* ── 需方联系人 / 联系方式(2026-11-11 用户口径:打印前弹窗下拉选,可新增) ───────────────── */
+/** 候选名单([{姓名, 联系方式}]),来自系统参数 pu_order.buyer_contacts */
+const buyerContacts = ref([])
+const buyerName = ref('')
+const buyerPhone = ref('')
+/** 拉候选名单 + 默认选第一条(取不到不影响打印,只是下拉空着) */
+async function loadBuyerContacts() {
+  try {
+    const list = await engine.puPrintBuyerContacts()
+    buyerContacts.value = Array.isArray(list) ? list : []
+  } catch (e) {
+    console.warn('[pu-print] 需方联系人加载失败:', e?.message || e)
+    buyerContacts.value = []
+  }
+  if (!buyerName.value && buyerContacts.value.length) {
+    buyerName.value = String(buyerContacts.value[0]['姓名'] || '')
+    buyerPhone.value = String(buyerContacts.value[0]['联系方式'] || '')
+  }
+}
+/** 选名字 → 自动带出该名字对应的联系方式(名字是新的就保持用户手填的电话) */
+function onBuyerChange(name) {
+  const hit = buyerContacts.value.find((c) => String(c['姓名']) === String(name))
+  if (hit) buyerPhone.value = String(hit['联系方式'] || '')
+}
+/**
+ * 把这次用的「姓名 + 联系方式」记进候选名单(用户口径「可以新增」)。
+ * 名单里已有同一对就不发请求;没有「修改」权的账号保存会失败 —— 静默跳过,不挡打印。
+ */
+async function rememberBuyerContact() {
+  const nm = String(buyerName.value || '').trim()
+  const ph = String(buyerPhone.value || '').trim()
+  if (!nm) return
+  const exists = buyerContacts.value.some(
+    (c) => String(c['姓名']) === nm && String(c['联系方式'] || '') === ph)
+  if (exists) return
+  try {
+    const list = await engine.puPrintBuyerContactAdd({ 姓名: nm, 联系方式: ph })
+    if (Array.isArray(list)) buyerContacts.value = list
+  } catch (e) {
+    console.warn('[pu-print] 需方联系人保存失败(不影响打印):', e?.message || e)
+  }
+}
+/** 传给出纸的需方信息(送货运单不用,所以只在有金额时给) */
+function buyerOf() {
+  if (!showAmount.value) return null
+  const nm = String(buyerName.value || '').trim()
+  const ph = String(buyerPhone.value || '').trim()
+  if (!nm && !ph) return null
+  return { 联系人: nm, 联系方式: ph }
+}
 /** 该行的「剩余可打」(服务端已按单位精度取整:订单×(1+比例)−已送+已退回−已打印);没取到 → null */
 function capOf(row) {
   const q = quotaOf.value[String(row?.id)]
@@ -383,6 +458,8 @@ async function load() {
   quotaOf.value = {}
   overRatioPct.value = null
   Object.keys(qtyOf).forEach((k) => delete qtyOf[k])
+  // 需方联系人:候选名单每次开窗重取(别人刚加过的人这里也能看到);默认选第一条
+  loadBuyerContacts()
   try {
     // 额度与单据**并发**取,但额度先落地再渲染明细:
     // el-input-number 的 precision 只在首渲染时定形,若先渲染(精度缺省 2)再改 prop,
@@ -520,6 +597,8 @@ async function confirm() {
   }))
   busy.value = true
   try {
+    // 先把这次的需方联系人记进候选名单(用户口径「可以新增」;失败不挡打印)
+    await rememberBuyerContact()
     const res = await engine.puPrintSave({
       orderNo: props.docNo,
       format: showAmount.value ? '有金额' : '无金额',
@@ -531,6 +610,8 @@ async function confirm() {
     let afterPrint = null
     let printDone = false   // onDone 可能比下面的赋值先到(打印被拒/层摘得快)
     const ok = printFn(doc.value, printRows, {
+      // 需方联系人/联系方式 = 弹窗里选的那一组(2026-11-11);无金额(送货单)不印签章框,给了也不用
+      buyer: buyerOf(),
       onDone: () => { printDone = true; if (afterPrint) afterPrint() },
     })
     if (!ok) {
@@ -582,6 +663,7 @@ async function doReprint(row) {
     let afterPrint = null
     let printDone = false
     await printFn(doc.value, printRows, {
+      buyer: buyerOf(),   // 重打也用当前选中的需方联系人(2026-11-11)
       onDone: () => { printDone = true; if (afterPrint) afterPrint() },
     })
     ElMessage.success(`${tt('已重打（第 {n} 次）').replace('{n}', res['打印次数'] ?? '')} ${res['单据编号']}`)
@@ -602,6 +684,7 @@ async function doReprint(row) {
 async function doTwin(row) {
   busy.value = true
   try {
+    await rememberBuyerContact()
     const res = await engine.puPrintTwin(row['单据编号'])
     if (!res || !res['单据编号']) throw new Error(tt('打印记录不存在或已作废'))
     const printRows = res['lines'] || []
@@ -609,6 +692,7 @@ async function doTwin(row) {
     let afterPrint = null
     let printDone = false
     const ok = printFn(doc.value, printRows, {
+      buyer: buyerOf(),
       onDone: () => { printDone = true; if (afterPrint) afterPrint() },
     })
     if (!ok) {
@@ -657,6 +741,11 @@ async function doVoid(row) {
 .pup-fmt { display: inline-flex; align-items: center; gap: 6px; }
 .pup-tip { font-size: 12.5px; color: #8a6d3b; background: #fdf6e3; border: 1px solid #f5e3b3; border-radius: 4px; padding: 3px 8px; }
 .pup-quota-tip { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #8a6d3b; background: #fdf6e3; border: 1px dashed #f5e3b3; border-radius: 4px; padding: 3px 8px; }
+/* 需方联系人/联系方式(2026-11-11):与上方单据信息同排,窄屏自动换行 */
+.pup-buyer { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 12.5px; color: #46586e; }
+.pup-buyer-item { display: inline-flex; align-items: center; gap: 4px; }
+.pup-buyer-sel { width: 150px; }
+.pup-buyer-tel { width: 170px; }
 .pup-ratio { color: #1f6f4a; font-weight: 600; }
 .pup-foot { display: flex; justify-content: flex-end; align-items: center; font-size: 12.5px; color: #46586e; }
 /* 已打印记录:与上方勾选表隔一道浅线,说明用途 */

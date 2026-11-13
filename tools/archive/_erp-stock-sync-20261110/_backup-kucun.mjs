@@ -1,0 +1,10 @@
+﻿import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import mssql from "../../../deploy/node_modules/mssql/index.js";
+const base = JSON.parse(readFileSync(new URL("../../../deploy/config.json", import.meta.url),"utf8")).database;
+const pool = await mssql.connect({server:base.server,port:base.port,database:"HSDZ_MES",user:base.user,password:base.password,options:{encrypt:false,trustServerCertificate:true},pool:{max:2,min:0,idleTimeoutMillis:3000}});
+const rows = (await pool.request().query(`SELECT id,wzdm,ckdm,lot_no,rkl,ckl,yl,price,asp_cancel FROM dbo.kucun`)).recordset;
+mkdirSync(new URL("../../../deploy/backup/", import.meta.url), { recursive: true });
+const file = new URL("../../../deploy/backup/kucun-before-stock-sync-20261110.jsonl", import.meta.url);
+writeFileSync(file, rows.map((r)=>JSON.stringify(r)).join("\n")+"\n", "utf8");
+console.log(`kucun 全量前像 ${rows.length} 行 → deploy/backup/kucun-before-stock-sync-20261110.jsonl`);
+await pool.close();

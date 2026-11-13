@@ -1,0 +1,55 @@
+﻿=== 两个商品的档案差异(只列不同的键) ===
+id:
+   YJ-HKB-001 = "2182903688861940736"
+   YJ-YCYX-020 = "2198817746593081344"
+number:
+   YJ-HKB-001 = "YJ-HKB-001"
+   YJ-YCYX-020 = "YJ-YCYX-020"
+name:
+   YJ-HKB-001 = "黑卡载银炭粉"
+   YJ-YCYX-020 = "折叠棉"
+base_unit_id:
+   YJ-HKB-001 = "7"
+   YJ-YCYX-020 = "3"
+base_unit_name:
+   YJ-HKB-001 = "kg"
+   YJ-YCYX-020 = "支"
+aux_unit_name:
+   YJ-HKB-001 = "kg"
+   YJ-YCYX-020 = "支"
+model:
+   YJ-HKB-001 = "RWAP6068"
+   YJ-YCYX-020 = "72*60*120"
+help_code:
+   YJ-HKB-001 = "hkzytf"
+   YJ-YCYX-020 = "zdm"
+purchase_unit_id:
+   YJ-HKB-001 = "7"
+   YJ-YCYX-020 = "3"
+sale_unit_id:
+   YJ-HKB-001 = "7"
+   YJ-YCYX-020 = "3"
+store_unit_id:
+   YJ-HKB-001 = "7"
+   YJ-YCYX-020 = "3"
+aux_unit_id:
+   YJ-HKB-001 = "7"
+   YJ-YCYX-020 = "3"
+aux_unit_number:
+   YJ-HKB-001 = "kg"
+   YJ-YCYX-020 = "支"
+is_batch:
+   YJ-HKB-001 = true
+   YJ-YCYX-020 = false
+price_entity:
+   YJ-HKB-001 = [{"id":"2182903865593160909","price_barcode":"","price_unit_id":"7","price_unit_name":"kg","price_unit_number":"kg","price_purchase_price":"0","price_max_purchase_price":"0","price_cost_price":"0","pr
+   YJ-YCYX-020 = [{"id":"2198817746593081345","price_barcode":"","price_unit_id":"3","price_unit_name":"支","price_unit_number":"支","price_purchase_price":"0","price_max_purchase_price":"0","price_cost_price":"0","pric
+parent_number:
+   YJ-HKB-001 = "001"
+   YJ-YCYX-020 = "017"
+parent_id:
+   YJ-HKB-001 = "2167738972682336256"
+   YJ-YCYX-020 = "2167738974485886977"
+modify_time:
+   YJ-HKB-001 = "2025-04-15 17:13:56"
+   YJ-YCYX-020 = "2025-05-05 17:27:16"

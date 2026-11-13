@@ -67,10 +67,64 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+# ── Win7 / 老 PowerShell 兼容(2026-11-10,现场 Win7 报 0x1F 后加)────────────────
+# 现场症状(Win7 + PS 5.1,安装窗口里):
+#   Write-Host : The Win32 internal error "A device attached to the system is not functioning" 0x1F
+#                occurred when writing console output buffer at current cursor position.
+# 触发条件 = chcp 65001 + 某些 Win7 控制台/远程会话下控制台输出缓冲区不可写;Write-Host 一抛,
+# $ErrorActionPreference='Stop' 就把安装打断。下面统一走 Say:
+#   先试带颜色 Write-Host → 失败退 [Console]::Out → 再失败只写日志,**绝不因输出中断安装**。
+$script:SayLog = if ($PSScriptRoot) { Join-Path $PSScriptRoot 'agent.log' } else { Join-Path (Get-Location).Path 'agent.log' }
+function Say {
+    param([string]$Text = '', [string]$Color = '')
+    try {
+        if ($Color) { Write-Host $Text -ForegroundColor $Color } else { Write-Host $Text }
+    } catch {
+        try { [Console]::Out.WriteLine($Text) } catch { }
+    }
+    try { Add-Content -LiteralPath $script:SayLog -Value $Text -Encoding UTF8 -ErrorAction SilentlyContinue } catch { }
+}
+# Win7 默认没有 TLS1.2(.NET 4.5+ 才认识);HTTPS 服务器必须显式打开,失败不致命(HTTP 现场仍可用)
+try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+} catch { }
+# PS2(Win7 自带):没有 ConvertFrom-Json / ConvertTo-Json / Invoke-WebRequest(都是 3.0+ 才有)。
+# 用户口径「要兼容,能够一键完成,不要多余操作」⇒ 加载同目录兼容层,不让客户去装 WMF。
+$script:HereDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Definition }
+if ($PSVersionTable.PSVersion.Major -lt 3) {
+    $compatFile = Join-Path $script:HereDir 'compat-ps2.ps1'
+    if (-not (Test-Path $compatFile)) { Say "[FAIL] 同目录缺少 compat-ps2.ps1,请把整个文件夹一起拷贝: $compatFile" 'Red'; exit 1 }
+    . $compatFile
+}
+
 $AgentVersion = '1.1.0'
 $RunKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $RunName = 'YinjiaMesPrintAgent'
-$ScriptPath = $PSCommandPath
+$ScriptPath = if ($PSCommandPath) { $PSCommandPath } else { $MyInvocation.MyCommand.Path }
+
+# ── 配置:优先读同目录 print-agent.config.json(2026-11-10)──────────────────
+# 现场打印机名是 "EPSON LQ-635KII ESC/P2 (副本 1)"(带空格/括号),站点是 "仓库" ——
+# 用 Start-Process -ArgumentList @(...) 传参会按空格拆开(实测只剩 "EPSON"),所以自启与安装
+# 都只传 -File,其余参数从这里的 JSON 读;命令行显式给了的仍然优先。
+$script:CfgPath = Join-Path (Split-Path -Parent $ScriptPath) 'print-agent.config.json'
+if (Test-Path $script:CfgPath) {
+    try {
+        $rawCfg = [System.IO.File]::ReadAllText($script:CfgPath, [System.Text.Encoding]::UTF8)
+        $cfgObj = ConvertFrom-Json $rawCfg
+        if (-not $PSBoundParameters.ContainsKey('Port') -and $cfgObj.port) { $Port = [int]$cfgObj.port }
+        if (-not $PSBoundParameters.ContainsKey('Printer') -and $cfgObj.printer) { $Printer = [string]$cfgObj.printer }
+        if (-not $PSBoundParameters.ContainsKey('Mode') -and $cfgObj.mode) { $Mode = [string]$cfgObj.mode }
+        if (-not $PSBoundParameters.ContainsKey('Server') -and $cfgObj.server) { $Server = [string]$cfgObj.server }
+        if (-not $PSBoundParameters.ContainsKey('User') -and $cfgObj.user) { $User = [string]$cfgObj.user }
+        if (-not $PSBoundParameters.ContainsKey('Pass') -and $cfgObj.pass) { $Pass = [string]$cfgObj.pass }
+        if (-not $PSBoundParameters.ContainsKey('Factory') -and $cfgObj.factory) { $Factory = [string]$cfgObj.factory }
+        if (-not $PSBoundParameters.ContainsKey('Station') -and $cfgObj.station) { $Station = [string]$cfgObj.station }
+        Say ("[配置] 已读取 " + $script:CfgPath) 'DarkGray'
+    } catch {
+        Say ("[WARN] 配置文件读取失败(继续用命令行参数):" + $_.Exception.Message) 'Yellow'
+    }
+}
 
 # PDF 输出目录:默认放在脚本同级的 print-out\(不污染仓库根)
 if (-not $PdfDir) { $PdfDir = Join-Path (Split-Path -Parent $ScriptPath) 'print-out' }
@@ -79,9 +133,9 @@ if (-not $PdfDir) { $PdfDir = Join-Path (Split-Path -Parent $ScriptPath) 'print-
 if ($Uninstall) {
     if (Test-Path $RunKey) {
         Remove-ItemProperty -Path $RunKey -Name $RunName -ErrorAction SilentlyContinue
-        Write-Host "[OK] 已取消开机自启: $RunName"
+        Say "[OK] 已取消开机自启: $RunName"
     }
-    Write-Host '代理进程如仍在运行,请在任务管理器里结束对应 powershell 进程(或重启电脑)。'
+    Say '代理进程如仍在运行,请在任务管理器里结束对应 powershell 进程(或重启电脑)。'
     return
 }
 
@@ -92,20 +146,32 @@ if ($Install) {
     #   直接导致 -Install 整个失败、代理也没起来)。Run 键几乎必然存在,所以这里基本不建。
     if (-not (Test-Path $RunKey)) { New-Item -Path $RunKey -Force | Out-Null }
     Set-ItemProperty -Path $RunKey -Name $RunName -Value $cmd
-    Write-Host "[OK] 已设为开机自启: $RunName"
-    Write-Host "     $cmd"
-    Write-Host '     下次开机会自动在后台运行;现在先手动跑一次即可生效。'
-    Write-Host ''
+    Say "[OK] 已设为开机自启: $RunName"
+    Say "     $cmd"
+    Say '     下次开机会自动在后台运行;现在先手动跑一次即可生效。'
+    Say ''
 }
 
 # ── 打印机 ────────────────────────────────────────────────────────
 
-function Get-SystemPrinterName {
+function Get-InstalledPrinterNames {
+    # Win7 用 .NET(PS2/.NET2 就有);不依赖 Get-Printer(Win8+)/CIM 服务
+    $names = @()
     try {
-        $p = Get-CimInstance -ClassName Win32_Printer -ErrorAction Stop |
+        Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+        $names = @([System.Drawing.Printing.PrinterSettings]::InstalledPrinters)
+    } catch { }
+    return $names
+}
+function Get-SystemPrinterName {
+    # 系统默认打印机:Win32_Printer 走 WMI(Win7 一定有),失败再看 .NET 第一台
+    try {
+        $p = Get-WmiObject -Class Win32_Printer -ErrorAction Stop |
              Where-Object { $_.Default -eq $true } | Select-Object -First 1
         if ($p) { return $p.Name }
     } catch { }
+    $all = Get-InstalledPrinterNames
+    if ($all.Count -gt 0) { return $all[0] }
     return ''
 }
 
@@ -126,6 +192,8 @@ $VirtualPrinterNames = @(
 function Test-VirtualPrinter {
     param([string]$Name)
     if (-not $Name) { return $true }
+    # 名字里带 PDF/XPS/OneNote/Fax/WPS 的一律视为虚拟(2026-11-10:WPS 的「导出为WPS PDF」被当成真机选过)
+    if ($Name -match 'PDF|XPS|OneNote|Fax|WPS') { return $true }
     foreach ($v in $VirtualPrinterNames) {
         if ($Name -eq $v -or $Name -like "$v*") { return $true }
     }
@@ -143,13 +211,53 @@ function Get-RealPrinterName {
     if ($Prefer -and -not (Test-VirtualPrinter $Prefer)) { return $Prefer }
     $def = Get-SystemPrinterName
     if ($def -and -not (Test-VirtualPrinter $def)) { return $def }
-    try {
-        $all = Get-CimInstance -ClassName Win32_Printer -ErrorAction Stop |
-               Where-Object { $_.WorkOffline -ne $true }
-        foreach ($p in $all) {
-            if (-not (Test-VirtualPrinter $p.Name)) { return $p.Name }
-        }
-    } catch { }
+    foreach ($n in (Get-InstalledPrinterNames)) {
+        if (-not (Test-VirtualPrinter $n)) { return $n }
+    }
+    return ''
+}
+
+# ── 打印机名核对(2026-11-10)────────────────────────────────────────────
+# 现场配置里是 "EPSON LQ-635KII ESC/P2 (副本 1)",系统里这台"副本"已被删 ⇒ 打印报
+# 「已删除指定的打印机。」。这里按「去掉 (副本 N)、空格、大小写」比对系统清单,
+# 对不上就返回空,让调用方换一台可用真机(并记日志),而不是死在一个陈旧名字上。
+function Get-PrinterNameKey {
+    param([string]$Name)
+    if (-not $Name) { return '' }
+    $k = $Name -replace '\s*\(\s*副本\s*\d+\s*\)\s*', ' '
+    $k = $k -replace '\s+', ' '
+    return $k.Trim().ToUpper()
+}
+
+function Resolve-PrinterName {
+    param([string]$Name)
+    $all = @(Get-InstalledPrinterNames)
+    if ($all.Count -eq 0) { return '' }
+    if ($Name -and ($all -contains $Name)) { return $Name }
+    if (-not $Name) { return '' }
+    $k = Get-PrinterNameKey $Name
+    if (-not $k) { return '' }
+    foreach ($p in $all) { if ((Get-PrinterNameKey $p) -eq $k) { return $p } }
+    foreach ($p in $all) {
+        $pk = Get-PrinterNameKey $p
+        if ($pk -and ($pk.Contains($k) -or $k.Contains($pk))) { return $p }
+    }
+    return ''
+}
+
+# PDF 兜底用的虚拟打印机:Win7 没有 Microsoft Print to PDF,常见是 WPS/福昕/Adobe
+function Get-PdfPrinterName {
+    $all = @(Get-InstalledPrinterNames)
+    $prefer = @(
+        'Microsoft Print to PDF',
+        '导出为WPS PDF', 'WPS PDF', 'WPS Office PDF',
+        'Foxit Reader PDF Printer', 'Foxit PDF Printer', 'Foxit PhantomPDF Printer',
+        'Adobe PDF', 'CutePDF Writer', 'Bullzip PDF Printer'
+    )
+    foreach ($k in $prefer) {
+        foreach ($p in $all) { if ($p -eq $k) { return $p } }
+    }
+    foreach ($p in $all) { if ($p -match 'PDF') { return $p } }
     return ''
 }
 
@@ -255,7 +363,7 @@ function Send-LabelToPrinter {
             $ms = New-Object System.IO.MemoryStream(,$bytes)
             $qrImg = [System.Drawing.Image]::FromStream($ms)
         } catch {
-            Write-Host "[WARN] 二维码图解码失败,本轮只打文字: $($_.Exception.Message)" -ForegroundColor Yellow
+            Say "[WARN] 二维码图解码失败,本轮只打文字: $($_.Exception.Message)" 'Yellow'
             $qrImg = $null
         }
     }
@@ -272,18 +380,43 @@ function Send-LabelToPrinter {
     # **静默**落成 PDF —— 不会弹"另存为"对话框(那是普通用户点打印才有的行为)。
     # 关键三件:PrinterName 指向虚拟打印机、PrintToFile=$true、PrintFileName 给死路径。
     if ($PdfPath) {
-        $pdfPrinter = 'Microsoft Print to PDF'
+        $pdfPrinter = Get-PdfPrinterName
+        if (-not $pdfPrinter) {
+            $allPd = @(Get-InstalledPrinterNames)
+            throw ("这台电脑没有可用的 PDF 虚拟打印机(Win7 没有系统自带的 Microsoft Print to PDF)。" +
+                   "请装 WPS/福昕阅读器后重试,或在「打印机」里启用一个 PDF 打印机。当前已装:" + ($allPd -join ' / '))
+        }
+        if ($pdfPrinter -ne 'Microsoft Print to PDF') { Say "[PDF ] 用「$pdfPrinter」落 PDF" 'DarkGray' }
         $doc.PrinterSettings.PrinterName = $pdfPrinter
         if (-not $doc.PrinterSettings.IsValid) {
-            throw "找不到虚拟打印机「$pdfPrinter」:请在 Windows「打印机和传真」里启用它(系统自带,可能被关掉了)"
+            throw "找不到虚拟打印机「$pdfPrinter」:请在 Windows「打印机和传真」里启用它"
         }
         $doc.PrinterSettings.PrintToFile = $true
         $doc.PrinterSettings.PrintFileName = $PdfPath
     } else {
-        if ($PrinterName) { $doc.PrinterSettings.PrinterName = $PrinterName }
-        if (-not $doc.PrinterSettings.IsValid) {
-            throw "打印机不可用:[$PrinterName](检查打印机名称,或在网页里留空使用系统默认打印机)"
+        # 配置的名字可能已失效(如 "…(副本 1)" 被删)⇒ 先核对,再准备候选列表逐台重试
+        $script:PrintCandidates = @()
+        if ($PrinterName) { $script:PrintCandidates += $PrinterName }
+        $resolved = Resolve-PrinterName $PrinterName
+        if ($resolved) { $script:PrintCandidates += $resolved }
+        $realFallback = Get-RealPrinterName -Prefer ''
+        if ($realFallback) { $script:PrintCandidates += $realFallback }
+        # 再兜所有真机:配置那台可能只是驱动残留(名字在、端口/驱动已删)
+        foreach ($n in (Get-InstalledPrinterNames)) {
+            if (-not (Test-VirtualPrinter $n)) { $script:PrintCandidates += $n }
         }
+        $script:PrintCandidates = @($script:PrintCandidates | Where-Object { $_ } | Select-Object -Unique)
+        $picked = ''
+        foreach ($c in $script:PrintCandidates) {
+            $doc.PrinterSettings.PrinterName = $c
+            if ($doc.PrinterSettings.IsValid) { $picked = $c; break }
+        }
+        if (-not $picked) {
+            $allPd = @(Get-InstalledPrinterNames)
+            throw ("打印机不可用:[$PrinterName]。这台电脑上可用的打印机:" + ($allPd -join ' / ') +
+                   " (在「自动打印」页把打印机留空即用系统默认)")
+        }
+        if ($picked -ne $PrinterName) { Say ("[打印机] 配置的「{0}」不在系统里,改用「{1}」" -f $PrinterName, $picked) 'Yellow' }
     }
     $doc.DocumentName = "YINJIA-MES $Title $WoNo"
     # StandardPrintController = 不显示进度对话框 ⇒ 真静默
@@ -302,20 +435,39 @@ function Send-LabelToPrinter {
     #   注意:这里只能选**标准纸型**;自定义纸型会被 PDF 驱动丢掉(上面那条踩坑)。
     $script:W100 = 827   # 横向 210mm ≈ 8.27in(1/100 英寸)
     $script:H100 = 583   # 纵向 148mm ≈ 5.83in(A5 短边)
-    $paperKind = if (([string]$Paper).Trim().ToUpper() -eq 'A4') { 'A4' } else { 'A5' }
+    # ── DOT-PAPER-20261110 ─────────────────────────────────────────────
+    # 针式打印机(ESC/P2 连续纸)不能按 A5 横版设:驱动会再旋转一次,结果"横竖反了 + 右侧被裁"。
+    # 这里:针式机 → 自定义纸 241×140mm(中一刀)、**不旋转**;其它机(激光/PDF)→ 原来的 A5/A4 横版。
+    $isDot = $false
+    $pn = ''
+    try { $pn = [string]$doc.PrinterSettings.PrinterName } catch { }
+    if ($pn -match 'LQ-|ESC\s*/\s*P2|FX-|针式|Dot\s*Matrix') { $isDot = $true }
+    $paperOpt = ([string]$Paper).Trim().ToUpper()
+    if ($paperOpt -eq 'LQ' -or $paperOpt -eq 'DOT') { $isDot = $true }
+    $paperKind = if ($paperOpt -eq 'A4') { 'A4' } else { 'A5' }
     try {
-        $ps = $doc.PrinterSettings.PaperSizes | Where-Object { $_.Kind -eq $paperKind } | Select-Object -First 1
-        if (-not $ps) { $ps = $doc.PrinterSettings.PaperSizes | Where-Object { $_.PaperName -match $paperKind } | Select-Object -First 1 }
-        if ($ps) {
-            $doc.DefaultPageSettings.PaperSize = $ps
-            $doc.DefaultPageSettings.Landscape = $true    # 横打:A5→210×148 / A4→297×210
+        if ($isDot) {
+            # 241mm × 140mm = 949 × 551(1/100 英寸);Landscape=false:纸本身就是"宽>高",不再转
+            $dotPaper = New-Object System.Drawing.Printing.PaperSize('中一刀 241x140', 949, 551)
+            $doc.DefaultPageSettings.PaperSize = $dotPaper
+            $doc.DefaultPageSettings.Landscape = $false
             $doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
-            Write-Host ("[版面] 纸张 = {0} 横打(内容仍 210×148mm,不缩放)" -f $paperKind) -ForegroundColor DarkGray
+            Say '[版面] 针式打印机 → 自定义纸 241×140mm(中一刀),不旋转' 'DarkGray'
+            $script:IsDotPaper = $true
         } else {
-            Write-Host ("[WARN] 打印机没有 {0} 纸型,按默认纸输出" -f $paperKind) -ForegroundColor Yellow
+            $ps = $doc.PrinterSettings.PaperSizes | Where-Object { $_.Kind -eq $paperKind } | Select-Object -First 1
+            if (-not $ps) { $ps = $doc.PrinterSettings.PaperSizes | Where-Object { $_.PaperName -match $paperKind } | Select-Object -First 1 }
+            if ($ps) {
+                $doc.DefaultPageSettings.PaperSize = $ps
+                $doc.DefaultPageSettings.Landscape = $true    # 横打:A5→210×148 / A4→297×210
+                $doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
+                Say ("[版面] 纸张 = {0} 横打(内容仍 210×148mm)" -f $paperKind) 'DarkGray'
+            } else {
+                Say ("[WARN] 打印机没有 {0} 纸型,按默认纸输出" -f $paperKind) 'Yellow'
+            }
         }
     } catch {
-        Write-Host ("[WARN] 设置纸张({0} 横版)失败,按默认纸输出: {1}" -f $paperKind, $_.Exception.Message) -ForegroundColor Yellow
+        Say ("[WARN] 设置纸张失败,按默认纸输出: {0}" -f $_.Exception.Message) 'Yellow'
     }
 
     # 版式数据交给回调(script 作用域,PrintPage 里能读到)
@@ -345,8 +497,27 @@ function Send-LabelToPrinter {
         $g = $e.Graphics
         $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
         $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
-        $pageW = 827   # 210mm
+        $pageW = 827   # 210mm(版式坐标,不随纸张变)
         $pageH = 583   # 148mm
+        # 纸比版式小时等比缩小并居中:以前固定坐标直接画,针式连续纸(140mm 高)会把下半截裁掉
+        try {
+            $mb = $e.MarginBounds
+            if ($mb -and $mb.Width -gt 50 -and $mb.Height -gt 50) {
+                # 针式机:实际可打印宽度约 203mm(8in),版式 210mm ⇒ 目标宽收到 198mm;
+                # 高度减 1mm 余量,避免 140mm 纸刚好压线。
+                $targetW = 827.0
+                $targetH = 583.0
+                if ($script:IsDotPaper) { $targetW = 780.0; $targetH = 575.0 }
+                $sx = [Math]::Min([double]$mb.Width, $targetW) / 827.0
+                $sy = [Math]::Min([double]$mb.Height, $targetH) / 583.0
+                $sc = [Math]::Min(1.0, [Math]::Min($sx, $sy))
+                $g.TranslateTransform([float]$mb.Left, [float]$mb.Top)
+                if ($sc -lt 0.999) {
+                    $g.ScaleTransform([float]$sc, [float]$sc)
+                    Say ("[版面] 可打印区 {0}×{1} → 缩放 {2:P0}" -f $mb.Width, $mb.Height, $sc) 'DarkGray'
+                }
+            }
+        } catch { }
         $black = [System.Drawing.Brushes]::Black
         $gray  = [System.Drawing.Brushes]::DimGray
 
@@ -504,12 +675,30 @@ function Send-LabelToPrinter {
         $fontTitle.Dispose(); $fontNo.Dispose(); $fontHead.Dispose(); $fontCell.Dispose(); $fontFoot.Dispose()
         } catch {
             $msg = $_.Exception.Message
-            Write-Host "[绘制失败] $msg" -ForegroundColor Red
-            Write-Host "  堆栈: $($_.ScriptStackTrace)" -ForegroundColor DarkYellow
+            Say "[绘制失败] $msg" 'Red'
+            Say "  堆栈: $($_.ScriptStackTrace)" 'DarkYellow'
             throw
         }
     })
-    $doc.Print()
+    # 打印可能因驱动/打印机被删而失败 ⇒ 换候选列表里的下一台重试(最多 3 台)
+    $printed = $false
+    $lastErr = $null
+    $tryIdx = 0
+    while (-not $printed) {
+        try {
+            $doc.Print()
+            $printed = $true
+        } catch {
+            $lastErr = $_.Exception.Message
+            $cands = @($script:PrintCandidates)
+            if ($tryIdx + 1 -ge $cands.Count -or $tryIdx -ge 2) { throw }
+            $tryIdx++
+            $next = $cands[$tryIdx]
+            Say ("[打印机] 打印失败({0}),改试「{1}」" -f $lastErr, $next) 'Yellow'
+            $doc.PrinterSettings.PrinterName = $next
+            if (-not $doc.PrinterSettings.IsValid) { throw }
+        }
+    }
     if ($qrImg) { $qrImg.Dispose() }
 }
 
@@ -580,9 +769,12 @@ function Invoke-PrintJob {
     # 判"能不能打"两条:① 排除虚拟打印机(PDF/XPS/OneNote/Fax,它们不落纸);
     # ② 真打一次,失败(离线/缺纸/驱动报错)也降级 —— 现场不会"点了没反应"。
     try {
-        $real = Get-RealPrinterName -Prefer $printerN
+        # 先按系统清单核对配置名(忽略 (副本 N)),对不上就换可用真机
+        $real = Resolve-PrinterName $printerN
+        if (-not $real) { $real = Get-RealPrinterName -Prefer '' }
+        if ($real -and $printerN -and $real -ne $printerN) { Say ("[打印机] 配置的「{0}」不在系统里,改用「{1}」" -f $printerN, $real) 'Yellow' }
         if (-not $real) {
-            Write-Host '[兜底] 本机没有可用打印机,改落 PDF' -ForegroundColor Yellow
+            Say '[兜底] 本机没有可用打印机,改落 PDF' 'Yellow'
             $pdfPath = & $doPdf
             return @{ ok = $true; mode = 'pdf'; pdfPath = $pdfPath; pdfDir = $PdfDir; fallback = 'no-printer' }
         }
@@ -592,7 +784,7 @@ function Invoke-PrintJob {
         return @{ ok = $true; mode = 'printer'; printer = $real }
     } catch {
         $why = $_.Exception.Message
-        Write-Host "[兜底] 打印失败,改落 PDF:$why" -ForegroundColor Yellow
+        Say "[兜底] 打印失败,改落 PDF:$why" 'Yellow'
         $pdfPath = & $doPdf
         return @{ ok = $true; mode = 'pdf'; pdfPath = $pdfPath; pdfDir = $PdfDir; fallback = $why }
     }
@@ -616,8 +808,8 @@ $listener.Prefixes.Add($prefix)
 try {
     $listener.Start()
 } catch {
-    Write-Host "[FAIL] 端口 $Port 起不来(被占用或权限不足):$($_.Exception.Message)" -ForegroundColor Red
-    Write-Host '       可能已有一个代理在跑;如需换端口,同时改 src/business/printStation.js 的 AGENT_URL。'
+    Say "[FAIL] 端口 $Port 起不来(被占用或权限不足):$($_.Exception.Message)" 'Red'
+    Say '       可能已有一个代理在跑;如需换端口,同时改 src/business/printStation.js 的 AGENT_URL。'
     exit 1
 }
 # ══════════════════════════════════════════════════════════════════════
@@ -635,9 +827,11 @@ try {
 #   给了 -Server 才会启动轮询;不给则维持原来"等页面推任务"的模式。
 if ($Server) {
     $srvBase = $Server.TrimEnd('/')
-    $pollArgs = @($srvBase, $User, $Pass, $Factory, $Station, $Port, $Mode, $PdfDir, $Printer)
+    $compatForJob = Join-Path $script:HereDir 'compat-ps2.ps1'
+    $pollArgs = @($compatForJob, $srvBase, $User, $Pass, $Factory, $Station, $Port, $Mode, $PdfDir, $Printer)
     $script:pollJob = Start-Job -ScriptBlock {
-        param($Srv, $Usr, $Pwd, $Fac, $Sta, $AgentPort, $ModeX, $PdfDirX, $PrinterX)
+        param($Cmp, $Srv, $Usr, $Pwd, $Fac, $Sta, $AgentPort, $ModeX, $PdfDirX, $PrinterX)
+        if ($PSVersionTable.PSVersion.Major -lt 3) { . $Cmp }
         # ⚠ 全部走 Invoke-WebRequest + 手动 UTF-8 解码,不用 Invoke-RestMethod ——
         #   实测 PS 5.1 的 Invoke-RestMethod 会把 JSON 响应按 Latin1 解,中文键名全变乱码
         #   ("二维码内容" → "äºç»´ç å å®¹"),后面 $task.'二维码内容' 就永远取不到值,
@@ -704,21 +898,27 @@ if ($Server) {
             if ($did) { Start-Sleep -Milliseconds 300 } else { Start-Sleep -Seconds 4 }
         }
     } -ArgumentList $pollArgs
-    Write-Host "[轮询] 已启动:每 4 秒去 $srvBase 拉一次任务(站点:$Station)" -ForegroundColor Cyan
-    Write-Host '[轮询] 这个模式下**不需要**浏览器页面开着;页面只用来开关/看队列。' -ForegroundColor DarkGray
+    Say "[轮询] 已启动:每 4 秒去 $srvBase 拉一次任务(站点:$Station)" 'Cyan'
+    Say '[轮询] 这个模式下**不需要**浏览器页面开着;页面只用来开关/看队列。' 'DarkGray'
 }
 
 
 $defaultPrinter = Get-SystemPrinterName
-$effective = if ($Printer) { $Printer } elseif ($defaultPrinter) { "$defaultPrinter(系统默认)" } else { '(未检测到默认打印机!)' }
-Write-Host ''
-Write-Host '════════════════════════════════════════════════════════' -ForegroundColor Cyan
-Write-Host " YINJIA-MES 本地打印代理 v$AgentVersion" -ForegroundColor Cyan
-Write-Host " 监听: $prefix" -ForegroundColor Green
-Write-Host " 打印机: $effective"
-Write-Host ' 按 Ctrl+C 退出' -ForegroundColor DarkGray
-Write-Host '════════════════════════════════════════════════════════' -ForegroundColor Cyan
-Write-Host ''
+# 配置的打印机名可能已失效(现场 "…(副本 1)" 被删,打印报「已删除指定的打印机。」)
+$resolvedStartup = Resolve-PrinterName $Printer
+if ($Printer -and -not $resolvedStartup) {
+    Say ("[打印机] 配置的「{0}」在这台电脑上不存在,打印时会自动改用可用打印机" -f $Printer) 'Yellow'
+    foreach ($n in (Get-InstalledPrinterNames)) { Say ("          可选: " + $n) 'DarkGray' }
+}
+$effective = if ($resolvedStartup) { $resolvedStartup } elseif ($Printer) { $Printer + '(未找到!)' } elseif ($defaultPrinter) { "$defaultPrinter(系统默认)" } else { '(未检测到默认打印机!)' }
+Say ''
+Say '════════════════════════════════════════════════════════' 'Cyan'
+Say " YINJIA-MES 本地打印代理 v$AgentVersion" 'Cyan'
+Say " 监听: $prefix" 'Green'
+Say " 打印机: $effective"
+Say ' 按 Ctrl+C 退出' 'DarkGray'
+Say '════════════════════════════════════════════════════════' 'Cyan'
+Say ''
 
 try {
     while ($listener.IsListening) {
@@ -762,7 +962,7 @@ try {
                     $cfg = $raw | ConvertFrom-Json
                     if ($cfg.PSObject.Properties.Name -contains 'mode') {
                         $m = [string]$cfg.mode
-                        if ($m -in @('Auto', 'Printer', 'Pdf')) { $script:Mode = $m }
+                        if (@('Auto', 'Printer', 'Pdf') -contains $m) { $script:Mode = $m }
                     }
                     if ($cfg.PSObject.Properties.Name -contains 'pdfDir') {
                         $d = [string]$cfg.pdfDir
@@ -775,7 +975,7 @@ try {
                         }
                     }
                     Write-JsonResponse $res @{ ok = $true; mode = $Mode; pdfDir = $PdfDir; printer = $effective }
-                    Write-Host "[配置] mode=$Mode pdfDir=$PdfDir" -ForegroundColor Cyan
+                    Say "[配置] mode=$Mode pdfDir=$PdfDir" 'Cyan'
                 }
             }
             elseif ($req.HttpMethod -eq 'POST' -and $path -eq '/print') {
@@ -786,13 +986,13 @@ try {
                 $r = Invoke-PrintJob -Job $job
                 Write-JsonResponse $res @{ ok = $true; mode = $r.mode; printer = $r.printer; pdfPath = $r.pdfPath }
                 if ($r.mode -eq 'pdf') {
-                    Write-Host "[PDF ] $($job.'工单号') #$($job.'工单行号') -> $($r.pdfPath)" -ForegroundColor Cyan
+                    Say "[PDF ] $($job.'工单号') #$($job.'工单行号') -> $($r.pdfPath)" 'Cyan'
                 } else {
-                    Write-Host "[打印] $($job.'工单号') #$($job.'工单行号') -> $($r.printer)" -ForegroundColor Green
+                    Say "[打印] $($job.'工单号') #$($job.'工单行号') -> $($r.printer)" 'Green'
                 }
             }
             elseif ($req.HttpMethod -eq 'POST' -and $path -eq '/test') {
-                $r = Invoke-PrintJob -Job ([pscustomobject]@{
+                $r = Invoke-PrintJob -Job (New-Object PSObject -Property @{
                     标题 = '打印代理测试'
                     工单号 = 'TEST-0001'
                     工单行号 = 1
@@ -801,15 +1001,15 @@ try {
                     二维码内容 = '0@TEST-0001@1001'
                 })
                 Write-JsonResponse $res @{ ok = $true; mode = $r.mode; printer = $r.printer; pdfPath = $r.pdfPath }
-                if ($r.mode -eq 'pdf') { Write-Host "[测试] 已生成测试 PDF: $($r.pdfPath)" -ForegroundColor Yellow }
-                else { Write-Host '[测试] 已发送一张测试标签' -ForegroundColor Yellow }
+                if ($r.mode -eq 'pdf') { Say "[测试] 已生成测试 PDF: $($r.pdfPath)" 'Yellow' }
+                else { Say '[测试] 已发送一张测试标签' 'Yellow' }
             }
             else {
                 Write-JsonResponse $res @{ ok = $false; error = 'not found' } 404
             }
         } catch {
             # 单次打印失败不影响代理继续跑:把错误回给网页,让人在界面上看得见
-            Write-Host "[错误] $($_.Exception.Message)" -ForegroundColor Red
+            Say "[错误] $($_.Exception.Message)" 'Red'
             try { Write-JsonResponse $res @{ ok = $false; error = $_.Exception.Message } 500 } catch { }
         } finally {
             try { $res.Close() } catch { }
@@ -817,6 +1017,6 @@ try {
     }
 } finally {
     try { $listener.Stop(); $listener.Close() } catch { }
-    Write-Host ''
-    Write-Host '代理已停止。' -ForegroundColor DarkGray
+    Say ''
+    Say '代理已停止。' 'DarkGray'
 }

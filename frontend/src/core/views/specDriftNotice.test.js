@@ -68,7 +68,9 @@ test('端点 + 前端 API + 前端加载时机', () => {
   assert.match(controller, /@GetMapping\("\/rdDev\/specDrift"\)[\s\S]{0,200}?buttons\.specDriftState\(panelCode, docNo\)/)
   assert.match(engine, /export async function rdSpecDrift\(panelCode, docNo\)/)
   assert.match(panelx, /const SPEC_REF_PANELS = \['RD_MOLD_PROC', 'RD_X_SINTER', 'RD_ASM_PROC', 'RD_INSP_PLAN'\]/)
-  assert.match(panelx, /loadRdFlowState\(\); loadPendingDocs\(\); loadSpecDrift\(\); loadProdDrift\(\) \}/,
+  // 2026-11-11:该 watch 加了「不在前台页签就跳过」的前置闸(页签名字/数据横跳修复),
+  // 断言随之放宽为「同一个 watch 里带上这几个 loader」,不再死抠单行排版
+  assert.match(panelx, /loadSpecDrift\(\)[\s\S]{0,40}?loadProdDrift\(\)/,
     '切单据的 watch 里必须带上 loadSpecDrift/loadProdDrift —— 否则黄条永远不出现')
 })
 

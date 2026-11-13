@@ -21,7 +21,17 @@
  */
 
 /** 已转提示的中文键(含 {no} 占位符,由 erpOutcomeText 填入 ERP 单号;译名见 i18n/locales/*.js biz) */
-export const ERP_ALREADY_KEY = '该单据已转入ERP（{no}），不可重复转入；如需重新转ERP，请先「弃审」再「审核」'
+export const ERP_ALREADY_KEY = '该单据已转入ERP（{no}），不可重复转入；如需重新转ERP，请先「弃审」→「审核」，并在金蝶删除原单据，否则金蝶侧会有两张'
+
+/**
+ * 「弃审一张已转过ERP 的单据」的确认文案(2026-11-12 用户口径)。
+ *
+ * 用户原话:「弃审后重新审核要确保是可以重新转erp的,这样可以做到 mes 改错、erp 重新同步。
+ * 原先修改前的单据就可以他们在 erp 上删除就行」—— 即重推是**允许且正常**的流程,
+ * 但**旧的那张必须先在金蝶删掉**,否则金蝶侧留两张(重复入库的另一种来源)。
+ * 这句话必须出现在「弃审确认」那一刻:它是用户唯一会看提示的时机,弹在事后就白说了。
+ */
+export const ERP_UNAUDIT_WARN = '确认弃审该单据？本单已转过ERP（{no}）：请先在金蝶删除那张单据，再修改 → 审核 → 重新转ERP，否则金蝶侧会有两张'
 
 /**
  * 「转ERP」单次请求的超时(毫秒)。
@@ -35,6 +45,23 @@ export const ERP_CALL_TIMEOUT_MS = 180000
 
 /** 请求超时提示的中文键(同上,译名见 i18n/locales/*.js biz) */
 export const ERP_TIMEOUT_KEY = '转ERP请求超时：服务端可能仍在推送，请稍后刷新列表确认「是否已转ERP」后再操作，不要立刻重复点'
+
+/**
+ * 「上一次转ERP 还没结束」的中文键(2026-11-12 客户报障「点了两下就生成两个入库单」)。
+ *
+ * 背景:转ERP 要连金蝶(冷启动十几秒很常见),原来的按钮**点一下不灰** ⇒ 用户看没反应就再点一次,
+ * 两个请求几乎同时进后端,都读到「是否已转ERP=否」⇒ 金蝶落两张入库单(重复入库)。
+ * 现在前端在推送期间把按钮置灰(本键=点击时的解释文案),服务端另有单号级互斥兜底
+ * (KingdeePushService.pushDocument),两边同时点、开两个标签页也只会推一次。
+ */
+export const ERP_BUSY_KEY = '该单据正在转ERP（正在连金蝶推送，通常十几秒），请勿重复点击；完成后列表会自动显示 ERP 单号'
+
+/**
+ * 「批量转ERP 正在跑」的中文键。
+ * 批量弹窗里的「开始转ERP」也是连点高发区:上一批没跑完再点一次 = 把同一批单据**并行再推一遍**,
+ * 与单张双击是同一种重复入库风险。按钮本身已带 loading,这里再兜一层。
+ */
+export const ERP_BATCH_BUSY_KEY = '批量转ERP正在执行，请等待本批完成，勿重复点击'
 
 /**
  * 判定一次「转ERP」调用的结果。
@@ -80,4 +107,18 @@ export function erpFailureOutcome(err) {
   const isTimeout = err?.code === 'ECONNABORTED' || /timeout/i.test(msg)
   if (isTimeout) return { timeout: true, level: 'warning', key: ERP_TIMEOUT_KEY }
   return { timeout: false, level: 'error', key: '' }
+}
+
+/**
+ * 「这次点击该不该被拦下」的唯一判据(列表页/表单页共用,避免两处各写一遍又慢慢走偏)。
+ *
+ * 为什么单独抽出来:重复入库这道闸最怕"某天有人只改了一边"。抽成纯函数后
+ * erpOutcome.test.js 能直接钉住(组件只负责把 erpPushing 传进来)。
+ *
+ * @param {string} action    按钮动作名
+ * @param {boolean} pushing  该单据是否有一次转ERP 正在飞
+ * @returns {boolean} true = 拦下(不发请求)
+ */
+export function erpClickBlocked(action, pushing) {
+  return action === '转ERP' && pushing === true
 }

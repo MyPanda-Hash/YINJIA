@@ -673,6 +673,19 @@ export async function puPrintDetail(printNo) {
   return unwrapStrict(await request.get('/px/puPrint/lines', { params: { docNo: printNo } }))
 }
 
+/**
+ * 需方联系人候选(2026-11-11 用户口径「需方的联系人和联系方式改为打印前先弹窗,
+ * 下拉选择名字和联系方式。可以新增」)—— 存系统参数 `pu_order.buyer_contacts`,返 [{姓名, 联系方式}]。
+ */
+export async function puPrintBuyerContacts() {
+  return unwrapStrict(await request.get('/px/puPrint/buyerContacts'))
+}
+
+/** 新增一条需方联系人候选(姓名 + 联系方式;同一条重复提交不会重复存,返回整份名单) */
+export async function puPrintBuyerContactAdd(payload) {
+  return unwrapStrict(await request.post('/px/puPrint/buyerContacts', payload || {}))
+}
+
 /** 保存「收料超送比例」(生单对话框改动即自动保存):落系统参数 receive_over_ratio,传 0~1 小数 */
 export async function batchFlowSaveOverRatio(overRatio) {
   return unwrap(await request.post('/px/batchFlow/overRatio', { overRatio }))

@@ -90,28 +90,38 @@
       >⧉ {{ carrying ? tt('带入中…') : tt('带入检验要求') }}</span>
     </div>
 
-    <!-- ④ 表体:检验项 | 检测标准 | 检测结果 | 单项判定 -->
+    <!-- ④ 表体:检验项 | 检测标准 | 检测结果(固定五格) | 单项判定 -->
     <table class="qr-table">
       <thead>
+        <!-- 检测结果 = 固定五格(2026-11-11 用户口径「检验结果改为固定五格」):
+             表头两行 —— 第一行「检测结果」跨 5 列,第二行 1..5 标出第几格;
+             格子数据键 = 结果1..结果5(见 @core/qc/qcInspRecColumns 的 QC_INSP_REC_RESULT_KEYS) -->
         <tr>
-          <th class="c-item">
-            {{ tt('检验项') }}
-            <span
-              v-if="editable"
-              class="qr-lib-btn no-print"
-              :title="tt('检验项来自数据库选择，可在此维护')"
-              @click="openStdLib"
-            >⧉ {{ tt('标准库维护') }}</span>
+          <th class="c-item" rowspan="2">
+            {{ tt('检验项') }}<span v-if="isRequired(K.ITEM)" class="qr-req" :title="tt('必填')">*</span>
+            <!-- 2026-11-12 用户口径:「检验项现在是带入的,不需要标准库维护」
+                 ⇒ 检验项列不再挂「⧉ 标准库维护」入口(检验项由「带入检验要求」带出来,
+                    历史值仍在下拉候选里可回显/可选,输入框本就 allow-create 可自由敲)。
+                 检验结论 / 处理意见 两处入口不受影响(它们仍是标准库下拉)。 -->
           </th>
-          <th class="c-std">{{ tt('检测标准') }}</th>
-          <th class="c-result">{{ tt('检测结果') }}</th>
-          <th class="c-judge">{{ tt('单项判定') }}</th>
-          <th v-if="editable" class="c-op"></th>
+          <th class="c-std" rowspan="2">{{ tt('检测标准') }}</th>
+          <!-- 检验方法(2026-11-11 用户口径):来料检验要求「父目录+两个子目录」带入时,
+               一个子目录进 检测标准、另一个进 检验方法 —— 报告表体必须有这一列 -->
+          <th class="c-method" rowspan="2">{{ tt('检验方法') }}</th>
+          <th class="c-result" colspan="5">{{ tt('检测结果') }}</th>
+          <!-- 单项判定必填(2026-11-11 用户口径) -->
+          <th class="c-judge" rowspan="2">
+            {{ tt('单项判定') }}<span v-if="isRequired(K.JUDGE)" class="qr-req" :title="tt('必填')">*</span>
+          </th>
+          <th v-if="editable" class="c-op" rowspan="2"></th>
+        </tr>
+        <tr>
+          <th v-for="(k, gi) in RESULT_KEYS" :key="'rh' + k" class="c-res">{{ gi + 1 }}</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="(row, i) in items" :key="row.id ?? ('new' + i)">
-          <td class="c-item">
+          <td class="c-item" :title="row[K.ITEM] || ''">
             <el-select
               v-if="editable"
               v-model="row[K.ITEM]"
@@ -128,24 +138,66 @@
             </el-select>
             <span v-else class="qr-cell-text">{{ row[K.ITEM] || '' }}</span>
           </td>
-          <td class="c-std">
-            <el-input v-if="editable" v-model="row[K.STD]" size="small" class="qr-cell-input" maxlength="500" @input="emit('dirty')" />
-            <span v-else class="qr-cell-text">{{ row[K.STD] || '' }}</span>
+          <td class="c-std" :title="row[K.STD] || ''">
+            <!-- 检测标准(2026-11-11 用户口径):源文本里本来就可能有**硬换行**(Excel Alt+Enter →
+                 char(10)/char(13)),而这一格原来是单行 el-input —— 换行显示不出来、超宽还被截断,
+                 于是同一份数据"草稿态一行、审核后多行",看着像带入不一致。现在:
+                 · 编辑态 = 多行 textarea(自动增高 1~6 行),硬换行按原样断行;
+                 · 只读态 = 保留换行的 span(.qr-pre = white-space: pre-wrap);
+                 · 两态都挂 tooltip:内容超过格高/格宽时,光标停上去看全文;
+                 · maxlength 500 → 1000(物理列是 nvarchar(1000),原来编辑一下就会被截到 500 字)。 -->
+            <el-tooltip
+              v-if="editable"
+              :content="row[K.STD] || ''"
+              placement="top-start"
+              popper-class="qc-std-tip"
+              :disabled="!row[K.STD]"
+              :show-after="400"
+            >
+              <el-input
+                v-model="row[K.STD]"
+                type="textarea"
+                :autosize="{ minRows: 1, maxRows: 6 }"
+                size="small"
+                class="qr-cell-input qr-std-input"
+                maxlength="1000"
+                @input="emit('dirty')"
+              />
+            </el-tooltip>
+            <el-tooltip
+              v-else
+              :content="row[K.STD] || ''"
+              placement="top-start"
+              popper-class="qc-std-tip"
+              :disabled="!row[K.STD]"
+              :show-after="300"
+            >
+              <span class="qr-cell-text qr-pre">{{ row[K.STD] || '' }}</span>
+            </el-tooltip>
           </td>
-          <td class="c-result">
+          <td class="c-method" :title="row[K.METHOD] || ''">
             <el-input
               v-if="editable"
-              v-model="row[K.RESULT]"
-              type="textarea"
-              :autosize="{ minRows: 1, maxRows: 5 }"
+              v-model="row[K.METHOD]"
               size="small"
               class="qr-cell-input"
-              maxlength="500"
+              maxlength="1000"
               @input="emit('dirty')"
             />
-            <span v-else class="qr-cell-text">{{ row[K.RESULT] || '' }}</span>
+            <span v-else class="qr-cell-text qr-pre">{{ row[K.METHOD] || '' }}</span>
           </td>
-          <td class="c-judge">
+          <td v-for="k in RESULT_KEYS" :key="'r' + k" class="c-res" :title="row[k] || ''">
+            <el-input
+              v-if="editable"
+              v-model="row[k]"
+              size="small"
+              class="qr-cell-input"
+              maxlength="200"
+              @input="emit('dirty')"
+            />
+            <span v-else class="qr-cell-text">{{ row[k] || '' }}</span>
+          </td>
+          <td class="c-judge" :title="row[K.JUDGE] || ''">
             <el-select
               v-if="editable"
               v-model="row[K.JUDGE]"
@@ -165,7 +217,7 @@
           </td>
         </tr>
         <tr v-if="!items.length">
-          <td :colspan="editable ? 5 : 4" class="qr-empty">{{ tt('暂无检验项，点击下方按钮新增') }}</td>
+          <td :colspan="editable ? 10 : 9" class="qr-empty">{{ tt('暂无检验项，点击下方按钮新增') }}</td>
         </tr>
       </tbody>
     </table>
@@ -173,9 +225,12 @@
       <div class="qr-add" @click="addItem">＋ {{ tt('新增检验项') }}</div>
     </div>
 
-    <!-- ⑤ 表尾:检验结论 / 处理意见(值格铺满表格右侧,对齐原表 C:I 合并) + 签名行 -->
+    <!-- ⑤ 表尾(2026-11-11 用户口径:按模板排成**两行两对** ——
+         左「检验人 / 审核人」、右「检验结论 / 处理意见」):
+           检验人 | 值 | 检验结论 | 值
+           审核人 | 值 | 处理意见 | 值
+         处理意见 = 标准库(qc.insp_disposal,可维护、可自定义输入);检验结论/处理意见必填(★)。 -->
     <table class="qr-foot-table">
-      <!-- 列宽与原表一致:标签列=表体首列(B),值区=C:I(其余三列合并) -->
       <colgroup>
         <col class="fc-label" />
         <col class="fc-v1" />
@@ -183,47 +238,59 @@
         <col class="fc-v2" />
       </colgroup>
       <tbody>
-        <tr v-for="cell in QC_INSP_REC_FOOT_FULL" :key="cell.key">
-          <th class="qr-label">{{ tt(cell.label) }}</th>
-          <td class="qr-value qr-value-wide" colspan="3">
-            <!-- 检验结论(2026-10-19 用户口径 task 2):改**下拉选择** 特采/合格/不合格,
-                 且允许"自定义补充" —— filterable + allow-create:预置三项可选,也能直接敲一个新结论回车即落库
-                 (与表体「检验项」同款交互)。选项来自 yj_field.dict_sql(migrate-qc-insp-rec-verdict-dropdown-20261019.sql),
-                 不硬编码;历史库里已有的其它结论文本照原样显示(allow-create 的输入值即原值)。 -->
-            <el-select
-              v-if="editable && cell.key === VERDICT_KEY"
-              v-model="head[cell.key]"
-              size="small"
-              filterable
-              allow-create
-              default-first-option
-              clearable
-              class="qr-cell-input qr-verdict-sel"
-              :placeholder="tt('请选择')"
-              @change="emit('dirty')"
-            >
-              <el-option v-for="o in verdictOptions" :key="o.value" :label="o.label" :value="o.value" />
-            </el-select>
-            <el-input
-              v-else-if="editable"
-              v-model="head[cell.key]"
-              type="textarea"
-              :autosize="{ minRows: 2, maxRows: 8 }"
-              size="small"
-              class="qr-cell-input"
-              maxlength="1000"
-              @input="emit('dirty')"
-            />
-            <span v-else class="qr-cell-text">{{ head[cell.key] || '' }}</span>
-          </td>
-        </tr>
-        <!-- 签名行:检验人=新增时按登录人生成(锁定) / 审核人=固定:冯敏(落库列 表单审核人) -->
-        <tr>
-          <template v-for="cell in QC_INSP_REC_SIGN_ROW" :key="cell.key">
-            <th class="qr-label">{{ tt(cell.label) }}</th>
+        <tr v-for="(pair, ri) in QC_INSP_REC_FOOT_ROWS" :key="'fr' + ri">
+          <template v-for="cell in pair" :key="cell.key">
+            <th class="qr-label">
+              {{ tt(cell.label) }}<span v-if="isRequired(cell.key)" class="qr-req" :title="tt('必填')">*</span>
+              <!-- 检验结论 / 处理意见:都是标准库(2026-11-11 两轮口径),各自带维护入口 -->
+              <span
+                v-if="editable && cell.key === VERDICT_KEY"
+                class="qr-lib-btn no-print"
+                :title="tt('检验结论候选来自标准库，可在此维护')"
+                @click="openStdLib(VERDICT_LIB, '检验结论')"
+              >⧉ {{ tt('标准库维护') }}</span>
+              <span
+                v-else-if="editable && cell.key === DISPOSAL_KEY"
+                class="qr-lib-btn no-print"
+                :title="tt('处理意见候选来自标准库，可在此维护')"
+                @click="openStdLib(DISPOSAL_LIB, '处理意见')"
+              >⧉ {{ tt('标准库维护') }}</span>
+            </th>
             <td class="qr-value">
+              <!-- 处理意见:标准库下拉(与检验项同一套:选现成条目,也能敲新词)。
+                   2026-11-11 用户口径「不需要先写样例,自己手动填写就行」 ⇒ 库先清空,
+                   候选为空时直接输入即可落库,想沉淀再用「⧉ 标准库维护」加条目。 -->
+              <el-select
+                v-if="editable && cell.key === DISPOSAL_KEY"
+                v-model="head[cell.key]"
+                size="small"
+                filterable
+                allow-create
+                default-first-option
+                class="qr-cell-input qr-verdict-sel"
+                :placeholder="tt('直接输入处理意见')"
+                @change="emit('dirty')"
+              >
+                <el-option v-for="o in disposalOptions" :key="o.value" :label="o.label" :value="o.value" />
+              </el-select>
+              <!-- 检验结论:标准库下拉(2026-11-11 第二轮:只要 合格/不合格,没有特采;
+                   老单上的历史值不在候选里也能照原样回显 —— allow-create + 值直显) -->
+              <el-select
+                v-else-if="editable && cell.key === VERDICT_KEY"
+                v-model="head[cell.key]"
+                size="small"
+                filterable
+                allow-create
+                default-first-option
+                clearable
+                class="qr-cell-input qr-verdict-sel"
+                :placeholder="tt('请选择')"
+                @change="emit('dirty')"
+              >
+                <el-option v-for="o in verdictOptions" :key="o.value" :label="o.label" :value="o.value" />
+              </el-select>
               <el-input
-                v-if="editable && !cell.locked"
+                v-else-if="editable && !cell.locked"
                 v-model="head[cell.key]"
                 size="small"
                 class="qr-cell-input"
@@ -238,9 +305,9 @@
       </tbody>
     </table>
 
-    <!-- 标准库维护(检验项候选的数据库,可增删改;与项目记录表同一组件) -->
-    <el-dialog v-model="stdLibVisible" :title="tt('标准库维护') + ' · ' + tt('检验项')" width="680px" append-to-body>
-      <StdLibManager :lib="QC_INSP_ITEM_LIB" @changed="onStdLibChanged" />
+    <!-- 标准库维护(检验项 / 处理意见各一套,可增删改;与项目记录表同一组件) -->
+    <el-dialog v-model="stdLibVisible" :title="tt('标准库维护') + ' · ' + tt(stdLibTitle)" width="680px" append-to-body>
+      <StdLibManager :lib="stdLibCode" @changed="onStdLibChanged" />
       <template #footer>
         <el-button @click="stdLibVisible = false">{{ tt('关闭') }}</el-button>
       </template>
@@ -279,21 +346,32 @@ import { carryPlan } from '@core/qc/qcInspReqCarry'
 import { qcInspReqTabs, tabsOfPanel } from './qcInspReqConfig'
 import {
   QC_INSP_REC_HEAD_ROWS,
-  QC_INSP_REC_FOOT_FULL,
-  QC_INSP_REC_SIGN_ROW,
-  QC_INSP_ITEM_LIB,
+  QC_INSP_REC_FOOT_ROWS,
+  QC_INSP_REC_RESULT_KEYS,
+  QC_INSP_REC_DISPOSAL_LIB,
+  QC_INSP_REC_VERDICT_LIB,
 } from '@core/qc/qcInspRecColumns'
 
 /** 表体数据键(与 qc_insp_rec_detail 物理列同名) */
 const K = Object.freeze({
   ITEM: '检验项',
   STD: '检测标准',
-  RESULT: '检测结果',
+  /** 检验方法(2026-11-11 新增列):来料检验要求带入时,两个子目录分别落 检测标准 / 检验方法 */
+  METHOD: '检验方法',
   JUDGE: '单项判定',
 })
 
-/** 检验结论(表尾整宽格,2026-10-19 起是下拉框 + 可自定义补充) */
+/** 检测结果 = **固定五格**(2026-11-11 用户口径):结果1..结果5,一格一个实测值。
+ *  键与次序只有一处真源(@core/qc/qcInspRecColumns 的 QC_INSP_REC_RESULT_KEYS),
+ *  纸面渲染、导出、迁移脚本三处必须一致 —— 少一格就会有一个值无处落库。 */
+const RESULT_KEYS = QC_INSP_REC_RESULT_KEYS
+
+/** 检验结论(表尾右列第 1 行):2026-11-11 第二轮起改为**标准库**(qc.insp_verdict:合格/不合格) */
 const VERDICT_KEY = '检验结论'
+const VERDICT_LIB = QC_INSP_REC_VERDICT_LIB
+/** 处理意见(表尾右列第 2 行,2026-11-11 起是**标准库**下拉;必填) */
+const DISPOSAL_KEY = '处理意见'
+const DISPOSAL_LIB = QC_INSP_REC_DISPOSAL_LIB
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -315,13 +393,22 @@ function optionsOf(key) {
     ? { value: o.value ?? o.label, label: o.label ?? o.value }
     : { value: o, label: o }))
 }
+/** 该格是否必填(取元数据的 isRequired —— 面板配置里 yj_field.required 就下发达一字段;
+ *  纸面显示 ★,服务端保存/提交时由 ButtonService.ensureRequiredFilled 强制) */
+function isRequired(key) {
+  const f = fieldMap.value.get(key)
+  return !!(f && (f.isRequired || f.required))
+}
 /** 检验项候选:来自标准库 qc.insp_item(原表「检验项为数据库选择」) */
 const itemOptions = computed(() => optionsOf(K.ITEM))
 /** 单项判定:下拉(合格/不合格),字典值=中文数据键 */
 const judgeOptions = computed(() => optionsOf(K.JUDGE))
-/** 检验结论候选:特采/合格/不合格(来自 yj_field.dict_sql,不硬编码);
- *  `allow-create` 让用户直接敲一个新结论 —— 历史库里已有的自定义值也照原值回显/可再选 */
+/** 检验结论候选:来自标准库 qc.insp_verdict(2026-11-11 第二轮:只要 合格 / 不合格,没有特采),
+ *  条目在「⧉ 标准库维护」里增删;`allow-create` 让老单上的历史值仍能回显/再选 */
 const verdictOptions = computed(() => optionsOf(VERDICT_KEY))
+/** 处理意见候选:来自标准库 qc.insp_disposal(2026-11-11 用户口径「处理意见做成标准库的形式」),
+ *  条目在「⧉ 标准库维护」里增删;同样允许敲新词(allow-create) */
+const disposalOptions = computed(() => optionsOf(DISPOSAL_KEY))
 
 /* ── 来料检验单号链接(2026-10-19 用户口径 task 6)──
    报告建单时落了「来料检验单号」(QcCatalogService.createInspRecord),这里只做跳转:
@@ -400,10 +487,16 @@ function headVal(key) {
 }
 
 /** 行增删(与检验目录同款 ＋/× 操作) */
+/** 新建行的空白骨架:**把必填列显式建成空串**(2026-11-11)。
+ *  服务端 ensureDetailRequiredFilled 只校验「载荷里带了这一键」的行 —— 空对象{} 会整行跳过,
+ *  于是「单项判定必填」对新增/带入出来的行形同虚设。这里先把键建出来,空值照样被拦。 */
+function blankRow() {
+  return { [K.ITEM]: '', [K.STD]: '', [K.METHOD]: '', [K.JUDGE]: '' }
+}
 function insertAfter(i) {
   const d = props.head.detail
   if (!d || !Array.isArray(d.items)) return
-  d.items.splice(i + 1, 0, {})
+  d.items.splice(i + 1, 0, blankRow())
   emit('dirty')
 }
 function removeItem(i) {
@@ -414,13 +507,20 @@ function removeItem(i) {
 function addItem() {
   const d = props.head.detail || (props.head.detail = {})
   if (!Array.isArray(d.items)) d.items = []
-  d.items.push({})
+  d.items.push(blankRow())
   emit('dirty')
 }
 
-/** 标准库维护:改完让面板重拉一次配置(选项随之刷新) */
+/** 标准库维护:改完让面板重拉一次配置(选项随之刷新)
+ *  ⚠ 2026-11-12 起只有 **检验结论**(qc.insp_verdict)与 **处理意见**(qc.insp_disposal)两个入口 ——
+ *  用户口径「检验项现在是带入的,不需要标准库维护」,检验项那一列的入口已摘掉
+ *  (qc.insp_item 这个库本身还在:历史值仍是下拉候选,回显不受影响)。 */
 const stdLibVisible = ref(false)
-function openStdLib() {
+const stdLibCode = ref('')
+const stdLibTitle = ref('')
+function openStdLib(lib, title) {
+  stdLibCode.value = lib
+  stdLibTitle.value = title
   stdLibVisible.value = true
 }
 function onStdLibChanged() {
@@ -518,7 +618,8 @@ async function carryFromReq(opts = {}) {
     const d = props.head.detail || (props.head.detail = {})
     if (!Array.isArray(d.items)) d.items = []
     // 逐列落成行:检验项=表头列名,检测标准=该列数据;结果/判定留空等人填
-    for (const e of plan.add) d.items.push({ [K.ITEM]: e.检验项, [K.STD]: e.检测标准 })
+    // (单项判定显式建空串:必填校验只认"带了这一键"的行,不建键等于放行)
+    for (const e of plan.add) d.items.push({ [K.ITEM]: e.检验项, [K.STD]: e.检测标准, [K.METHOD]: e.检验方法 || '', [K.JUDGE]: '' })
     emit('dirty')
     ElMessage.success(tt('已按来料检验要求带入 {n} 项检验项').replace('{n}', String(plan.add.length)))
     return plan.add.length
@@ -679,6 +780,12 @@ watch(
   text-align: center;
   white-space: nowrap;
 }
+/* 必填标记(2026-11-11:检验结论 / 处理意见 / 单项判定必填) */
+.qr-req {
+  color: #c0392b;
+  font-weight: 700;
+  margin-left: 2px;
+}
 /* 整张纸共用一套列宽(与原表 B|C:D|E|F:I 同节奏):
    标签列 20% / 值列 30% / 标签列 20% / 值列 30%;表尾「检验结论/处理意见」值格跨后三列铺到表格右缘 */
 .qr-head-table col.fc-label,
@@ -700,6 +807,17 @@ watch(
   display: inline-block;
   width: 100%;
   word-break: break-all;
+}
+/* 保留源文本里的硬换行(2026-11-11):检验要求里的多段标准带 char(10)/char(13),
+   默认 white-space:normal 会把它们折成空格,导致"审核后断行位置和源表不一致" */
+.qr-pre {
+  white-space: pre-wrap;
+}
+/* 检测标准改成多行输入后:去掉 textarea 自带的 resize 手柄(版面里不该出现),
+   行高与只读态一致(1.6),超 6 行在格内滚动 + 悬停 tooltip 看全文 */
+.qr-std-input :deep(.el-textarea__inner) {
+  resize: none;
+  min-height: 20px !important;
 }
 /* 商品参照单元格(物料名称/物料编码):拟态输入框 —— 点整格即弹参照,未填时给占位提示。
    与 DataRecordSheet/RecordSheetPanels 的参照格同观感(纸面上仍是"一格值",不带边框)。 */
@@ -785,11 +903,19 @@ watch(
 .qr-table tr:hover td {
   background: #f7fbff;
 }
-.c-item { width: 20%; }
-.c-std { width: 24%; }
-.c-result { width: 42%; }
-.c-judge { width: 14%; }
+/* 2026-11-11 加「检验方法」列后重排列宽(合计 100%):
+   检验项 14% / 检测标准 21% / 检验方法 21% / 检测结果五格 34%(每格 6.8%) / 单项判定 10% */
+.c-item { width: 14%; }
+.c-std { width: 21%; }
+.c-method { width: 21%; }
+/* 「检测结果」= 固定五格:表头第一行跨 5 列(34%),第二行 1..5 每格 6.8% */
+.c-result { width: 34%; }
+.c-res { width: 6.8%; }
+.c-judge { width: 10%; }
 .c-op { width: 46px; text-align: center; }
+/* 五格是窄格(约 6.8%),缩一缩左右内边距,数字/短文本不会被挤掉 */
+.qr-table th.c-res,
+.qr-table td.c-res { padding-left: 2px; padding-right: 2px; }
 .qr-lib-btn {
   margin-left: 6px;
   font-size: 11px;
@@ -861,6 +987,27 @@ watch(
 }
 </style>
 
+<!-- 检测标准的悬停全文(2026-11-11):这一格可能几百字,Element 的 tooltip 默认不限宽,
+     会把提示拉成一条横贯全屏的长条 —— 这里限宽 + 换行(内容里的硬换行也照原样断) -->
+<style>
+.qc-std-tip.el-popper {
+  max-width: 460px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.6;
+  font-size: 12.5px;
+  /* 纸面是白底表格,提示必须实底深色,否则半透明叠在文字上看不清 */
+  background: #1f2937;
+  color: #fff;
+  border: 1px solid #374151;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+.qc-std-tip.el-popper .el-popper__arrow::before {
+  background: #1f2937;
+  border-color: #374151;
+}
+</style>
+
 <!-- 打印整张:只保留纸张(与项目进度查询/检验目录同口径) -->
 <style>
 @media print {
@@ -916,6 +1063,11 @@ watch(
   body.approval-printing .qr-addbar,
   body.approval-printing .qr-lib-btn,
   body.approval-printing .qr-ref-ico {
+    display: none !important;
+  }
+  /* 行操作列(＋/×)是屏幕上的编辑入口,纸面不该出现(2026-11-11 做「检测结果固定五格」时
+     顺带把这一列从打印里摘掉:五格已经占满版面,再留一列空操作格会挤窄格子) */
+  body.approval-printing .c-op {
     display: none !important;
   }
   @page {

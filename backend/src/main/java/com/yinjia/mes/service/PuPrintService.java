@@ -55,6 +55,10 @@ public class PuPrintService {
     /** 版式取值:与前端「打印版式」两个单选一致(中文数据键,ADR-0001) */
     public static final String FMT_AMOUNT = "有金额";
     public static final String FMT_NO_AMOUNT = "无金额";
+    /** 需方联系人候选的系统参数键 / 兜底默认 / 条数上限(2026-11-11) */
+    private static final String BUYER_CONTACTS_KEY = "pu_order.buyer_contacts";
+    private static final String BUYER_CONTACTS_DEFAULT = "孙郝聪|13718162430";
+    private static final int BUYER_CONTACTS_MAX = 12;
 
     private final JdbcTemplate jdbc;
     private final FormNoService formNoService;
@@ -522,6 +526,95 @@ public class PuPrintService {
         head.put("单据编号", no);
         head.put("lines", linesOf(no));
         return head;
+    }
+
+    // ==================== ⑥ 需方联系人候选(2026-11-11) ====================
+
+    /**
+     * 采购订单「有金额」打印前弹窗里的**需方联系人**候选。
+     *
+     * <p>用户口径(2026-11-11):「还有需方的联系人和联系方式改为打印前先弹窗。下拉选择名字和联系方式。可以新增」
+     * ⇒ 存**系统参数** {@code yj_app_setting.pu_order.buyer_contacts}(格式 `姓名|联系方式;姓名|联系方式`),
+     * 不建表、不建面板:它只是"打印时填哪个人"的候选名单,改一处全公司生效。
+     *
+     * <p>库里没有该参数时回落到**历史硬编码**的那一组(孙郝聪 / 13718162430),老行为不丢。
+     */
+    public List<Map<String, Object>> buyerContacts() {
+        return parseContacts(rawContacts());
+    }
+
+    /**
+     * 新增一条需方联系人候选(用户口径「可以新增」)。
+     *
+     * <p>幂等语义:同「姓名 + 联系方式」已存在就直接返回现有名单(不重复落库);
+     * 数量上限 {@value #BUYER_CONTACTS_MAX} 条 —— 参数列只有 400 字符,超了会被截断,
+     * 与其静默截断不如明确报错让人先删不用的。
+     */
+    @Transactional
+    public List<Map<String, Object>> addBuyerContact(String name, String phone, String user) {
+        String nm = str(name);
+        String ph = str(phone);
+        if (nm.isEmpty()) throw new IllegalArgumentException("请填写需方联系人姓名");
+        List<Map<String, Object>> list = parseContacts(rawContacts());
+        boolean exists = false;
+        for (Map<String, Object> c : list) {
+            if (nm.equals(str(c.get("姓名"))) && ph.equals(str(c.get("联系方式")))) { exists = true; break; }
+        }
+        if (exists) return list;
+        if (list.size() >= BUYER_CONTACTS_MAX) {
+            throw new IllegalArgumentException("需方联系人最多保留 " + BUYER_CONTACTS_MAX + " 条,请先清理不用的再新增");
+        }
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("姓名", nm);
+        m.put("联系方式", ph);
+        list.add(m);
+        StringBuilder sb = new StringBuilder();
+        for (Map<String, Object> c : list) {
+            if (sb.length() > 0) sb.append(';');
+            sb.append(str(c.get("姓名"))).append('|').append(str(c.get("联系方式")));
+        }
+        String val = sb.toString();
+        if (val.length() > 400) {
+            throw new IllegalArgumentException("需方联系人保存失败:内容过长(参数列上限 400 字符)");
+        }
+        Integer cnt = jdbc.queryForObject("SELECT COUNT(*) FROM yj_app_setting WHERE setting_key = ?",
+                Integer.class, BUYER_CONTACTS_KEY);
+        if (cnt == null || cnt == 0) {
+            jdbc.update("INSERT INTO yj_app_setting (setting_key, setting_value, remark, asp_user1, asp_time1)"
+                            + " VALUES (?,?,?,?,SYSDATETIME())",
+                    BUYER_CONTACTS_KEY, val,
+                    "采购订单「有金额」打印·需方联系人候选(姓名|联系方式,分号分隔;打印弹窗下拉选,可新增)", user);
+        } else {
+            jdbc.update("UPDATE yj_app_setting SET setting_value = ?, asp_time2 = SYSDATETIME() WHERE setting_key = ?",
+                    val, BUYER_CONTACTS_KEY);
+        }
+        return list;
+    }
+
+    /** 参数原值(库里没有/为空 ⇒ 历史默认那一条) */
+    private String rawContacts() {
+        Map<String, Object> row = firstRow(
+                "SELECT TOP 1 setting_value AS v FROM yj_app_setting WHERE setting_key = ?", BUYER_CONTACTS_KEY);
+        String v = row == null ? "" : str(row.get("v"));
+        return v.isEmpty() ? BUYER_CONTACTS_DEFAULT : v;
+    }
+
+    /** `姓名|联系方式;姓名|联系方式` → [{姓名, 联系方式}](脏数据跳过,不抛错) */
+    private static List<Map<String, Object>> parseContacts(String raw) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (String part : str(raw).split("[;\\n]")) {
+            String p = part.trim();
+            if (p.isEmpty()) continue;
+            int bar = p.indexOf('|');
+            String nm = (bar < 0 ? p : p.substring(0, bar)).trim();
+            String ph = bar < 0 ? "" : p.substring(bar + 1).trim();
+            if (nm.isEmpty()) continue;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("姓名", nm);
+            m.put("联系方式", ph);
+            out.add(m);
+        }
+        return out;
     }
 
     // ==================== 小工具 ====================

@@ -1,6 +1,82 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '免检跳过': 'Miễn kiểm (bỏ qua)',
+    '该物料免检，不需要来料检验（送料审核后可直接生成采购入库单）': 'Vật tư này miễn kiểm nên không cần kiểm tra đầu vào (sau khi duyệt phiếu nhận có thể tạo phiếu nhập mua ngay)',
+    '该批次还没有采购入库单：在送料暂收单上点「生成检验或入库单」即可直达入库（免检物料不需要检验）': 'Lô này chưa có phiếu nhập mua: mở phiếu nhận và bấm "Tạo phiếu kiểm tra/nhập kho" để nhập trực tiếp (vật tư miễn kiểm không cần kiểm)',
+    '还没有送料暂收单': 'Chưa có phiếu nhận hàng',
+    '还没有来料检验单': 'Chưa có phiếu kiểm tra',
+    '还没有暂收退回单': 'Chưa có phiếu trả hàng',
+    '还没有特采单': 'Chưa có phiếu chấp nhận đặc biệt',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '退货': 'Trả hàng',
+    '待退货': 'Chờ trả hàng',
+    '待特采': 'Chờ chấp nhận đặc biệt',
+    '显示已隐藏': 'Hiện mục đã ẩn',
+    '已隐藏': 'Đã ẩn',
+    '已转ERP': 'Đã chuyển ERP',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '部分不合格': 'Một phần không đạt',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '送检': 'Đã gửi',
+    '金蝶同步导入的采购入库单没有 MES 来源单号，只能按批号推定匹配；推不到就显示未生成': 'Phiếu nhập kho đồng bộ từ Kingdee không có số nguồn MES nên chỉ khớp theo số lô. Không khớp sẽ hiển thị “Chưa tạo”',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '需检验': 'Cần kiểm',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '仅需检验': 'Chỉ hàng cần kiểm',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '来料性质': 'Tính chất nhập',
+
+
+    // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
+    '品质流程监控': 'Giám sát quy trình chất lượng',
+    '物料批号': 'Số lô vật tư',
+    '物料批号与物料编码': 'Số lô và mã vật tư',
+    '供应商与采购订单': 'Nhà cung cấp và đơn mua',
+    '搜索单号、物料编码、物料批号或供应商': 'Tìm số phiếu, mã vật tư, số lô hoặc nhà cung cấp',
+    '批次行数': 'Số dòng lô',
+    '停留': 'Lưu lại',
+    '停留天数': 'Số ngày lưu',
+    '天': 'ngày',
+    '免检': 'Miễn kiểm',
+    '匹配方式': 'Cách khớp',
+    '检验单行': 'Dòng phiếu kiểm',
+    '批号推定': 'Suy theo lô',
+    '实收': 'Thực nhận',
+    '异常': 'Bất thường',
+    '待检': 'Chờ kiểm',
+    '待入库': 'Chờ nhập kho',
+    '入库': 'Nhập kho',
+    '合格数量': 'SL đạt',
+    '不合格数量': 'SL không đạt',
+    '当前环节': 'Bước hiện tại',
+    '未填批号': 'Chưa có số lô',
+    '该物料免检，不需要来料检验': 'Vật tư này miễn kiểm, không cần kiểm tra đầu vào',
+    '该环节还没有单据': 'Bước này chưa có chứng từ',
+    '点击跳转到': 'Nhấn để mở',
+    '点节点跳转到对应单据；没有该面板权限时不可跳转': 'Nhấn vào nút để mở chứng từ tương ứng; cần quyền xem bảng đó',
+    '没有符合条件的批次': 'Không có lô phù hợp',
+    '送料 → 检验 → 入库': 'Nhận hàng → Kiểm tra → Nhập kho',
+    '绿=已审核/已完成': 'Xanh lá = Đã duyệt/Hoàn tất',
+    '蓝=待办': 'Xanh dương = Cần làm',
+    '橙=审批中': 'Cam = Đang duyệt',
+    '红=作废/不合格': 'Đỏ = Hủy/Không đạt',
+    '无查看该面板的权限': 'Không có quyền xem bảng này',
+
     // 结案回正(2026-10-18):外部程序直连库误写已结案时的恢复入口
     '结案回正': 'Hoàn tác đóng lệnh',
     '没有需要回正的结案行': 'Không có lệnh nào cần hoàn tác',
@@ -321,6 +397,20 @@ export default {
     '打印标识卡': 'In thẻ định danh',
     '当前单据没有可打印的明细行': 'Không có dòng chi tiết có thể in trong tài liệu hiện tại',
     '打印材料码': 'In nhãn QR vật liệu',
+    '联系方式': 'Số liên hệ',
+    '需方联系人': 'Người liên hệ bên mua',
+    '选择或输入联系人': 'Chọn hoặc nhập người liên hệ',
+    '选择或输入联系方式': 'Chọn hoặc nhập số liên hệ',
+    '这两个会印在「需方」框里；填了名单里没有的名字或电话，打印时会自动存进下拉选项': 'Cả hai được in trong khung "Bên mua"; tên/số chưa có trong danh sách sẽ tự lưu khi in',
+    '每箱数量': 'Số lượng mỗi thùng',
+    '零头不足一箱，已自动出卡': 'thùng lẻ chưa đầy, nhãn được in tự động',
+    '请填写每箱数量（必填）': 'Vui lòng nhập số lượng mỗi thùng (bắt buộc)',
+    '按每箱数量算出的标签张数过多（{n} 张），请核对每箱数量': 'Số nhãn tính ra quá nhiều ({n}); vui lòng kiểm tra số lượng mỗi thùng',
+    '有零头箱：整批不是每箱数量的整数倍，零头箱会单独出一张卡（卡面印零头数量）': 'Có thùng lẻ: số lượng không phải bội số của số lượng mỗi thùng; sẽ in thêm một nhãn riêng',
+    '标签张数': 'Số nhãn',
+    '每箱': 'Mỗi thùng',
+    '整箱': 'Thùng đầy',
+    '零头箱': 'Thùng lẻ',
     '打印订单无金额': 'In đơn hàng không có số tiền',
     '请先勾选要导出的商品': 'Hãy chọn trước các hàng hóa cần xuất',
     '请先勾选要打印的仓位': 'Hãy chọn trước các vị trí cần in',
@@ -402,6 +492,23 @@ export default {
     '来料品质': 'Chất lượng nguyên liệu đầu vào',
     '来料检验单': 'Phiếu kiểm nghiệm đầu vào',
     '检验目录': 'Danh mục kiểm tra',
+    '待检验目录': 'Danh mục chờ kiểm tra',
+    '检验数据记录明细表': 'Chi tiết hồ sơ kiểm tra',
+    '查询定位': 'Tìm dòng',
+    '数据定位': 'Bộ định vị dòng',
+    '按物料/批次等条件在本单的行里定位': 'Tìm dòng trong phiếu này theo vật tư / lô / trạng thái',
+    '按物料/批次/检验状态等条件在本单的行里定位（不换单据）': 'Tìm dòng trong phiếu này theo vật tư / lô / trạng thái (không đổi phiếu)',
+    '匹配': 'khớp',
+    '清除定位': 'Xóa định vị',
+    '清除定位，显示全部待检验行': 'Xóa định vị và hiện tất cả dòng chờ kiểm',
+    '没有匹配的行，点上面的「清除定位」看全部待检验行': 'Không có dòng khớp — bấm «Xóa định vị» ở trên để xem tất cả dòng chờ kiểm',
+    '没有匹配的行，请调整条件或点「清除定位」': 'Không có dòng khớp — hãy chỉnh điều kiện hoặc bấm «Xóa định vị»',
+    '已定位': 'Đã định vị',
+    '显示全部状态': 'Hiện tất cả trạng thái',
+    '默认只显示已完成检验，勾选后一并显示正在检验中': 'Mặc định chỉ hiển thị các phiếu đã kiểm tra xong; tích để hiện cả phiếu đang kiểm tra',
+    '收起条件': 'Ẩn điều kiện',
+    '展开条件': 'Hiện điều kiện',
+    '收起或铺开表头的查询条件': 'Thu gọn hoặc mở rộng dòng điều kiện trên tiêu đề',
     '暂收退料单': 'Phiếu trả hàng tạm nhận',
     '生产异常分析报告': 'Báo cáo phân tích bất thường sản xuất',
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----
@@ -2029,9 +2136,12 @@ export default {
     '库存台账需选择一个仓库和一种存货': 'Sổ cái kiểm kê cần chọn kho và kho',
     '以下为已审核且未转入ERP的单据，勾选后点击"开始转ERP"': 'Sau đây là các tài liệu đã được xem xét và chưa được chuyển sang ERP, hãy kiểm tra và nhấp vào "Bắt đầu chuyển đổi ERP"',
     '开始转ERP': 'Bắt đầu chuyển sang ERP',
-    '该单据已转入ERP（{no}），不可重复转入；如需重新转ERP，请先「弃审」再「审核」': 'Chứng từ này đã được chuyển sang ERP ({no}), không thể chuyển lại. Nếu muốn chuyển lại, hãy bỏ duyệt rồi duyệt lại.',
+    '该单据已转入ERP（{no}），不可重复转入；如需重新转ERP，请先「弃审」再「审核」': 'Chứng từ này đã được chuyển sang ERP ({no}), không thể chuyển lại. Muốn chuyển lại: bỏ duyệt → duyệt lại, và xóa chứng từ cũ bên Kingdee, nếu không Kingdee sẽ có hai chứng từ.',
     '批量转ERP完成：成功{ok}，已转跳过{skip}，失败{fail}': 'Chuyển hàng loạt sang ERP hoàn tất: thành công {ok}, đã chuyển và bỏ qua {skip}, thất bại {fail}',
     '转ERP请求超时：服务端可能仍在推送，请稍后刷新列表确认「是否已转ERP」后再操作，不要立刻重复点': 'Yêu cầu chuyển sang ERP đã quá thời gian: máy chủ có thể vẫn đang chuyển. Hãy làm mới danh sách sau và kiểm tra "Đã chuyển sang ERP" trước khi thao tác lại; đừng bấm lại ngay.',
+    '该单据正在转ERP（正在连金蝶推送，通常十几秒），请勿重复点击；完成后列表会自动显示 ERP 单号': "Chứng từ đang được chuyển sang ERP (đang kết nối Kingdee, thường mất vài giây). Vui lòng không nhấp lại; số ERP sẽ hiển thị trong danh sách khi hoàn tất",
+    '确认弃审该单据？本单已转过ERP（{no}）：请先在金蝶删除那张单据，再修改 → 审核 → 重新转ERP，否则金蝶侧会有两张': "Bỏ duyệt chứng từ này? Chứng từ đã được chuyển sang ERP ({no}): hãy xóa chứng từ đó bên Kingdee trước, rồi sửa → duyệt → chuyển lại, nếu không Kingdee sẽ có hai.",
+    '批量转ERP正在执行，请等待本批完成，勿重复点击': "Đang chạy chuyển hàng loạt sang ERP; hãy chờ đợt này xong và không nhấp lại",
     '供应商/客户': 'Nhà cung cấp/Khách hàng',
     '暂无已审核且未转ERP的单据': 'Không có tài liệu nào đã được xem xét và chưa được chuyển giao cho ERP',
     '材料二维码标签': 'Nhãn mã QR vật liệu',
