@@ -4840,3 +4840,5 @@ migrate-merge-gen-20261113.sql
 migrate-role-field-view-20261113.sql
 # 2026-11-13 角色字段视图加序号:yj_field_view.seq(角色内位置 1..n,只对勾选=显示的字段有值)
 migrate-role-field-view-seq-20261113.sql
+# 2026-11-13 采购订单明细「单价」「仓库」改为非必填(只改 yj_field.required,两行;不碰表结构)
+migrate-pu-order-price-wh-not-required-20261113.sql

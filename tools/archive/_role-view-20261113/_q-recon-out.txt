@@ -1,4 +1,4 @@
-# DB=HSDZ_MES_TEST
+# DB=HSDZ_MES
 
 == yj_role 列 ==
   n=id | ty=int | len=4 | nul=0 | ident=1 | 
@@ -83,16 +83,16 @@
   n=tab_key | ty=nvarchar | len=100 | nul=1 | ident=0 | 
 
 == yj_field 总行数 / 隐藏行 / 改过栏名 ==
-  字段行=4977 | 隐藏行=1301 | 改过栏名=19 | 
+  字段行=4976 | 隐藏行=1302 | 改过栏名=19 | 
 
 == 样本面板 SL_RECV 字段现状 ==
   (0 rows)
 
 == yj_field 整表校验和(迁移前后比对,证明一行未动) ==
-  n=4977 | ck=534593652 | 
+  n=4976 | ck=-956433662 | 
 
 == 是否已存在 yj_field_view ==
-  object_id=1708845450 | 
+  object_id=1388844310 | 
 
 == yj_role_panel 样本 ==
   panel_code=RD_SHARE_FILE | perms=view,query | 

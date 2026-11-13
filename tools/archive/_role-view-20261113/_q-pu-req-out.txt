@@ -1,0 +1,74 @@
+# HSDZ_MES_TEST
+
+== yj_panel ==
+  panel_code=PU_ORDER | mode=doc | head_table=bd_pu_order | line_table=bl_pu_order | 
+
+== yj_field:单价/仓库(全库,不限面板) ==
+  p=CGD | place=detail | seq=14 | col_name=od_danj | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=CUR | place=detail | seq=70 | col_name=单价小数位 | label=单价小数位 | data_type=整数 | required=0 | hidden=0 | visible=1 | 
+  p=FINISH_IN | place=detail | seq=80 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=FINISH_IN | place=query,header,detail | seq=20 | col_name=仓库 | label=仓库 | data_type=参照 | required=0 | hidden=0 | visible=1 | 
+  p=FINISH_IN_DETAIL | place=detail | seq=200 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=FINISH_IN_DETAIL | place=query,detail | seq=60 | col_name=仓库 | label=仓库 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=FINISH_IN_STATS | place=detail | seq=90 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=FINISH_IN_STATS | place=detail | seq=120 | col_name=单价(辅单位) | label=单价(辅单位) | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=KHDD | place=detail | seq=15 | col_name=od_danj | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=MANU_ORDER | place=detail | seq=350 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=MANU_ORDER | place=header | seq=450 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=MATERIAL_OUT | place=detail | seq=60 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=MATERIAL_OUT | place=query,header,detail | seq=10 | col_name=仓库 | label=仓库 | data_type=参照 | required=0 | hidden=0 | visible=1 | 
+  p=MATERIAL_OUT_DETAIL | place=detail | seq=240 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=MATERIAL_OUT_DETAIL | place=query,detail | seq=60 | col_name=仓库 | label=仓库 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=MATERIAL_OUT_STATS | place=detail | seq=90 | col_name=单价(主单位) | label=单价(主单位) | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=MATERIAL_OUT_STATS | place=detail | seq=120 | col_name=单价(辅单位) | label=单价(辅单位) | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=MATERIAL_OUT_STATS | place=query,detail | seq=20 | col_name=仓库 | label=仓库 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=OP_TIME | place=detail | seq=130 | col_name=jgdj | label=加工单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=OP_TIME | place=detail | seq=140 | col_name=jgdj2 | label=加工单价2 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=OP_TIME | place=detail | seq=323 | col_name=bxdj2 | label=并序2加工单价 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=OP_TIME | place=detail | seq=333 | col_name=bxdj3 | label=并序3加工单价 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=OP_TIME | place=detail | seq=343 | col_name=bxdj4 | label=并序4加工单价 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=OP_TIME | place=detail | seq=353 | col_name=bxdj5 | label=并序5加工单价 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=OP_TIME | place=detail | seq=363 | col_name=bxdj6 | label=并序6加工单价 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=OP_TIME | place=detail | seq=373 | col_name=bxdj7 | label=并序7加工单价 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=OTHER_IN | place=detail | seq=90 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=OTHER_IN | place=query,detail | seq=40 | col_name=仓库 | label=仓库 | data_type=参照 | required=0 | hidden=0 | visible=1 | 
+  p=OTHER_IN_DETAIL | place=detail | seq=60 | col_name=仓库 | label=仓库 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=OTHER_IN_DETAIL | place=detail | seq=170 | col_name=单价 | label=单价 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=OTHER_IN_STATS | place=detail | seq=20 | col_name=仓库 | label=仓库 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=OTHER_IN_STATS | place=detail | seq=110 | col_name=单价(主单位) | label=单价(主单位) | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=OTHER_IN_STATS | place=detail | seq=140 | col_name=单价(辅单位) | label=单价(辅单位) | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=OTHER_OUT | place=detail | seq=90 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=OTHER_OUT | place=query,detail | seq=40 | col_name=仓库 | label=仓库 | data_type=参照 | required=0 | hidden=0 | visible=1 | 
+  p=OTHER_OUT_DETAIL | place=detail | seq=60 | col_name=仓库 | label=仓库 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=OTHER_OUT_DETAIL | place=detail | seq=180 | col_name=单价 | label=单价 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=OTHER_OUT_STATS | place=detail | seq=20 | col_name=仓库 | label=仓库 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=OTHER_OUT_STATS | place=detail | seq=110 | col_name=单价(主单位) | label=单价(主单位) | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=OTHER_OUT_STATS | place=detail | seq=140 | col_name=单价(辅单位) | label=单价(辅单位) | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=OUTSOURCE_ORDER | place=detail | seq=60 | col_name=委外单价 | label=委外单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=PROD_PICK_LIST | place=detail | seq=120 | col_name=成本单价 | label=成本单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=PU_ORDER | place=detail | seq=60 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=PU_ORDER | place=detail | seq=90 | col_name=含税单价 | label=含税单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=PU_ORDER | place=detail | seq=110 | col_name=仓库 | label=仓库 | data_type=参照 | required=0 | hidden=0 | visible=1 | 
+  p=PU_ORDER | place=detail | seq=960 | col_name=实际含税单价 | label=实际含税单价 | data_type=文本 | required=0 | hidden=1 | visible=0 | 
+  p=PU_ORDER | place=detail | seq=960 | col_name=折扣单价 | label=折扣单价 | data_type=文本 | required=0 | hidden=1 | visible=0 | 
+  p=PU_ORDER_DETAIL | place=detail | seq=200 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=PU_ORDER_DETAIL | place=detail | seq=220 | col_name=含税单价 | label=含税单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=PU_ORDER_DETAIL | place=detail | seq=270 | col_name=仓库 | label=仓库 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=PU_ORDER_STATS | place=detail | seq=120 | col_name=平均单价 | label=平均单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=PURCHASE_IN | place=detail | seq=80 | col_name=单价 | label=单价 | data_type=小数 | required=1 | hidden=0 | visible=1 | 
+  p=PURCHASE_IN | place=detail | seq=110 | col_name=含税单价 | label=含税单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=PURCHASE_IN | place=detail | seq=190 | col_name=仓库 | label=仓库 | data_type=参照 | required=1 | hidden=0 | visible=1 | 
+  p=PURCHASE_IN_DETAIL | place=detail | seq=220 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=PURCHASE_IN_DETAIL | place=detail | seq=240 | col_name=单价2 | label=单价2 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+  p=PURCHASE_IN_DETAIL | place=query,detail | seq=60 | col_name=仓库 | label=仓库 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=PURCHASE_IN_STATS | place=detail | seq=110 | col_name=单价(主单位) | label=单价(主单位) | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=PURCHASE_IN_STATS | place=detail | seq=130 | col_name=单价(辅单位) | label=单价(辅单位) | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=PURCHASE_IN_STATS | place=query,detail | seq=20 | col_name=仓库 | label=仓库 | data_type=文本 | required=0 | hidden=0 | visible=1 | 
+  p=QC_INSP | place=detail | seq=60 | col_name=单价 | label=单价 | data_type=小数 | required=0 | hidden=0 | visible=1 | 
+
+== 物理列可空性(bd_pu_order 头 / bl_pu_order 行) ==
+  表=bl_pu_order | 列=单价 | 类型=decimal | 可空=1 | 
+  表=bl_pu_order | 列=含税单价 | 类型=decimal | 可空=1 | 
+  表=bl_pu_order | 列=仓库 | 类型=nvarchar | 可空=1 | 
+  表=bl_pu_order | 列=实际含税单价 | 类型=nvarchar | 可空=1 | 
+  表=bl_pu_order | 列=折扣单价 | 类型=nvarchar | 可空=1 | 
