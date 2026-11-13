@@ -1827,7 +1827,8 @@ defineExpose({ focusField })
 }
 .as-no {
   width: 52px;
-  flex: none;
+  min-width: 34px;
+  flex: 0 1 auto;
   background: #29b8f0;
   color: #fff;
   font-size: 15px;
@@ -1836,8 +1837,12 @@ defineExpose({ focusField })
   padding: 0 0 0 10px;
 }
 .as-name {
+  /* 2026-11-13：允许在窄排版（A4 733px）下收缩，但保住最小宽度 —— 否则标签会被压成竖排字 */
   width: 150px;
-  flex: none;
+  min-width: 84px;
+  flex: 0 1 auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
   background: #29b8f0;
   color: #fff;
   font-size: 19px;
@@ -2453,7 +2458,14 @@ defineExpose({ focusField })
   display: flex;
 }
 .as-sign-cell {
-  flex: none;
+  /* 2026-11-13 用户口径「宽度不够填写数据自动换行，适配 A4 纸」——
+     导出时纸面会被压到 A4 内容宽（733px）。此前这里是 `flex:none` + 内联 px 宽（202/150），
+     完全不收缩 ⇒ 压窄后值区只剩几十像素，**「系统管理员」被挤成一字一行**（截图实测）。
+     现在：允许收缩但保住最小可读宽度（min-width + 文字不换行），
+     多余的空间缺口由 .as-sign-val 承担（它的 min-width 见下）。 */
+  flex: 0 1 auto;
+  min-width: 68px;
+  white-space: nowrap;
   background: #29b8f0;
   color: #fff;
   font-size: 16px;
@@ -2470,10 +2482,15 @@ defineExpose({ focusField })
 }
 .as-sign-val {
   flex: 1;
+  /* 最小宽度 = 能放下 4 个中文字（约 64px）；再窄就会变成一字一行（2026-11-13 实测）。
+     真装不下时由 .as-sign-row 溢出/换行处理，而不是把字竖排。 */
+  min-width: 64px;
   display: flex;
   align-items: center;
   padding: 0 10px;
   min-height: 50px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 </style>
 

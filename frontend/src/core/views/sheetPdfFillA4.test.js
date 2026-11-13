@@ -84,3 +84,33 @@ test('⑤ 打印/导出不是「整体缩小」：不许靠 zoom 把宽纸压进
   assert.match(fn, /clone\.style\.zoom\s*=\s*'1'|clone\.style\.zoom\s*=\s*1/,
     '截图时 zoom 必须清成 1（按重排后的像素直接出图）')
 })
+
+/**
+ * 第二轮实测暴露的两个问题（填了真实数据、走真实截图路径才看得出来）：
+ *
+ *  ① **文字被截断**：立项背景那 175 字，在 1242px 宽时只占 3 行（框高 143px），
+ *     压到 733px 后要 7 行，但克隆体里 textarea 的 `height` 还是屏幕上那个 143px
+ *     ⇒ 后面 4 行直接看不见（截图实测：显示到"流量不低于每"就断了）。
+ *     根因：克隆时只把 `value` 写进文本节点，**没有按新宽度重算高度**。
+ *  ② **「申请立项人」被挤成一列竖排字**：签名行是 flex，压窄后标签格不收缩，
+ *     值区被压到 1 个字宽 ⇒ 一个字一行。要在窄排版下保住最小可读宽度。
+ */
+
+test('⑥ 克隆体里的 textarea 要按**新宽度**重算高度（否则窄排版后文字被裁）', () => {
+  const body = list.slice(list.indexOf('async function snapSheetPage('))
+  const fn = body.slice(0, body.indexOf('\nasync function shotsForPages('))
+  // 必须在写回 value 之后，显式把 height 撑到 scrollHeight（autosize 不会在克隆体里自己跑）
+  assert.match(fn, /scrollHeight/, '要读克隆体的 scrollHeight 来定高')
+  assert.match(fn, /\.style\.height\s*=/, '要把 height 写成内容高（覆盖屏幕上的旧内联高度）')
+  // 顺序：先写 value（有内容才能量出高度），再定高
+  const vi = fn.indexOf('c.textContent = t.value')
+  const hi = fn.indexOf('.style.height =')
+  assert.ok(vi > 0 && hi > vi, '先写 value 再量高（没内容量出来是空的）')
+})
+
+test('⑦ 压窄后签名/标签格不许被挤成一字一行', () => {
+  const ds = readFileSync(new URL('./DocSheet.vue', import.meta.url), 'utf8')
+  // 标签格（.as-no/.as-name/签名标签）与值区都要有最小宽度或允许换行，不能无限被压
+  assert.match(ds, /\.as-name\s*\{[^}]*min-width|\.as-name\s*\{[^}]*flex-shrink:\s*0/,
+    '标签格要有最小宽度/不收缩（否则压窄后被挤成竖排字）')
+})
