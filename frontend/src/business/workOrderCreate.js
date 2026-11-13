@@ -1,13 +1,15 @@
 /**
- * workOrderCreate.js — 生产工单「新增」弹窗的**纯逻辑**(2026-11-13)
+ * workOrderCreate.js — 生产工单「新增」整页编制的**纯逻辑**(2026-11-13)
  *
- * 入口:`frontend/src/views/modules/plan/WorkOrderCreateDialog.vue`(只负责请求/渲染,判定全在这里)。
+ * 入口:`frontend/src/views/modules/plan/WorkOrderCreatePage.vue`(只负责请求/渲染,判定全在这里)。
  * 单测:`workOrderCreate.test.js`(`cd frontend && node --test src/business/workOrderCreate.test.js`)。
  *
- * 口径来源(用户四项需求之②③ + 后端接口契约):
- *   ① 生产工单页可以**新建**生产工单(此前只有订单结转能生成);
- *   ② 新建弹窗有「常规工单 / 临时工单」两页签;临时工单 = 上方主物料 + 下方**本工单自己的用料**
- *      (临时 BOM,落 `wo_bom`;常规工单不写 BOM,领料按产品的标准组装 BOM 取料)。
+ * 口径来源(用户四项需求之②③ + 2026-11-13 第二轮「保存草稿/整页编制」方案 A 契约,
+ * 见 `tools/archive/_wo-draft-20261113/CONTRACT.md`):
+ *   ① 生产工单页可以**新建**生产工单(此前只有订单结转能生成),新建改**整页编制**(替换原弹窗);
+ *   ② 页面有「常规工单 / 临时工单」两页签;临时工单 = 上方主物料 + 下方**本工单自己的用料**
+ *      (临时 BOM,落 `wo_bom`;常规工单不写 BOM,领料按产品的标准组装 BOM 取料);
+ *   ③ **保存草稿**:草稿独立存草稿表(`GDD-` 号,**不写 plang**),提交时才生成正式工单。
  *
  * 两条硬规矩:
  *   · **提交给后端的键名一字不差**按契约 D(`工单类型`/`产品编码`/…/`物料清单`),数据键永远中文不翻译
@@ -209,7 +211,33 @@ export function pickDefaultRoute({ routes = [], productRoute = '', fallback = ''
 }
 
 /**
- * 弹窗表单 + 明细 → `POST /px/workOrderList/create` 的请求体。
+ * 明细行 → 请求体里的 `物料清单`(create 与 draft/save **共用同一份规范化**,避免两条路径口径分叉)。
+ *
+ * 口径:① 常规工单 `物料清单: []`(后端不写 wo_bom);② 临时工单只提交**有子件编码**的行
+ * (空行不落库,不报错),行序按提交顺序重排 1..n;③ 数值列统一 Number,空值 → 0。
+ *
+ * @param {Array} lines 临时工单用料行
+ * @param {string} kind 常规|临时
+ * @returns {Array<object>} 可提交的明细行
+ */
+function payloadLines(lines, kind) {
+  if (kind !== KIND_TEMP) return []
+  return (Array.isArray(lines) ? lines : [])
+    .filter((r) => r && str(r.子件编码))
+    .map((r, i) => ({
+      行序: i + 1,
+      子件编码: str(r.子件编码),
+      子件名称: str(r.子件名称),
+      子件规格: str(r.子件规格),
+      计量单位: str(r.计量单位),
+      标准用量: num(r.标准用量),
+      损耗量: num(r.损耗量),
+      行备注: str(r.行备注),
+    }))
+}
+
+/**
+ * 页面表单 + 明细 → `POST /px/workOrderList/create` 的请求体。
  *
  * 键名严格按契约 D(一字不差):
  * ```
@@ -217,8 +245,7 @@ export function pickDefaultRoute({ routes = [], productRoute = '', fallback = ''
  *   订单数量, 生产数量, 工单日期, 计划开工日期, 交期, 工艺路线, 备注,
  *   物料清单: [{行序, 子件编码, 子件名称, 子件规格, 计量单位, 标准用量, 损耗量, 行备注}] }
  * ```
- * 口径:① 常规工单 `物料清单: []`(后端不写 wo_bom);② 临时工单只提交**有子件编码**的行
- * (空行不落库,不报错),行序按提交顺序重排 1..n;③ 数值列统一 Number,空值 → 0。
+ * 口径同 payloadLines:常规不带明细、临时只落有编码的行、数值列统一 Number。
  *
  * @param {object} form 表单
  * @param {Array} lines 临时工单用料行
@@ -228,20 +255,6 @@ export function pickDefaultRoute({ routes = [], productRoute = '', fallback = ''
 export function buildCreatePayload(form = {}, lines = [], kind = KIND_NORMAL) {
   const f = form || {}
   const temp = kind === KIND_TEMP
-  const list = temp
-    ? (Array.isArray(lines) ? lines : [])
-      .filter((r) => r && str(r.子件编码))
-      .map((r, i) => ({
-        行序: i + 1,
-        子件编码: str(r.子件编码),
-        子件名称: str(r.子件名称),
-        子件规格: str(r.子件规格),
-        计量单位: str(r.计量单位),
-        标准用量: num(r.标准用量),
-        损耗量: num(r.损耗量),
-        行备注: str(r.行备注),
-      }))
-    : []
   return {
     工单类型: temp ? KIND_TEMP : KIND_NORMAL,
     产品编码: str(f.产品编码),
@@ -254,6 +267,131 @@ export function buildCreatePayload(form = {}, lines = [], kind = KIND_NORMAL) {
     交期: str(f.交期),
     工艺路线: str(f.工艺路线),
     备注: str(f.备注),
-    物料清单: list,
+    物料清单: payloadLines(lines, kind),
   }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// 草稿(2026-11-13 方案 A):`draft/save` / `draft/get` 的纯逻辑
+//   草稿存**独立草稿表**(`GDD-` 号,不写 plang)⇒ 草稿态不会进待排产/报工/领料。
+//   本节三件:接口返回 → 页面状态(draftToState)、页面状态 → 保存请求体(buildDraftPayload)、
+//   页面状态 → 快照串(formSnapshot,离开守卫的脏检查)。
+// ══════════════════════════════════════════════════════════════════════════════════
+
+/** 草稿表头里**文本类**字段(键名 = 契约 `/draft/save` 的键,一字不差) */
+const DRAFT_TEXT_KEYS = [
+  '产品编码', '产品名称', '规格型号', '计量单位',
+  '客户编码', '客户名称',
+  '工单日期', '计划开工日期', '交期',
+  '工艺路线', '备注',
+]
+/** 草稿表头里**数量类**字段(空 = 不填,页面留 undefined;提交时才按 0 序列化) */
+const DRAFT_QTY_KEYS = ['订单数量', '生产数量']
+
+/** 草稿行 → 页面明细行(行序重排 1..n、数值化、trim;`备注` 是草稿表叫法,本页叫 `行备注`) */
+function draftLines(raw) {
+  const list = Array.isArray(raw) ? raw : []
+  return list
+    .filter((r) => r && typeof r === 'object')
+    .map((r, i) => {
+      const std = r.标准用量
+      return {
+        行序: i + 1,
+        子件编码: str(r.子件编码),
+        子件名称: str(r.子件名称),
+        子件规格: str(r.子件规格),
+        计量单位: str(r.计量单位),
+        标准用量: std === undefined || std === null || std === '' ? 1 : num(std),
+        损耗量: num(r.损耗量),
+        行备注: str(r.行备注 ?? r.备注),
+      }
+    })
+}
+
+/**
+ * `POST /px/workOrderList/draft/get` 的返回 → 页面状态(继续编辑草稿时的回填)。
+ *
+ * 口径:
+ *   ① 表头只认契约里的字段,**接口没给的字段保留 blankForm 的默认值**(不臆造空串覆盖默认);
+ *   ② 数量列空/非法 → undefined(页面留空,让用户自己填),不是 0;
+ *   ③ 工单类型只认 `临时`,其余(空/未知)一律 `常规`(与后端「空=常规」同口径);
+ *   ④ 明细行行序**重排 1..n**(草稿可能存着断号,表格里必须连续)。
+ *
+ * @param {object} draft `draft/get` 返回(draft/list 的行也可直接传:没有 物料清单 就是空明细)
+ * @returns {{form:object, lines:Array<object>, kind:string}}
+ */
+export function draftToState(draft) {
+  const d = draft && typeof draft === 'object' ? draft : {}
+  const form = blankForm()
+  for (const k of DRAFT_TEXT_KEYS) {
+    if (k in d) form[k] = str(d[k])
+  }
+  for (const k of DRAFT_QTY_KEYS) {
+    if (k in d) {
+      const v = d[k]
+      form[k] = v === undefined || v === null || v === '' ? undefined : num(v)
+    }
+  }
+  return {
+    form,
+    lines: draftLines(d.物料清单),
+    kind: str(d.工单类型) === KIND_TEMP ? KIND_TEMP : KIND_NORMAL,
+  }
+}
+
+/**
+ * 页面表单 + 明细 → `POST /px/workOrderList/draft/save` 的请求体。
+ *
+ * 与 `buildCreatePayload` 的差异只有两处(契约 `/draft/save` 的 body):
+ *   ① 多存三条**展示用档案字段**(产品名称/规格型号/计量单位)—— 草稿箱列表要直接显示,
+ *      不必再回查档案;
+ *   ② 带 `草稿id`:`0` = 新建草稿(后端取 `GDD-` 号);已有 id = **覆盖**该草稿
+ *      (后端只允许 状态=草稿,否则 400「该草稿不存在或已提交」)。
+ * `物料清单` 与 create 同一份规范化(payloadLines):常规工单清空、临时工单只落有编码的行。
+ *
+ * @param {object} form 表单
+ * @param {Array} lines 临时工单用料行
+ * @param {string} [kind] 常规|临时
+ * @param {number|string} [draftId] 当前草稿id(0/空 = 新建)
+ * @returns {object} `draft/save` 请求体
+ */
+export function buildDraftPayload(form = {}, lines = [], kind = KIND_NORMAL, draftId = 0) {
+  const f = form || {}
+  const temp = kind === KIND_TEMP
+  return {
+    草稿id: Math.max(0, num(draftId)),
+    工单类型: temp ? KIND_TEMP : KIND_NORMAL,
+    产品编码: str(f.产品编码),
+    产品名称: str(f.产品名称),
+    规格型号: str(f.规格型号),
+    计量单位: str(f.计量单位),
+    客户编码: str(f.客户编码),
+    客户名称: str(f.客户名称),
+    订单数量: num(f.订单数量),
+    生产数量: num(f.生产数量),
+    工单日期: str(f.工单日期),
+    计划开工日期: str(f.计划开工日期),
+    交期: str(f.交期),
+    工艺路线: str(f.工艺路线),
+    备注: str(f.备注),
+    物料清单: payloadLines(lines, kind),
+  }
+}
+
+/**
+ * 页面状态的**快照串**(离开守卫的脏检查:与「最后一次保存/提交成功」的快照比较)。
+ *
+ * 口径:快照 = `buildDraftPayload` 去掉 `草稿id` 后的 JSON —— 也就是**这份内容保存下来会是什么样**。
+ * 好处:① 与保存口径天然同源(保存了的一定不脏、没保存的一定脏);
+ *      ② trim/数值化差异不算脏(输入 `' A '` 与 `'A'` 是同一份内容,不该拦用户);
+ *      ③ 常规工单不看明细(与后端一致:常规工单忽略物料清单)。
+ *
+ * @param {object} form 表单
+ * @param {Array} lines 明细行
+ * @param {string} [kind] 常规|临时
+ * @returns {string} 可直接 `===` 比较的快照串
+ */
+export function formSnapshot(form = {}, lines = [], kind = KIND_NORMAL) {
+  const { 草稿id, ...rest } = buildDraftPayload(form, lines, kind, 0)
+  return JSON.stringify(rest)
 }

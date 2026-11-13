@@ -84,7 +84,9 @@ public class WorkOrderCreateService {
         List<Map<String, Object>> customers = jdbc.queryForList(
                 "SELECT dm AS 客户编码, mc AS 客户名称, ISNULL(khjb, N'') AS 客户等级"
                         + " FROM dbo.dm_kh WHERE ISNULL(asp_cancel,'N') <> 'Y'"
-                        + "   AND ISNULL(mc,N'') <> N'' ORDER BY dm");
+                        // 2026-11-13 第二轮:过滤 客户编码/名称为空的行(测试账套里有编码为空的脏行
+                        //   「全量流验证」,下拉里会出现「 — 全量流验证」这种无值项;选它等于没选客户)
+                        + "   AND ISNULL(mc,N'') <> N'' AND ISNULL(dm,N'') <> N'' ORDER BY dm");
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("客户", customers);
         out.put("默认工艺路线", defaultRoute());

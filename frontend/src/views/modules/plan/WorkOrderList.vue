@@ -36,11 +36,16 @@
          无该动作词的角色不显示按钮 —— 此前本页连列表接口都没有校验(登录即可读全部工单/客户/数量)。
          2026-11-05:「转领料单」按钮下架(picking 词已从矩阵动作集移除),后端实现保留。 -->
     <div class="wol-btns">
-      <!-- 新增(2026-11-13 用户口径「让当前的生产工单可以新建生产工单」):打开「新增生产工单」弹窗。
-           弹窗两个页签 —— 常规工单(只填主物料,用料按产品的标准组装 BOM 取)/
-           临时工单(主物料 + 本工单自己的子件用料,落 wo_bom;领料/报工优先按它取料)。
+      <!-- 新增(2026-11-13 用户口径「让当前的生产工单可以新建生产工单」→ 当日第二轮拍板「保存草稿/页面形式」):
+           改为**整页编制**(不再弹窗):跳 /prod/plan/workOrderCreate,页内可「保存草稿」;
+           常规工单 = 只填主物料(用料按产品标准组装 BOM);临时工单 = 主物料 + 本工单子件用料(wo_bom)。
            权限 = 页面动作词 create(「新增」;PagePanelRegistry.WORK_ORDER_LIST_ACTIONS)。 -->
-      <el-button v-if="canCreate" size="small" type="primary" @click="createVisible = true">{{ tt('新增') }}</el-button>
+      <el-button v-if="canCreate" size="small" type="primary" @click="goCreate">{{ tt('新增') }}</el-button>
+      <!-- 草稿箱(2026-11-13 方案 A):草稿存 wo_draft_head/_line(不写 plang),可继续编辑/删除/提交;
+           提交时才生成正式工单。角标=草稿态数量。 -->
+      <el-button v-if="canCreate" size="small" plain @click="draftBoxVisible = true">
+        {{ tt('草稿箱') }}<span v-if="draftCount > 0" class="wol-draft-cnt">{{ draftCount }}</span>
+      </el-button>
       <el-button v-if="canDo('close')" size="small" type="success" plain @click="onClose(true)" :disabled="!checked.length">{{ tt('结案') }}</el-button>
       <el-button v-if="canDo('close')" size="small" type="success" plain @click="onClose(false)" :disabled="!checked.length">{{ tt('取消结案') }}</el-button>
       <!-- 结案回正(2026-10-18):把「手机端小程序/参考库直连库误写成已结案」的行改回未结案。
@@ -351,10 +356,10 @@
       </template>
     </el-dialog>
 
-    <!-- 新增生产工单(2026-11-13 用户口径):常规工单 / 临时工单两页签。
-         常规工单只填主物料(用料仍取产品标准组装 BOM);临时工单 = 上方主物料 + 下方所需物料
-         (落 wo_bom,领料/报工优先按它取料)。组件自包含,保存成功后 load() 刷新列表。 -->
-    <WorkOrderCreateDialog v-model="createVisible" @saved="onCreated" />
+    <!-- 新增生产工单(2026-11-13 方案 A):改为**整页编制**(WorkOrderCreatePage,路由 /prod/plan/workOrderCreate),
+         本页不再挂新增弹窗;这里挂「草稿箱」:列表可继续编辑/删除/提交,提交成功刷新列表与角标。 -->
+    <WorkOrderDraftBoxDialog v-model="draftBoxVisible" @edit="onEditDraft"
+                             @submitted="onDraftSubmitted" @changed="refreshDraftCount" />
 
     <!-- 工单物料清单(只读):临时工单=本工单用料(wo_bom);常规工单=产品标准组装 BOM。
          用户提问「只填主物料、没写子物料会不会导致 BOM 查不到」的现场答案 —— 这里直接标出
@@ -411,7 +416,7 @@ import { printWorkTaskSheet } from '@/business/print-formats'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
 import ScheduleBoard from './ScheduleBoard.vue'
-import WorkOrderCreateDialog from './WorkOrderCreateDialog.vue'
+import WorkOrderDraftBoxDialog from './WorkOrderDraftBoxDialog.vue'
 import { qtyText, dayColState, isToday, isPast, dayCellView, historyShortfalls, shortfallTotals, isOutOfPlanRange } from '@/business/dayPlan'
 import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
@@ -533,8 +538,9 @@ const mixingLoading = ref(false)
 const mixingData = ref(null)
 const mixingTarget = ref(null)
 const mixingQty = ref(0)
-/** 新增生产工单弹窗(2026-11-13):常规/临时两页签;保存成功后 load() 刷新列表 */
-const createVisible = ref(false)
+/** 草稿箱(2026-11-13 方案 A:保存草稿 + 整页编制):弹窗开关 + 草稿态数量角标 */
+const draftBoxVisible = ref(false)
+const draftCount = ref(0)
 /** 物料清单弹窗(2026-11-13,只读):临时工单=本工单用料;常规工单=产品标准组装 BOM */
 const bomVisible = ref(false)
 const bomLoading = ref(false)
@@ -1250,14 +1256,35 @@ function openMixingRecipe() {
 }
 
 /** 新增生产工单保存成功(2026-11-13):按当前查询条件重查,把新单带出来(新单日期=今天,默认窗口内可见) */
-async function onCreated(payload) {
-  createVisible.value = false
+/** 新增生产工单(2026-11-13 方案 A):跳整页编制(页面内可「保存草稿」),不再开弹窗 */
+function goCreate() {
+  router.push({ path: '/prod/plan/workOrderCreate' })
+}
+
+/** 草稿箱「继续编辑」:跳整页编制并带草稿 id 回填 */
+function onEditDraft(payload) {
+  const id = payload && payload['草稿id'] ? payload['草稿id'] : ''
+  if (!id) return
+  draftBoxVisible.value = false
+  router.push({ path: '/prod/plan/workOrderCreate', query: { draftId: String(id) } })
+}
+
+/** 草稿箱「提交成功」:提示单号 + 刷新列表(新单在默认近 15 天窗口内)/ 刷新角标 */
+async function onDraftSubmitted(payload) {
+  draftBoxVisible.value = false
   const no = payload && payload['工单号'] ? payload['工单号'] : ''
-  if (no) {
-    // 默认窗口是"近 15 天";新单日期=今天 ⇒ 正常能查到。这里不改查询条件,避免打断现场当前视图。
-    ElMessage.success(`${tt('已新增生产工单')} ${no}`)
-  }
+  if (no) ElMessage.success(`${tt('已新增生产工单')} ${no}`)
   await load()
+  await refreshDraftCount()
+}
+
+/** 刷新草稿箱角标(草稿态数量):进页面/切回本页/草稿箱变动后调用;失败不阻断(角标保持原值) */
+async function refreshDraftCount() {
+  if (!canCreate.value) { draftCount.value = 0; return }
+  try {
+    const res = await request.post('/px/workOrderList/draft/count', {})
+    draftCount.value = Number((res.data || {})['数量'] || 0)
+  } catch { /* 角标非关键路径,失败保留旧值 */ }
 }
 
 /**
@@ -1412,6 +1439,8 @@ onMounted(async () => {
   loadLines()
   // 生产工序进度看板点行跳进来(?focus=行id):定位该行并自动打开追溯
   await applyRouteFocus()
+  // 草稿箱角标(2026-11-13):草稿态数量;读取失败不阻断页面
+  await refreshDraftCount()
 })
 
 /**
@@ -1432,10 +1461,12 @@ onActivated(async () => {
     await load()
     loadLines()
     await applyRouteFocus()
+    await refreshDraftCount()
     return
   }
   await load()
   await applyRouteFocus()
+  await refreshDraftCount()
 })
 
 /**
@@ -1472,6 +1503,9 @@ onBeforeUnmount(() => unbindTableScroll())
 .wol-lm-arrow { font-style: normal; font-weight: 700; margin-left: 2px; }
 .wol-lm-busy { color: #e6a23c; }
 .wol-loadmore.is-end { color: #c0c4cc; }
+/* 草稿箱角标(2026-11-13 方案 A):按钮内右侧红点数字,= 草稿态数量;0 不显示 */
+.wol-draft-cnt { margin-left: 5px; padding: 0 5px; font-size: 11px; line-height: 16px; color: #fff;
+  background: #f56c6c; border-radius: 8px; display: inline-block; vertical-align: 1px; }
 /* 日排产日期列(2026-10-29;2026-10-31:自动均摊 + 双击就地改):上=当天计划,下=当天已审核报工量 */
 .dp-plan { color: #303133; font-weight: 600; line-height: 1.2; cursor: text; }
 /* 2026-10-31 融合显示:当天有报工 ⇒ 格子里显示的是**实际完成数**(绿色);没报工显示计划(深色) */

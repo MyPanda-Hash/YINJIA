@@ -1,13 +1,16 @@
 /**
- * workOrderCreate.test.js — 生产工单「新增」弹窗纯逻辑单测(2026-11-13)
+ * workOrderCreate.test.js — 生产工单「新增」整页编制纯逻辑单测(2026-11-13)
  *
  * 断言指向的都是**会和后端口径对不上就会坏**的点:
  *   · todayStr      → 本地日期,不能用 UTC(否则东八区凌晨把工单日期算成昨天)
- *   · blankForm / blankBomLine / nextLineSeq / renumberLines → 弹窗初始值与行序连续
- *   · mapStdBomLines→ 标准BOM(接口/表) 的行 → 本弹窗明细行:行序重排、数值化、备注→行备注
+ *   · blankForm / blankBomLine / nextLineSeq / renumberLines → 初始值与行序连续
+ *   · mapStdBomLines→ 标准BOM(接口/表) 的行 → 本页明细行:行序重排、数值化、备注→行备注
  *   · lineProblem / validateWorkOrder → 契约里的每条校验及其**准确中文文案**
  *   · pickDefaultRoute → 只用「已审核」路线;产品档案优先,其次 options 默认
  *   · buildCreatePayload → POST create 的键名一字不差(契约 D)、常规工单不带明细、临时只落有编码的行
+ *   · draftToState     → POST draft/get 的返回 → 页面状态(继续编辑草稿的回填口径)
+ *   · buildDraftPayload→ POST draft/save 的键名一字不差、草稿id 0/覆盖、常规清空明细
+ *   · formSnapshot     → 离开守卫的脏检查:与保存口径同源,trim/数值差异不算脏
  *
  * 跑法:`cd frontend && node --test src/business/workOrderCreate.test.js`
  */
@@ -20,6 +23,9 @@ import {
   blankBomLine,
   blankForm,
   buildCreatePayload,
+  buildDraftPayload,
+  draftToState,
+  formSnapshot,
   lineProblem,
   mapStdBomLines,
   nextLineSeq,
@@ -36,6 +42,12 @@ const PAYLOAD_KEYS = [
 ]
 /** 契约 D 的明细行键 */
 const LINE_KEYS = ['行序', '子件编码', '子件名称', '子件规格', '计量单位', '标准用量', '损耗量', '行备注']
+/** 契约 `/draft/save` 的顶层键(顺序也按契约写:草稿id 在最前,后端按它判新建/覆盖) */
+const DRAFT_PAYLOAD_KEYS = [
+  '草稿id', '工单类型', '产品编码', '产品名称', '规格型号', '计量单位',
+  '客户编码', '客户名称', '订单数量', '生产数量',
+  '工单日期', '计划开工日期', '交期', '工艺路线', '备注', '物料清单',
+]
 
 /** 一份能通过校验的常规工单表单 */
 const okForm = () => ({
@@ -269,4 +281,109 @@ test('buildCreatePayload:空表单也能安全序列化(空串/0,不出现 undef
   assert.equal(p.工单日期, '')
   assert.equal(p.物料清单.length, 0)
   assert.ok(!JSON.stringify(p).includes('null'), 'JSON 里不许出现 null(后端按空串/0 处理更稳)')
+})
+
+// ════════════════════════════════════════════════════════════════════════════════
+// 草稿(方案 A,2026-11-13):draft/get → 页面状态 → draft/save → 快照脏检查
+// ════════════════════════════════════════════════════════════════════════════════
+
+// ── 草稿:接口返回 → 页面状态 ──────────────────────────────────────────────────────
+test('draftToState:表头回填 + 临时页签 + 明细行序重排/数值化/备注落行备注', () => {
+  const st = draftToState({
+    草稿id: 12, 草稿号: 'GDD-2026-11-0001', 工单类型: '临时', 状态: '草稿',
+    产品编码: ' A-32-01 ', 产品名称: 'S阻垢炭棒', 规格型号: '40.5*16*80', 计量单位: '支',
+    客户编码: 'A-26', 客户名称: '宁波某某',
+    订单数量: '10', 生产数量: 12,
+    工单日期: '2026-11-13', 计划开工日期: '', 交期: '2026-11-20',
+    工艺路线: 'GY-CB-STD', 备注: '',
+    物料清单: [
+      { 行序: 5, 子件编码: ' M-001 ', 子件名称: '炭粉', 子件规格: '320目', 计量单位: 'kg', 标准用量: '2.5', 损耗量: '0.3', 行备注: '首批' },
+      { 行序: 9, 子件编码: 'M-002', 子件名称: '胶粉', 子件规格: '', 计量单位: 'kg', 备注: '标准BOM叫法' },
+    ],
+  })
+  assert.equal(st.kind, KIND_TEMP)
+  assert.equal(st.form.产品编码, 'A-32-01')
+  assert.equal(st.form.产品名称, 'S阻垢炭棒')
+  assert.equal(st.form.客户编码, 'A-26')
+  assert.equal(st.form.订单数量, 10, '数量列回填成数字(不是字符串 10)')
+  assert.equal(st.form.生产数量, 12)
+  assert.equal(st.form.工单日期, '2026-11-13')
+  assert.equal(st.form.计划开工日期, '')
+  assert.deepEqual(st.lines.map((r) => r.行序), [1, 2], '草稿里存的断号要重排 1..n')
+  assert.deepEqual(Object.keys(st.lines[0]), LINE_KEYS)
+  assert.equal(st.lines[0].子件编码, 'M-001')
+  assert.equal(st.lines[0].标准用量, 2.5)
+  assert.equal(st.lines[0].行备注, '首批')
+  assert.equal(st.lines[1].标准用量, 1, '草稿行没给标准用量 ⇒ 按新增行默认 1')
+  assert.equal(st.lines[1].行备注, '标准BOM叫法', '草稿行的 备注 落到本页 行备注')
+})
+
+test('draftToState:缺字段保留 blankForm 默认;数量空 = undefined;未知类型 = 常规;null 安全', () => {
+  const st = draftToState({ 草稿id: 3, 工单日期: '', 订单数量: '', 生产数量: null })
+  assert.equal(st.kind, KIND_NORMAL, '工单类型空/未知一律常规(与后端「空=常规」同口径)')
+  assert.deepEqual(st.lines, [])
+  assert.equal(st.form.工单日期, '', '草稿明确给了空串 ⇒ 就是空(不拿今天覆盖)')
+  assert.equal(st.form.订单数量, undefined, '数量空 ⇒ 页面留空让用户填,不是 0')
+  assert.equal(st.form.生产数量, undefined)
+  assert.equal(st.form.工艺路线, '', '接口没给的字段保留默认')
+  assert.equal(st.form.产品编码, '')
+  const bad = draftToState(null)
+  assert.equal(bad.kind, KIND_NORMAL)
+  assert.deepEqual(bad.lines, [])
+  assert.equal(bad.form.产品编码, '')
+  assert.equal(bad.form.工单日期, todayStr())
+})
+
+// ── 草稿:页面状态 → draft/save 请求体 ────────────────────────────────────────────
+test('buildDraftPayload:键名严格按契约(草稿id 在最前),新草稿 = 0,存展示用档案字段', () => {
+  const p = buildDraftPayload(okForm(), [okLine()], KIND_NORMAL)
+  assert.deepEqual(Object.keys(p), DRAFT_PAYLOAD_KEYS)
+  assert.equal(p.草稿id, 0, '新草稿固定传 0(后端据此取 GDD 号)')
+  assert.equal(p.工单类型, '常规')
+  assert.equal(p.产品名称, '炭棒', '草稿要存展示用档案字段(草稿箱列表直接显示)')
+  assert.equal(p.规格型号, '48*120')
+  assert.equal(p.计量单位, '支')
+  assert.deepEqual(p.物料清单, [], '常规工单忽略/清空物料清单')
+  // 已有草稿:'12' 这种字符串 id 要数值化,不能原样把 '12' 发过去
+  assert.equal(buildDraftPayload(okForm(), [], KIND_NORMAL, '12').草稿id, 12)
+  assert.equal(buildDraftPayload(okForm(), [], KIND_NORMAL, -1).草稿id, 0, '非法 id 落回 0(当新建),不写坏数据')
+})
+
+test('buildDraftPayload:临时工单只落有编码的行,行序重排 + 与 create 同一份明细键名', () => {
+  const lines = [
+    okLine({ 行序: 5, 子件编码: ' M-001 ', 标准用量: '2.5', 损耗量: '0.25', 行备注: ' 首批 ' }),
+    { 行序: 6 },
+    okLine({ 行序: 7, 子件编码: 'M-002', 标准用量: '', 损耗量: null }),
+  ]
+  const p = buildDraftPayload({ ...okForm(), 备注: '急单' }, lines, KIND_TEMP, 12)
+  assert.equal(p.草稿id, 12)
+  assert.equal(p.工单类型, '临时')
+  assert.equal(p.物料清单.length, 2)
+  assert.deepEqual(Object.keys(p.物料清单[0]), LINE_KEYS)
+  assert.deepEqual(p.物料清单.map((r) => r.行序), [1, 2])
+  assert.equal(p.物料清单[0].子件编码, 'M-001')
+  assert.equal(p.物料清单[0].标准用量, 2.5)
+  assert.equal(p.物料清单[0].行备注, '首批')
+  // 空表单也要能安全序列化(草稿存坏存一律不许出 undefined/NaN)
+  const empty = buildDraftPayload({}, [], KIND_NORMAL)
+  assert.equal(empty.订单数量, 0)
+  assert.ok(!JSON.stringify(empty).includes('null'))
+})
+
+// ── 快照:离开守卫的脏检查 ────────────────────────────────────────────────────────
+test('formSnapshot:同内容 = 同快照;trim 不算脏;改数量/改行/切类型算脏', () => {
+  const s1 = formSnapshot(okForm(), [okLine()], KIND_TEMP)
+  assert.equal(formSnapshot(okForm(), [okLine()], KIND_TEMP), s1, '同样的内容必须得到同一个快照')
+  // 首尾空格 / 数量写成字符串:存下来是同一份内容 ⇒ 不算脏(不该拦用户)
+  assert.equal(formSnapshot({ ...okForm(), 产品编码: ' A-48-01 ' }, [okLine()], KIND_TEMP), s1)
+  assert.equal(formSnapshot({ ...okForm(), 订单数量: '100' }, [okLine()], KIND_TEMP), s1)
+  // 真改了东西 ⇒ 快照必须变(否则离开时静默丢数据)
+  assert.notEqual(formSnapshot({ ...okForm(), 备注: '改一句' }, [okLine()], KIND_TEMP), s1)
+  assert.notEqual(formSnapshot({ ...okForm(), 生产数量: 101 }, [okLine()], KIND_TEMP), s1)
+  assert.notEqual(formSnapshot(okForm(), [okLine({ 标准用量: 3 })], KIND_TEMP), s1, '明细行改动算脏')
+  assert.notEqual(formSnapshot(okForm(), [okLine(), okLine({ 子件编码: 'M-002' })], KIND_TEMP), s1, '加一行算脏')
+  assert.notEqual(formSnapshot(okForm(), [okLine()], KIND_NORMAL), s1, '切换常规/临时算脏(保存的内容变了)')
+  // 常规工单不看明细:同一份表头下改明细不算脏(与后端「常规忽略物料清单」一致)
+  const n1 = formSnapshot(okForm(), [], KIND_NORMAL)
+  assert.equal(formSnapshot(okForm(), [okLine()], KIND_NORMAL), n1)
 })

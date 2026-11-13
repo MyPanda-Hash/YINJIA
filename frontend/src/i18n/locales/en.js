@@ -5880,6 +5880,23 @@ export default {
     // 生产工单页两条历史 tooltip(2026-11-13 补译;此前一直缺 en,页面走查时补齐,非本次新增功能)
     '该工单行没有工序台账(没预排产)': 'No process ledger for this work order line (not pre-scheduled)',
     '不在本行排产区间(开工日~计划完工日)内': 'Outside this line\'s schedule window (start date to planned finish date)',
+    // ---- 生产工单「保存草稿 + 整页编制 + 草稿箱」(2026-11-13 方案 A)----
+    //   草稿存 wo_draft_head/_line(不写 plang);提交时生成正式工单。数据键(草稿/已提交/常规/临时)照旧中文,显示时 tt()。
+    '提交生成工单': 'Submit & Create',
+    '草稿箱': 'Draft Box',
+    '草稿号': 'Draft No.',
+    '草稿已保存': 'Draft saved',
+    '保存草稿失败': 'Failed to save the draft',
+    '请先选择主物料再保存草稿': 'Select the main material before saving the draft',
+    '该草稿不存在或已提交': 'This draft does not exist or has already been submitted',
+    '草稿箱暂无数据': 'No drafts',
+    '继续编辑': 'Continue Editing',
+    '提交成功': 'Submitted successfully',
+    '已删除草稿': 'Draft deleted',
+    '确认删除草稿': 'Delete this draft?',
+    '确认提交草稿': 'Submit this draft and create the work order?',
+    '当前有未保存的修改，离开将丢失，是否继续？': 'There are unsaved changes. Leave and lose them?',
+    '提交': 'Submit',
   },
 
 }

@@ -5,6 +5,7 @@ import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.WorkOrderBomService;
 import com.yinjia.mes.service.WorkOrderCreateService;
+import com.yinjia.mes.service.WorkOrderDraftService;
 import com.yinjia.mes.service.WorkOrderPickingService;
 import com.yinjia.mes.service.WorkOrderRecipeService;
 import com.yinjia.mes.service.WorkOrderSplitService;
@@ -69,11 +70,14 @@ public class WorkOrderListController {
     private final WorkOrderCreateService createService;
     /** 工单 BOM 取数(临时工单用料优先 → 产品标准组装 BOM 兜底) */
     private final WorkOrderBomService bomService;
+    /** 生产工单编制草稿(2026-11-13 方案 A:保存草稿/草稿箱/提交生成正式工单) */
+    private final WorkOrderDraftService draftService;
 
     public WorkOrderListController(JdbcTemplate jdbc, PanelPermissionService perm, WorkOrderSplitService splitService,
                                    WorkOrderPickingService pickingService, WorkOrderRecipeService recipeService,
                                    com.yinjia.mes.service.WorkOrderCloseGuard closeGuard,
-                                   WorkOrderCreateService createService, WorkOrderBomService bomService) {
+                                   WorkOrderCreateService createService, WorkOrderBomService bomService,
+                                   WorkOrderDraftService draftService) {
         this.jdbc = jdbc;
         this.perm = perm;
         this.splitService = splitService;
@@ -82,6 +86,7 @@ public class WorkOrderListController {
         this.closeGuard = closeGuard;
         this.createService = createService;
         this.bomService = bomService;
+        this.draftService = draftService;
     }
 
     /** 工单行键:公司代码+工单号+工单行号+批次号(plang 行键;批次号=转单日期 yyyyMMdd,同日同批累加) */
@@ -522,6 +527,73 @@ public class WorkOrderListController {
         Map<String, Object> out = createService.create(body == null ? Map.of() : body, user);
         logUsage(user, "新增生产工单", String.valueOf(out.get("工单号")), null);
         return ApiResult.ok(out);
+    }
+
+    // ══════════ 生产工单编制草稿(2026-11-13 方案 A:保存草稿 + 整页编制 + 草稿箱)══════════
+    // 用户口径:「新建的生产工单如何实现保存草稿的情况呢?是否当前不能使用弹窗形式而是使用页面形式会更好呢?」
+    // ⇒ 草稿存 wo_draft_head/_line(**不写 plang**,避免草稿进入待排产/报工/领料),提交时复用
+    //   WorkOrderCreateService.create 生成正式工单。业务规则全部在 WorkOrderDraftService(Controller 零业务)。
+    // 权限:查看权 + 页面动作词 create(「新增」)—— 草稿保存/删除/提交与建单同词,不新增权限词。
+
+    /** 保存草稿(草稿id=0/空=新建;否则覆盖) */
+    @PostMapping("/workOrderList/draft/save")
+    public ApiResult<Map<String, Object>> draftSave(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireAnyPerm(PagePanelRegistry.WORK_ORDER_LIST, "新增", "create");
+        return ApiResult.ok(draftService.save(body == null ? Map.of() : body, currentUser()));
+    }
+
+    /** 草稿箱列表(只列草稿态;keyword 模糊 草稿号/产品编码/产品名称) */
+    @PostMapping("/workOrderList/draft/list")
+    public ApiResult<List<Map<String, Object>>> draftList(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        Map<String, Object> b = body == null ? Map.of() : body;
+        return ApiResult.ok(draftService.list(strOf(b.get("keyword"))));
+    }
+
+    /** 草稿详情(继续编辑/提交前读取:表头 + 物料清单) */
+    @PostMapping("/workOrderList/draft/get")
+    public ApiResult<Map<String, Object>> draftGet(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        Map<String, Object> b = body == null ? Map.of() : body;
+        return ApiResult.ok(draftService.get(requireDraftId(b)));
+    }
+
+    /** 删除草稿(软删;只允许草稿态) */
+    @PostMapping("/workOrderList/draft/delete")
+    public ApiResult<Map<String, Object>> draftDelete(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireAnyPerm(PagePanelRegistry.WORK_ORDER_LIST, "新增", "create");
+        Map<String, Object> b = body == null ? Map.of() : body;
+        return ApiResult.ok(draftService.delete(requireDraftId(b), currentUser()));
+    }
+
+    /** 提交草稿 → 生成正式生产工单(成功才把草稿置「已提交」并回填正式工单号) */
+    @PostMapping("/workOrderList/draft/submit")
+    public ApiResult<Map<String, Object>> draftSubmit(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireAnyPerm(PagePanelRegistry.WORK_ORDER_LIST, "新增", "create");
+        Map<String, Object> b = body == null ? Map.of() : body;
+        String user = currentUser();
+        Map<String, Object> out = draftService.submit(requireDraftId(b), user);
+        logUsage(user, "提交工单草稿", String.valueOf(out.get("工单号")), null);
+        return ApiResult.ok(out);
+    }
+
+    /** 草稿箱角标数量(生产工单页工具栏) */
+    @PostMapping("/workOrderList/draft/count")
+    public ApiResult<Map<String, Object>> draftCount() {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("数量", draftService.count());
+        return ApiResult.ok(out);
+    }
+
+    /** body.草稿id → long;缺/非数字直接给业务错误(前端能原样提示) */
+    private static long requireDraftId(Map<String, Object> body) {
+        Long id = longOf(body.get("草稿id"));
+        if (id == null || id <= 0) throw new IllegalArgumentException("缺少草稿id");
+        return id;
     }
 
     /** 取字符串并 trim;空 → 空串(不返回 null,前端少判一种情况) */
