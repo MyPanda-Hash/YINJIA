@@ -70,7 +70,7 @@
           <!-- 表头字段(单据编号只读;已保存的单据里"设备名称/仪器/测试项目"这类标识字段也只读) -->
           <div v-for="f in headerFields" :key="'h-' + f.code" class="labm-field">
             <label>
-              {{ labelOf(f) }}<span v-if="f.isNotNull && !isDocNo(f)" class="req">*</span>
+              {{ labelOf(f) }}
               <span v-if="!isDocNo(f) && !headerEditable(f) && !readOnly" class="labm-locktag">{{ tt('已锁定') }}</span>
             </label>
             <el-input v-if="isDocNo(f)" :model-value="form[f.code]" disabled />
@@ -969,7 +969,7 @@ defineExpose({ panelCode, panel })
 
 .labm-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
 .labm-field > label { font-size: 12px; color: var(--el-text-color-secondary); }
-.labm-field .req { margin-left: 2px; color: var(--el-color-danger); }
+.labm-field .req { }
 
 .labm-drow {
   margin-bottom: 10px;

@@ -40,7 +40,7 @@
         <!-- data-code = 字段数据键:校验失败时靠它把缺必填的那一栏滚到视野里并高亮
              (2026-10-19 用户报「出货检验计划表提示标题不能为空,但不知道填哪」) -->
         <div v-for="r in visibleFormMeta" :key="r.code" class="field" :data-code="r.code">
-          <label :title="tt(r.name)">{{ tt(r.name) }}<span v-if="r.isNotNull" class="req">*</span></label>
+          <label :title="tt(r.name)">{{ tt(r.name) }}</label>
           <el-input v-if="isText(r)" v-model="form[r.code]" :disabled="!editable || fieldLocked(r)" :placeholder="tt(r.name)" />
           <el-input-number
             v-else-if="isNumber(r)"
@@ -128,7 +128,7 @@
           <div class="dt-head">
             <div class="dt-tabs">
               <span class="dt-tab" :class="{ on: (subActive[tab.key] || 'detail') === 'detail' }" @click="subActive[tab.key] = 'detail'">
-                {{ tab.label }}<span v-if="tab.isRequired" class="req">*</span>
+                {{ tab.label }}
               </span>
               <span
                 v-if="tab.summaryItems && tab.summaryItems.length"
@@ -1824,8 +1824,9 @@ watch(() => [panelCode.value, code.value], () => {
   text-align: left;
   white-space: nowrap;
 }
+/* 必填红星已于 2026-11-13 按用户口径去掉（「保留必填项的属性就行，只是去掉红点」）：
+   只删视觉，isNotNull/isRequired 判据与保存校验全部保留 */
 .field .req {
-  color: #dc2626;
 }
 .field .el-input,
 .field .el-select,
@@ -1838,7 +1839,6 @@ watch(() => [panelCode.value, code.value], () => {
   align-items: center;
   gap: 2px;
 }.field .req {
-  color: #dc2626;
 }
 .detail {
   margin-top: 12px;
@@ -2011,8 +2011,9 @@ watch(() => [panelCode.value, code.value], () => {
   font-weight: 700;
   border-bottom: 2px solid #3788FF;
 }
+/* 必填红星已于 2026-11-13 按用户口径去掉（「保留必填项的属性就行，只是去掉红点」）：
+   只删视觉，isNotNull/isRequired 判据与保存校验全部保留 */
 .dt-tab .req {
-  color: #dc2626;
 }
 .dt-actions {
   display: flex;
@@ -2086,7 +2087,6 @@ watch(() => [panelCode.value, code.value], () => {
   font-weight: 700;
 }
 .dt-tab .req {
-  color: #dc2626;
 }
 .dt-actions {
   display: flex;

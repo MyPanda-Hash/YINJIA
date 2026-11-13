@@ -109,7 +109,7 @@ test('组件按 QC_INSP_REC_RESULT_KEYS 渲染五个格子,且不再用文本域
 })
 
 /** 源码级回归:「处理意见」必须走标准库下拉 + 两个必填星号(2026-11-11 用户口径) */
-test('处理意见 = 标准库下拉,且检验结论/处理意见/单项判定带必填标记', () => {
+test('处理意见 = 标准库下拉,且检验结论/处理意见/单项判定仍是必填项（2026-11-13 起只去掉红星）', () => {
   const src = readFileSync(new URL('../views/QcInspRecSheet.vue', import.meta.url), 'utf8')
   assert.match(src, /DISPOSAL_KEY = '处理意见'/, '处理意见键要单列常量')
   assert.match(src, /disposalOptions = computed\(\(\) => optionsOf\(DISPOSAL_KEY\)\)/,
@@ -119,7 +119,11 @@ test('处理意见 = 标准库下拉,且检验结论/处理意见/单项判定�
   assert.match(src, /openStdLib\(VERDICT_LIB, '检验结论'\)/, '检验结论也要有自己的标准库维护入口')
   // 检验结论候选只来自标准库(合格/不合格):不得再写死「特采」选项
   assert.ok(!/el-option[^>]*特采/.test(src), '检验结论候选中不得再写死「特采」选项')
-  assert.match(src, /isRequired\(K\.JUDGE\)/, '单项判定要显示必填星号')
+  // 2026-11-13 用户口径「把必填项的红点标识去掉，保留必填项的属性就行，只是去掉红点」
+  //   ⇒ 判据从"有星号"改成"必填属性在、星号不在"。
+  assert.match(src, /function isRequired\(/, '必填判据 isRequired 必须保留（只去视觉）')
+  assert.doesNotMatch(src, /class="qr-req"/, '必填红星 span 已按用户口径去掉')
+  assert.doesNotMatch(src, /content:\s*'\*'/, 'CSS 里不许再画红星')
   // 新建行必须把必填列建成空串,否则服务端"只校验带键的行"会放行
   assert.match(src, /function blankRow\(\)[\s\S]{0,120}\[K\.ITEM\]: ''[\s\S]{0,60}\[K\.JUDGE\]: ''/,
     '新增行要把 检验项/检测标准/单项判定 的键建出来(空串),必填才拦得住')

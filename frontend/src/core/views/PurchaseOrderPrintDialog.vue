@@ -734,7 +734,8 @@ async function doVoid(row) {
 /* 弹窗内容(勾选表 + 已打印记录)比原来高:矮屏(768/1080 笔记本)上会把底部按钮顶出视口。
    让**内容区自己滚动**、标题与底部按钮固定可见(2026-11-09 实测 707px 高时按钮被挡在视口外)。 */
 .pup { display: block; max-height: 82vh; overflow-y: auto; padding-right: 4px; }
-/* 明细表是定高组件,不能被外层 flex 压缩(否则 10 行只露 4 行);用相邻 margin 代替 gap */`.pup > * + * { margin-top: 8px; }
+/* 明细表是定高组件,不能被外层 flex 压缩(否则 10 行只露 4 行);用相邻 margin 代替 gap */
+.pup > * + * { margin-top: 8px; }
 .pup :deep(.el-table) { flex: none; }
 .pup-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 12.5px; color: #46586e; }
 .pup-chip { background: #f2f6fa; border: 1px solid #e1e8f0; border-radius: 4px; padding: 2px 8px; }

@@ -743,7 +743,10 @@ async function doVoid(row) {
   background: #fdf6e3; border: 1px solid #f5e3b3; border-radius: 4px; padding: 4px 8px; }
 .mlq-box-line { white-space: normal; }
 /* 必填列表头:红色星号(每箱数量必填,2026-11-11 用户口径「这个设计为必填」) */
-.mlq-req::before { content: '*'; color: #f56c6c; margin-right: 2px; }
+/* 必填红星(2026-11-13 用户口径「把必填项的红点标识去掉，保留必填项的属性就行」):
+   只去掉视觉，.mlq-req 类名保留（它是"这列必填"的钩子，输入校验/placeholder 不受影响）。 */
+.mlq-req {
+}
 </style>
 
 <style>

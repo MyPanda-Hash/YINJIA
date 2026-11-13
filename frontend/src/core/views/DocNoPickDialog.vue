@@ -40,7 +40,7 @@
           height="360"
           highlight-current-row
           :row-class-name="({ row }) => (leftPick === rowKeyOf(row) ? 'dnp-picked' : '')"
-          @row-click="(row) => pickLeft(row)"
+          @row-click="(row, col, e) => pickLeft(row, e)"
         >
           <el-table-column width="42">
             <template #default="{ row }">
@@ -71,7 +71,7 @@
           height="360"
           highlight-current-row
           :row-class-name="({ row }) => (rightPick === rowKeyOf(row) ? 'dnp-picked' : '')"
-          @row-click="(row) => pickRight(row)"
+          @row-click="(row, col, e) => pickRight(row, e)"
         >
           <el-table-column width="42">
             <template #default="{ row }">
@@ -149,7 +149,15 @@ async function searchLeft() {
   }
 }
 
-function pickLeft(row) {
+/**
+ * 点行选中（2026-11-13 用户口径统一：所有多选/单选弹窗都点行即可，不必去点前面那个小圆点）。
+ * 本弹窗原本就绑了 row-click，这里补两件事：
+ *   ① 点 radio 本身不重复处理（el-radio 的 change 已经选过了）；
+ *   ② 手型光标由样式给（见 .dnp-pane 的 cursor:pointer）。
+ */
+function pickLeft(row, event) {
+  const t = event?.target
+  if (t && typeof t.closest === 'function' && t.closest('.el-radio, .el-radio__input')) return
   leftPick.value = rowKeyOf(row)
   rightPick.value = ''   // 单选语义:选左即清右
 }
@@ -183,7 +191,9 @@ async function searchRight() {
   }
 }
 
-function pickRight(row) {
+function pickRight(row, event) {
+  const t = event?.target
+  if (t && typeof t.closest === 'function' && t.closest('.el-radio, .el-radio__input')) return
   rightPick.value = rowKeyOf(row)
   leftPick.value = ''
 }
@@ -232,6 +242,9 @@ watch(() => props.modelValue, (open) => {
 </script>
 
 <style scoped>
+/* 整行可点（2026-11-13 用户口径统一）：两张表本来就绑了 row-click 选单，
+   但缺手型光标 ⇒ 用户不知道能点整行，只会去点前面那个 radio。 */
+.dnp-pane :deep(.el-table__body-wrapper tbody tr) { cursor: pointer; }
 .dnp-tip {
   font-size: 12.5px;
   color: #8ba6bd;

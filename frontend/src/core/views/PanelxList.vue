@@ -255,12 +255,35 @@
         </div>
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
 
-        <div class="approval-side" :class="{ collapsed: sideCollapsed }">
-          <div class="as-side-title" @click="sideCollapsed = !sideCollapsed">
+        <div class="approval-side" :class="{ collapsed: sideCollapsed, 'preview-on': previewInSide }">
+          <!-- ═══ 单据预览：**替换**右侧栏（2026-11-13 用户口径）────────────────────────
+               用户原话：「把侧边栏换成右边展开，使用的时候替换右边栏，要有返回按钮」。
+               形态：点「单据预览」→ 右栏整体换成「单据预览」面板（表格列表 + 返回按钮）；
+               点「返回」或再点「单据预览」→ 恢复原来的操作按钮栏。两者互斥，不叠在一起。 -->
+          <!-- ═══ 单据预览：**把左侧「单据选择」栏那套表格搬到右栏**（2026-11-13 用户口径）═══
+               用户原话：「我要左边栏的展示效果在右边展示，而不是换成右边之前的样式」。
+               ⇒ 直接复用 DocSelectRail（与表格单据左栏**同一个组件**：单号 | 日期 | 中间列… |
+                 审核状态 的表格、上方翻页条、模糊搜索全库跨页、可拖宽），
+                 只是挂在右边，并在标题处给一个「← 返回」。 -->
+          <div v-if="previewInSide" class="ps-wrap">
+            <div class="ps-backbar">
+              <span class="ps-back" :title="tt('返回')" @click="closeSidePreview">← {{ tt('返回') }}</span>
+              <span class="ps-cap">{{ tt('单据预览') }}</span>
+            </div>
+            <DocSelectRail
+              v-if="previewRailBind"
+              v-bind="previewRailBind"
+              @select="onRailSelect"
+              @toggle="closeSidePreview"
+              @page="onRailPage"
+              @search="onRailSearch"
+            />
+          </div>
+          <div v-else class="as-side-title" @click="sideCollapsed = !sideCollapsed">
             <span v-if="!sideCollapsed">{{ tt(panelName) }}</span>
             <span class="as-side-toggle">{{ sideCollapsed ? '◀' : '▶' }}</span>
           </div>
-          <template v-if="!sideCollapsed">
+          <template v-if="!sideCollapsed && !previewInSide">
             <!-- 单据状态胶囊 + 单据切换分页器(2026-10-09 用户口径「把进度查询表侧边栏上边的单据切换去掉」):
                  单单据面板(RD_PROGRESS)全库只有一张单,切换无意义 ⇒ 这两块整块不渲染。 -->
             <div v-if="!singleDocMode" class="as-side-status-row">
@@ -369,7 +392,10 @@
               <div class="as-side-btn" @click="openFuzzy">{{ tt('模糊搜索') }}</div>
               <!-- 单据预览:全量单据卡片化预览(关键信息摘要),快速分辨并跳转——文件档案查看效果;
                    矩阵面板的卡片 = 产品行(编号 + 受控 + 4 个文件状态) -->
-              <div class="as-side-btn" @click="openDocPreview">{{ tt(isProdDocMatrix ? '产品预览' : '单据预览') }}</div>
+              <!-- 2026-11-13 用户口径：「把侧边栏换成右边展开，使用的时候替换右边栏，要有返回按钮」。
+                   ⇒ 产品信息表 / 立项申请：点本按钮把**右侧操作栏整体换成预览面板**（带返回）；
+                     其余面板仍走原来的窄侧栏卡片预览（openDocPreview），行为逐字不变。 -->
+              <div class="as-side-btn" @click="canPreviewSide ? openSidePreview() : openDocPreview()">{{ tt(isProdDocMatrix ? '产品预览' : '单据预览') }}</div>
               <!-- 流程管控(2026-11-11 用户口径:「新的流程管控面板应该放在产品文件列表」)——
                    入口就放在这张表的侧栏,点开是**独立页面** /rd/productFlow(版式照项目流程管控:
                    KPI + 检索 + 5 步时间轴),不再是本页里的内嵌切换。 -->
@@ -1659,7 +1685,7 @@
         </div>
         <!-- 查询弹窗面板(T+):单个「单据日期」区间控件(日期段必填的统一入口) -->
         <div v-if="reportQueryDialog" class="query-dialog-field">
-          <label class="req-label">{{ tt('单据日期') }}<span class="req-star">*</span></label>
+          <label class="req-label">{{ tt('单据日期') }}</label>
           <el-date-picker
             v-model="rqdRange"
             type="daterange"
@@ -1677,7 +1703,7 @@
         </div>
         <div v-for="field in queryDialogFields" :key="headerFieldKey(field)" class="query-dialog-field">
           <label :class="{ 'req-label': rqdFieldRequired(field) }">
-            {{ headerFieldLabel(field) }}<span v-if="rqdFieldRequired(field)" class="req-star">*</span>
+            {{ headerFieldLabel(field) }}
           </label>
           <!-- 参照双模(2026-09-21):按档案行数自动选控件 —— ≤20 行可搜索下拉(仓库 6 个),
                >20 行参照弹窗(存货 3838 个);都不开 allow-create,未建档值手输不进条件 -->
@@ -4640,6 +4666,42 @@ async function openFuzzyResult(r) {
 // 与模糊搜索同源取数(pageSize 拉到 200 一次取全),关键字客户端筛选;点卡片即跳转,文件档案查看效果。零后端改动。
 const previewMode = ref(false)
 const previewKw = ref('')
+/**
+ * 「单据预览」= **替换右侧操作栏**（2026-11-13 用户口径定稿）。
+ *
+ * <p>用户原话：「把侧边栏换成右边展开，使用的时候替换右边栏，要有返回按钮」。</p>
+ *
+ * <p>演进史（每一步都是用户纠正的，别再往回改）：
+ * ① 窄侧栏卡片列表 —— 一列 3~4 张，扫得慢；
+ * ② 弹窗浮层横向多列 —— 「应该是侧边栏展开的形式而不是弹窗」；
+ * ③ 左侧 DocSelectRail 表格 —— 「把侧边栏换成右边展开」；
+ * ④ **现在**：点「单据预览」→ 右侧操作栏整体换成预览面板（表格列表 + 「← 返回」），
+ *    点返回或再点「单据预览」→ 恢复原来的操作按钮栏。两者**互斥替换**，不叠在一起。</p>
+ */
+const PREVIEW_SIDE_PANELS = new Set(['RD_PROD_INFO', 'RD_APPROVAL'])
+const canPreviewSide = computed(() => PREVIEW_SIDE_PANELS.has(String(panelCode.value)))
+/** 右栏是否处于「单据预览」态 */
+const previewInSide = ref(false)
+/**
+ * 打开右栏预览。取数口径与 openDocPreview 一致（pageSize 拉到 200 一次取全、客户端筛选），
+ * 但**不走 previewMode** —— previewMode 是"把左栏/整页切走"的老预览态，这里只替换右栏内容。
+ */
+async function openSidePreview() {
+  if (canPreviewSide.value && previewInSide.value) { closeSidePreview(); return }
+  previewKw.value = ''
+  previewInSide.value = true
+  sideCollapsed.value = false
+  if (previewPrevPageSize === null) previewPrevPageSize = query.pageSize
+  query.pageSize = 200
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+}
+/** 返回：恢复右侧操作栏（操作按钮原样回来） */
+function closeSidePreview() {
+  previewInSide.value = false
+  previewKw.value = ''
+}
 let previewPrevPageSize = null
 /**
  * 摘要内容 = 纯函数 core/panel/docPreview.js 的口径（2026-11-11 用户口径：
@@ -6167,6 +6229,22 @@ const DOC_RAIL_PANELS = {
   //   客户名称改由纸面抬头显示(报告按工单行/产品定位,不再以客户为索引)。
   QC_OQC_REPORT: ['工单号', '产品名称'],
 }
+
+/**
+ * 「单据预览」右栏表格的中间列（2026-11-13）。
+ *
+ * <p>⚠ **不能登记进 DOC_RAIL_PANELS** —— 那张表是"这个面板有左侧单据选择栏"的开关，
+ * `docRailCfg` 读它、两个左栏渲染点（网格分支 / 纸面分支）都 `v-if="docRailCfg"`。
+ * 我图省事把 RD_PROD_INFO / RD_APPROVAL 加进去后，**左边平白多出一条左栏**
+ * （用户 2026-11-13 报障：「把左边的删掉，现在多了」）。</p>
+ *
+ * <p>故预览的列配置独立放这里，只被 {@link previewRailBind} 使用，左栏完全不受影响。</p>
+ */
+const PREVIEW_COLUMNS = {
+  // 中间列按"找单线索"挑，且是实测有值的短字段
+  RD_PROD_INFO: ['产品编号', '产品名称', '客户名称'],
+  RD_APPROVAL: ['客户名', '项目等级', '申请立项人'],
+}
 /** 左栏标题 =「面板名 + 选择」。分词语言(英/德/俄/越…)两词相接必须留空格,否则英文下显示成
  *  "Other inbound delivery notesSelect";中/日/韩/泰文直接相接才对。故按「两侧是否都是表音文字
  *  字母」判,不硬编码语言清单 —— 中文面板名照旧零间距。 */
@@ -6211,6 +6289,38 @@ const railBind = computed(() => ({
   selectable: railSelectable.value,
   checked: railChecked.value,
 }))
+/**
+ * 预览态专用的 rail 绑定：与 railBind 同一套字段，但
+ * · `collapsed` 恒 false —— 预览态必须显示表格本体，不能是那个 « 把手；
+ * · `title` 用「XX选择」，与左栏一致。
+ * 数据源照样是 list / total / query，翻页与模糊搜索走上面同一批 handler。
+ */
+const previewRailBind = computed(() => {
+  // 列从 PREVIEW_COLUMNS 自建，与左栏的 docRailCfg 完全解耦
+  const middles = PREVIEW_COLUMNS[panelCode.value]
+  const columns = middles
+    ? [
+        { label: '单号', keys: ['编号', '单据编号', '单号'], align: 'left', no: true },
+        { label: '日期', keys: ['日期', '单据日期'], align: 'left' },
+        ...middles.map((m) => (typeof m === 'string' ? { label: m, keys: [m], align: 'left' } : m)),
+        { label: '审核状态', keys: ['单据状态'], align: 'center', tag: true },
+      ]
+    : null
+  return {
+  title: railTitle(panelName.value),
+  columns,
+  rows: list.value,
+  currentNo: railCurNo.value,
+  collapsed: false,
+  total: total.value,
+  pageNo: query.pageNo,
+  pageSize: query.pageSize,
+  keyword: query.keyword,
+  selectable: false,
+  checked: [],
+  }
+})
+
 function onRailSelect(idx) {
   guardPageAction(async () => { curIdx.value = idx })
 }
@@ -8246,13 +8356,53 @@ async function snapSheetPage(el, domToPng) {
   let holder = null
   try {
     // 纸宽=scrollWidth(max-width:100% 压缩 offsetWidth 时,内容横向溢出,scrollWidth 才是整张纸)
-    const w0 = Math.max(el.scrollWidth, el.offsetWidth)
+    const paperW = Math.max(el.scrollWidth, el.offsetWidth)
+    /**
+     * A4 内容宽(px)：194mm @96dpi ≈ 733px。
+     *
+     * 🔴 2026-11-13 用户口径：「在导出 PDF 拉长一点，现在就缩在一半，把整个面板进行排版重新设计，
+     *   拉长一点，宽度不够填写数据自动换行，适配 A4 纸」。
+     *
+     * 【为什么要"重排"而不是"缩小"】立项申请的纸按**固定 1242px** 设计（FIXED_SHEET_W），
+     *   而 A4 竖向只有 733px 内容宽 ⇒ 只能整体缩到 0.59。缩小是全比例的：
+     *     · 宽：1242 × 0.59 → 正好铺满 194mm（看起来"横向满了"）；
+     *     · 高：纸张本身只有 928px 高（行高是设计写死的 min-height），
+     *           928 × 0.59 ≈ 145mm，而 A4 内容高 272mm ⇒ **纵向只占一半**（用户实测 49%）。
+     *   所以"缩在一半"不是缩放系数算错，而是**为了塞下过宽的纸把高度一起缩掉了**。
+     *
+     * 【现在的做法】导出/打印截图时，把克隆体**压到 A4 内容宽重新排版**：
+     *   值区变窄 ⇒ 长文本按既有规则换行（DocSheet 的 textarea pre-wrap + break-word）⇒
+     *   行高随内容撑开（模板用 min-height）⇒ 版面自然"拉长"，纵向填满 A4。
+     *   只有**比 A4 宽**的纸才压；本来就窄的（组装/BOM 表等）保持原宽，行为不变。
+     */
+    const A4_CONTENT_PX = Math.floor((SHEET_PAGE_W - SHEET_MARGIN * 2) / SHEET_MM)
+    /**
+     * 只对**文书式**纸面重排；表格式纸面（`layout:'grid'`，样品两张申请单）**不压**。
+     *
+     * 为什么：表格式纸面的列宽是写死的 px（`<colgroup>` 的 `col w`，见 DocSheet 的 sg-table），
+     * 压窄外层容器**表格不会跟着缩**（实测：1188 → 733 时表宽仍是 1189，直接横向溢出被裁）。
+     * 那类纸本来就按 A4 设计过（1188/1220/1365 三档，planSheetPages 已按宽度铺满或纵向切张），
+     * 硬压只会裁掉右边几列。判据用纸面自己的结构类名，不写死面板码。
+     */
+    const isTableStyleSheet = !!(el.querySelector && el.querySelector('.sg-table'))
+    const reflow = !isTableStyleSheet && paperW > A4_CONTENT_PX
+    const w0 = reflow ? A4_CONTENT_PX : paperW
     holder = document.createElement('div')
     holder.style.cssText = `position:fixed;left:-10000px;top:0;width:${w0}px;background:#ffffff;`
     const clone = el.cloneNode(true)
     clone.style.width = w0 + 'px'
     clone.style.maxWidth = 'none'
     clone.style.overflow = 'visible'
+    // 🔴 2026-11-13 用户报障「立项申请表的 PDF 导出有问题，应该是完整的页面才是」——
+    //   导出的 PDF 里单据只占纸张左上角一块（内容约 2/3 宽，右侧大片空白）。
+    //   根因：DocSheet 为「窄窗口别撑出横向滚动条」给纸面根节点写了**内联 zoom**
+    //   （sheetZoom = 容器内宽 ÷ 纸宽，见 DocSheet.vue 注释），而 cloneNode 会把它一起复制。
+    //   这里随后只覆盖了 width/maxWidth/overflow，zoom 留着 ⇒ 截图宽按**未缩放的纸宽**定，
+    //   克隆体内部却按 zoom 排版，右边就成了空白。
+    //   （浏览器实测：原元素 zoom=0.6 ⇒ 克隆体 zoom=0.6 ⇒ 内容只占截图宽 60%。）
+    //   导出件要的是**完整纸面**：屏幕上的窄窗适配与纸面尺寸无关，必须清掉。
+    //   ⚠ 单页面板走 window.print() 不受影响 —— 那条路按 CSS 变量 --print-zoom 另算。
+    clone.style.zoom = '1'
     // 页签条是编辑控件,不进导出件(打印时由 body.approval-printing 隐藏;导出走同一口径)
     clone.querySelectorAll('.rsp-pages').forEach((n) => n.remove())
     // 行操作列(＋插入/×删除)只在编辑态存在;从"编辑中的单据"直接打印时它会连 60px 一起上纸
@@ -8277,16 +8427,91 @@ async function snapSheetPage(el, domToPng) {
     document.body.appendChild(holder)
     // 双 raf:等克隆体按全宽完成重排再量高(窄窗换行多,原元素高度偏大;全宽布局高度才是纸高)
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+    /**
+     * 🔴 textarea 的**高度要按克隆体的新宽度重算**（2026-11-13 实测踩到）。
+     *
+     * 现象：填了 175 字的「立项背景」，屏幕 1242px 宽时 3 行就够（框高 143px），
+     *   压到 733px 后需要 7 行 —— 但克隆体里 `height` 还是从原元素带过来的 143px，
+     *   于是后 4 行**直接看不见**（导出的 PDF 里文字显示到"流量不低于每"就断了）。
+     * 原因：Element Plus 的 autosize 是**组件在响应式里监听 input 才重算**的，
+     *   克隆出来的裸 <textarea> 没人给它算高度 ⇒ 必须在这里手动按 scrollHeight 撑开。
+     * 顺序：value 已经写进文本节点（上面那段），此时 scrollHeight 才是真实内容高。
+     * 只增不减（Math.max）：原本更高的框（用户手动拉过）不该被压回去。
+     */
+    clone.querySelectorAll('textarea').forEach((c) => {
+      try {
+        const cs = getComputedStyle(c)
+        const extra = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0)
+          + (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0)
+        const need = c.scrollHeight + extra
+        const cur = parseFloat(c.style.height) || parseFloat(cs.height) || 0
+        if (need > cur) {
+          c.style.height = need + 'px'
+          c.style.overflowY = 'hidden'
+          // 行容器的 min-height 也要跟着抬，否则 flex 行会压回去
+          const row = c.closest('.as-row, .q-pairs, .q-section, .q-dept')
+          if (row) {
+            const rowCur = parseFloat(getComputedStyle(row).minHeight) || 0
+            const rowNeed = row.scrollHeight
+            if (rowNeed > rowCur) row.style.minHeight = rowNeed + 'px'
+          }
+        }
+      } catch (e) { /* 量不出来就保持原样，不影响出图 */ }
+    })
+    // 撑高后再等一帧，让承载它的行/表按新高度完成布局
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
     const h0 = Math.max(clone.scrollHeight, clone.offsetHeight, el.scrollHeight)
+    /**
+     * 🔴 截图宽度必须取**重排后的真实内容宽**，不能用写死的 `w0`（2026-11-13 用户报障
+     *   「这些 PDF 都有缺失」——规格书/产品信息表右缘被切掉一截）。
+     *
+     * 【根因（生产实测数据）】为了让 PDF 纵向填满 A4，上面会把克隆体压到
+     *   `A4_CONTENT_PX`(733px) 重新排版。但这两张纸的**列宽是写死的 px**
+     *   （`<colgroup>` 的 `col w` / 各段固定列宽），压窄容器它们**不会跟着缩**：
+     *     · 规格书      纸宽 794 → 压到 733 后 `scrollWidth` 仍是 794 ⇒ 溢出 61px
+     *     · 产品信息表  纸宽 781 → 压到 733 后 `scrollWidth` 仍是 781 ⇒ 溢出 48px
+     *     · 立项申请    纸宽 1242 → 压到 733 后 `scrollWidth` 731 ⇒ 正常（它本来就按比例重排）
+     *   而 `domToPng({ width: w0 })` 是按 `w0=733` 去裁图的 ⇒ 超出的 61/48px **被直接切掉**。
+     *   （立项申请不缺，正是因为它压得下去；所以只有这两张报"缺失"。）
+     *
+     * 【改法】用克隆体实测的 `scrollWidth` 兜底（取与 `w0` 的较大者）：
+     *   压窄重排仍然保留（纵向填满 A4 的效果不变），只是**不再把溢出部分裁掉**；
+     *   多出来的宽度由 PDF 侧按 `k = min(contentW/iw, contentH/ih)` 等比缩放吸收，
+     *   宁可整张略窄一点也不丢内容。本来就是 733 的页面行为完全不变（取 max 后仍是 733）。
+     */
+    const realW = Math.max(
+      clone.scrollWidth || 0,
+      clone.offsetWidth || 0,
+      Math.ceil(clone.getBoundingClientRect().width) || 0,
+      w0,
+    )
+    /**
+     * 行边界（2026-11-13）：`shotsForPages` 纵向切张时要**避开行中间**，
+     * 否则一张单会被切成"上半行在第 1 页、下半行在第 2 页"，读起来是断的。
+     * 这里把每个可切块（.as-row / .sg-table 的 tr / 明细表 tr）的**底边**记下来，
+     * 切分点就近吸附到最近的块边界。元素相对克隆体顶部的偏移 = rect.top - cloneRect.top。
+     */
+    let rowBreaks = []
+    try {
+      const baseTop = clone.getBoundingClientRect().top
+      const blocks = clone.querySelectorAll('.as-row, .sg-table > tbody > tr, .rs-row, table > tbody > tr')
+      rowBreaks = [...blocks]
+        .map((n) => Math.round(n.getBoundingClientRect().bottom - baseTop))
+        .filter((y) => y > 0 && y < h0)
+      // 去重 + 升序（嵌套结构会重复报同一个底边）
+      rowBreaks = [...new Set(rowBreaks)].sort((a, b) => a - b)
+    } catch (e) {
+      rowBreaks = []
+    }
     const dataUrl = await domToPng(clone, {
       scale: 2,
       backgroundColor: '#ffffff',
-      width: w0,
+      width: realW,
       height: h0,
       // 隐藏编辑态元素(字段编辑/标准库/终止横幅/拖动下标等),与打印口径一致
       filter: (node) => !(node instanceof HTMLElement && node.classList?.contains?.('no-print')),
     })
-    return { dataUrl, w0, h0 }
+    return { dataUrl, w0: realW, h0, rowBreaks }
   } finally {
     if (holder) holder.remove()
   }
@@ -10887,24 +11112,38 @@ function warnDisabled(action) {
  * ⇒ 直接打开它，不再新建。反复进出点「新增」都落回同一张，库里不会堆一串空草稿。
  * 只看 RD_APPROVAL：其它文书面板（实施计划等）的「新增」行为逐字不变。
  */
-function reusableBlankApproval() {
-  if (String(panelCode.value || '') !== 'RD_APPROVAL') return null
-  return (list.value || []).find((it) => {
-    const saved = String(it['saved'] ?? '').toUpperCase()
-    const blank = !String(it['客户名'] ?? '').trim()
-      && !String(it['立项背景'] ?? '').trim()
-      && !String(it['文档编号'] ?? '').trim()
-    return saved === 'N' && blank
+/**
+ * 已有**没填过内容**的草稿单 → 直接复用它，不再新建（2026-11-06 口径）。
+ *
+ * 🔴 2026-11-13 修：原判据要求 `it['saved'] === 'N'`，但 `saved` 是**前端本地标记**，
+ *   列表接口从来不下发它（全文件搜不到任何 `.saved =` 赋值）⇒ 这个函数**恒为 null**，
+ *   复用从来没生效过。实测：进出面板 7 次就攒了 7 张空白的 LXA-2026-11-0006…0012。
+ *   现在改按**业务上是否空白**判断（不依赖任何前端临时标记）：
+ *     单据状态是草稿 && 关键内容字段全空 ⇒ 这就是一张可以接着填的空单。
+ *   ⚠ 只认「草稿」：已提交/已审核的单即使字段空着也不能被当成"可复用"（那是别人的在办单）。
+ */
+function reusableBlankDraft(code) {
+  const c = String(code || '')
+  const isBlank = (it, keys) => keys.every((k) => !String(it?.[k] ?? '').trim())
+  const find = (keys) => (list.value || []).find((it) => {
+    const st = String(it['单据状态'] ?? '').trim()
+    // 列表行的状态键可能是『单据状态』或被 tt 过的值；草稿就这两种写法
+    const isDraft = st === '草稿' || st === ''
+    return isDraft && isBlank(it, keys)
   }) || null
+  if (c === 'RD_APPROVAL') return find(['客户名', '立项背景', '文档编号'])
+  // 产品信息表：产品编号是唯一标识，它空着且没有客户/项目 ⇒ 就是一张空草稿
+  if (c === 'RD_PROD_INFO') return find(['产品编号', '产品名称', '客户名称'])
+  return null
 }
 async function directAdd() {
   try {
     // 立项申请表：已有空白草稿就复用，不再建第二张（2026-11-06 用户口径）
-    const reuse = reusableBlankApproval()
+    const reuse = reusableBlankDraft(panelCode.value)
     if (reuse) {
       const idx = list.value.findIndex((item) => item['编号'] === reuse['编号'])
       if (idx >= 0) curIdx.value = idx
-      ElMessage.info(tt('已有一张未填写的立项申请草稿，直接打开它'))
+      ElMessage.info(tt('已有一张未填写的草稿，直接打开它'))
       return
     }
     const formData = {}
@@ -10933,6 +11172,49 @@ async function directAdd() {
     ElMessage.success(`已新增 ${panelName.value}-${no}，请在列表页填写并保存`)
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || '新增失败')
+  }
+}
+
+/**
+ * 「点进去就能开始填写新的草稿」（2026-11-13 用户口径）。
+ *
+ * <p>原话：「立项申请和产品信息表我现在点进去看到的是旧的单据，我想要点击进去就能开始填写
+ * 新的草稿了」。此前面板载入后 `cur = list[curIdx]`、`curIdx=0` ⇒ 永远显示**列表第一张旧单**。</p>
+ *
+ * <p>【为什么只对这两张】它们是**以"草稿"为主要录入形态**的单据（立项申请、产品信息表），
+ * 用户 90% 的进入动作是"新建一张"。订单/工单/检验单这类面板进去多半是"看已有单据"，
+ * 一刀切自动建草稿会把"新增"变成副作用、越攒越多空单。</p>
+ *
+ * <p>【复用而非总是新建】走 {@link directAdd}，它内部已有「已有空白草稿就复用」的口径
+ * （见 reusableBlankApproval），反复进出不会攒空单。产品信息表暂无该口径，
+ * 但它有「产品编号唯一」的天然约束，空单不会太多。</p>
+ *
+ * <p>【只在"进入"时触发】用 `autoDraftPanel` 记住上次为哪个面板建过 ——
+ * 同面板内翻页/查询/刷新不再触发（那些路径也会走 load()）。</p>
+ *
+ * <p>【失败静默降级】无新增权限 / 后端报错时**不弹错**，退回原来的"显示列表第一张"，
+ * 不能让一个自动行为把整个面板拦住。</p>
+ */
+const AUTO_DRAFT_PANELS = ['RD_APPROVAL', 'RD_PROD_INFO']
+/** 上次自动建草稿是为哪个面板（同一面板内重复 load 不再触发） */
+let autoDraftPanel = ''
+/** 正在建单（防重入：load 在一轮里会被多处调用） */
+let autoDraftBusy = false
+async function autoDraftOnEnter() {
+  const code = String(panelCode.value || '')
+  if (!AUTO_DRAFT_PANELS.includes(code)) return
+  if (autoDraftPanel === code) return      // 本面板已经处理过（翻页/查询/刷新不再建）
+  // ⚠ 闸门必须**先**置位再 await：load() 在一轮里可能被触发两次，
+  //   后置位会在 await 期间重复建出两张草稿。
+  autoDraftPanel = code
+  if (autoDraftBusy) return
+  autoDraftBusy = true
+  try {
+    await directAdd()
+  } catch (e) {
+    // 自动行为失败不打扰用户：停在"显示列表第一张"即可（这正是改前的行为）
+  } finally {
+    autoDraftBusy = false
   }
 }
 
@@ -12343,6 +12625,11 @@ async function load(clamping = false) {
     markSavedSnapshot() // 未保存离开守卫的基线快照（载入即干净；保存成功也会经此刷新）
     inlineDirtyFlag.value = false
     restoreFreshDraft() // 刷新/重进后恢复「本次新增未保存草稿」标记,守卫仍可撤回
+    // 「点进去就能填新草稿」（2026-11-13）：只对白名单里的两张单据，且每个面板只做一次。
+    // 放在 load 成功之后 —— 建完草稿 directAdd 自己会再 load() 一次刷新列表并定位到新单。
+    // ⚠ 这里**不能 await**：await 会让 load() 的调用方（onMounted/翻页/查询）多等一个建单往返；
+    //   而 autoDraftOnEnter 内部有闸门，异步跑不会重复建。
+    autoDraftOnEnter()
   } catch (e) {
     const msg = engine.errMsg(e) || '加载失败'
     ElMessage.error(msg)
@@ -13505,16 +13792,11 @@ onUnmounted(() => {
   color: #444;
   white-space: nowrap;
 }
-.field label.req::before {
-  content: '*';
-  color: #ff0033;
-  margin-right: 2px;
+/* 必填红星(2026-11-13 用户口径「把必填项的红点标识去掉，保留必填项的属性就行」):
+   只去掉**视觉**，`.req` / `.req-label` 类名与 required 判据照旧（校验/必填提示不受影响）。 */
+.field label.req {
 }
-.col-hdr-text.req::before {
-  content: '*';
-  color: #ff0033;
-  margin-right: 2px;
-  font-weight: bold;
+.col-hdr-text.req {
 }
 .field :deep(.el-input),
 .field :deep(.el-select),
@@ -14767,6 +15049,61 @@ onUnmounted(() => {
 .rpt-up-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .rpt-up-label { flex: none; width: 70px; text-align: right; font-size: 13px; color: #5a7a99; }
 /* ── 单据预览查找(文书侧栏,文件档案查看效果) ── */
+/* ── 右栏「单据预览」态（2026-11-13）──────────────────────────────────────
+   用户口径：「我要左边栏的展示效果在右边展示，而不是换成右边之前的样式」
+   ⇒ 右栏里直接放 DocSelectRail 本体（与表格单据左栏同一组件、同一套表格/翻页/搜索）。
+   这里只做三件事：① 造一个"返回"条；② 让 rail 在右栏里铺满（它默认带 border-right，
+   挂到右边要改成 border-left）；③ 去掉它自己的宽度（交给右栏宽度决定）。 */
+/* 预览态右栏加宽：左栏那套表格有 6 列（单号/日期/中间3列/审核状态），
+   176px 的常规宽度放不下（实测只露出"单号+日期"，其余列溢出不可见）。
+   ⚠ 382px 仍不够：实测产品信息表那张表格 **scrollWidth=416px**，
+      `.dsr-grid` 是 `overflow-x:auto` ⇒ 「审核状态」被推到右侧看不见
+      （用户 2026-11-13 报障「产品信息表的应该显示全，现在显示不全」）。
+   故按最宽的那个面板给足：**440px**（416 + 滚动条/内边距余量），
+   两个面板共用同一宽度，切换时不跳动。 */
+.approval-side.preview-on { width: 440px; }
+.ps-wrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.ps-backbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid #dce4e1;
+  background: #fafbfd;
+  flex: none;
+}
+.ps-cap { font-size: 12px; color: rgba(0, 0, 0, 0.45); }
+/* rail 在右栏里：铺满宽度、边框换到左侧、不要它自带的固定宽度与拖宽把手 */
+.ps-wrap :deep(.doc-select-rail) {
+  width: 100% !important;
+  flex: 1;
+  min-height: 0;
+  border-right: none;
+  border-left: 1px solid #dce4e1;
+}
+.ps-wrap :deep(.dsr-resizer) { display: none; }
+.ps-wrap :deep(.dsr-coll) { display: none; }
+
+/* ── 右栏「单据预览」态（2026-11-13 用户口径：替换右边栏 + 返回按钮）────────
+   右栏宽约 200~240px，故列表是**一列紧凑行**（不是横向多列——那是弹窗时代的要求，
+   换成右栏后横向空间不够）。每行 = 单号+状态 / 日期(·摘要) / 字段行，
+   与左栏表格信息量对齐但更省宽度。
+   取值：padding 8/10、colorBorderSecondary #f0f0f0、colorTextSecondary rgba(0,0,0,.45)。 */
+.ps-back {
+  cursor: pointer;
+  color: #1e5a8a;
+  font-size: 12px;
+  margin-right: 8px;
+  white-space: nowrap;
+}
+.ps-back:hover { text-decoration: underline; }
+.ps-cap { font-size: 12px; color: rgba(0, 0, 0, 0.45); }
+
 .preview-kw { margin: 4px 0 6px; }
 .preview-cards { max-height: 520px; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px; }
 .preview-card {

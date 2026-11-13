@@ -98,7 +98,7 @@
              格子数据键 = 结果1..结果5(见 @core/qc/qcInspRecColumns 的 QC_INSP_REC_RESULT_KEYS) -->
         <tr>
           <th class="c-item" rowspan="2">
-            {{ tt('检验项') }}<span v-if="isRequired(K.ITEM)" class="qr-req" :title="tt('必填')">*</span>
+            {{ tt('检验项') }}
             <!-- 2026-11-12 用户口径:「检验项现在是带入的,不需要标准库维护」
                  ⇒ 检验项列不再挂「⧉ 标准库维护」入口(检验项由「带入检验要求」带出来,
                     历史值仍在下拉候选里可回显/可选,输入框本就 allow-create 可自由敲)。
@@ -111,7 +111,7 @@
           <th class="c-result" colspan="5">{{ tt('检测结果') }}</th>
           <!-- 单项判定必填(2026-11-11 用户口径) -->
           <th class="c-judge" rowspan="2">
-            {{ tt('单项判定') }}<span v-if="isRequired(K.JUDGE)" class="qr-req" :title="tt('必填')">*</span>
+            {{ tt('单项判定') }}
           </th>
           <th v-if="editable" class="c-op" rowspan="2"></th>
         </tr>
@@ -241,7 +241,7 @@
         <tr v-for="(pair, ri) in QC_INSP_REC_FOOT_ROWS" :key="'fr' + ri">
           <template v-for="cell in pair" :key="cell.key">
             <th class="qr-label">
-              {{ tt(cell.label) }}<span v-if="isRequired(cell.key)" class="qr-req" :title="tt('必填')">*</span>
+              {{ tt(cell.label) }}
               <!-- 检验结论 / 处理意见:都是标准库(2026-11-11 两轮口径),各自带维护入口 -->
               <span
                 v-if="editable && cell.key === VERDICT_KEY"
@@ -780,12 +780,7 @@ watch(
   text-align: center;
   white-space: nowrap;
 }
-/* 必填标记(2026-11-11:检验结论 / 处理意见 / 单项判定必填) */
-.qr-req {
-  color: #c0392b;
-  font-weight: 700;
-  margin-left: 2px;
-}
+/* 必填红星已于 2026-11-13 按用户口径去掉（只去视觉，isRequired 判据保留） */
 /* 整张纸共用一套列宽(与原表 B|C:D|E|F:I 同节奏):
    标签列 20% / 值列 30% / 标签列 20% / 值列 30%;表尾「检验结论/处理意见」值格跨后三列铺到表格右缘 */
 .qr-head-table col.fc-label,

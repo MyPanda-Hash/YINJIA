@@ -44,6 +44,8 @@
          row-key=__rk(reserve-selection 跨页保留勾选的前提,与 RefPickDialog 同款)。
          ⚠ 勾选**不做**跨筛选保留以外的特殊处理:筛选清空后勾选集合仍按行对象保留 ——
          这正是"先搜 A 勾两条,再搜 B 勾一条,一起带入"的用法。 -->
+    <!-- 点行即勾选（2026-11-13 用户口径：「其他的这种弹窗的勾选形式都进行改动，都做点击行就判定勾选」）
+         —— 不必再去点前面那个 45px 的小方框；复选框列保留（表头全选 / 跨页 reserve-selection 靠它）。 -->
     <el-table
       ref="tableRef"
       v-loading="loading"
@@ -52,7 +54,9 @@
       height="380"
       border
       size="small"
+      class="pi-table"
       :empty-text="loading ? tt('加载中') : tt('没有匹配的商品')"
+      @row-click="onRowClick"
       @selection-change="(r) => (selected = r)"
     >
       <el-table-column type="selection" width="45" reserve-selection />
@@ -110,6 +114,21 @@ const selected = ref([])
 const loading = ref(false)
 const error = ref('')
 const tableRef = ref(null)
+
+/**
+ * 点行即勾选（2026-11-13 用户口径：「都做点击行就判定勾选的操作」）。
+ * ⚠ 点复选框本身不重复处理：那一下 el-checkbox 的 change 已经翻过一次，
+ *   再走行点击会翻第二次 ⇒ 看起来像"点了没反应"。判据 closest('.el-checkbox')。
+ * 切换走 el-table 的 toggleRowSelection（不自己维护数组）：本表用 `reserve-selection`
+ * 跨页保留勾选，另存一份会跟表格内部状态打架。
+ */
+function onRowClick(row, column, event) {
+  const t = event?.target
+  if (t && typeof t.closest === 'function' && t.closest('.el-checkbox, .el-checkbox__input')) return
+  if (!row || row.__rk === undefined) return
+  const isOn = selected.value.some((r) => r && r.__rk === row.__rk)
+  tableRef.value?.toggleRowSelection(row, !isOn)
+}
 
 /** 模块级缓存(不是组件级):弹窗是 v-model 开关,关掉组件实例就没了,组件内 ref 留不住 */
 let cache = { at: 0, rows: [] }
@@ -188,6 +207,8 @@ function confirm() {
 </script>
 
 <style scoped>
+/* 整行可点（2026-11-13）：手型光标提示"这一行能点" */
+.pi-table :deep(.el-table__body-wrapper tbody tr) { cursor: pointer; }
 .pi-tip {
   font-size: 12px;
   color: #666;

@@ -59,18 +59,28 @@ SET required = 0
 WHERE panel_code = N'RD_PROD_INFO' AND label IN (N'项目编号', N'项目名称') AND ISNULL(required, 0) = 1;
 PRINT '[prodinfo-required] 豁免(项目编号/项目名称)回退行数 = ' + CAST(@@ROWCOUNT AS nvarchar(10));
 
-/* 自检：9 个字段必须都在且 required=1 */
+/* 自检：**只要字段在本账套存在**，就必须 required=1。
+   ⚠ 不能断言"11 个字段一个不少"：实测 2026-11-12 两个账套的 yj_field 有 schema 漂移 ——
+   测试账套(HSDZ_MES_TEST)的 RD_PROD_INFO 缺「客户名称」「应用场景」两行（正式库有），
+   硬断言会让整条迁移在测试账套上失败回滚。这里改为：
+     · 存在但没置必填 → 报错（真问题）；
+     · 压根不存在的字段 → 只 PRINT 出来（账套漂移，属另一件事，另行对齐）。 */
 DECLARE @miss INT = (
     SELECT COUNT(*) FROM @req r
-    WHERE NOT EXISTS (
+    WHERE EXISTS (SELECT 1 FROM yj_field f WHERE f.panel_code = N'RD_PROD_INFO' AND f.label = r.label)
+      AND NOT EXISTS (
         SELECT 1 FROM yj_field f
         WHERE f.panel_code = N'RD_PROD_INFO' AND f.label = r.label AND ISNULL(f.required, 0) = 1)
 );
 IF @miss > 0
 BEGIN
-    RAISERROR(N'[prodinfo-required] 自检失败：还有 %d 个字段没置成必填', 16, 1, @miss);
+    RAISERROR(N'[prodinfo-required] 自检失败：还有 %d 个已存在的字段没置成必填', 16, 1, @miss);
     RETURN;
 END
+/* 本账套缺哪些目标字段（只报告，不阻断） */
+SELECT N'[prodinfo-required] 本账套缺字段: ' + r.label AS missing
+FROM @req r
+WHERE NOT EXISTS (SELECT 1 FROM yj_field f WHERE f.panel_code = N'RD_PROD_INFO' AND f.label = r.label);
 DECLARE @exempt INT = (
     SELECT COUNT(*) FROM yj_field
     WHERE panel_code = N'RD_PROD_INFO' AND label IN (N'项目编号', N'项目名称') AND ISNULL(required, 0) = 1
@@ -80,4 +90,4 @@ BEGIN
     RAISERROR(N'[prodinfo-required] 自检失败：项目编号/项目名称被标成了必填（用户要求豁免）', 16, 1);
     RETURN;
 END
-PRINT '[prodinfo-required] 自检通过：一区 7 + 二区 2 已必填，项目编号/项目名称保持豁免。';
+PRINT '[prodinfo-required] 自检通过：本账套存在的目标字段已全部必填，项目编号/项目名称保持豁免。';

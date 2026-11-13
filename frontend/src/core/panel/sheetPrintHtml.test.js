@@ -152,3 +152,43 @@ test('⑫ 多张截图各算各的（封面矮、检验表长，互不影响）'
   const order = plan.map((p) => p.index)
   assert.deepEqual(order, [...order].sort((a, b) => a - b))
 })
+
+/**
+ * 「拉长一点」带来的新问题：按 A4 宽重排后纸会变高、跨多页，
+ * 切张如果切在行中间，一张单会被切成"上半行在第 1 页、下半行在第 2 页"。
+ * 2026-11-13 加 snapToRowBreak：切点就近吸附到行底边。
+ */
+import { snapToRowBreak } from './sheetPrintHtml.js'
+
+test('切点吸附到行边界（不把一行切成两半）', () => {
+  const breaks = [120, 240, 360, 480, 600, 720, 840, 960, 1080]
+  assert.equal(snapToRowBreak(1058, breaks), 960, '1058 落在 960 与 1080 之间 ⇒ 吸到靠前的 960')
+  assert.equal(snapToRowBreak(1080, breaks), 1080, '正好是边界就用它')
+  assert.equal(snapToRowBreak(100, breaks), 100, '前面没有边界 ⇒ 保持理想切点（宁可切一半也不丢内容）')
+  assert.equal(snapToRowBreak(1058, []), 1058, '没给边界 ⇒ 原行为不变')
+})
+
+test('吸附绝不倒退（否则切出空页/死循环）', () => {
+  const breaks = [50, 60, 70]
+  // from=500 时，所有边界都 ≤ from ⇒ 一个都不能选，退回理想切点
+  assert.equal(snapToRowBreak(1000, breaks, 500), 1000)
+})
+
+test('带 rowBreaks 切张:总高度守恒、页数有限', () => {
+  const breaks = []
+  for (let y = 120; y < 1600; y += 120) breaks.push(y)
+  const plan = planSheetPages([{ w0: 733, h0: 1601, rowBreaks: breaks }])
+  const sum = plan.reduce((a, p) => a + p.h, 0)
+  assert.equal(Math.round(sum), 1601, '各页高度之和必须等于整张纸高（不许丢内容）')
+  assert.ok(plan.length >= 2 && plan.length < 10, `页数应有限且合理，实际 ${plan.length}`)
+  // 每页切点都落在行边界上（最后一页除外）
+  for (const p of plan.slice(0, -1)) {
+    assert.ok(breaks.includes(Math.round(p.y + p.h)), `切点 ${Math.round(p.y + p.h)} 应在行边界上`)
+  }
+})
+
+test('异常 rowBreaks（全在最前面）不会死循环', () => {
+  const plan = planSheetPages([{ w0: 733, h0: 1601, rowBreaks: [10, 20, 30] }])
+  assert.ok(plan.length > 0 && plan.length < 10, '必须有页数上限保护')
+  assert.equal(Math.round(plan.reduce((a, p) => a + p.h, 0)), 1601, '内容仍守恒')
+})

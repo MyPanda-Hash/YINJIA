@@ -35,6 +35,25 @@ export const SHEET_SPLIT_RATIO = 0.8
  * 每张截图要印成几张纸、每张取哪一段（纯算术，不碰 DOM）。
  * @returns {Array<{index:number, k:number, y:number, h:number}>} y/h 单位为截图**原始 CSS px**
  */
+/**
+ * 把理想切点吸附到**最近的块边界**（行底边），避免把一行切成两半（2026-11-13）。
+ *
+ * 只在「吸附后这一页仍然装得下」时才吸：候选边界必须 ≤ 理想切点，
+ * 且不能比上一页已经用掉的位置还靠前（否则会切出空页/死循环）。
+ * 找不到合适边界就退回理想切点（宁可切一半，也不能丢内容）。
+ *
+ * @param {number} ideal 理想切点（CSS px，相对截图顶部）
+ * @param {number[]} breaks 块边界（升序，CSS px）
+ * @param {number} from 本页起点（切点必须 > from）
+ * @returns {number} 实际切点
+ */
+export function snapToRowBreak(ideal, breaks, from = 0) {
+  const list = (Array.isArray(breaks) ? breaks : [])
+    .filter((b) => Number.isFinite(b) && b > from && b <= ideal)
+  if (!list.length) return ideal
+  return list[list.length - 1]          // 升序 ⇒ 最后一个就是最靠近理想切点的
+}
+
 export function planSheetPages(shots) {
   const contentW = SHEET_PAGE_W - SHEET_MARGIN * 2
   // 与 sheetPrintHtml 的页框同口径（比内容区矮 1mm，防亚像素溢出）
@@ -51,8 +70,18 @@ export function planSheetPages(shots) {
       return
     }
     const sliceH = contentH / kW / SHEET_MM        // 一张纸能放多少 CSS px
-    for (let y = 0; y < h0; y += sliceH) {
-      out.push({ index, k: kW, y, h: Math.min(sliceH, h0 - y) })
+    const breaks = Array.isArray(s?.rowBreaks) ? s.rowBreaks : []
+    // ⚠ 逐页推进（不是 `for (y += sliceH)`）：吸附会改变每页实际切点，步长不再固定。
+    //   进度保证：snapToRowBreak 只会返回 > y 的值，最坏退回 ideal，故必然推进。
+    let y = 0
+    let guard = 0
+    while (y < h0 && guard < 500) {
+      guard += 1
+      const ideal = Math.min(y + sliceH, h0)
+      // 最后一页（剩余不足一张纸）直接到底，不吸附
+      const cut = ideal >= h0 ? h0 : snapToRowBreak(ideal, breaks, y)
+      out.push({ index, k: kW, y, h: cut - y })
+      y = cut
     }
   })
   return out
