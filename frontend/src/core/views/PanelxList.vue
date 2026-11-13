@@ -2607,6 +2607,7 @@ import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
 import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaults'
+import { parseSamplingQty } from '@core/insp/samplingQty'
 import { applyInspectorDefault } from '@core/qc/qcInspector'
 import { applyCalcRules } from '@core/panel/calcRules'
 import { sumKeepScale } from '@core/panel/sumTotals'
@@ -9364,7 +9365,13 @@ function applyInspItems(items) {
     // 但这里一直漏写 ⇒ 制程检验单从弹窗「出货检验计划」来源带入时这一格是空的(走「取出货检验计划」
     // 按钮那条路 applyShipPlanItems 有写)。组装成品检验单没有这一列 ⇒ 按 has() 自动跳过。
     if (it['不合格应对措施'] && has('不合格应对措施')) row['不合格应对措施'] = it['不合格应对措施']
-    if (it['取样要求'] && has('抽检量')) row['抽检量'] = it['取样要求']
+    // 取样要求是标准库里的**自由文本**(「称取100g」「每批5件」「全检」),而抽检量是 **decimal 数值列**:
+    // 原文直写会让保存 500(2026-11-13 用户报 `error code [8114]; Error converting data type nvarchar to numeric`)。
+    // ⇒ 只写能明确解析成数量的写法(纯数字 / nPCS / n件…),其余留空;解析口径见 core/insp/samplingQty.js。
+    if (it['取样要求'] && has('抽检量')) {
+      const qty = parseSamplingQty(it['取样要求'])
+      if (qty != null) row['抽检量'] = qty
+    }
     if (it['计量单位'] && has('单位')) row['单位'] = it['计量单位']
     // 检验数量 → 横表格数 + 上限(只对制程检验单这张横表;其它检验单是纵向明细,没有格的概念)
     if (isProcSheet) {

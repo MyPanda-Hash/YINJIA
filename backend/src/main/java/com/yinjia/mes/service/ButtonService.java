@@ -2217,6 +2217,10 @@ public class ButtonService {
     /** 插入并返回自增主键(无主键时返回 null) */
     private Object insertRow(String table, Map<String, Object> cols, String user) {
         if (cols.isEmpty()) return null;
+        // 数值列收到文本 = 直接 500(2026-11-13 用户报「出货检验单保存报 8114 nvarchar→numeric」):
+        // 先按**物理列类型**做一次防御性收敛,不让脏值把整单保存打挂。
+        coerceNumericValues(table, cols);
+        cols.values().removeIf(java.util.Objects::isNull);
         fillRequiredDefaults(table, cols);
         // 审计列按表结构补(同 updateRow 的 2026-10-18 说明)
         Set<String> physical = tableCols(table);
@@ -2259,6 +2263,59 @@ public class ButtonService {
         });
     }
 
+    /** 物理列类型缓存:table|col -> 小写类型名(decimal/nvarchar/int…) */
+    private final Map<String, String> colTypeCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 取物理列类型(缺表/缺列返回空串:调用方按"不是数值列"处理,保持历史行为) */
+    private String colTypeOf(String table, String col) {
+        return colTypeCache.computeIfAbsent(table + "|" + col, k -> {
+            try {
+                java.util.List<String> t = jdbc.queryForList(
+                        "SELECT ty.name FROM sys.columns c JOIN sys.types ty ON c.user_type_id = ty.user_type_id"
+                                + " WHERE c.object_id = OBJECT_ID(?) AND c.name = ?", String.class, table, col);
+                return t.isEmpty() || t.get(0) == null ? "" : t.get(0).toLowerCase();
+            } catch (Exception e) {
+                return "";
+            }
+        });
+    }
+
+    /**
+     * 数值列收到文本值时的防御性收敛(2026-11-13 事故:出货检验单保存 500 ——
+     * {@code PreparedStatementCallback; SQL state [S0005], error code [8114]; Error converting data type nvarchar to numeric}).
+     *
+     * <p>根因:「带入检验项目」把《检验项目标准库》的自由文本 `取样要求`(如「称取100g」)原样写进了
+     * `抽检量` —— 而该物理列是 decimal ⇒ 插/更新时 SQL Server 报 8114,整张单保存回滚。
+     * 前端同批已修(只把能解析成"数量"的取样要求写进抽检量),这里是**服务端兜底**:
+     * 任何面板/任何路径把文本塞进数值列,都不应该让"整单保存"失败(客户端绕过、历史脏前端、
+     * 移动端 etc. 都可能触发)。规则:
+     * <ul>
+     *   <li>只处理**物理列是数值类型**(decimal/numeric/money/float/real/int/bigint/smallint/tinyint)的列;</li>
+     *   <li>字符串去空格后为空 ⇒ 记 null(与「清空一格」口径一致,由 dropNullsOnNotNull/默认值兜住);</li>
+     *   <li>能当 BigDecimal 解析 ⇒ 用数值写(避免 SQL 端隐式转换);否则 ⇒ null + 一条 WARN(不静默造假数据);</li>
+     *   <li>非字符串值(Number/日期等)一律不动 —— 既有行为零变化。</li>
+     * </ul>
+     */
+    private void coerceNumericValues(String table, Map<String, Object> cols) {
+        for (Map.Entry<String, Object> e : cols.entrySet()) {
+            if (!(e.getValue() instanceof String s)) continue;
+            String t = colTypeOf(table, e.getKey());
+            boolean numeric = t.contains("decimal") || t.contains("numeric") || t.contains("money")
+                    || t.contains("float") || t.contains("real") || t.startsWith("int")
+                    || t.contains("bigint") || t.contains("smallint") || t.contains("tinyint");
+            if (!numeric) continue;
+            String x = s.trim();
+            if (x.isEmpty()) { e.setValue(null); continue; }
+            try {
+                e.setValue(new java.math.BigDecimal(x));
+            } catch (NumberFormatException ex) {
+                log.warn("[数值列] {}.{} 收到非数值文本「{}」,按空值写入(避免 8114 打挂整单保存)",
+                        table, e.getKey(), x.length() > 50 ? x.substring(0, 50) + "…" : x);
+                e.setValue(null);
+            }
+        }
+    }
+
     /** 补齐无默认值的 NOT NULL 列(排除 IDENTITY):comm->'0',字符->'',数值->0 —— 与旧系统写入习惯一致 */
     private void fillRequiredDefaults(String table, Map<String, Object> cols) {
         List<String[]> required = requiredColsCache.computeIfAbsent(table, t -> {
@@ -2292,6 +2349,7 @@ public class ButtonService {
     private void updateRow(String table, String pk, Object id, Map<String, Object> cols, String user,
                            String groupCol, String groupVal) {
         if (cols.isEmpty()) return;
+        coerceNumericValues(table, cols);   // 数值列收到文本的防御,同 insertRow(2026-11-13)
         dropNullsOnNotNull(table, cols);
         if (cols.isEmpty()) return;
         // 审计列按表结构补(2026-10-18):数据建模·字段管理(FIELDMGR)的数据源 yj_field 只有 asp_user1/
