@@ -1,0 +1,36 @@
+{
+  "before": "YINJIA-MES",
+  "items": [
+    "YINJIA-MES",
+    "YINJIA-MES",
+    "YINJIA-MES·测试库",
+    "YINJIA-MES·测试库",
+    "简体中文",
+    "繁體中文 (zh-TW)",
+    "English (en)",
+    "日本語 (ja)",
+    "한국어 (ko)",
+    "Español (es)",
+    "Français (fr)",
+    "Deutsch (de)",
+    "Русский (ru)",
+    "Tiếng Việt (vi)",
+    "ไทย (th)",
+    "帮助文档",
+    "AI 智能帮助",
+    "关于",
+    "组织架构",
+    "使用权限查看",
+    "账号管理",
+    "修改密码",
+    "界面设置",
+    "换肤",
+    "工作台设置",
+    "退出"
+  ],
+  "picked": "YINJIA-MES·测试库",
+  "after": {
+    "factory": "YINJIA-MES·测试库",
+    "topbar": "银嘉数字化平台YINJIA-MES·测试库admin已认证YINJIA-MES·测试库登录日期 2026-11-13中更新公告 799+99+系统管理员"
+  }
+}

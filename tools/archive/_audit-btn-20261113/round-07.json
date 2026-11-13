@@ -1,0 +1,54 @@
+{
+  "hash": "#/panelx/list/PU_ORDER",
+  "factory": "YINJIA-MES",
+  "doc": "单据：YJ-20261110-04",
+  "status": "已审核",
+  "toolbar": [
+    {
+      "main": "新增",
+      "disabled": false
+    },
+    {
+      "main": "保存",
+      "disabled": true
+    },
+    {
+      "main": "删除",
+      "disabled": false
+    },
+    {
+      "main": "审核",
+      "disabled": true
+    },
+    {
+      "main": "审批",
+      "disabled": true
+    },
+    {
+      "main": "生单",
+      "disabled": false
+    },
+    {
+      "main": "刷新",
+      "disabled": false
+    },
+    {
+      "main": "打印",
+      "disabled": false
+    },
+    {
+      "main": "导入",
+      "disabled": false
+    },
+    {
+      "main": "更多",
+      "disabled": false
+    }
+  ],
+  "drafts": [],
+  "total": 50,
+  "statusSet": [
+    "已审核",
+    "已完成"
+  ]
+}

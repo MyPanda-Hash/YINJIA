@@ -1,0 +1,70 @@
+{
+  "opts": [
+    "全部事件",
+    "产品开发业务流",
+    "美金",
+    "薪酬核算",
+    "人民币"
+  ],
+  "rate": "1",
+  "detail": {
+    "found": true,
+    "col": 13,
+    "cellHTML": "",
+    "hasSelect": false,
+    "inputVal": null
+  },
+  "after": {
+    "fields": [
+      {
+        "label": "单据日期",
+        "value": "2026-10-13"
+      },
+      {
+        "label": "单据编号",
+        "value": "YJ-20261013-01"
+      },
+      {
+        "label": "供应商",
+        "value": "福建鑫恒碳业有限公司"
+      },
+      {
+        "label": "供应商编码",
+        "value": "YJ-XH"
+      },
+      {
+        "label": "币种",
+        "value": ""
+      },
+      {
+        "label": "汇率",
+        "value": "1"
+      },
+      {
+        "label": "交货日期",
+        "value": ""
+      },
+      {
+        "label": "数据来源",
+        "value": ""
+      },
+      {
+        "label": "创建时间",
+        "value": "2026-10-13"
+      },
+      {
+        "label": "创建人名称",
+        "value": "孙淼淼"
+      },
+      {
+        "label": "附件地址",
+        "value": ""
+      },
+      {
+        "label": "附件个数",
+        "value": ""
+      }
+    ],
+    "status": "草稿"
+  }
+}

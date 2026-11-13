@@ -1,0 +1,54 @@
+{
+  "history": "{\"code\":200,\"message\":\"success\",\"data\":[{\"action\":\"AUDIT\",\"result\":\"APPROVED\",\"operator\":\"admin\",\"opinion\":\"【验收】审核按钮直审(测试账套)\",\"selfAudit\":false,\"nodeNo\":1,\"createTime\":\"2026-11-13 10:40:52\"}]}",
+  "unaudit": "{\"code\":200,\"message\":\"success\",\"data\":{\"单据状态\":\"草稿\",\"编号\":\"YJ-20261013-01\"}}",
+  "state": {
+    "doc": "单据：YJ-20261013-01",
+    "status": "草稿",
+    "cells": [
+      "审核人：",
+      "审核时间："
+    ],
+    "toolbar": [
+      {
+        "main": "新增",
+        "disabled": false
+      },
+      {
+        "main": "保存",
+        "disabled": false
+      },
+      {
+        "main": "删除",
+        "disabled": false
+      },
+      {
+        "main": "审核",
+        "disabled": false
+      },
+      {
+        "main": "审批",
+        "disabled": false
+      },
+      {
+        "main": "生单",
+        "disabled": true
+      },
+      {
+        "main": "刷新",
+        "disabled": false
+      },
+      {
+        "main": "打印",
+        "disabled": false
+      },
+      {
+        "main": "导入",
+        "disabled": false
+      },
+      {
+        "main": "更多",
+        "disabled": false
+      }
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "topbar": "银嘉数字化平台YINJIA-MESadmin已认证YINJIA-MES登录日期 2026-11-12中更新公告 299+系统管理员",
+  "chip": "单据：YJ-20261110-04",
+  "lsKeys": [
+    "mes_locale",
+    "mes_login_date",
+    "mes_desk_settings",
+    "mes_token",
+    "mes_user",
+    "mes_factory"
+  ],
+  "claims": null
+}

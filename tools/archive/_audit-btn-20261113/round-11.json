@@ -1,0 +1,102 @@
+{
+  "before": {
+    "doc": "单据：YJ-20261013-01",
+    "status": "草稿",
+    "auditor": "",
+    "toolbar": [
+      {
+        "main": "新增",
+        "disabled": false
+      },
+      {
+        "main": "保存",
+        "disabled": false
+      },
+      {
+        "main": "删除",
+        "disabled": false
+      },
+      {
+        "main": "审核",
+        "disabled": false
+      },
+      {
+        "main": "审批",
+        "disabled": false
+      },
+      {
+        "main": "生单",
+        "disabled": true
+      },
+      {
+        "main": "刷新",
+        "disabled": false
+      },
+      {
+        "main": "打印",
+        "disabled": false
+      },
+      {
+        "main": "导入",
+        "disabled": false
+      },
+      {
+        "main": "更多",
+        "disabled": false
+      }
+    ],
+    "messages": []
+  },
+  "after": {
+    "doc": "单据：YJ-20261013-01",
+    "status": "草稿",
+    "auditor": "",
+    "toolbar": [
+      {
+        "main": "新增",
+        "disabled": false
+      },
+      {
+        "main": "保存",
+        "disabled": false
+      },
+      {
+        "main": "删除",
+        "disabled": false
+      },
+      {
+        "main": "审核",
+        "disabled": false
+      },
+      {
+        "main": "审批",
+        "disabled": false
+      },
+      {
+        "main": "生单",
+        "disabled": true
+      },
+      {
+        "main": "刷新",
+        "disabled": false
+      },
+      {
+        "main": "打印",
+        "disabled": false
+      },
+      {
+        "main": "导入",
+        "disabled": false
+      },
+      {
+        "main": "更多",
+        "disabled": false
+      }
+    ],
+    "messages": []
+  },
+  "history": {
+    "title": "审批情况",
+    "rows": []
+  }
+}

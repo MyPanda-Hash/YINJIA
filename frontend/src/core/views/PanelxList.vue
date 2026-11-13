@@ -429,6 +429,16 @@
                    弃审 → ⑤ 危险操作。 -->
               <template v-if="hasApprovalBtns && ['草稿', '修改中'].includes(curDocStatus)">
                 <div class="as-side-btn" :class="{ disabled: isDisabled('提交审批') }" @click="onSideAction('提交审批')">{{ tt('提交审批') }}</div>
+                <!-- 2026-11-13 用户口径「单据的按钮界面都需要加上审核」:纸面文书(来料检验记录 / 数据记录表 /
+                     品质单据…)的侧栏也放一颗直审,和工具栏那颗同一条判据(有审批权 ∪ 状态∈草稿/修改中,
+                     已提交审批的只能用「审批通过」——见 isDisabled/disabledReason 的 DIRECT_AUDIT_ACTION 分支)。 -->
+                <div
+                  v-if="canApproveHere()"
+                  class="as-side-btn"
+                  :class="{ disabled: isDisabled('审核') }"
+                  :title="isDisabled('审核') ? disabledReason('审核') : tt('审核：一步到位（草稿 → 已审核），不需要再走提交审批')"
+                  @click="onSideAction('审核')"
+                >{{ tt('审核') }}</div>
               </template>
               <template v-if="IN_APPROVAL.includes(curDocStatus)">
                 <template v-if="approvalBtnsVisible">
@@ -3592,6 +3602,24 @@ const reportColumnTree = computed(() => {
 const GENERATE_HIDDEN = { SO_ORDER: ['生成生产工单'] }
 const hiddenGenerateActions = computed(() => GENERATE_HIDDEN[String(panelCode.value)] || [])
 
+// 「审核」= 一步到位(未提交审批的单据 → 已审核)。
+// 🔴 2026-11-13 用户口径:「这个审批要有个审核按钮,否则对自填自审的角色来说,操作过于麻烦。
+//   单据的按钮界面都需要加上这个按钮。然后只有有审核权限的角色,并且没有提交审批状态的单据才可以
+//   点击这个按钮。如果已经提交审核了,就正常用审批通过来就行,不能点击审核按钮」。
+// ⇒ 与「审批通过/驳回」同一条显隐规则(有该面板审批权才出现),并从「审批 ▼」下拉里**提出来**
+//   单独成一颗工具栏按钮(见 hoistDirectAudit);2026-09-22 那版「仅管理员」的收权就此作废
+//   (后端 ButtonService.audit 同批改口径)。
+const DIRECT_AUDIT_ACTION = '审核'
+/**
+ * 只走两级审批、**不允许直审**的面板(与后端 ButtonService.ADMIN_L2_PANELS / TWO_LEVEL_PANELS 同口径,
+ * 后端改了这里必须同步改):9 张质量单据(固定超级管理员作二级)+ 2 张一级选人的研发单。
+ * 这些面板上「审核」按钮照常出现(用户口径:单据按钮界面都要有),点了会给出「走两级审批」的原因。
+ */
+const DIRECT_AUDIT_BLOCKED = [
+  'QC_TC_IN', 'QC_BHG', 'QC_BHC', 'QC_BHZ', 'QC_JJF', 'QC_SCP', 'QC_LYB', 'QC_SCY', 'QC_OQC_REPORT',
+  'RD_PROD_INFO', 'RD_SAMPLE_EXT',
+]
+
 const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   // 2026-10-07 用户口径(提交 3dd7dbb0「删除整单卡片入口」):列表页不再提供「能打开整单卡片
   //   (VoucherFormDialog)」的入口 —— 「修改」动作唯一的作用就是弹那张卡片,卡片删除后它成了死按钮,
@@ -3621,7 +3649,36 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
     if (extra.length) return { ...group, name, actions: [...actions, ...extra] }
   }
   return { ...group, name, actions }
-}).filter((group) => actsOf(group).length))
+}).filter((group) => actsOf(group).length)
+  // 2026-11-13:「审核」从「审批 ▼」下拉里提出来,单独成一颗工具栏按钮(紧挨在「审批」左边)
+  .reduce(hoistDirectAudit, []))
+
+/**
+ * 把「审核」从所在动作组里**提出来**,单独成一颗工具栏按钮。
+ *
+ * 用户口径(2026-11-13):「这个审批要有个审核按钮,否则对自填自审的角色来说,操作过于麻烦」——
+ * 此前「审核」是「审批 ▼」下拉里的最后一项(engine.normalizeApprovalGroups 把附加动作排在
+ * 工作流固定动作之后),自填自审的角色要"展开下拉 → 找最后一项 → 点"三步才审一张单。
+ *
+ * 行为约定:
+ *   · 位置 = 原「审批」组所在处之前 ⇒ 工具栏读作「… 删除 | 审核 | 审批 ▼ | 生单 …」;
+ *   · 组内只留「审核」一个动作 ⇒ 主按钮点击直接执行 `审核`,不带 ▼;
+ *   · 原组若还有其他动作(提交审批/审批通过/…)照旧保留,只是不再包含「审核」(避免重复入口);
+ *   · 显隐/置灰**不在这里判**(filterGroups 管有没有审批权、isDisabled 管单据状态)。
+ */
+function hoistDirectAudit(out, group) {
+  const actions = actsOf(group)
+  if (!actions.includes(DIRECT_AUDIT_ACTION)) {
+    out.push(group)
+    return out
+  }
+  const rest = actions.filter((a) => a !== DIRECT_AUDIT_ACTION)
+  if (!out.some((g) => actsOf(g).includes(DIRECT_AUDIT_ACTION))) {
+    out.push({ name: DIRECT_AUDIT_ACTION, actions: [DIRECT_AUDIT_ACTION] })
+  }
+  if (rest.length) out.push({ ...group, actions: rest })
+  return out
+}
 // 文书式面板右侧栏:过滤无意义动作(选单/生单/复制/表格调整 对无明细文书无作用;审批流程本面板不启用)
 const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '表头调整', '审核', '提交审批', '审批通过', '审批驳回', '审批情况', '弃审', '刷新', '退出', '导出', '扫描填单'] // 刷新/退出在文书侧栏体验差(刷新整页重载/退出关闭页签),2026-09-14 移除；导出/扫描填单 2026-10-09 按用户口径移到侧栏末尾「文档输出」下(见模板里那两个显式按钮)
 
@@ -3688,6 +3745,25 @@ const iAmCurSubmitter = computed(() => {
   if (!s || user.isAdmin) return false
   if (canSelfAuditHere()) return false          // 授予自审 ⇒ 不按提交人自我排除(后端会记 self_audit='Y')
   return s === String(user.userName || user.account || '')
+})
+/**
+ * 本面板只能走两级审批 ⇒ 直审「审核」恒置灰(与后端 ButtonService.audit 同口径)。
+ * 只影响**置灰与提示**,显隐仍由 filterGroups(有没有审批权)决定 —— 用户口径是
+ * 「单据的按钮界面都要有这颗按钮」,所以不给"凭空消失"而给"灰着 + 说清为什么"。
+ */
+const isDirectAuditBlocked = computed(() => DIRECT_AUDIT_BLOCKED.includes(String(panelCode.value)))
+/**
+ * 这张**还没提交审批**的单子是不是我填的(2026-11-13 直审闸门),判据与后端 authorOfDoc 对齐:
+ *   后端 authorOfDoc 取表头 asp_user1(制单人账号);QueryService 把同一来源下发为
+ *   「发起人账号」——草稿阶段 == 制单人/申请人,提交审批后被 pending_by 覆盖
+ *   (所以只在草稿/修改中判断才有意义,那时它就是制单人)。
+ * 拿不到这一格(个别面板没有 制单人/申请人 字段)时返回 false ⇒ 不拦,交给后端裁决,提示照旧清楚。
+ */
+const iAmDraftAuthor = computed(() => {
+  if (user.isAdmin || canSelfAuditHere()) return false
+  const me = String(user.userName || user.account || '')
+  const who = String(cur.value?.['发起人账号'] || '').trim()
+  return !!me && !!who && who === me
 })
 /** 这一次点「审批通过」会不会走自审(用于按钮旁提前说明;真正的裁决在后端 canSelfAudit) */
 const selfAuditNow = computed(() => curSubmitter.value === String(user.userName || user.account || '')
@@ -7075,11 +7151,9 @@ function closeCtx() {
   openDelMenu.value = false
 }
 
-// ---------- 审批按钮权限（提交审批/审批情况公开；审批通过/驳回需角色审批权限） ----------
+// ---------- 审批按钮权限（提交审批/审批情况公开；审核/审批通过/驳回需角色审批权限） ----------
+// 判据见文件上方「DIRECT_AUDIT_ACTION / DIRECT_AUDIT_BLOCKED」的注释(2026-11-13 用户口径)。
 const APPROVE_ACTIONS = ['审批通过', '审批驳回']
-// 直接「审核」仅管理员（2026-09-22）：审批下拉最下的直审按钮收权——
-// 有审批权的角色走 提交审批→审批通过（同效已审核），不再保留直审入口；后端 audit() 同口径拒绝
-const ADMIN_ONLY_ACTIONS = ['审核']
 
 /** 处于审批流程中的状态(2026-09-20 两级审批:一级「审批中」/二级「待二级审批」) */
 const IN_APPROVAL = ['审批中', '待二级审批']
@@ -7399,8 +7473,10 @@ function filterGroups(raw) {
   const canApprove = user.isAdmin || user.approvePanels.includes(panelCode.value)
   return (raw || [])
     .map((g) => {
-      let actions = (g.actions || g.items || []).filter((a) => !(!user.isAdmin && ADMIN_ONLY_ACTIONS.includes(a)))
-      if (!canApprove) actions = actions.filter((a) => !APPROVE_ACTIONS.includes(a))
+      let actions = g.actions || g.items || []
+      // 2026-11-13:直审「审核」不再仅管理员 —— 与「审批通过/驳回」同一条显隐规则:
+      // 有该面板审批权(∪管理员)才出现;没审批权的人连"可以点但会被拒"的死入口都不给。
+      if (!canApprove) actions = actions.filter((a) => a !== DIRECT_AUDIT_ACTION && !APPROVE_ACTIONS.includes(a))
       return { ...g, actions }
     })
     .filter((g) => (g.actions || []).length > 0)
@@ -10270,7 +10346,7 @@ function isDisabled(action) {
   const map = {
     新增: false, // 单单据面板新增按钮不置灰
     删除: !current.value,
-    审核: !current.value || st !== '草稿',
+    审核: !current.value || !['草稿', '修改中'].includes(st) || isDirectAuditBlocked.value,
     // 反审核(弃审):后端 ButtonService.unaudit 接受「已审核/已归档」(变更单另接受「已生效」),
     // 前端置灰口径必须与之一致 —— 否则文书归档面板归档后按钮永远点不动(用户口径 2026-10-16)
     弃审: !current.value || !['已审核', '已归档', '已生效'].includes(st),
@@ -10364,6 +10440,13 @@ function disabledReason(action) {
   }
   // 灰色占位动作(后端 metadata.disabledActions:选单无流转来源/生单无实现链路),与状态无关
   if ((cfgCache.value?.metadata?.disabledActions || []).includes(action)) return tt('该动作当前没有可用的来源单据')
+  // 直接「审核」(2026-11-13):三种点不动的原因逐个说清,别让用户对着灰按钮猜
+  if (action === DIRECT_AUDIT_ACTION) {
+    if (isDirectAuditBlocked.value) return tt('该单走两级审批：请用「提交审批」→「审批通过」逐级签核，不能直接审核')
+    if (IN_APPROVAL.includes(st)) return tt('该单已提交审批：请用「审批通过」完成审批，不能再点「审核」')
+    if (iAmDraftAuthor.value) return tt('本单由你填写：按「编制与审批分离」不能自己审核（未授「本人自审」），请用「提交审批」→「审批通过」由他人审批')
+    return tt('单据状态') + '：' + stText + '，' + tt('仅草稿可审核')
+  }
   // 编制与审批分离:提交人自己点一级「审批通过」= 后端必拒(实测 403),这里把原因说在他点之前
   if (action === '审批通过' && st === '审批中' && iAmCurSubmitter.value) {
     return tt('本单由你提交：按「编制与审批分离」不能审批自己提交的单，请由他人完成一级审批')
@@ -11393,16 +11476,27 @@ async function onButton(action) {
   let auditOpinion = ''
   // 「申请修改」的修改原因(2026-09-30);2026-10-18 起「弃审」在归档态也会写它(融合后由弃审发起申请)
   let modifyReason = ''
-  if (action === '审核') {
+  if (action === DIRECT_AUDIT_ACTION) {
     if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
-    // 已审核过的单据不允许再次审核，也不允许补填审批意见
-    if (current.value['单据状态'] !== '草稿') return ElMessage.warning('仅草稿状态可审核，已审核单据不允许再次审核')
+    // 2026-11-13:直审只服务「没提交审批」的单据(草稿 / 修改中);
+    // 已提交的在审批流里走「审批通过」—— 这里提前拦住并把该走哪条路说清(后端同口径拒绝)。
+    const stNow = String(current.value['单据状态'] || '')
+    if (!['草稿', '修改中'].includes(stNow)) {
+      return ElMessage.warning(IN_APPROVAL.includes(stNow)
+        ? tt('该单已提交审批：请用「审批通过」完成审批')
+        : tt('仅草稿状态可审核，已审核单据不允许再次审核'))
+    }
     const no = current.value['编号'] || current.value['单据编号'] || ''
     try {
       const { value } = await ElMessageBox.prompt(
-        tt('单据：{no}（当前状态：{st}）').replace('{no}', no).replace('{st}', current.value['单据状态'] || ''),
-        '人工审核确认',
-        { confirmButtonText: '确认审核', cancelButtonText: '取消', inputType: 'textarea', inputPlaceholder: '审核意见（选填）' }
+        tt('单据：{no}（当前状态：{st}）').replace('{no}', no).replace('{st}', tt(stNow || '')),
+        tt('人工审核确认'),
+        {
+          confirmButtonText: tt('确认审核'),
+          cancelButtonText: tt('取消'),
+          inputType: 'textarea',
+          inputPlaceholder: tt('审核意见（选填）'),
+        }
       )
       auditOpinion = value || ''
     } catch (e) {

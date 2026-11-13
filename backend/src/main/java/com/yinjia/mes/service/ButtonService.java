@@ -2493,12 +2493,31 @@ public class ButtonService {
 
     // ============ 状态机(照搬 light-mes:草稿⇄已审核 + 审批流) ============
 
+    /**
+     * 直接「审核」:草稿(或修改中)→ 已审核,**一步到位**。
+     *
+     * <p>🔴 2026-11-13 用户口径(本方法的权限口径来源):
+     * 「这个审批要有个审核按钮,否则对自填自审的角色来说,操作过于麻烦。单据的按钮界面都需要加上这个按钮。
+     *   然后只有有审核权限的角色,并且没有提交审批状态的单据才可以点击这个按钮。
+     *   如果已经提交审核了,就正常用审批通过来就行,不能点击审核按钮」。
+     *
+     * <p>⇒ 权限从「仅管理员」(2026-09-22 收权)改为**与「审批通过」同一把尺子**:
+     * <ol>
+     *   <li>必须有该面板审批权({@link #requireApprover}:yj_role_panel.can_approve ∪ 管理员)——
+     *       接口层 PanelPermissionService 的「审核」→audit 词表是第一道闸,这里是第二道;</li>
+     *   <li>「编制与审批分离」照旧生效,但豁免口径与审批通过完全一致({@link #canSelfAudit}:
+     *       角色勾了「本人自审」∪ 该面板除我之外没有别的启用审批人)。不这么放宽,自填自审的角色
+     *       仍会被自己这道门挡回去,等于没修;</li>
+     *   <li>只为**未提交审批**的单据服务:审批中/待二级审批一律拒绝,让用户走「审批通过」——
+     *       否则审批留痕里会混进一条与流程无关的 AUDIT 行;</li>
+     *   <li>两级审批面板(RD_PROD_INFO / RD_SAMPLE_EXT / 质量单据一族)继续拒绝直审:一步跨过
+     *       第二级签核会让纸面「审核/批准」两格与流程打架。</li>
+     * </ol>
+     */
     private Map<String, Object> audit(PanelRegistry.PanelDef def, Map<String, Object> formData) {
-        // 直审收权(2026-09-22):直接「审核」仅管理员——此前与审批通过/驳回同口径(管理员 ∪ can_approve),
-        // 有审批权的角色现在走 提交审批→审批通过(同效已审核,钩子同口径);前端审批下拉对非管理员同步隐藏
         String auditor = currentUserName();
-        if (!isAdminUser(auditor))
-            throw new org.springframework.security.access.AccessDeniedException("仅管理员可直接审核，其他角色请走提交审批");
+        boolean admin = isAdminUser(auditor);
+        requireApprover(def.code());
         if (!def.isDoc()) throw new IllegalStateException("档案面板无审核动作");
         String no = requireNo(formData);
         ensureDocExists(def, no);
@@ -2506,17 +2525,27 @@ public class ButtonService {
         if ("已作废".equals(st.get("status"))) throw new IllegalStateException("已作废单据不可审核");
         if ("已中止".equals(st.get("status"))) throw new IllegalStateException("已中止单据不可审核，请先恢复");
         if ("已审核".equals(st.get("status"))) throw new IllegalStateException("单据已是已审核状态");
-        // 两级审批(远端 2026-09-20):「待二级审批」同样不可直审,与「审批中」同口径拦截
-        if ("审批中".equals(st.get("status")) || "待二级审批".equals(st.get("status"))) throw new IllegalStateException("审批中单据不可直接审核，请走审批流");
-        // 质量单据(2026-10-04 用户口径「取消直审」):一律走 提交审批 → 一级审核 → 超级管理员批准,
-        // 直审会让二级形同虚设(纸面「审核/批准」两格也就没了两级留痕)。接口层同口径拒绝。
-        // 2026-11-04 出厂检验报告、2026-11-06 首件/制程检验单加入后自动继承本拦截(靠 ADMIN_L2_PANELS)。
-        if (ADMIN_L2_PANELS.contains(def.code()))
-            throw new IllegalStateException(def.name() + "走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核");
-        // 编制审核分离(2026-09-12):审核人不得是制单人本人——此前有审批权的用户可自审自己制的单;
-        // 管理员豁免(管理员保存即归档本就是等价权力,堵死反而制造死路)
-        if (!isAdminUser(auditor) && auditor.equals(authorOfDoc(def, no)))
-            throw new org.springframework.security.access.AccessDeniedException("审核人不能与制单人相同（编制与审批分离）");
+        // 两级审批(远端 2026-09-20):「待二级审批」同样不可直审,与「审批中」同口径拦截。
+        // 2026-11-13 用户口径:「如果已经提交审核了,就正常用审批通过来就行,不能点击审核按钮」。
+        if ("审批中".equals(st.get("status")) || "待二级审批".equals(st.get("status")))
+            throw new IllegalStateException("该单已提交审批：请用「审批通过」完成审批，不能直接「审核」");
+        // 两级审批面板(2026-10-04 用户口径「取消直审」):一律走 提交审批 → 一级审批通过 → 超级管理员批准,
+        // 直审会让第二级形同虚设(纸面「审核/批准」两格也就没了两级留痕)。接口层同口径拒绝。
+        // · 固定超级管理员作二级的(ADMIN_L2_PANELS:特采单 + 质量单据一族 + 出厂检验报告)= 管理员也拒(原口径不变);
+        // · 一级选人的(RD_PROD_INFO / RD_SAMPLE_EXT)= 2026-11-13 起非管理员也拒(管理员维持原有直审捷径)。
+        if (ADMIN_L2_PANELS.contains(def.code()) || (!admin && TWO_LEVEL_PANELS.contains(def.code())))
+            throw new IllegalStateException(def.name() + "走两级审批：请用「提交审批」→「审批通过」逐级签核，不支持直接审核");
+        // 编制审核分离(2026-09-12):审核人不得是制单人本人——此前有审批权的用户可自审自己制的单。
+        // 2026-11-13 起豁免口径与「审批通过」对齐(canSelfAudit:本人自审授权 ∪ 单人审批兜底 ∪ 管理员),
+        // 否则「自填自审的角色」仍会被自己挡在门外(那正是本次要解决的场景)。
+        String author = authorOfDoc(def, no);
+        boolean byAuthor = !author.isBlank() && author.equals(auditor);
+        boolean selfGranted = byAuthor && canSelfAudit(auditor, def.code());
+        if (byAuthor && !admin && !selfGranted)
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "审核人不能与制单人相同（编制与审批分离）：本面板未授「本人自审」，请走「提交审批」→「审批通过」由他人审核");
+        // 自审标记:与审批通过同口径,只有**非管理员**本人审自己制的单才记 self_audit='Y'(审批情况里显示「自审」)
+        boolean selfAudit = selfGranted && !admin;
         jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
                         + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
                         + "WHEN MATCHED THEN UPDATE SET shr = ?, shsj = GETDATE(), canceled = 'N', pending = 'N', saved = 'Y', update_at = GETDATE() "
@@ -2533,7 +2562,8 @@ public class ButtonService {
         // 否则「审批情况」里看不到直接审核 —— 研发管理那套动作(提交/通过/驳回/会签/弃审…)全都有留痕,
         // 直审是唯一漏网的;制程检验单只有直审这一条路 ⇒ 不补就是"审了但查不到谁审的、意见是什么"。
         // 位置在竞态守卫**之后**:被守卫挡下的那次不该留痕。
-        recordApproval(def.code(), no, "AUDIT", "APPROVED", auditOpinionOf(formData));
+        // 2026-11-13:带 self_audit 标记(与「审批通过」同口径),审批情况里本人审自己的单会显示「自审」。
+        recordApproval(def.code(), no, "AUDIT", "APPROVED", auditOpinionOf(formData), 1, selfAudit);
         // 批次号自洽(2026-10-04 口径:批次号在**生单那一刻**就写在单头+全部明细行,不再有"入库审核取号回填"):
         // 保存后把单头值同步到全部明细行、缺号则按「供应商编码 + 当天」取号、顺批次键补齐历史台账。
         // 位置在库存过账**之前** —— kucun.lot_no 的口径是"批次号优先、批号兜底"(见 StockLedgerService.loadRows)。
