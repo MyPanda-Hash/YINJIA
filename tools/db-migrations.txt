@@ -4624,3 +4624,6 @@ migrate-wo-report-list-query-input-20261113.sql
 
 # 2026-11-13 生产工单「新增生产工单」(含临时工单):新表 wo_bom 工单物料清单 + 生产工单页面动作词 create(新增)授权(不动旧表;幂等;两账套)
 migrate-wo-bom-20261113.sql
+
+# 2026-11-13 生产工单「保存草稿 + 整页编制 + 草稿箱」(方案 A):新表 wo_draft_head/wo_draft_line 编制草稿(不写 plang;提交时生成正式工单);幂等;两账套
+migrate-wo-draft-20261113.sql
