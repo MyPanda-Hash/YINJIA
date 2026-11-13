@@ -140,3 +140,65 @@ test('BOM 导入弹窗必须有自由文本搜索框，且走 matchKeyword（而
     '过滤链必须先过关键字再过四栏（AND）')
   assert.match(sheet, /matPickKeyword\.value = ''/, '「清空筛选」要一并清关键字')
 })
+
+/**
+ * 商品引用弹窗「每搜索一次转好久」（2026-11-13 用户报障）。
+ *
+ * 【用户原话】「现在的产品信息表的导入采购物料清单，每次搜索都要转好久，看看什么原因」
+ *
+ * 【根因·实测数据（不是推断）】
+ *   浏览器最小复现（3850 行商品档案，与生产同量级），把一个按键拆成三段计时：
+ *
+ *     阶段                 全量 3850 行        分页 50 行
+ *     ─────────────────────────────────────────────────────
+ *     computed 过滤           0.6 – 2.8 ms       1 – 2.3 ms
+ *     Vue patch(el-table)  2551 – 4606 ms     24 – 45 ms
+ *     paint                 189 – 1228 ms     38 – 57 ms
+ *     每键合计                3 – 7 秒          ~70 – 100 ms
+ *
+ *   ⇒ 计算（matchKeyword/matchGoods）完全不是瓶颈；瓶颈是 el-table 一次绑 3850 行 × 6 列
+ *     ≈ 2.3 万个单元格，每打一个字 Vue 都要重建整棵子树并重算选择态。
+ *   排除项：去掉 selection 列 + row-key 仍然 5–7 秒 ⇒ 不是选择态的锅；
+ *           rAF 空转实测 6–12ms ⇒ 不是浏览器节流。
+ *
+ * 【修法】表格只渲染**当前页**（默认 50 行），过滤/勾选仍在全量上做。
+ *   勾选状态改成自己维护 Map（row-key → 行），翻页不丢已勾；「引用(N)」口径不变。
+ *
+ * 这些断言钉住「表格数据源必须是分页切片、且勾选不依赖 el-table 的 selection-change」。
+ */
+
+test('⑨ 弹窗表格只渲染当前页（3850 行全量绑给 el-table ⇒ 每键 3~7 秒）', () => {
+  const sheet = readFileSync(new URL('../views/RecordSheetPanels.vue', import.meta.url), 'utf8')
+  // 表格 :data 必须是分页切片，不能再是 matPickFiltered 全量
+  assert.match(sheet, /:data="matPickPaged"/, 'el-table 必须绑分页切片 matPickPaged')
+  assert.doesNotMatch(sheet, /:data="matPickFiltered"/,
+    '不许再直接绑全量过滤结果 —— 那正是"每搜索一次转好久"的根因')
+  // 要有分页器
+  assert.match(sheet, /<el-pagination/, '要有分页器')
+  assert.match(sheet, /matPickPage/, '分页当前页状态')
+})
+
+test('⑩ 分页器的每页条数是纯常量且足够小（>100 行仍会明显卡）', () => {
+  const sheet = readFileSync(new URL('../views/RecordSheetPanels.vue', import.meta.url), 'utf8')
+  const m = sheet.match(/MAT_PICK_PAGE_SIZE\s*=\s*(\d+)/)
+  assert.ok(m, '要有具名常量 MAT_PICK_PAGE_SIZE（别把 50 散落在模板里）')
+  const n = Number(m[1])
+  assert.ok(n > 0 && n <= 100, `每页 ${n} 行；实测 3850 行 3~7 秒、50 行 ~100ms，超过 100 行会重新变卡`)
+})
+
+test('⑪ 翻页/改筛选后当前页要收回第 1 页（否则会停在空白页）', () => {
+  const sheet = readFileSync(new URL('../views/RecordSheetPanels.vue', import.meta.url), 'utf8')
+  // 关键字/四栏任一变化 ⇒ 页码归 1
+  assert.match(sheet, /watch\([\s\S]{0,400}matPickKeyword[\s\S]{0,400}matPickPage\.value\s*=\s*1/,
+    '关键字变化要把页码收回第 1 页')
+  assert.match(sheet, /resetMatPickFilters[\s\S]{0,300}matPickPage\.value\s*=\s*1/,
+    '「清空筛选」也要把页码收回第 1 页')
+})
+
+test('⑫ 跨页勾选不丢（勾选状态自己维护，不靠 el-table 的 selection-change）', () => {
+  const sheet = readFileSync(new URL('../views/RecordSheetPanelss.vue'.replace('Panelss', 'Panels'), import.meta.url), 'utf8')
+  assert.match(sheet, /matPickPicked/, '勾选状态要有独立容器（Map/Set）')
+  assert.match(sheet, /toggleMatPickRow/, '行勾选走自己的 toggle，不是 selection-change')
+  // 仍要有 onMatPickSelection 兜底（mate 源仍用整表 selection）
+  assert.match(sheet, /onMatPickSelection/, '物料清单源(mate)仍走整表 selection')
+})

@@ -1673,9 +1673,28 @@
             </div>
           </div>
         </div>
-        <el-table v-loading="matPickLoading" :data="matPickFiltered" size="small" border max-height="420"
+        <!-- ⚠ 2026-11-13 用户报障「每次搜索都要转好久」：表格**只渲染当前页**。
+             根因（浏览器实测，3850 行）：el-table 一次绑全量 ⇒ 每打一个字 Vue 要 patch
+             ≈2.3 万个单元格，单键 2.5–4.6 秒；分页 50 行后同样输入只要 ~25–45ms。
+             过滤与勾选仍在**全量**上做（matPickFiltered / matPickPicked），表格只是它的切片。 -->
+        <el-table v-loading="matPickLoading" :data="matPickPaged" size="small" border max-height="420"
                   row-key="__k" @selection-change="onMatPickSelection">
-          <el-table-column type="selection" width="42" />
+          <el-table-column width="42" align="center">
+            <template #header>
+              <el-checkbox
+                :model-value="matPickPageAllPicked"
+                :indeterminate="matPickPageSomePicked"
+                :disabled="!matPickPaged.length"
+                @change="(v) => toggleMatPickPage(v)"
+              />
+            </template>
+            <template #default="{ row }">
+              <el-checkbox
+                :model-value="matPickPicked.has(row.__k)"
+                @change="() => toggleMatPickRow(row)"
+              />
+            </template>
+          </el-table-column>
           <!-- 列宽(2026-11-12 重排)：把弹性宽度留给**存货名称**——它是勾选时唯一要读的内容；
                备注往往是空的，给固定 140 即可，别让它跟名称抢空间（原来三个 min-width
                一起分剩余宽度，备注反而比名称宽）。 -->
@@ -1686,11 +1705,23 @@
           <el-table-column prop="计量单位" :label="tt('计量单位')" width="90" align="center" />
           <el-table-column prop="备注" :label="tt('备注')" width="140" show-overflow-tooltip />
         </el-table>
+        <!-- 分页器：3850 行分 77 页。页码变化只切 matPickPaged，不动过滤结果 -->
+        <div class="gp-pager">
+          <el-pagination
+            :current-page="matPickPage"
+            :page-size="MAT_PICK_PAGE_SIZE"
+            :total="matPickFiltered.length"
+            layout="prev, pager, next, total"
+            background
+            small
+            @current-change="(p) => (matPickPage = p)"
+          />
+        </div>
       </template>
       <div class="gp-foot-hint">{{ matPickHint }}</div>
       <template #footer>
         <el-button @click="matPickVisible = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" @click="confirmMaterialPick">{{ tt('引用') }}({{ matPickChecked.length }})</el-button>
+        <el-button type="primary" @click="confirmMaterialPick">{{ tt('引用') }}({{ pickedCount }})</el-button>
       </template>
     </el-dialog>
 
@@ -4659,13 +4690,70 @@ const matPickChecked = ref([])
 const matPickTargetDt = ref(null)
 /** 四栏筛选值(键 = 商品面板的列名;空串 = 不筛) */
 const matPickFilters = reactive(Object.fromEntries(GOODS_FACETS.map((k) => [k, ''])))
+
+/**
+ * 商品源表格的**每页行数**（2026-11-13 用户报障「每次搜索都要转好久」的修复）。
+ *
+ * 实测数据（浏览器，3850 行商品档案，与生产同量级）：
+ *   全量绑给 el-table ⇒ 每打一个字要 patch ≈2.3 万个单元格：computed 2ms + **patch 2551~4606ms**；
+ *   分页 50 行      ⇒ 同样输入只要 patch 24~45ms（每键合计 ~100ms）。
+ * 所以这个数不是审美参数，是性能闸门：改大之前先量一遍每键耗时。
+ */
+const MAT_PICK_PAGE_SIZE = 50
+const matPickPage = ref(1)
+/**
+ * 跨页勾选：`__k` → 商品行。
+ *
+ * 为什么不用 el-table 的 selection 列自己存：那个 selection 是**按当前 data 数组**维护的，
+ * 一分页就只剩当前页的勾选（翻回上一页勾过的就丢了）。用户勾 20 条往往要跨几页，
+ * 所以勾选状态自己拿 Map 存，表格只是它的视图。
+ */
+const matPickPicked = reactive(new Map())
+/** 当前页的切片（表格 :data）—— 过滤结果的全量在 matPickFiltered 里，表格只看这一页 */
+const matPickPaged = computed(() => {
+  const list = matPickFiltered.value
+  const size = MAT_PICK_PAGE_SIZE
+  const pages = Math.max(1, Math.ceil(list.length / size))
+  const p = Math.min(Math.max(1, matPickPage.value), pages)
+  const start = (p - 1) * size
+  return list.slice(start, start + size)
+})
+/** 当前页是否全勾 / 部分勾（表头三态复选框） */
+const matPickPageAllPicked = computed(() =>
+  matPickPaged.value.length > 0 && matPickPaged.value.every((r) => matPickPicked.has(r.__k)))
+const matPickPageSomePicked = computed(() =>
+  !matPickPageAllPicked.value && matPickPaged.value.some((r) => matPickPicked.has(r.__k)))
+/** 勾选集合 → 数组（confirmMaterialPick 与「已选 N」都读它，保序按勾选先后） */
+const matPickPickedRows = computed(() => Array.from(matPickPicked.values()))
+
+function toggleMatPickRow(row) {
+  const k = row?.__k
+  if (!k) return
+  if (matPickPicked.has(k)) matPickPicked.delete(k)
+  else matPickPicked.set(k, row)
+}
+function toggleMatPickPage(checked) {
+  for (const r of matPickPaged.value) {
+    if (checked) { if (!matPickPicked.has(r.__k)) matPickPicked.set(r.__k, r) }
+    else matPickPicked.delete(r.__k)
+  }
+}
+/**
+ * 物料清单源（mate）仍走整表 selection-change：那一源勾的是**整张单**、条目少（几十张），
+ * 不分页也不会有性能问题；这里把它同步进同一个 matPickChecked，两条源对外口径一致。
+ */
 function onMatPickSelection(sel) {
   matPickChecked.value = sel || []
 }
 function resetMatPickFilters() {
   for (const k of GOODS_FACETS) matPickFilters[k] = ''
   matPickKeyword.value = ''
+  matPickPage.value = 1
 }
+/** 关键字/四栏任一变化 ⇒ 页码收回第 1 页（否则会停在"筛选后只有 3 页、当前是第 9 页"的空白页） */
+watch([matPickKeyword, () => GOODS_FACETS.map((k) => matPickFilters[k]).join('\u0001')], () => {
+  matPickPage.value = 1
+})
 /** 每栏的候选值 —— 按**其它三栏**的当前条件收窄(用户要的"范围缩小"),capped 见 goodsPick.FACET_CAP */
 const matPickFacets = computed(() => GOODS_FACETS.map((k) => ({ key: k, ...facetValues(matPickRows.value, k, matPickFilters) })))
 /** 表格数据 = 四栏 AND 之后的结果 */
@@ -4689,11 +4777,17 @@ const matPickHint = computed(() => {
   const base = hit === all
     ? tt('共 {n} 条商品；勾选后点「引用」，按 存货编码/名称/规格型号 带进本表').replace('{n}', String(all))
     : tt('筛选后 {m} / {n} 条；勾选后点「引用」带进本表').replace('{m}', String(hit)).replace('{n}', String(all))
-  return base + (matPickChecked.value.length ? tt('；已选 {c} 条').replace('{c}', String(matPickChecked.value.length)) : '')
+  return base + (matPickPickedRows.value.length ? tt('；已选 {c} 条').replace('{c}', String(matPickPickedRows.value.length)) : '')
 })
+/** 底部「引用(N)」的 N：mate 源 = 勾的清单张数；商品源 = 跨页累计勾的商品行数 */
+const pickedCount = computed(() =>
+  matPickSource.value === 'mate' ? matPickChecked.value.length : matPickPickedRows.value.length)
+
 async function openMaterialPick(dt) {
   matPickTargetDt.value = dt
   matPickChecked.value = []
+  matPickPicked.clear()
+  matPickPage.value = 1
   matPickRows.value = []
   resetMatPickFilters()
   matPickVisible.value = true
@@ -4778,7 +4872,7 @@ function confirmMaterialPick() {
   } else {
     // ── 源 ②:商品档案 —— 映射走纯函数 goodsToDetail(已单测);数量**不带** ──
     const existCodes = rowsOf(dt).map((r) => String(r['物料编码'] || '').trim()).filter(Boolean)
-    const { rows: picked, skipped: sk } = goodsToDetail(matPickChecked.value, existCodes, colKeys)
+    const { rows: picked, skipped: sk } = goodsToDetail(matPickPickedRows.value, existCodes, colKeys)
     for (const p of picked) {
       addRow(dt)
       const rows = rowsOf(dt)
@@ -4796,6 +4890,7 @@ function confirmMaterialPick() {
   }
 
   matPickChecked.value = []
+  matPickPicked.clear()
   matPickVisible.value = false
   emit('dirty')
   ElMessage.success(tt('已引用 {n} 行').replace('{n}', added)
@@ -6297,6 +6392,8 @@ body.approval-printing .rs-mold-pick { display: none !important; }
 .gp-facet { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .gp-facet-label { font-size: 12px; line-height: 20px; color: rgba(0, 0, 0, 0.45); }
 .gp-facet-select { width: 100%; }
+/* 分页器：右对齐、与表格留 8pt（2026-11-13 分页修复的配套） */
+.gp-pager { display: flex; justify-content: flex-end; margin-top: 8px; }
 /* 表格下方那行统计：左对齐小字，与筛选区同色系 */
 .gp-foot-hint { margin-top: 12px; font-size: 12px; line-height: 20px; color: rgba(0, 0, 0, 0.45); }
 .pp-foot { margin-top: 6px; font-size: 12px; color: #909399; }
