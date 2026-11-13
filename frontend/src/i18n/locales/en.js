@@ -4937,6 +4937,28 @@ export default {
     '报工已提交并生效': 'Report submitted and effective',
     '报工已提交,待审核后工序进度才更新': 'Report submitted; process progress updates after approval',
     '报工单已建,请到「工序报工单」审核': 'Report created; please approve it in Work reports',
+    // 工序报工·超量弹窗(2026-11-13 用户口径:「报工提示不明确,实现一个弹窗提示;手机端适配手机比例;
+    //   文案简洁明了;指出当前工序的可报工数量依赖于上一个工序,不能超出当前的值」)
+    //   弹窗结构:本次最多可报 X(大) / 你填了 Y(超出 Z) / 可报 = 上一道「成型」已审完工 A − 本道已报 B = X
+    //   + 一句"本道只能报上一道真正流下来的量,不能超过它"。纯逻辑与文案见 business/reportCap.js。
+    '报工数量超出可报上限': 'Qty exceeds the reportable limit',
+    '本次最多可报': 'Max reportable now',
+    '你填了': 'You entered',
+    '超出': 'over',
+    '可报 = 本道排产': 'Reportable = scheduled qty',
+    '本道已报': 'reported by this op',
+    '可报 = 上一道': 'Reportable = previous op',
+    '已审完工': 'approved output',
+    '首道工序按排产数量封顶。': 'The first operation is capped by the scheduled qty.',
+    '本道只能报上一道工序真正流下来的量,不能超过它。':
+      'This operation can only report what the previous operation actually produced; it cannot exceed that.',
+    '改为': 'Set to',
+    '报工未提交成功': 'Report not submitted',
+    '请稍后重试;仍不行就到「工序报工单」手工开单。':
+      'Try again later; if it still fails, create the report manually in "Work Reports".',
+    '本道计划量已报完,暂不能报工': 'This operation has already reported its planned qty; nothing to report now.',
+    '上一道工序还没有已审核完工,本道暂不能报工':
+      'The previous operation has no approved output yet; this operation cannot report now.',
     '默认路线': 'Default routing',
     '道工序': 'operations',
     '该工单行还没有工序台账(没预排产)': 'This work-order line has no process ledger yet (not pre-scheduled)',

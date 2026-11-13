@@ -360,15 +360,9 @@ public class WoReportService {
         ProcessFlow.Step curStep = ProcessFlow.stepOf(flow, op);
         double cap;
         double allowed;
-        String capFrom = "";
         if (curStep != null && curStep.avail() > ProcessFlow.EPS) {
             cap = Math.min(curStep.planQty() > ProcessFlow.EPS ? curStep.planQty() : curStep.avail(), curStep.avail());
             allowed = curStep.reportCap();                       // 已含 1% 容差
-            if (curStep.availBase() < rowPl - ProcessFlow.EPS) {
-                // 后道:说明来料只流下来了多少,报错时让现场一眼看懂"卡在哪"
-                capFrom = "(本道可加工量 " + trimQty(curStep.avail()) + ",来自上一道已审完工折成品 "
-                        + trimQty(curStep.availBase()) + ")";
-            }
         } else {
             Double rowRate = plangRowId == null ? null : jdbc.queryForObject(
                     "SELECT TOP 1 ISNULL(r.换算率,1) FROM dbo.plang p JOIN dbo.bs_route r"
@@ -400,9 +394,19 @@ public class WoReportService {
             throw new IllegalStateException("工序[" + op + "]没有有效计划数量,不能报工");
         }
         if (reported + qty > allowed + 0.0001d) {
-            throw new IllegalStateException("报工数量超出允许上限(本行工序[" + op + "]上限 " + trimQty(cap)
-                    + capFrom + ",允许至 " + trimQty(allowed) + ",已报 " + trimQty(reported)
-                    + ",本次 " + trimQty(qty) + ")");
+            // 2026-11-13 用户口径「报工提示文案要简洁明了」(手机端):原来一句话套四层括号
+            //   (上限 1200(本道可加工量 1200,来自上一道已审完工折成品 1200),允许至 1212;已报 1100,本次 200),
+            //   现场读不懂。改成一眼能算的短句:
+            //   报工数量超出可报上限:本道最多可报 100(上限 1200 − 已报 1100),本次 200
+            //   后道再补一句「上一道已审完工 1200」说明这个上限是从哪来的(前面卡住的是上一道的实际产出)。
+            double left = Math.max(cap - reported, 0);
+            String fromDesc = "";
+            if (curStep != null && curStep.availBase() < rowPl - ProcessFlow.EPS) {
+                fromDesc = ",可加工量 " + trimQty(curStep.avail()) + " 来自上一道已审完工 " + trimQty(curStep.availBase());
+            }
+            throw new IllegalStateException("报工数量超出可报上限:本道最多可报 " + trimQty(left)
+                    + "(上限 " + trimQty(cap) + " − 已报 " + trimQty(reported) + ")" + fromDesc
+                    + ",本次 " + trimQty(qty));
         }
         return t;
     }

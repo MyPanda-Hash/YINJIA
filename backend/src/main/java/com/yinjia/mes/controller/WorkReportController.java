@@ -227,9 +227,10 @@ public class WorkReportController {
         } catch (Exception e) {
             // callButton 是 @Transactional ⇒ 同一事务里抛异常会把"保存"一起回滚,
             // 所以这里可以放心说"没有保存",不会留下孤儿草稿单。
-            throw new IllegalStateException("报工没有提交成功:"
-                    + (admin ? "审核" : "提交审批") + "失败(" + e.getMessage() + ")。请稍后重试,"
-                    + "或直接到「工序报工单」手工建单。");
+            // 2026-11-13 用户口径「报工提示文案要简洁明了」:原来这里又包了一层"请稍后重试,或直接到…手工建单",
+            //   叠加后端原文后手机上是一大段。现只保留「报工提交失败: <真正原因>」,
+            //   前端弹窗再按情况给一句统一建议(见 MobileReport.vue 的超量/失败弹窗)。
+            throw new IllegalStateException("报工提交失败:" + e.getMessage());
         }
 
         Map<String, Object> out = new LinkedHashMap<>();
