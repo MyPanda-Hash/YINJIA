@@ -369,7 +369,9 @@
               <div class="as-side-btn" @click="openFuzzy">{{ tt('模糊搜索') }}</div>
               <!-- 单据预览:全量单据卡片化预览(关键信息摘要),快速分辨并跳转——文件档案查看效果;
                    矩阵面板的卡片 = 产品行(编号 + 受控 + 4 个文件状态) -->
-              <div class="as-side-btn" @click="openDocPreview">{{ tt(isProdDocMatrix ? '产品预览' : '单据预览') }}</div>
+              <!-- 2026-11-12：产品信息表（RD_PROD_INFO）改成打开**大块浮层**（横向多列卡片），
+                   其余面板仍走原来的窄侧栏预览（openDocPreview），行为逐字不变。 -->
+              <div class="as-side-btn" @click="canPreviewGrid ? openPreviewGrid() : openDocPreview()">{{ tt(isProdDocMatrix ? '产品预览' : '单据预览') }}</div>
               <!-- 流程管控(2026-11-11 用户口径:「新的流程管控面板应该放在产品文件列表」)——
                    入口就放在这张表的侧栏,点开是**独立页面** /rd/productFlow(版式照项目流程管控:
                    KPI + 检索 + 5 步时间轴),不再是本页里的内嵌切换。 -->
@@ -1557,6 +1559,57 @@
     </template>
 
 
+
+    <!-- ═══ 单据预览浮层（2026-11-12，仅产品信息表）══════════════════════════════
+         用户口径：「做成和销售订单的左侧边栏一样的形式，横向多列排布，但是是由单据预览右侧打开」。
+         版式：覆盖大半屏的浮层，内部卡片 grid 自适应多列（≥4 列），一屏能扫几十张单，
+         而不是窄侧栏（~180px）里一列只放 3~4 张。
+         数据源：复用 previewCards（list 已拉到 200 条），不新增接口。
+         取值：padding 16/24、borderRadiusLG 8、colorBorderSecondary #f0f0f0、
+              colorTextSecondary rgba(0,0,0,.65)。 -->
+    <el-dialog
+      v-model="previewGridVisible"
+      :title="tt('单据预览')"
+      width="88%"
+      top="6vh"
+      append-to-body
+      @close="closePreviewGrid"
+    >
+      <div class="pv-grid-bar">
+        <el-input
+          v-model="previewKw"
+          clearable
+          class="pv-grid-kw"
+          :placeholder="tt('输入单据编号或任意内容快速筛选')"
+        >
+          <template #prefix><el-icon><Search /></el-icon></template>
+        </el-input>
+        <span class="pv-grid-count">{{ tt('共 {n} 张').replace('{n}', String(previewCards.length)) }}</span>
+      </div>
+      <div class="pv-grid">
+        <div
+          v-for="c in previewCards"
+          :key="c.no"
+          class="pv-card"
+          :class="{ on: c.no === curDocNo }"
+          @click="pickPreviewGridCard(c)"
+        >
+          <div class="pv-card-head">
+            <span class="pv-card-no" :title="c.no">{{ c.no }}</span>
+            <span v-if="c.status" class="doc-status" :class="c.status">{{ tt(c.status) }}</span>
+          </div>
+          <div class="pv-card-date">
+            {{ c.date }}
+            <span v-if="c.summary" class="pv-card-sum" :title="c.summary"> · {{ c.summary }}</span>
+          </div>
+          <div v-for="(f, i) in c.fields" :key="i" class="pv-card-field">
+            <span class="pv-card-label">{{ tt(f.label) }}</span>
+            <span class="pv-card-value" :title="f.value">{{ f.value }}</span>
+          </div>
+        </div>
+        <div v-if="!previewCards.length" class="pv-grid-empty">{{ tt('没有匹配的单据') }}</div>
+      </div>
+    </el-dialog>
 
     <!-- ══════════ 表格右键菜单（对齐真实 T+ 明细右键）══════════ -->
     <div v-if="ctx.visible" class="ctx-menu" :style="{ left: ctx.x + 'px', top: ctx.y + 'px' }">
@@ -4161,6 +4214,48 @@ async function openFuzzyResult(r) {
 // 与模糊搜索同源取数(pageSize 拉到 200 一次取全),关键字客户端筛选;点卡片即跳转,文件档案查看效果。零后端改动。
 const previewMode = ref(false)
 const previewKw = ref('')
+/**
+ * 「单据预览」大块浮层（2026-11-12 用户口径）。
+ *
+ * <p>用户原话：「旁边的单据预览做成和销售订单的左侧边栏一样的形式，横向多列排布，
+ * 但是是由单据预览右侧打开」。</p>
+ *
+ * <p>现状：点侧栏「单据预览」→ 把**窄侧栏**切成卡片列表（`.preview-cards` 是
+ * `flex-direction: column`，侧栏实宽 ~180px）⇒ 一屏只能扫 3~4 张，找单据很慢。</p>
+ *
+ * <p>本次：**只对产品信息表**（RD_PROD_INFO）改成点开一个覆盖大半屏的浮层，
+ * 内部卡片 `grid` 横向多列（自适应 4 列）。其余面板仍走原来的窄侧栏，逐字不变。</p>
+ */
+const PREVIEW_GRID_PANELS = new Set(['RD_PROD_INFO'])
+const canPreviewGrid = computed(() => PREVIEW_GRID_PANELS.has(String(panelCode.value)))
+const previewGridVisible = ref(false)
+/**
+ * 浮层里的卡片源：复用 previewCards —— 它读 list/previewKw，
+ * 所以浮层打开前先把 list 拉到 200 条（与 openDocPreview 同一套取数，不新增接口）。
+ */
+async function openPreviewGrid() {
+  previewKw.value = ''
+  if (previewPrevPageSize === null) previewPrevPageSize = query.pageSize
+  query.pageSize = 200
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+  previewGridVisible.value = true
+}
+async function closePreviewGrid() {
+  previewGridVisible.value = false
+  previewKw.value = ''
+  if (previewPrevPageSize !== null) { query.pageSize = previewPrevPageSize; previewPrevPageSize = null }
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+}
+/** 浮层里点卡片：切到该单据并关浮层（用户要的是"看着列表挑，挑中就看那张"） */
+async function pickPreviewGridCard(c) {
+  const index = list.value.indexOf(c.row)
+  previewGridVisible.value = false
+  if (index >= 0) await guardDocSwitch(index)
+}
 let previewPrevPageSize = null
 /**
  * 摘要内容 = 纯函数 core/panel/docPreview.js 的口径（2026-11-11 用户口径：
@@ -14204,6 +14299,62 @@ onUnmounted(() => {
 .rpt-up-label { flex: none; width: 70px; text-align: right; font-size: 13px; color: #5a7a99; }
 /* ── 单据预览查找(文书侧栏,文件档案查看效果) ── */
 .preview-kw { margin: 4px 0 6px; }
+/* ── 单据预览浮层（2026-11-12，仅产品信息表）──────────────────────────────
+   用户口径「和销售订单的左侧边栏一样，横向多列排布」。
+   卡片 grid：auto-fill + minmax(240px, 1fr) ⇒ 88% 宽浮层下自然排 4~6 列，
+   窗口变窄自动减列，不出现横向滚动。
+   取值：padding 16/12、borderRadius 6（卡片）/8（浮层）、
+        colorBorderSecondary #f0f0f0、colorTextSecondary rgba(0,0,0,.65)。 */
+.pv-grid-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.pv-grid-kw { width: 360px; }
+.pv-grid-count { font-size: 12px; color: rgba(0, 0, 0, 0.45); }
+.pv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  max-height: 64vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+.pv-card {
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  background: #fff;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  min-width: 0;
+}
+.pv-card:hover { border-color: #1677ff; box-shadow: 0 1px 4px rgba(22, 119, 255, 0.12); }
+.pv-card.on { border-color: #1677ff; background: #f0f7ff; }
+.pv-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+/* 单号不折行、不省略（号尾才是区分单据的部分）；放不下时让状态徽标换行 */
+.pv-card-no { font-weight: 600; font-size: 13px; color: #1e5a8a; white-space: nowrap; }
+.pv-card-head .doc-status { flex: none; white-space: nowrap; font-size: 11px; line-height: 16px; padding: 0 5px; }
+.pv-card-date { font-size: 12px; line-height: 18px; color: rgba(0, 0, 0, 0.45); }
+.pv-card-sum { color: rgba(0, 0, 0, 0.65); }
+.pv-card-field {
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 18px;
+  min-width: 0;
+}
+.pv-card-label { flex: none; color: rgba(0, 0, 0, 0.45); }
+.pv-card-value { color: rgba(0, 0, 0, 0.88); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-grid-empty { grid-column: 1 / -1; padding: 40px 0; text-align: center; color: rgba(0, 0, 0, 0.45); }
+
 .preview-cards { max-height: 520px; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px; }
 .preview-card {
   border: 1px solid #d9e2ea; border-radius: 6px; background: #fff;

@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import {
   PREVIEW_COMPACT_CAP, PREVIEW_FIELDS, PREVIEW_SKIP, PREVIEW_VALUE_CAP,
   previewLineText, previewSummaryOf,
@@ -88,4 +89,28 @@ test('⑥ 登记表本身：立项申请有摘要字段，且都是真实存在�
   assert.deepEqual(PREVIEW_FIELDS.RD_APPROVAL, ['客户名', '项目等级', '申请立项人'])
   const real = new Set(fields.map((f) => f.dataName))
   for (const k of PREVIEW_FIELDS.RD_APPROVAL) assert.ok(real.has(k), `${k} 不在表头字段里(打错字就永远不显示)`)
+})
+
+/* ── 产品信息表：浮层横向多列 + 摘要字段固定（2026-11-12 用户口径）────── */
+test('RD_PROD_INFO 必须登记摘要字段，卡片才对得齐', () => {
+  // 用户口径原话：「单据预览做成和销售订单的左侧边栏一样的形式，横向多列排布」。
+  // 横向多列的前提是**卡片等高**；不登记就会走通用口径（前 4 个非空字段），
+  // 而各单填的字段不同（实测 PI-…0002 出「编辑人/审核人」，CP382 出「产品编号/名称/类别」）
+  // ⇒ 卡片高矮不齐、列错位。这里钉住登记内容。
+  assert.ok(PREVIEW_FIELDS.RD_PROD_INFO, '缺 RD_PROD_INFO 摘要字段登记')
+  assert.deepEqual(PREVIEW_FIELDS.RD_PROD_INFO, ['产品编号', '产品名称', '客户名称'],
+    '产品信息表摘要 = 产品编号 / 产品名称 / 客户名称（找单三线索，都是短字段）')
+})
+
+test('产品信息表的单据预览走"大块浮层横向多列"，其余面板仍走窄侧栏', () => {
+  const vue = readFileSync(new URL('../views/PanelxList.vue', import.meta.url), 'utf8')
+  // 只有产品信息表在白名单里
+  assert.match(vue, /const PREVIEW_GRID_PANELS = new Set\(\['RD_PROD_INFO'\]\)/,
+    '浮层白名单必须只有 RD_PROD_INFO（本次范围只做产品信息表）')
+  // 侧栏按钮按开关分派，不能一刀切改掉所有面板
+  assert.match(vue, /canPreviewGrid \? openPreviewGrid\(\) : openDocPreview\(\)/,
+    '按钮要按面板分派：产品信息表走浮层，其余走原逻辑')
+  // 浮层用 grid 横向多列（而不是窄侧栏的 column）
+  assert.match(vue, /grid-template-columns: repeat\(auto-fill, minmax\(240px, 1fr\)\)/,
+    '浮层卡片必须是横向多列栅格')
 })
