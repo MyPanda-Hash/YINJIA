@@ -2461,14 +2461,14 @@ public class ButtonService {
         String wo = String.valueOf(h.get("wo") == null ? "" : h.get("wo")).trim();
         int xc = h.get("xc") instanceof Number n ? n.intValue() : 0;
         if (func.isEmpty() && !wo.isEmpty()) {
-            String auto = latestAuditedInsp("QC_PROC_INSP", "qc_proc_insp_head", wo, xc);
+            String auto = latestInsp("QC_PROC_INSP", "qc_proc_insp_head", wo, xc);
             if (!auto.isEmpty()) {
                 func = auto;
                 jdbc.update("UPDATE bd_finish_in SET 出货检验功能单号=? WHERE 单据编号=? AND ISNULL(出货检验功能单号,N'')=N''", auto, no);
             }
         }
         if (look.isEmpty() && !wo.isEmpty()) {
-            String auto = latestAuditedInsp("QC_ASM_INSP", "qc_asm_insp_head", wo, xc);
+            String auto = latestInsp("QC_ASM_INSP", "qc_asm_insp_head", wo, xc);
             if (!auto.isEmpty()) {
                 look = auto;
                 jdbc.update("UPDATE bd_finish_in SET 出货检验表观单号=? WHERE 单据编号=? AND ISNULL(出货检验表观单号,N'')=N''", auto, no);
@@ -2805,6 +2805,10 @@ public class ButtonService {
         manuWriteback.post(def.code(), no, user);
         // 组装成品检验审核 → 重算结案(组装成品检验已审核 + 入库≥排产)
         syncCloseAfterAsmInsp(def.code(), no, user);
+        // 出货检验功能/表观 审核/审批通过 → 把单号同步到同工单行**未提交**的产成品入库单草稿
+        //   (2026-11-13 用户报障「表观没有实现自动关联」:ASM 单往往在入库草稿生成之后才审核,
+        //    生成时只认已审核单 ⇒ 草稿永远拿不到号;现在审核那一刻补上)
+        syncFinishInInspNos(def.code(), no, user);
         // 不良品处理记账钩子已随「不良品处理单 QC_DISPOSAL」下架移除(2026-10-09,origin/main):
         //   该面板 0 单据、0 操作留痕,用户确认不要,对应的 QcDisposalService 整文件已删除。
         // ⚠ 本方法 runWoAuditHooks 是**本分支新抽**的公共方法,远端删钩子时看不到它 ⇒
@@ -2956,8 +2960,8 @@ public class ButtonService {
             need.add(item);
         }
         if (need.isEmpty()) return out;
-        String procNo = latestAuditedInsp("QC_PROC_INSP", "qc_proc_insp_head", wo, xc);
-        String asmNo = latestAuditedInsp("QC_ASM_INSP", "qc_asm_insp_head", wo, xc);
+        String procNo = latestInsp("QC_PROC_INSP", "qc_proc_insp_head", wo, xc);
+        String asmNo = latestInsp("QC_ASM_INSP", "qc_asm_insp_head", wo, xc);
         if (openNo != null) {
             // 未提交单:补齐/更新明细行(一张单承载多批次)
             for (java.util.Map<String, Object> item : need) {
@@ -3067,6 +3071,74 @@ public class ButtonService {
         } catch (RuntimeException e) {
             log.warn("[FINISH_IN] 匹配 {} 检验单失败(工单 {} 行 {}): {}", panelCode, wo, xc, e.getMessage());
             return "";
+        }
+    }
+
+    /**
+     * 同工单行、**最新一张有效检验单号**(优先已审核,没有则回退最新未作废单)。
+     *
+     * <p>2026-11-13 用户报障:「出货检验功能能够自动关联,但是出货检验表观没有实现自动关联」——
+     * 根因不是 ASM 面板:入库单生成/补生成时只认**已审核**单,而 ASM 单往往是事后才审
+     * (本次 ZJ-2026-11-0009 在入库草稿生成之后才审核)⇒ 草稿永远拿不到号。
+     * 现在:①生成/补生成用本方法(已审核优先、否则最新单)先关联上;②QC 单审核时再同步到
+     * 同工单行的未提交入库单(见 {@link #syncFinishInInspNos});③提交时仍由 assertFinishInInspLink
+     * 校验「已审核」——关联与放行分开,不会因为关联了未审核单就误入库。
+     */
+    private String latestInsp(String panelCode, String headTable, String wo, int xc) {
+        String audited = latestAuditedInsp(panelCode, headTable, wo, xc);
+        if (!audited.isEmpty()) return audited;
+        try {
+            java.util.List<String> nos = jdbc.queryForList(
+                    "SELECT TOP 1 h.单据编号 FROM dbo." + headTable + " h"
+                            + " WHERE ISNULL(h.工单号,N'')=? AND ISNULL(h.工单行号,0)=? AND ISNULL(h.asp_cancel,'N')<>'Y'"
+                            + " AND NOT EXISTS (SELECT 1 FROM dbo.yj_doc_status s WHERE s.panel_code=?"
+                            + "   AND s.doc_no=CAST(h.单据编号 AS nvarchar(100)) AND ISNULL(s.canceled,'N')='Y')"
+                            + " ORDER BY h.id DESC", String.class, wo, xc, panelCode);
+            return nos.isEmpty() || nos.get(0) == null ? "" : nos.get(0).trim();
+        } catch (RuntimeException e) {
+            log.warn("[FINISH_IN] 回退匹配 {} 检验单失败(工单 {} 行 {}): {}", panelCode, wo, xc, e.getMessage());
+            return "";
+        }
+    }
+
+    /**
+     * QC 检验单(出货检验功能/表观)**审核/审批通过**后,把单号同步到同工单行**未提交**的产成品入库单。
+     *
+     * <p>用户口径(2026-11-13):两张检验单完成后入库单要能自动关联;草稿可以先空着,
+     * 检验单审核那一刻自动补上是最自然的时机(否则要人工再点补生成/手工选单)。
+     *
+     * <p>只补空位、不覆盖已有值;只动**草稿**(未提交/未审核/未作废)的 MES 自建入库单;
+     * 非两张检验面板、异常都直接返回/仅 warn(不阻断检验单审核)。
+     */
+    private void syncFinishInInspNos(String panelCode, String inspNo, String user) {
+        String headTable = "QC_PROC_INSP".equals(panelCode) ? "qc_proc_insp_head"
+                : "QC_ASM_INSP".equals(panelCode) ? "qc_asm_insp_head" : null;
+        if (headTable == null) return;
+        try {
+            java.util.List<java.util.Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT ISNULL(工单号,N'') AS wo, ISNULL(工单行号,0) AS xc FROM dbo." + headTable
+                            + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", inspNo);
+            for (java.util.Map<String, Object> r : rows) {
+                String wo = str(r.get("wo"));
+                int xc = (int) numOr(r.get("xc"));
+                if (wo.isEmpty() || xc <= 0) continue;
+                String procNo = latestInsp("QC_PROC_INSP", "qc_proc_insp_head", wo, xc);
+                String asmNo = latestInsp("QC_ASM_INSP", "qc_asm_insp_head", wo, xc);
+                if (procNo.isEmpty() && asmNo.isEmpty()) continue;
+                int n = jdbc.update("UPDATE f SET"
+                                + " 出货检验功能单号=CASE WHEN ISNULL(f.出货检验功能单号,N'')=N'' THEN ? ELSE f.出货检验功能单号 END,"
+                                + " 出货检验表观单号=CASE WHEN ISNULL(f.出货检验表观单号,N'')=N'' THEN ? ELSE f.出货检验表观单号 END"
+                                + " FROM dbo.bd_finish_in f"
+                                + " LEFT JOIN dbo.yj_doc_status s ON s.panel_code=N'FINISH_IN' AND s.doc_no=f.单据编号"
+                                + " WHERE f.加工单号=? AND ISNULL(f.工单行号,0)=? AND ISNULL(f.asp_cancel,'N')<>'Y'"
+                                + "   AND ISNULL(f.外部单据号,N'')=N''"
+                                + "   AND ISNULL(s.canceled,'N')<>'Y' AND ISNULL(s.pending,'N')<>'Y' AND s.shr IS NULL",
+                        procNo, asmNo, wo, xc);
+                if (n > 0) log.info("[FINISH_IN] 检验单 {} 审核 → 同步入库草稿检验单号(工单 {} 行 {}): 功能={} 表观={} 影响 {} 张",
+                        inspNo, wo, xc, procNo, asmNo, n);
+            }
+        } catch (Exception e) {
+            log.warn("[FINISH_IN] 检验单 {} 同步入库单检验单号失败(不阻断): {}", inspNo, e.getMessage());
         }
     }
 
