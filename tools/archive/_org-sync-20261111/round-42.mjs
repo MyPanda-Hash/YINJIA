@@ -1,0 +1,60 @@
+const task = await taskSpace('qc-insp-rec-result5-20261111')
+const page = task.page('p1')
+async function jwtSub() {
+  return page.evaluate(() => {
+    const t = localStorage.getItem('mes_token') || ''
+    try { return JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).sub } catch (e) { return null }
+  })
+}
+await page.goto('http://127.0.0.1:8090/', { timeout: 60000 })
+await page.waitForTimeout(4000)
+await page.evaluate(() => { try { localStorage.removeItem('mes_token') } catch (e) {} })
+await page.evaluate(() => location.reload())
+await page.waitForTimeout(5000)
+// 登录 zfy(8090 与 5173 同源不同端口,localStorage 各自独立)
+await page.evaluate(() => {
+  const setVal = (el, v) => {
+    const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    s.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }))
+  }
+  const ins = [...document.querySelectorAll('input')]
+  const acc = ins.find((i) => (i.placeholder || '').includes('账号'))
+  const pw = ins.find((i) => (i.placeholder || '').includes('密码'))
+  if (acc) setVal(acc, 'zfy')
+  if (pw) setVal(pw, '123456')
+})
+await page.waitForTimeout(600)
+await page.evaluate(() => {
+  const b = [...document.querySelectorAll('button')].find((x) => (x.textContent || '').includes('进入系统'))
+  if (b) b.click()
+})
+await page.waitForTimeout(7000)
+console.log('sub=' + (await jwtSub()) + ' factory=' + (await page.evaluate(() => localStorage.getItem('mes_factory'))))
+try {
+  const w = await page.cdp('Browser.getWindowForTarget', {})
+  if (w && w.windowId) await task.cdp('Browser.setWindowBounds', { windowId: w.windowId, bounds: { windowState: 'normal' } })
+} catch (e) {}
+
+await page.evaluate(() => { const el = document.querySelector('.nc-ref.type-msg'); if (el) el.click() })
+await page.waitForTimeout(2500)
+const items = await page.evaluate(() => [...document.querySelectorAll('.nc-item')].map((el) => (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 90)))
+console.log('items=' + JSON.stringify(items.slice(0, 4), null, 2))
+await page.screenshot({ path: 'C:/Users/Lenovo/ego/qc-insp-rec-result5-20261111/round-42-8090-msglist.png' })
+
+console.log('click=' + await page.evaluate(() => {
+  const hit = [...document.querySelectorAll('.nc-item')].find((el) => (el.textContent || '').includes('JYSJ-2026-11-0004'))
+  if (!hit) return 'NOT-FOUND'
+  hit.click(); return 'OK'
+}))
+await page.waitForTimeout(2500)
+await page.evaluate(() => {
+  const d = [...document.querySelectorAll('.el-dialog')].find((x) => x.offsetParent !== null)
+  const b = d && [...d.querySelectorAll('button')].find((x) => /去处理/.test(x.textContent || ''))
+  if (b) b.click()
+})
+await page.waitForTimeout(8000)
+console.log('jump=' + JSON.stringify(await page.evaluate(() => {
+  const txt = (el) => (el ? (el.textContent || '').replace(/\s+/g, ' ').trim() : null)
+  return { hash: location.hash, side: (txt(document.querySelector('.approval-side')) || '').slice(0, 32), cells: [...document.querySelectorAll('.qc-rec-sheet table.qr-table tbody tr')].length }
+})))
+await page.screenshot({ path: 'C:/Users/Lenovo/ego/qc-insp-rec-result5-20261111/round-42-8090-jump.png' })

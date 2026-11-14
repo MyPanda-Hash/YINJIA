@@ -1,0 +1,4 @@
+﻿列表: number=YJ-HKB-001 name=黑卡载银炭粉 modify_time=undefined is_batch=true
+详情: modify_time=2026-11-11 15:06:38
+custom_field={"custom_field__1__4swgci5cr1vb":"","custom_field__1__4swgegvojiasxiej":"","custom_field__1__62tvoyr1j4fa":"","custom_field__1__6jiafyhnnjic0w":""}
+检验相关键: check_type="1"

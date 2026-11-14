@@ -104,6 +104,11 @@ const routes = [
       // 项目流程管控(研发管理·项目管理,2026-10-20):按立项单号查流程走到哪一步。
       // 页面级虚拟面板 PROJECT_FLOW(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由,显式注册。
       { path: 'rd/projectFlow', component: () => import('@/views/rd/ProjectFlow.vue'), meta: { title: '项目流程管控', code: 'rdFlow', panelCode: 'PROJECT_FLOW' } },
+      // 产品文件流程管控（2026-11-11 用户口径）:把「产品文件列表 · 流程全览」升级成一个**专门的面板**,
+      // 版式照 项目流程管控（KPI → 检索 → 清单 + 时间轴）。
+      // 权限:不新造虚拟面板,直接挂 RD_PROD_DOCLIST 的查看权 —— 这份流程本来就是那张表的数据,
+      // 没有它的查看权也不该看这条流程（省掉一条 yj_role_panel 迁移）。
+      { path: 'rd/productFlow', component: () => import('@/views/rd/ProductFlow.vue'), meta: { title: '产品文件流程管控', code: 'rdProductFlow', panelCode: 'RD_PROD_DOCLIST' } },
       // 订单结转·发单工作台(方案 V1.0):待结转行→转工单/转采购单;不进 flatMenus 自动路由。
       // 2026-10-16 权限化:四处看板页面各挂**页面级虚拟面板码**(定义见后端 PagePanelRegistry),
       // meta.panelCode 供下方守卫拦「直接敲 URL」——菜单隐藏挡不住手输地址。
@@ -124,6 +129,11 @@ const routes = [
       //   点行跳「生产工单」页并定位该工单(WorkOrderList 支持 ?keyword=&focus= 定位)。
       //   页面级虚拟面板 WORK_ORDER_PROGRESS(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由。
       { path: 'prod/plan/workOrderProgress', component: () => import('@/views/modules/plan/WorkOrderProgressBoard.vue'), meta: { title: '生产工序进度看板', code: 'workOrderProgress', panelCode: 'WORK_ORDER_PROGRESS' } },
+      // 品质流程监控(2026-11-12 用户口径「流程监控:从送料->检验单->入库……主要要显示物料批号和物料编码」):
+      //   一行=一个来料批次(送料暂收单的一条物料行),右侧 送料 → 检验 → 入库 三节点带单号/状态/日期,
+      //   点节点跳对应面板并定位该单(没有该面板查看权时只提示不跳);数据由 QcFlowService 现算。
+      //   页面级虚拟面板 QC_FLOW(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由。
+      { path: 'qc/flowMonitor', component: () => import('@/views/modules/qc/QcFlowMonitor.vue'), meta: { title: '品质流程监控', code: 'qcFlowMonitor', panelCode: 'QC_FLOW' } },
       // ══════════ 手机扫码(2026-10-30 新增一级目录)══════════
       // 用户口径:「把生产领料和工序报工这两个 app 的面版重新放在一个新的『手机扫码』(和生产计划平级)
       //   导航下。工序报工不变。生产领料重写。」

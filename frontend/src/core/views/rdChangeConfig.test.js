@@ -69,7 +69,7 @@ test('RD_CHANGE 的数据表行也要有最小行高 rowH(空表时别压扁)', 
   assert.match(rec, /:style="dt\.rowH \? \{ height: dt\.rowH \+ 'px' \} : null"/, '数据表行渲染要读 dt.rowH')
 })
 
-// ── 表尾段(三.相关变更 / 四、库存产品处理方式 / 五、其它 / 批准)──
+// ── 表尾段(四、相关变更 / 批准)── 2026-11-12：原「三.相关变更」与三区撞号，已改为「四、相关变更」
 /**
  * 2026-10-16 用户口径:「这个产品变更申请表的这个位置的格子要大一点,现在有点窄了,
  *   每个格子竖向加长到原来的 1.5 倍」。
@@ -94,26 +94,37 @@ test('表尾段渲染必须认 row.grid 与 row.h(否则调 h 也不生效,行�
 test('RD_CHANGE 尾段行高 = 原始值与 ×1.5 的**中点**(用户两轮口径:先 ×1.5,再"太长了取中间值")', () => {
   const tail = recordSheetConfigs.RD_CHANGE.tailSections || []
   const byBar = Object.fromEntries(tail.map((s) => [s.bar, s]))
-  assert.ok(byBar['三.相关变更'], '尾段「三.相关变更」在')
-  assert.equal(byBar['三.相关变更'].rows[0].h, 115, '相关变更行高:92 与 138 的中点 = 115')
-  assert.equal(byBar['三.相关变更'].rows[0].grid.find((c) => c.area).rows, 3, '长文本格 3 行(1.5 倍那版的口径保留)')
-  for (const bar of ['四、库存产品处理方式', '五、其它', '批准']) {
+  assert.ok(byBar['四、相关变更'], '尾段「四、相关变更」在')
+  assert.equal(byBar['四、相关变更'].rows[0].h, 115, '相关变更行高:92 与 138 的中点 = 115')
+  assert.equal(byBar['四、相关变更'].rows[0].grid.find((c) => c.area).rows, 3, '长文本格 3 行(1.5 倍那版的口径保留)')
+  // ⚠ 2026-11-11 用户口径:「四五内容区去掉」—— 「四、库存产品处理方式」与「五、其它」
+  //   已整段删除,故这里不再校验它们的行高;只保留仍存在的「批准」段。
+  for (const bar of ['批准']) {
     const sec = byBar[bar]
     assert.ok(sec, `尾段「${bar}」在`)
     for (const r of sec.rows) assert.equal(r.h, 92, `${bar} 每行 h 应为 92(74 与 111 的中点)`)
   }
+  // 已删的两段不得回流（防手滑把它们加回来）
+  for (const gone of ['四、库存产品处理方式', '五、其它']) {
+    assert.equal(byBar[gone], undefined, `尾段「${gone}」已于 2026-11-11 按用户口径删除`)
+  }
 })
 
-test('「批准」段下方三格是**手签空白区**:只读、不给 key(用户口径「批注/签字/日期不能填写」)', () => {
+test('「批准」段下方三格：审批通过时回填、纸面只读（2026-11-11 口径变更）', () => {
   const sec = (recordSheetConfigs.RD_CHANGE.tailSections || []).find((s) => s.bar === '批准')
   assert.ok(sec, '批准段在')
   const labelRow = sec.rows[0].grid
   assert.deepEqual(labelRow.map((c) => c.label), ['批准', '签字', '日期'], '第一行是三个静态标签')
   const signRow = sec.rows[1].grid
-  assert.equal(signRow.length, 3, '第二行三格手签区')
+  assert.equal(signRow.length, 3, '第二行三格')
+  // ⚠ 2026-11-11 口径变更：原来是「不留 key 的手签空白区」；用户要求
+  //   「审批的时候弹出弹窗，审批人可以进行批准，还有签字，把信息回填进这里面，还有日期…打印出来也是有数据的」
+  //   ⇒ 三格改为绑字段（批准人/批准签字/批准日期，落在 备用2/3/4，yj_field.editable=0），
+  //   纸面仍标 ro:true ⇒ 任何状态下都只渲染纯文本，人手改不进来；真源只有「审批通过」动作。
+  //   旧断言（key 必须 undefined）已按新口径替换，改为钉住"有 key 且只读"。
+  assert.deepEqual(signRow.map((c) => c.key), ['批准人', '批准签字', '批准日期'], '三格绑审批回填字段')
   for (const c of signRow) {
-    assert.equal(c.key, undefined, '手签格**不能**带 key —— 带了就真能填了(纸面是留给手签的)')
-    assert.equal(c.ro, true, '手签格显式标 ro,意图写在配置里')
+    assert.equal(c.ro, true, '三格必须 ro:true（只读，值只有审批动作写得进去）')
   }
   // 渲染侧:不带 key 的格必须落到只读文本(AnnotatedText),不能落进可编辑分支
   const rec = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
@@ -165,13 +176,15 @@ test('分组设计表:非组首行不得再输出序号/组名 <td>(否则整行
  *   ② 配置把大标题绑到它,提示词 = 现在的静态标题;
  *   ③ 值为空时只读态/打印回落 staticTitle —— 不改的老单据观感不变(组件那支已由 RD_PROD_INFO 的用例钉着)。
  */
-test('RD_CHANGE:大标题格改为可编辑输入框(titleKey=标题),提示词与静态标题同文', () => {
+test('RD_CHANGE:大标题**固定**为「产品变更申请表」(2026-11-11 推翻 2026-10-16 的可编辑口径)', () => {
+  // 2026-10-16 曾要求「这个栏改为可自主编辑的普通文本框」;2026-11-11 用户口径明确改回:
+  //   「这个产品变更申请表的表的表头标题固定为产品变更申请表」⇒ 去掉 titleKey/titleKeyPh,
+  //   纸上永远印 staticTitle,不再渲染输入框。旧单据里已存的「标题」值不再上纸(库列保留不删)。
   const cfg = recordSheetConfigs.RD_CHANGE
   assert.ok(cfg, 'RD_CHANGE 配置缺失')
-  assert.equal(cfg.staticTitle, 'KPC管控点申请单', 'staticTitle 保留:空值时纸上仍印这句')
-  assert.equal(cfg.titleKey, '标题', '大标题要绑到「标题」字段(表头字段,可编辑)')
-  assert.equal(cfg.titleKeyPh, 'KPC管控点申请单', '背景提示词 = 现在的这个标题')
-  assert.equal(cfg.titleKeyPh, cfg.staticTitle, '提示词与静态标题同文 —— 不填就是老观感')
+  assert.equal(cfg.staticTitle, '产品变更申请表', '大标题固定为「产品变更申请表」')
+  assert.equal(cfg.titleKey, undefined, '不能再绑 titleKey(否则又变成可编辑输入框)')
+  assert.equal(cfg.titleKeyPh, undefined, 'titleKey 已去掉，提示词一并清理')
 })
 
 test('RD_PROD_INFO:大标题格是 产品名称 输入框(titleKey),且该键能定位到页(否则高亮不生效)', () => {  const cfg = recordSheetConfigs.RD_PROD_INFO

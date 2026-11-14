@@ -1,0 +1,9 @@
+﻿/jdy/v2/scm/pur_mat_notice             FAIL HTTP 519 status code 519
+/jdy/v2/scm/pur_mat_notice_detail      FAIL HTTP 519 status code 519
+/jdy/v2/scm/pur_receive_notice         FAIL HTTP 519 status code 519
+/jdy/v2/scm/pur_receipt_notice         FAIL HTTP 519 status code 519
+/jdy/v2/scm/pur_mat_rec_notice         OK count=0 rows=0
+/jdy/v2/scm/pur_inbound                OK count=3631 rows=3
+/jdy/v2/qc/qc_bill                     FAIL HTTP 519 status code 519
+/jdy/v2/qc/inspect_bill                FAIL HTTP 519 status code 519
+/jdy/v2/scm/qc_bill                    FAIL HTTP 519 status code 519

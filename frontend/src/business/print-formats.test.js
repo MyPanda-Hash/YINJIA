@@ -1,4 +1,4 @@
-/**
+﻿/**
  * print-formats.test.js — printProductCards 卡面渲染单测(2026-09-28,采购入库单·打印标识卡)
  * 口径:
  *  ① 单据行多带可选键(订单编号/供应商名称/数量/批次/生产日期)时卡面填充事实值;
@@ -146,20 +146,47 @@ const PU_LINES = [
   { 物料编码: 'M-002', 物料名称: '物料B', 规格型号: 'Φ25', 单价: 2, 单位: '支', 数量: 5, 金额: 10, 备注: '加急' },
 ]
 
-test('打印订单无金额:采购订单另一种报表,仅去 单价/小计/总计金额(2026-09-28 用户澄清)', () => {
+test('打印订单无金额 = 送货单(2026-11-11 用户口径:报表名改送货单、下方不写供方/需方)', () => {
   printPuOrderNoAmount(PU_DOC, PU_LINES)
   const html = captured.html
-  // 版式与订单完全同款:标题/信息区(付款方式/是否含税)/注意事项/签章框
-  assert.ok(html.includes('<h1>银嘉采购订单</h1>'), '标题=银嘉采购订单(同款)')
-  assert.ok(html.includes('付款方式') && html.includes('是否含税'), '信息区与订单一致')
-  assert.ok(html.includes('注意事项：'), '注意事项块')
-  assert.ok(html.includes('供　方') && html.includes('需　方'), '供/需方签章框')
-  // 仅去金额:单价/小计列不出现,交期要求列保留;总计仅数量合计(10+5=15)
-  assert.ok(!html.includes('<th>单价</th>'), '不得有单价列')
-  assert.ok(!html.includes('<th>小计</th>'), '不得有小计列')
-  assert.ok(html.includes('<th>交期要求</th>'), '交期要求列保留(同订单)')
+  // ① 标题改名
+  assert.ok(html.includes('<h1>送货单</h1>'), '标题=送货单(2026-11-11 改名)')
+  assert.ok(!html.includes('银嘉采购订单'), '不得再出现旧标题「银嘉采购订单」')
+  // ② 下方不再有供方/需方签章框
+  assert.ok(!html.includes('供　方'), '送货单不印「供　方」框')
+  assert.ok(!html.includes('需　方'), '送货单不印「需　方」框')
+  assert.ok(!html.includes('class="sign"'), '签章框整块不出现')
+  // ③ 其余与采购订单同款
+  assert.ok(html.includes('付款方式') && html.includes('是否含税'), '信息区保留')
+  assert.ok(html.includes('注意事项：'), '注意事项块保留')
+  assert.ok(html.includes('<th>交期要求</th>'), '交期要求列保留')
   assert.ok(html.includes('加急'), '备注列')
   assert.ok(/总　计<\/td><td class="r">15<\/td><td><\/td><td><\/td>/.test(html), '总计=仅数量合计(15),无金额单元格')
+})
+
+test('打印订单无金额:仍不带金额列(单价/小计不出现)', () => {
+  printPuOrderNoAmount(PU_DOC, PU_LINES)
+  const html = captured.html
+  assert.ok(!html.includes('<th>单价</th>'), '不得有单价列')
+  assert.ok(!html.includes('<th>小计</th>'), '不得有小计列')
+})
+
+test('打印采购订单:供方单位名称带入供应商名称 + 需方联系人/联系方式按 opts.buyer 印(2026-11-11)', () => {
+  printPuOrder(PU_DOC, PU_LINES, { buyer: { 联系人: '李文', 联系方式: '13800001111' } })
+  const html = captured.html
+  assert.ok(html.includes('<h1>银嘉采购订单</h1>'), '有金额版标题仍是银嘉采购订单')
+  assert.ok(html.includes('供　方') && html.includes('需　方'), '有金额版保留供/需方签章框')
+  assert.ok(html.includes(`单位名称：${PU_DOC['供应商']}`), '供方单位名称 = 本单供应商名称(不再留空)')
+  assert.ok(html.includes('联 系 人：李文') && html.includes('联系方式：13800001111'),
+    '需方联系人/联系方式 = 打印前弹窗选的那一组')
+  assert.ok(!html.includes('孙郝聪'), '传了 buyer 就不再用公司默认那组')
+})
+
+test('打印采购订单:没传 buyer 时用公司默认那组(老纸不变)', () => {
+  printPuOrder(PU_DOC, PU_LINES)
+  const html = captured.html
+  assert.ok(html.includes('联 系 人：孙郝聪') && html.includes('联系方式：13718162430'),
+    '未传 buyer ⇒ 回落 COMPANY.buyer(历史行为)')
 })
 
 test('打印采购订单回归:抽取公共版式块后仍保留金额列(输出不变)', () => {

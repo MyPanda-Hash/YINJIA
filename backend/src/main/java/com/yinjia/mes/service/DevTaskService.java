@@ -643,6 +643,8 @@ public class DevTaskService {
             row.put("产品负责人", specOwnerNameOf(productCode));
             // 规格书「批准」落款（2026-11-06）：已批准的产品在列表里显示「姓名/日期」而不是按钮。
             row.put("批准日期", specApprovedOf(productCode));
+            // 产品信息表的填写人（2026-11-11 用户口径）：矩阵在 4 列文件之前先显示来源单据的信息。
+            row.put("填写人", prodInfoFillerOf(productCode));
             out.add(row);
         }
         return out;
@@ -655,6 +657,37 @@ public class DevTaskService {
      *   未分发/挂起(没有那一行或负责人为空)时退回产品信息表的总负责人(supervisorOf),
      *   再没有就空串 —— 不让这一列因为分发缺失而整片空白。
      */
+    /**
+     * 产品信息表的「填写人」—— 该产品那条产品信息表单据的**制单人**（asp_user1 → 姓名，
+     * 取不到姓名退回账号）。
+     *
+     * 2026-11-11 用户口径：「给产品文件列表前面加上对应的产品信息表信息，填写人这些」
+     *   —— 4 列文件之前先给出来源单据的基本信息，填写人就是"这张产品信息表是谁填的"。
+     * 为什么查 rd_prod_info_head 而不是 rd_dev_task：rd_dev_task 记的是**下发**动作
+     *   （下发人/下发时间），而"填写人"是单据本身的制单人，两者不是一回事（同一个人下发
+     *   别人填的产品也会发生）。同产品多条（历史作废）取最新一条、跳过已作废。
+     */
+    private String prodInfoFillerOf(String productCode) {
+        if (productCode == null || productCode.isBlank()) return "";
+        try {
+            String acc = jdbc.queryForObject(
+                    "SELECT TOP 1 h.asp_user1 FROM rd_prod_info_head h"
+                            + " WHERE ISNULL(h.asp_cancel,'N') <> 'Y'"
+                            + "   AND LTRIM(RTRIM(ISNULL(h.产品编号, N''))) = LTRIM(RTRIM(?))"
+                            + " ORDER BY h.id DESC",
+                    String.class, productCode);
+            if (acc != null && !acc.isBlank()) {
+                // 姓名取不到(历史单据的制单账号已不在 yj_user 里,如 'migration')就退回账号本身,
+                // 不让这一列空着 —— 空着会被误读成"没人填"。
+                String name = realNameOf(acc);
+                return (name == null || name.isBlank()) ? acc : name;
+            }
+        } catch (Exception e) {
+            log.warn("[RD_PROD_DOCLIST] 取产品信息表填写人失败 product={}: {}", productCode, e.getMessage());
+        }
+        return "";
+    }
+
     private String specOwnerNameOf(String productCode) {
         try {
             String acc = jdbc.queryForObject(

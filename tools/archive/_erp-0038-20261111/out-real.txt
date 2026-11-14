@@ -1,0 +1,274 @@
+﻿账套 clientId= 359797  outerInstanceId= 580147507460444160
+token ok
+
+=== pur_order 列表命中 1 条 ===
+{"id":"2604654100457214976","bill_no":"YJ-20261103-07","bill_date":"2026-11-03","bill_status":"C","io_status":"Z","bill_close_state":"C"}
+
+=== 订单头 ===
+{
+ "bill_no": "YJ-20261103-07",
+ "bill_date": "2026-11-03",
+ "bill_status": "C",
+ "io_status": "Z",
+ "bill_close_state": "C",
+ "supplier_name": "佛山市云创壹芯新材料有限公司",
+ "supplier_number": "YJ-YCYX",
+ "remark": ""
+}
+
+=== 分录(2行;close_state 0已关闭/1未关闭/2手动关闭) ===
+seq | material_number | material_name | unit_name | qty | in_qty | un_out_qty | close_state | io_status | entry_close_state
+1 | YJ-YCYX-020 | 折叠棉 | 支 | 5000 | 5057 | -57 | 0 |  | 
+2 | YJ-YCYX-055 | 折叠棉 | 支 | 1000 | 0 | 1000 | 1 |  | 
+
+=== 目标行(YJ-YCYX-020)原始键 ===
+命中 1 行
+{
+ "id": "2604654100457213952",
+ "picture": "",
+ "material_id": "2198817746593081344",
+ "material_name": "折叠棉",
+ "material_number": "YJ-YCYX-020",
+ "material_is_multi_unit": false,
+ "material_is_serial": false,
+ "material_is_asst_attr": false,
+ "material_is_batch": false,
+ "material_model": "72*60*120",
+ "material_help_code": "",
+ "stock_id": "",
+ "stock_name": "",
+ "stock_number": "",
+ "stock_is_allow_freight": false,
+ "sp_id": "",
+ "sp_name": "",
+ "sp_number": "",
+ "aux_prop_id": "",
+ "aux_prop_name": "",
+ "aux_prop_number": "",
+ "aux_id1": "",
+ "aux_name1": "",
+ "aux_number1": "",
+ "aux_id2": "",
+ "aux_name2": "",
+ "aux_number2": "",
+ "aux_id3": "",
+ "aux_name3": "",
+ "aux_number3": "",
+ "barcode": "",
+ "base_unit_id": "3",
+ "base_unit_name": "支",
+ "base_unit_number": "支",
+ "unit_id": "3",
+ "unit_name": "支",
+ "unit_number": "支",
+ "coefficient": 1,
+ "conversion_rate": "",
+ "qty": 5000,
+ "inv_qty": 22,
+ "inv_base_qty": 0,
+ "return_qty_unit": 0,
+ "return_qty": 0,
+ "bill_dis_distribution": 0,
+ "fee": 0,
+ "dis_rate": 0,
+ "unit_cost": 0,
+ "cost": 0,
+ "batch_no": "",
+ "pro_place": "",
+ "pro_reg_no": "",
+ "pro_license": "",
+ "sn_list": "",
+ "sn_list_id": "",
+ "aux_unit_id": "",
+ "aux_unit_name": "",
+ "aux_unit_number": "",
+ "aux_coefficient": 0,
+ "aux_qty": 0,
+ "seq": 1,
+ "entry_settle_status": "A",
+ "is_free": false,
+ "comment": "11/10,送303",
+ "src_order_id": "",
+ "src_bill_no": "",
+ "src_bill_type_id": "",
+ "src_bill_type_name": "",
+ "src_bill_type_number": "",
+ "src_inter_id": "0",
+ "src_bill_date": "",
+ "src_seq": 0,
+ "src_entry_id": "0",
+ "supp_material_number": "",
+ "supp_material_name": "",
+ "custom_entity_field": {},
+ "delivery_date": "2026-11-03",
+ "in_qty": 5057,
+ "close_state": "0",
+ "base_qty": 5000,
+ "entry_realio_status": "C",
+ "entry_ios_tatus": "C",
+ "un_out_qty": -57,
+ "kf_date": "",
+ "valid_date": "",
+ "kf_type": "",
+ "kf_period": "0"
+}
+
+=== pur_inbound bill_no=CGRK-20261111-03675 → 1 条 ===
+{"id":"2610336524675611648","bill_no":"CGRK-20261111-03675","bill_date":"2026-11-11","bill_status":"C","bill_close_state":"","supplier_name":"佛山市云创壹芯新材料有限公司"}
+  行:
+   seq=1 material_number=YJ-YCYX-020 material_name=折叠棉 qty=5057 batch_no= src_bill_no=YJ-20261103-07 src_seq=1 close_state=
+
+=== src_bill_no=YJ-20261103-07 的采购入库单 50 张 ===
+CGRK-20261107-03676 | 2026-11-07 | C | 
+CGRK-20261111-03675 | 2026-11-11 | C | 
+CGRK-20261111-03674 | 2026-11-11 | C | 
+CGRK-20261111-03673 | 2026-11-11 | C | 
+CGRK-20261111-03672 | 2026-11-11 | C | 
+CGRK-20261111-03671 | 2026-11-11 | C | 
+CGRK-20261111-03670 | 2026-11-11 | C | 
+CGRK-20261111-03669 | 2026-11-11 | C | 
+CGRK-20261110-03668 | 2026-11-10 | C | 
+CGRK-20261109-03667 | 2026-11-09 | C | 
+CGRK-20261109-03666 | 2026-11-09 | C | 
+CGRK-20261110-03665 | 2026-11-10 | C | 
+CGRK-20261110-03664 | 2026-11-10 | C | 
+CGRK-20261110-03663 | 2026-11-10 | C | 
+CGRK-20261110-03662 | 2026-11-10 | C | 
+CGRK-20261110-03661 | 2026-11-10 | C | 
+CGRK-20261109-03660 | 2026-11-09 | C | 
+CGRK-20261110-03659 | 2026-11-10 | C | 
+CGRK-20261109-03658 | 2026-11-09 | C | 
+CGRK-20261109-03657 | 2026-11-09 | C | 
+CGRK-20261109-03656 | 2026-11-09 | C | 
+CGRK-20261109-03655 | 2026-11-09 | C | 
+CGRK-20261107-03654 | 2026-11-07 | C | 
+CGRK-20261106-03652 | 2026-11-06 | C | 
+CGRK-20261109-03651 | 2026-11-09 | C | 
+CGRK-20261109-03650 | 2026-11-09 | C | 
+CGRK-20261109-03653 | 2026-11-09 | C | 
+CGRK-20261107-03649 | 2026-11-07 | C | 
+CGRK-20261107-03648 | 2026-11-07 | C | 
+CGRK-20261107-03647 | 2026-11-07 | C | 
+CGRK-20261107-03646 | 2026-11-07 | C | 
+CGRK-20261106-03645 | 2026-11-06 | C | 
+CGRK-20261107-03644 | 2026-11-07 | C | 
+CGRK-20261106-03643 | 2026-11-06 | C | 
+CGRK-20261106-03642 | 2026-11-06 | C | 
+CGRK-20261106-03641 | 2026-11-06 | C | 
+CGRK-20261106-03639 | 2026-11-06 | C | 
+CGRK-20261106-03637 | 2026-11-06 | C | 
+CGRK-20261106-03636 | 2026-11-06 | C | 
+CGRK-20261105-03632 | 2026-11-05 | C | 
+CGRK-20261105-03631 | 2026-11-05 | C | 
+CGRK-20261105-03630 | 2026-11-05 | C | 
+CGRK-20261030-03629 | 2026-10-30 | C | 
+CGRK-20261105-03628 | 2026-11-05 | C | 
+CGRK-20261105-03627 | 2026-11-05 | C | 
+CGRK-20261105-03626 | 2026-11-05 | C | 
+CGRK-20261105-03625 | 2026-11-05 | C | 
+CGRK-20261103-03624 | 2026-11-03 | C | 
+CGRK-20261103-03623 | 2026-11-03 | C | 
+CGRK-20261104-03622 | 2026-11-04 | C | 
+
+=== 商品 YJ-YCYX-020 详情键(找需检验标志) ===
+{
+ "id": "2350998447882071040",
+ "number": "C-95-13",
+ "name": "006项目/功能炭棒滤芯",
+ "enable": "1",
+ "base_unit_id": "3",
+ "base_unit_name": "支",
+ "aux_unit_name": "支",
+ "mul_label": [
+  {
+   "id": "2479206810112873472",
+   "number": "2479206810112873472",
+   "name": "3-01-01-0234"
+  }
+ ],
+ "barcode": "",
+ "model": "57*21*66.5",
+ "brand_id": "",
+ "producing_pace": "",
+ "help_code": "3-01-01-0234",
+ "is_multi_unit": false,
+ "fix_unit_id1": "",
+ "coefficient1": 0,
+ "conversion_unit_id1": "",
+ "fix_unit_id2": "",
+ "coefficient2": 0,
+ "conversion_unit_id2": "",
+ "fix_unit_id3": "",
+ "coefficient3": 0,
+ "conversion_unit_id3": "",
+ "purchase_unit_id": "3",
+ "sale_unit_id": "3",
+ "store_unit_id": "3",
+ "aux_unit_id": "3",
+ "aux_unit_number": "支",
+ "is_weight": false,
+ "is_serial": false,
+ "is_batch": false,
+ "is_sale": true,
+ "is_purchase": true,
+ "is_subpart": true,
+ "is_assembly": true,
+ "is_kf_period": false,
+ "kf_period_type": "",
+ "kf_period": "0",
+ "alarm_day": "0",
+ "is_asst_attr": false,
+ "aux_entity": [],
+ "barcode_entity": [],
+ "inv_mgr_type": "0",
+ "min_inventory_qty": "0",
+ "max_inventory_qty": "0",
+ "sec_inventory_qty": "0",
+ "cost_method": "1",
+ "fetch_category_id": "",
+ "stock_id": "",
+ "space_id": "",
+ "vender_id": "",
+ "purchase_id": "",
+ "refistration_number": "",
+ "pro_license": "",
+ "gross_weight": "0",
+ "net_weight": "0",
+ "weight_unit_id": "",
+ "length": "0",
+ "wide": "0",
+ "high": "0",
+ "volume": "0",
+ "check_type": "1",
+ "remark": "寿命:300 gallons\n流速:0.5 GPM\n过滤精度:0.5-1微米(不能超过1)\n去除物质:余氧、cyst、lead(要求满足NSF 42\\53性能)",
+ "custom_field": {
+  "custom_field__1__4swgci5cr1vb": "57*21*66.5",
+  "custom_field__1__4swgegvojiasxiej": "57*21*66.5",
+  "custom_field__1__62tvoyr1j4fa": "",
+  "custom_field__1__6jiafyhnnjic0w": "108支/箱"
+ },
+ "parent_number": "SPFL00013",
+ "parent_id": "2236463020798653440",
+ "bom_entity": [],
+ "valid_qty": "0",
+ "qty_inv": "0",
+ "attachments_url": [],
+ "product_department_id": "",
+ "product_department_number": "",
+ "min_package_qty": 0,
+ "modify_time": "2026-08-22 16:19:59",
+ "is_backflushed": false,
+ "backflushed_stock_id": "",
+ "backflushed_stock_name": "",
+ "backflushed_stock_number": "",
+ "backflushed_space_id": "",
+ "backflushed_space_name": "",
+ "backflushed_space_number": "",
+ "short_name": "",
+ "invoice_name": "",
+ "invoice_model": "",
+ "standard_time_type": "1"
+}
+
+=== 疑似检验相关键 ===
+  check_type = "1"

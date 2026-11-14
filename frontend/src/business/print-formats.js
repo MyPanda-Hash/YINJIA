@@ -189,10 +189,20 @@ const PU_SHEET_CSS = '<style>'
   + '</style>'
 const PU_BRAND_HTML = `<div class="brand"><b>${esc(COMPANY.brand)}</b>${esc(COMPANY.en)}　${esc(COMPANY.name)}</div>`
 const PU_NOTES_HTML = `<div class="notes"><div class="t">注意事项：</div>${COMPANY.notes.map((n) => `<div>${esc(n)}</div>`).join('')}</div>`
-const PU_SIGN_HTML = '<div class="sign">'
-  + '<div class="box"><div class="t">供　方</div>单位名称：<br/>联 系 人：<br/>联系方式：</div>'
-  + `<div class="box"><div class="t">需　方</div>单位名称：${esc(COMPANY.buyer['单位名称'])}<br/>联 系 人：${esc(COMPANY.buyer['联系人'])}<br/>联系方式：${esc(COMPANY.buyer['联系方式'])}</div>`
-  + '</div>'
+/**
+ * 供方/需方签章框(2026-11-11 用户口径):
+ *   · **供方「单位名称」带入供应商名称**(以前恒留空让供应商手写);
+ *   · **需方「联系人 / 联系方式」改为打印前弹窗选**(下拉选名字与联系方式、可新增),
+ *     由调用方经 `opts.buyer` 传进来;没传就沿用公司默认那组(`COMPANY.buyer`),老纸不变。
+ * ⚠ 送货单(无金额版)**不印这个框**(用户口径「送货单下方不需要写供方和需方」)。
+ */
+function puSignHtml(supplierName, buyer) {
+  const b = buyer || COMPANY.buyer
+  return '<div class="sign">'
+    + `<div class="box"><div class="t">供　方</div>单位名称：${esc(supplierName)}<br/>联 系 人：<br/>联系方式：</div>`
+    + `<div class="box"><div class="t">需　方</div>单位名称：${esc(COMPANY.buyer['单位名称'])}<br/>联 系 人：${esc(b['联系人'])}<br/>联系方式：${esc(b['联系方式'])}</div>`
+    + '</div>'
+}
 
 /**
  * 银嘉采购订单
@@ -233,7 +243,8 @@ export function printPuOrder(doc, lines, opts) {
     + `<td class="r">${esc(fmtNum(totalQty))}</td><td class="r">${esc(fmtNum(totalAmt))}</td><td></td><td></td></tr>`
     + '</tbody></table>'
     + PU_NOTES_HTML
-    + PU_SIGN_HTML
+    // 签章框:供方单位名称 = 本单供应商;需方联系人/联系方式 = 打印前弹窗选的那一组(opts.buyer)
+    + puSignHtml(doc['供应商'] || doc['供应商名称'], opts && opts.buyer)
   // 返回「是否真的交给打印层」:打印弹窗据此决定关窗,还是留在窗里让用户重试
   // (2026-11-07 采购订单打印弹窗)
   const ok = printInPage('银嘉采购订单-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body, opts)
@@ -242,9 +253,11 @@ export function printPuOrder(doc, lines, opts) {
 }
 
 /**
- * 银嘉采购订单·无金额版(2026-09-28 用户澄清:不是入库单报表,是采购订单的另一种打印版式)——
- * 与 printPuOrder 同一标题/信息区(含付款方式/是否含税)/注意事项/签章框,仅三处金额内容不打印:
- * 行表去 单价/小计 两列(交期要求保留),总计行只留数量合计。
+ * 采购订单·无金额版 = **送货单**(2026-09-28 是"采购订单另一种版式",2026-11-11 用户改名):
+ *   「打印无金额的采购订单报表名字改为送货单。送货单下方不需要写供方和需方。」
+ *   ⇒ ① 纸面标题 `送货单`(打印层文档名也改);② **不印供方/需方签章框**;
+ *   其余与采购订单同款:品牌行、信息区(付款方式/是否含税)、注意事项;行表无 单价/小计,
+ *   总计行只留数量合计。
  * @param doc  头数据(同 printPuOrder)
  * @param lines 行数据(同 printPuOrder:物料编码/物料名称/规格型号/单价/单位/数量/金额/预计到货日期/备注)
  * @param {{onDone?:Function}} [opts] 打印层摘掉后回调一次(同 printPuOrder)
@@ -263,7 +276,7 @@ export function printPuOrderNoAmount(doc, lines, opts) {
     + Array.from({ length: pad }, () => '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>').join('')
   const body = PU_SHEET_CSS
     + PU_BRAND_HTML
-    + '<h1>银嘉采购订单</h1>'
+    + '<h1>送货单</h1>'
     + '<div class="info">'
     + `<span class="f">订单编号：<span class="v">${esc(doc['单据编号'])}</span></span>`
     + `<span class="f">下单日期：<span class="v">${esc(fmtDate(doc['单据日期']))}</span></span>`
@@ -280,8 +293,8 @@ export function printPuOrderNoAmount(doc, lines, opts) {
     + `<td class="r">${esc(fmtNum(totalQty))}</td><td></td><td></td></tr>`
     + '</tbody></table>'
     + PU_NOTES_HTML
-    + PU_SIGN_HTML
-  const ok = printInPage('银嘉采购订单(无金额)-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body, opts)
+    // ⚠ 无供方/需方签章框(2026-11-11 用户口径「送货单下方不需要写供方和需方」)
+  const ok = printInPage('送货单-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body, opts)
   if (!ok) alert(PRINT_FAIL_MSG)
   return ok
 }

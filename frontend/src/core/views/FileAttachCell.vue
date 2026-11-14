@@ -250,7 +250,9 @@ async function openFile(a) {
 .fac-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .fac-del { color: #909399; font-size: 11px; padding: 0 2px; }
 .fac-del:hover { color: #f56c6c; }
-.fac-empty { color: #b0b3b8; font-size: 12px; }
+/* 2026-11-13：导出到 A4（733px 重排）后备注列变窄，「暂无附件」被拆成「暂无附/件」。
+   它是**一个词**，不该从中间断 —— keep-all 让整个词一起换行。 */
+.fac-empty { color: #b0b3b8; font-size: 12px; word-break: keep-all; }
 .fac-actions { margin-top: 2px; }
 .fac-upload-btn {
   display: inline-flex; align-items: center; gap: 4px;

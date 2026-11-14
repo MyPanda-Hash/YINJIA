@@ -23,6 +23,9 @@ export const useUserStore = defineStore('user', {
       warnPanels: Array.isArray(ui?.warnPanels) ? ui.warnPanels : [],
       // 「改他人行」权限面板(2026-11-06 内部样品单,机制同 fieldPanels/warnPanels)
       editOtherRowsPanels: Array.isArray(ui?.editOtherRowsPanels) ? ui.editOtherRowsPanels : [],
+      // 样品申请单「可见全部单据」(2026-11-11):勾了 view_all 的面板码。真闸门在服务端
+      // QueryService.queryDocs / loadOneDoc,这里只用于前端提示与「全部/仅本人」范围文案。
+      viewAllPanels: Array.isArray(ui?.viewAllPanels) ? ui.viewAllPanels : [],
       // 可「本人自审」的面板(2026-10-28):管理员=['*'],其余=角色在该面板被勾了「本人自审」。
       // 前端据此把「审批通过」对**提交人本人**放开(展示层);真闸门 ButtonService.canSelfAudit。
       selfAuditPanels: Array.isArray(ui?.selfAuditPanels) ? ui.selfAuditPanels : [],
@@ -86,6 +89,7 @@ export const useUserStore = defineStore('user', {
       this.fieldPanels = Array.isArray(u?.fieldPanels) ? u.fieldPanels : []
       this.warnPanels = Array.isArray(u?.warnPanels) ? u.warnPanels : []
       this.editOtherRowsPanels = Array.isArray(u?.editOtherRowsPanels) ? u.editOtherRowsPanels : []
+      this.viewAllPanels = Array.isArray(u?.viewAllPanels) ? u.viewAllPanels : []
       this.selfAuditPanels = Array.isArray(u?.selfAuditPanels) ? u.selfAuditPanels : []
       this.pagePerms = u?.pagePerms && typeof u.pagePerms === 'object' ? u.pagePerms : {}
       this.supplierCode = typeof u?.supplierCode === 'string' ? u.supplierCode : ''
@@ -104,6 +108,7 @@ export const useUserStore = defineStore('user', {
       this.approvePanels = Array.isArray(p.approvePanels) ? p.approvePanels : []
       this.fieldPanels = Array.isArray(p.fieldPanels) ? p.fieldPanels : []
       this.editOtherRowsPanels = Array.isArray(p.editOtherRowsPanels) ? p.editOtherRowsPanels : this.editOtherRowsPanels || []
+      this.viewAllPanels = Array.isArray(p.viewAllPanels) ? p.viewAllPanels : this.viewAllPanels || []
       this.warnPanels = Array.isArray(p.warnPanels) ? p.warnPanels : []
       this.selfAuditPanels = Array.isArray(p.selfAuditPanels) ? p.selfAuditPanels : []
       this.pagePerms = p.pagePerms && typeof p.pagePerms === 'object' ? p.pagePerms : {}

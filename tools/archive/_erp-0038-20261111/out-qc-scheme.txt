@@ -1,0 +1,9 @@
+﻿类别详情 ok=true
+键: level,number,name,id,is_leaf,parent_id,description,create_time,creator_name,modify_time,modifier_name
+检验相关: (无)
+/jdy/v2/qm/qc_scheme FAIL HTTP 519 status code 519
+/jdy/v2/scm/qc_scheme FAIL HTTP 519 status code 519
+/jdy/v2/bd/qc_scheme FAIL HTTP 519 status code 519
+/jdy/v2/qm/inspect FAIL HTTP 519 status code 519
+/jdy/v2/scm/pur_inspect FAIL HTTP 519 status code 519
+/jdy/v2/sys/param FAIL HTTP 519 status code 519

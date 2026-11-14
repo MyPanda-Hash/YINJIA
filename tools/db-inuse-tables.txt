@@ -26,6 +26,7 @@ table:yj_doc_status   # 单据状态表(shr审核/canceled作废/stopped中止/p
 table:yj_erp_wh_map   # 金蝶仓库编码 → MES 仓库编码 映射(条码/库存面板按此把外部仓归到 MES 仓;改口径只改数据:CK00006/YCL-01→WH-CL)
 table:yj_ext_bind_log   # 动态字段绑定审计(bind绑定/retire退绑/clear清空;备用列池操作留痕)
 table:yj_field   # 面板字段注册表(列名/中文标签/类型/字典SQL/参照面板/位置query|header|detail/必填)
+table:yj_field_view   # 角色字段视图(2026-11-13):同一面板各角色「显示/隐藏哪些字段」;只存显隐(顺序与栏名仍由 yj_field=系统整体决定),同一角色所有账号共用;行存在=显式设定,行不存在=跟随整体 —— 原「表格调整/表头调整」对 yj_field 的写入一点没改
 table:yj_form_approval   # 审批流记录(提交/通过/驳回留痕)
 table:yj_locale   # 语言表(启用语言清单,插行即出现语言切换器)
 table:yj_lot_seq   # 批号流水表(批号=yyyymmdd+3位流水,材料/产品批号统一取号)
@@ -114,6 +115,8 @@ table:erp_imp_log   # ERP导入日志(金蝶星辰数据导入批次)
 table:erp_integ_api   # ERP集成接口配置(2026-10-18):一张接口一行 = 方向(导入/转出)+分类(基础资料/单据/设备)+接口地址+对应MES面板+启用/排序;界面=ERP系统集成·ERP集成配置清单
 table:erp_integ_device   # ERP集成设备绑定(2026-10-18):接口×设备(设备编码取 bs_equip),带用途(产量采集/点检对象/保养对象/数据来源)
 table:erp_integ_field   # ERP集成字段映射(2026-10-18):一行 = MES字段/常量 → 金蝶接口字段,带映射层级/转换规则/必填
+table:erp_stock_snapshot   # 金蝶库存快照(2026-11-10,最近一轮):一行 = 一个(物料,仓库,批号)键的金蝶现存量 + 覆盖前MES数量 + 差异 + 处理方式(覆盖/一致/新增/清零);每轮整表替换,历史见 erp_stock_sync_log
+table:erp_stock_sync_log   # 金蝶库存同步日志(2026-11-10,每轮一行):账套指纹/金蝶行数/覆盖·新增·清零·一致行数/差异合计/耗时/状态;deploy/sync-stock.mjs 写入(计划任务 JdyStockSync 每5分钟)
 table:feed_confirm   # 投料确认单头表(阶段:溶解/合成/A液/B液/浆体)
 table:feed_confirm_detail   # 投料确认单行表(投料成分/理论/实际)
 table:form_flow_link   # 单据流链接表(上游生单→下游单据占用,link_status=ACTIVE|RELEASED)
@@ -320,3 +323,5 @@ table:qc_line_patrol_detail   # 成型车间巡线记录表行表(一行 = 纸�
 table:qc_sample_reg   # 送样登记表/内部检测目录(档案单表;一行=一个可检验项目:检测元素/内部检出限/检测误差/测试方法/测试周期/收费/检测标准;检验委托单「检验类别」从这里带入;migrate-sample-insp-20261115.sql 新建并灌 44 行种子)
 table:qc_insp_commission_head   # 检验委托单头表(委托检验合同 YJ-QP-701-1-01 (00);单据号前缀 WT;委托方/样品/检验类别·依据/处理方式·判定规则·报告类型·有效期/双方确认/审核人与状态)
 table:qc_insp_commission_detail   # 检验委托单行表(一行=从送样登记表带入的一个检验项目快照:检测元素/内部检出限/检测误差/测试方法/测试周期/收费/检测标准;不建外键)
+view:v_qc_insp_rec_detail   # 检验数据记录明细表只读视图(2026-11-11:一行=一条检验数据记录=来料检验单一行物料;摊平 来料检验单号+行号/检验数据记录单号/采购订单号+行号/送料暂收单号+行号/采购入库单号+行号;QC_INSP_REC_DETAIL 取数,不改任何业务表)
+

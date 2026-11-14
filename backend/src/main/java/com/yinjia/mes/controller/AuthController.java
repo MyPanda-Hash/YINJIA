@@ -123,6 +123,10 @@ public class AuthController {
             // 内部样品单「改他人行」权限面板(2026-11-06):管理员=全部;其余=角色勾了 edit_others 的面板。
             // 前端据此把别人已保存的行锁成只读;真闸门在 ButtonService.applySampleIntRowRules(同词)。
             user.put("editOtherRowsPanels", panelsWithPerm(admin, u.get("role_id"), "edit_others"));
+            // 「可见全部单据」权限面板(2026-11-11 样品申请单):管理员=全部;其余=角色勾了 view_all 的面板。
+            // 用户口径「刘磊账号需要看到全部外部开发样品单信息」(刘磊是文件负责人、非管理员)。
+            // 真闸门在 QueryService.queryDocs / loadOneDoc(同词),前端只用它决定"是否提示本人范围"。
+            user.put("viewAllPanels", panelsWithPerm(admin, u.get("role_id"), "view_all"));
             // 本人自审权限面板(2026-10-28):管理员=全部;普通用户=角色勾了「本人自审」的面板。
             // 前端据此把「审批通过」对提交人本人放开;真闸门 ButtonService.canSelfAudit(同词)。
             user.put("selfAuditPanels", selfAuditPanelsFull(admin, u.get("role_id"), username));

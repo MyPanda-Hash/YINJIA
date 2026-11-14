@@ -1,0 +1,13 @@
+﻿import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { fetchAppToken, kingdeeGet, kingdeeTryGet } from "../../../deploy/kingdee-client.mjs";
+const cfg = JSON.parse(readFileSync(resolve("deploy/config.json"), "utf8").replace(/^\uFEFF/, "")).kingdee;
+const { token, domain } = await fetchAppToken(cfg); cfg.domain = domain;
+const list = await kingdeeGet(cfg, token, "/jdy/v2/scm/pur_order", { page: "1", page_size: "10", bill_no: "YJ-20261102-02" });
+const hit = (list.rows||[]).find(r=>r.bill_no==="YJ-20261102-02");
+const d = await kingdeeGet(cfg, token, "/jdy/v2/scm/pur_order_detail", { id: String(hit.id) });
+const e = (d.material_entity||[])[0];
+console.log("=== 订单 YJ-20261102-02 第1行 全部键 ===");
+for (const k of Object.keys(e)) if (!/amount|price|discount|tax|cess/i.test(k)) console.log(k + " = " + JSON.stringify(e[k]));
+console.log("\n=== 全表头键 ===");
+console.log(Object.keys(d).filter(k=>/qc|insp|check|quality/i.test(k)).map(k=>k+"="+JSON.stringify(d[k])).join(" | ") || "(无 qc/insp/check/quality 键)");

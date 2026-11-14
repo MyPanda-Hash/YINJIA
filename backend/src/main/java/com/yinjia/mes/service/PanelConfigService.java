@@ -34,14 +34,22 @@ public class PanelConfigService {
      * 前端数量输入/显示按它走 —— 个/卷=0、kg/米=3,与后端保存/过账的取整口径同源。
      */
     private final BatchService batchService;
+    /**
+     * 角色字段视图(2026-11-13):同一面板按角色叠加"显示/隐藏"。
+     * 只在这里取一次覆盖 {@link PanelFieldViewService#applyTo},下游(fieldSpec/buildGridColumns/
+     * fieldsAt)全部照旧 —— 所以界面、查询、导出自动一致,前端渲染代码零改动。
+     */
+    private final PanelFieldViewService fieldView;
 
     public PanelConfigService(PanelRegistry registry, JdbcTemplate jdbc, TranslationService translations,
-                              CalcRuleService calcRules, BatchService batchService) {
+                              CalcRuleService calcRules, BatchService batchService,
+                              PanelFieldViewService fieldView) {
         this.registry = registry;
         this.jdbc = jdbc;
         this.translations = translations;
         this.calcRules = calcRules;
         this.batchService = batchService;
+        this.fieldView = fieldView;
     }
 
     /** 当前请求的目标语言键(en/ja/ko/...;zh 系=zh)。 */
@@ -71,8 +79,23 @@ public class PanelConfigService {
         return buildConfig(registry.panel(panelCode));
     }
 
+    /**
+     * {@code roleView=false} = 按「系统整体」出配置(界面设置里"字段视图=系统整体"时用)。
+     * 默认 true:叠上本角色的显示/隐藏覆盖(无覆盖时 {@link PanelFieldViewService#applyTo}
+     * 原样返回同一个对象,零开销)。
+     */
+    public Map<String, Object> getPanelConfig(String panelCode, boolean roleView) {
+        return buildConfig(registry.panel(panelCode), roleView);
+    }
+
     public Map<String, Object> buildConfig(PanelRegistry.PanelDef def) {
-        Map<String, Object> out = "archive".equals(def.mode()) ? buildArchiveConfig(def) : buildDocConfig(def);
+        return buildConfig(def, true);
+    }
+
+    public Map<String, Object> buildConfig(PanelRegistry.PanelDef def, boolean roleView) {
+        // 角色字段视图:只换字段清单的 hidden/visible,其余一律原样(2026-11-13)
+        PanelRegistry.PanelDef view = roleView ? fieldView.applyTo(def) : def;
+        Map<String, Object> out = "archive".equals(view.mode()) ? buildArchiveConfig(view) : buildDocConfig(view);
         // 单位精度快照(2026-11-09):所有面板一份,前端数量输入/显示按单位小数位走。
         // 放顶层而不是 metadata:metadata 在档案/单据两条构建路径里各有一份,这里一次挂全。
         try {
@@ -636,6 +659,18 @@ public class PanelConfigService {
         // 后端「新增」建单时已写库,但前端新建后的**本地草稿对象**是空的 ——
         // 不下发就会出现"库里是保密、屏幕上却空着"的错位(本轮实测)。
         if (!def.headDefaults().isEmpty()) metadata.put("headDefaults", def.headDefaults());
+        // 状态闸门 + 查询条件区默认收起(2026-11-11,见 PanelDef.statusGate / collapseQueryBar):
+        //   检验数据记录明细表要「默认只列已完成检验,勾选后才含正在检验中」——闸门本体在
+        //   QueryService 里执行(服务端强制),这里只把声明下发给前端,用来渲染那个复选框;
+        //   collapseQueryBar 让条件区默认收起(用户口径「表头做个收缩」)。
+        PanelRegistry.PanelDef.StatusGate gate = def.statusGate();
+        if (gate != null) {
+            Map<String, Object> gm = new LinkedHashMap<>();
+            gm.put("field", gate.field());
+            gm.put("value", gate.value());
+            metadata.put("statusGate", gm);
+        }
+        if (def.collapseQueryBar()) metadata.put("collapseQueryBar", true);
         // 生单动作 → 目标面板(前端据此判断该动作是否走"分批送料对话框":目标面板配了批次号即分批)
         Map<String, Object> pushTargets = new LinkedHashMap<>();
         for (Map<String, Object> g : buttonGroups) {
@@ -765,6 +800,9 @@ public class PanelConfigService {
                 : f.displayName();
         if (!display.equals(f.label())) m.put("displayName", display);
         if (f.width() != null) m.put("width", f.width());
+        // 分组表头(父字段):运行时自定义列「设计分叉」靠它 —— 前端 RecordSheetPanels 用
+        // core/panel/extCols.js 把带 colGroup 的自定义列并进 subHeads(2026-11-11)。
+        if (f.colGroup() != null && !f.colGroup().isBlank()) m.put("colGroup", f.colGroup());
         if (f.hidden()) m.put("hidden", true);
         // 字段编辑的显隐开关(存 yj_field.visible):显式 false 才下发,前端据此隐藏该列
         if (!f.visible()) m.put("visible", false);
@@ -1462,6 +1500,21 @@ public class PanelConfigService {
             {"不合格数量", "退货数量"},
             // 行级仓库沿链贯通(2026-09-21):采购订单行/暂收行叫「仓库」,检验行叫「仓库代码」,入库行又叫「仓库」
             {"仓库", "仓库代码"}, {"仓库代码", "仓库"},
+            // 行级**仓位**沿链贯通(2026-11-13 用户口径「从采购订单生单的时候就开始预填仓库仓位」):
+            // 采购订单行的仓位列 label 是「仓位编码」,暂收行/检验行/入库行是「仓位」(物理列都是 仓位编码),
+            // 且仓位系列都是**hidden 列**(visible=0) —— 同名映射按 seq 排在最后,必被 14 条上限挤爆
+            // (实测暂收口径根本带不到),故同义词兜底(同义词循环不占那 14 条名额)。
+            {"仓位编码", "仓位"}, {"仓位", "仓位"},
+            {"仓位名称", "仓位名称"}, {"仓位id", "仓位id"},
+            // 行级**采购单号**(2026-11-13 合单生单):暂收行已有「采购单号」,检验/退回为本次新增列 ——
+            // 合单后一张暂收单跨多张采购订单,靠它与「采购订单行号」一起把行归回origin订单;
+            // 同名字段映射按 seq 排在后面、会被 14 条上限挤掉,故同义词兜底。
+            {"采购单号", "采购单号"},
+            // 采购入库行的行级订单号沿用**已有的 源单编号**(金蝶 src_bill_no 同名同义;
+            // 见 docs/development/金蝶采购入库单-多订单混装核查.md §四.1),故 采购单号 → 源单编号
+            {"采购单号", "源单编号"}, {"源单编号", "源单编号"},
+            {"仓库编码", "仓库编码"}, {"仓库id", "仓库id"},
+            {"仓库启用仓位管理", "仓库启用仓位管理"},
             // 采购链订单行号(2026-09-20):采购订单行 行号(金蝶 seq)→ 下游各站 采购订单行号,
             // 逐站下传后在 采购入库行 落 源单行号,转ERP 推给金蝶作 src_seq
             {"行号", "采购订单行号"},
@@ -1472,6 +1525,12 @@ public class PanelConfigService {
             {"行号", "销售订单行号"},
             // 送料批次号(2026-09-20 分批送料 P0):同名直通,逐站下传(暂收→检验→入库/退回)
             {"批次号", "批次号"},
+            // 采购链「现存量」沿链贯通(2026-11-12 用户口径:采购订单→送料暂收→检验/退料/特采→采购入库
+            // 全流程都要有这个信息,可以隐藏但要保留字段)。同名映射**本来就能带**,但它是按来源 seq
+            // 先到先得、上限 14 条 —— 暂收行的现存量 seq 360 排在最后,必然被挤爆(实测 QC_INSP 侧的
+            // detailMap 14 条里根本没有它),故用同义词兜底登记(同义词循环不占那 14 条名额)。
+            // 值口径:金蝶采购订单行 inv_qty = 制单时的库存快照,非实时库存(见 deploy/金蝶采购订单现存量口径.md)。
+            {"现存量", "现存量"},
             // 计划层(销售订单 → 生产工单)的产品口径换名
             {"存货编码", "产品编码"}, {"存货名称", "产品名称"},
             {"数量", "订单数量"},
@@ -2224,6 +2283,33 @@ public class PanelConfigService {
     private static final String QC_INSP_REQ_PANEL = "QC_INSP_REQ";
 
     /**
+     * 「运行时新增测试数据列」的面板及其**列数上限**(2026-11-11 用户口径)。
+     *
+     * <p>原话:「数据记录表的所有单据的测试数据字段要能新增列功能，自定义列数，**最多插入 8 个列**，
+     * 列还可以设计分叉」。备用列池本身有 20 个，这里按用户口径只放 8 个 ——
+     * 上限写在服务端(而不是只在前端禁用按钮)，否则直接调接口就能绕过。</p>
+     *
+     * <p>与前端的 EXT_COL_PANELS(RecordSheetPanels.vue)同一份名单，两处一起改。</p>
+     */
+    private static final Map<String, Integer> EXT_FIELD_CAP = Map.of(
+            "RD_FILTER_EFF", 8, "RD_ALKALINE", 8, "RD_MINERAL", 8, "RD_ANTIBACT", 8,
+            "RD_SCALE", 8, "RD_RO_PROTECT", 8, "RD_SOAK", 8, "RD_DROP_PREC", 8);
+
+    /** 该面板自定义字段的上限(未登记 = 走备用列池总数) */
+    private static int extFieldCapOf(String panelCode) {
+        Integer cap = EXT_FIELD_CAP.get(panelCode == null ? "" : panelCode);
+        return cap == null ? EXT_SPARE_COUNT : cap;
+    }
+
+    /** 该面板已绑定的动态字段数(备用列上的 yj_field 行) */
+    private int extFieldUsedOf(String panelCode) {
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM yj_field WHERE panel_code = ? AND col_name LIKE '备用%'",
+                Integer.class, panelCode);
+        return n == null ? 0 : n;
+    }
+
+    /**
      * 工序检验单 —— 工具栏注入「检验项目维护」入口的面板集。
      * 2026-10-09 用户口径:「给出一个按钮,让他可以在组装成品检验处对这个检验项目和检验方案进行维护」;
      * 各单同构、共用同一套检验标准库(bs_qc_plan + bs_qc_item),故都注入(组装单是主入口)。
@@ -2298,6 +2384,11 @@ public class PanelConfigService {
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("capacity", EXT_SPARE_COUNT);
+        // 该面板的**自定义列上限**(2026-11-11:8 张数据记录表最多 8 列)与已用量。
+        // 前端据此显示「已用 3/8」并在满额时禁用「添加」;真闸门在 addExtField 同源校验。
+        int cap = extFieldCapOf(panelCode);
+        out.put("cap", cap);
+        out.put("usedOfCap", extFieldUsedOf(panelCode));
         out.put("fields", fields);
         if (isTabbed(panelCode)) {
             // 每张表各 20 个:按页签顺序分段给账(段 = 备用[(i-1)*20+1 .. i*20]);tabs 一并下发,
@@ -2452,7 +2543,10 @@ public class PanelConfigService {
         // 与固定 7 张表的 规格/外观 是同一种东西:前端两行表头算法直接复用,不用另写一套。
         String parent = String.valueOf(body.getOrDefault("parent", "")).trim();
         if (!parent.isEmpty()) {
-            if (!isTabbed(panelCode)) throw new IllegalArgumentException("父字段仅分页签面板支持:" + panelCode);
+            // ⚠ 2026-11-11 放开:原先是"仅分页签面板支持",而用户要求 8 张数据记录表的自定义列
+            //   「列还可以设计分叉…可以自己新建一个分组」—— 这些表都不是分页签面板。
+            //   分组承载本就是 yj_field.col_group 的固有语义(见 migrate-col-group.sql),
+            //   与"分页签"没有本质耦合,限制是历史遗留。下面的大小/字符校验对两者一视同仁。
             if (parent.length() > 50) throw new IllegalArgumentException("父字段名过长(≤50):" + parent);
             for (char ch : parent.toCharArray())
                 if (".%/() \t\r\n".indexOf(ch) >= 0) throw new IllegalArgumentException("父字段名禁止含 . % / ( ) 或空格:" + parent);
@@ -2492,6 +2586,15 @@ public class PanelConfigService {
             sb.append(") AS t(v)");
             dictSql = sb.toString();
             if (dictSql.length() > 500) throw new IllegalArgumentException("词表过长(生成 SQL 超 500 字符),请精简");
+        }
+        // 列数上限(2026-11-11 用户口径:8 张数据记录表「最多插入 8 个列」)。
+        // 放在分配备用列**之前** —— 超限时不能留下任何副作用(绑定/清空/日志)。
+        // 上限在服务端强制:只在界面上禁用按钮，直接调接口就能绕过。
+        int cap = extFieldCapOf(panelCode);
+        int used = extFieldUsedOf(panelCode);
+        if (used >= cap) {
+            throw new IllegalStateException("该面板自定义列已达上限(" + used + "/" + cap + ")，"
+                    + "无法继续新增；如需更多请先停用不用的列。");
         }
         // G3/G4 分配空闲备用列:优先干净列;脏列需 confirmDirty(+可选清空,规格:全系统唯一写业务数据的动作)。
         // 分页签面板(来料检验要求):**每张表各 20 个扩展位** —— 只在本页签那一段里找(用户口径 2026-10-04),

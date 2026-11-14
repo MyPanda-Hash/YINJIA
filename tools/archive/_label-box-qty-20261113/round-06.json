@@ -1,0 +1,46 @@
+{
+  "open": {
+    "total": 1,
+    "visible": 1,
+    "title": "打印材料码 · YJ-20261110-04"
+  },
+  "rect": {
+    "ok": true,
+    "n": 2,
+    "r": [
+      46,
+      438,
+      104,
+      20
+    ],
+    "hit": "打印单号",
+    "hitIsBtn": false
+  },
+  "afterLoad": {
+    "rows": [
+      {
+        "qty": "240",
+        "qtyDisabled": false,
+        "box": "",
+        "boxDisabled": false
+      },
+      {
+        "qty": "18",
+        "qtyDisabled": false,
+        "box": "",
+        "boxDisabled": false
+      }
+    ],
+    "banner": ""
+  },
+  "msgs": [],
+  "typed": {
+    "ok": true,
+    "value": ""
+  },
+  "final": {
+    "boxValue": "120",
+    "hint": "行号 1.0000：每箱 120 ⇒ 共 2 张（整箱 2）",
+    "banner": ""
+  }
+}

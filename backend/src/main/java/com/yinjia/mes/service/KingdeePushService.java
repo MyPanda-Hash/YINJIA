@@ -164,7 +164,54 @@ public class KingdeePushService {
 
     // ══════════ 业务入口 ══════════
 
+    /**
+     * 正在推送中的单据(键 = `面板|单号`,值 = 开始时刻毫秒)。
+     *
+     * <p><b>为什么必须有这道互斥(2026-11-12 客户报障)</b>:「转ERP 反应好慢,有时点了两下就生成两个入库单,
+     * 有重复入库的风险」。根因是**唯一的防重守卫是事后判据** —— 原来只在方法开头读 `是否已转ERP`,
+     * 而回写 `是` 发生在金蝶落单**之后**(慢的时候十几秒)。于是双击产生的两个请求**都**读到"未转",
+     * 各自向金蝶 POST 一次 ⇒ 金蝶两张入库单(重复入库),MES 只记住后一张的 ERP单号。
+     * 前端限流兜不住:两个标签页、两台电脑、或"第一次超时后再点一次"都绕过前端。
+     *
+     * <p>语义:**同一张单推送中再来一次 = 立即拒绝**(不发第二次 POST、不排队),并说清"正在推送中,
+     * 完成后刷新即可看到 ERP单号"。不同单据之间互不影响(并行转两张不同单仍然可以)。
+     */
+    private final ErpPushGuard pushGuard = new ErpPushGuard();
+
+    /**
+     * 转ERP 入口(带**单号级互斥**)。真正的实现在 {@link #doPushDocument}。
+     * @throws IllegalStateException 该单正在推送中(重复点击);或该单已转过(见 {@link #doPushDocument} ①)
+     */
     public Map<String, Object> pushDocument(String panelCode, String docNo, String operator) throws Exception {
+        String key = panelCode + "|" + docNo;
+        Long runningMs = pushGuard.acquire(key);
+        if (runningMs != null) {
+            long sec = Math.max(1, runningMs / 1000);
+            log.warn("转ERP[{}] 重复点击被拒:上一次推送仍在进行中(已 {}s),不会再发第二次请求", docNo, sec);
+            throw new IllegalStateException("该单据正在转ERP推送中(已 " + sec + " 秒),请勿重复点击;"
+                    + "推送完成后列表会自动显示 ERP单号,若无结果请刷新列表确认「是否已转ERP」后再操作");
+        }
+        try {
+            return doPushDocument(panelCode, docNo, operator);
+        } finally {
+            // 无论成功/失败/超时都要放开 —— 否则一次异常会让这张单永久转不了
+            pushGuard.release(key);
+        }
+    }
+
+    /** 转ERP 支持的面板(与 ButtonService.ERP_HEAD_TABLE 同一套;下面用 isXxx 布尔推导表名/接口路径) */
+    private static final Set<String> ERP_PANELS = Set.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT",
+            "FINISH_IN", "OTHER_IN", "OTHER_OUT", "QC_RETURN");
+
+    /** 转ERP 实现(只由 {@link #pushDocument} 调用,以保证单号级互斥) */
+    private Map<String, Object> doPushDocument(String panelCode, String docNo, String operator) throws Exception {
+        long tBegin = System.currentTimeMillis();
+        // 面板白名单先行(2026-11-12):下面那串 isPur/isOrder/... 的**兜底分支是销售出库**
+        // (`: "bd_sale_out"` / `: "/jdy/v2/scm/sal_out_bound"`)—— 将来若有调用方传来未知面板,
+        // 它会被当成销售出库单推出去(最坏:单据类型推错、账对不上)。这里先拦住。
+        if (!ERP_PANELS.contains(panelCode)) {
+            throw new IllegalStateException("不支持的转ERP 面板:" + panelCode);
+        }
         assertPushTargetAllowed(); // 守卫先行:真实账套未开启 allowProd 时,连 token 都不取
         boolean isPur = "PURCHASE_IN".equals(panelCode);
         // 采购订单直推(2026-09-23):作为**金蝶采购订单**落到目标账套(用户口径:测试沙箱的采购订单里);
@@ -233,7 +280,7 @@ public class KingdeePushService {
             out.put("转ERP操作人", str(head.get("转ERP操作人")));
             out.put("转ERP时间", str(head.get("转ERP时间")));
             out.put("message", "该单据已转入ERP" + (erpNo.isEmpty() ? "" : "（ERP单号 " + erpNo + "）")
-                    + "，不可重复转入；如需重新转ERP，请先「弃审」再「审核」");
+                    + "，不可重复转入；如需重新转ERP，请先「弃审」→「审核」，并在金蝶删除原单据，否则金蝶侧会有两张");
             return out;
         }
 
@@ -253,6 +300,11 @@ public class KingdeePushService {
                     + "(如确需重推:先在金蝶删除该订单并弃审本单清标记后再转)");
         }
 
+        // 🔴 取数口径(2026-11-13 用户红线,别改成"按面板可见字段取"):
+        //    「传数据时,不显示的字段也要做到能传 ERP,不能因为隐藏字段就将之前转 ERP 的数据给删减」
+        //    ⇒ 这里**必须** `SELECT *`(物理列),键是列名而不是面板标签;推哪些列由下面逐键硬编码决定。
+        //    一旦改成走 `def.fieldsAt(...)` 并过滤 hidden/visible,前端/角色视图一藏字段,ERP 载荷就少一块,
+        //    而且首转之后的历史单会呈现"数据被删减"。字段显隐只属于**界面**层,与推送无关。
         List<Map<String, Object>> lines = jdbc.queryForList(
                 "SELECT * FROM " + lineTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
         if (lines.isEmpty()) throw new RuntimeException("单据无明细行，不可转ERP");
@@ -395,11 +447,15 @@ public class KingdeePushService {
         //   按无来源单的普通入库单推送,并在返回消息里明确提示,避免"账套里没有该订单 → 转ERP 直接失败"。
         String poNo = str(head.get("采购订单号"));
         String linkWarning = "";
+        // ★ 合单生单(2026-11-13):表头「采购订单号」这时可能是"订单1、订单2"的人读串 ——
+        //   它不是任何一张真实订单号,拿去做等值解析必然失败。这类单**逐行**用行级「源单编号」解析
+        //   (见下面 entities 循环),这里跳过表头预解析,也不给"未找到订单"的误导提示。
+        boolean multiOrderHead = poNo.contains("、") || poNo.contains(",");
         PoRefs poRefs = null;
         if (isPur && poNo.isEmpty()) {
             log.warn("采购入库单[{}]头上无采购订单号:本次转ERP 不带金蝶源单关联(src_bill_no/src_seq),"
                     + "金蝶侧显示为无来源单的普通入库单", docNo);
-        } else if (isPur) {
+        } else if (isPur && !multiOrderHead) {
             poRefs = resolvePoRefs(poNo);
             if (poRefs == null) {
                 // 兜底(2026-09-23):订单直推过金蝶的话,MES 已把金蝶侧真实号回写在 bd_pu_order.ERP单号
@@ -415,8 +471,9 @@ public class KingdeePushService {
                         + "或先在金蝶补建该订单后重审再转)";
                 log.warn("采购入库单[{}] 未挂来源单:金蝶账套内无采购订单[{}]", docNo, poNo);
             }
+        } else if (isPur) {
+            log.info("采购入库单[{}] 表头采购订单号为多单串[{}]:按**行级源单编号**逐行挂金蝶源单", docNo, poNo);
         }
-        boolean linkSrc = isPur && poRefs != null;
 
         // ── 销售出库单挂来源销售订单(2026-10-15 用户口径:
         //   「转erp时要把这个销售订单号与销售订单行号转成源订单号和源订单行号(在金蝶上)」)──
@@ -529,13 +586,25 @@ public class KingdeePushService {
             if (unitId.isEmpty() && !unit.isEmpty()) {
                 // 单位缓存 22h:目标账套刚补建了单位(如沙箱补「张」)而缓存还是旧的 → 强制失效重拉一次,
                 // 免去"补了单位还要重启后端"(2026-09-23 沙箱实测踩坑:补建后重试仍报无对应ID)
-                unitIdByName = null;
+                invalidateIdMap("unit");
                 unitId = str(unitMap().get(unit));
             }
             if (unitId.isEmpty()) throw new RuntimeException(
                     "第" + rowNo + "行计量单位[" + unit + "]在当前账套金蝶单位档案中无对应ID,无法转ERP"
                             + (unit.isEmpty() ? "(行上未填计量单位)" : ""));
             e.put("unit_id", unitId);
+            // 基本单位族(2026-11-13 沙箱实测):产品入库 inv_product / 生产领料 inv_pick **还要** base_unit_* ——
+            // 只发 unit_id 时金蝶直接拒单「第1行分录:基本单位为空,请重新录入商品 / 单位为空,请重新选择单位」。
+            // 行上有「基本单位id/编码」(金蝶拉取的历史单都有,见出入库单据字段文档 §2)就用它,没有沿用 unit_id。
+            if (isFinIn || isMatOut) {
+                String baseId = str(line.get("基本单位id"));
+                String baseNo = str(line.get("基本单位编码"));
+                e.put("base_unit_id", baseId.isEmpty() ? unitId : baseId);
+                if (!baseNo.isEmpty()) e.put("base_unit_number", baseNo);
+                if (!unit.isEmpty()) e.put("unit_number", unit);
+                // MES 侧没有"基本数量"独立列(单位=基本单位时两者相等),按本行数量同值推
+                e.put("base_qty", plainDecimal(num(line, qtyKey)));
+            }
             // 仓库:行级 > 头级 > 默认正品仓(金蝶要求非服务商品必须录入仓库);
             // 落到默认仓时打日志 —— 否则"单据没录仓库"会被静默推成 CK00001,账面上看不出来。
             // 采购订单不推仓库(订单无入库语义)
@@ -574,31 +643,46 @@ public class KingdeePushService {
             // 批次号写在表头;金蝶 inv_product 的 batch_no 是行级键,实测仅批次管理商品才落库)
             if (isFinIn && batch.isEmpty()) batch = str(head.get("批次号"));
             if (!batch.isEmpty() && !isOrder) e.put("batch_no", batch);
-            // 来源单:行级 src_bill_no=采购订单号(同单全部行带同一订单号;订单号与采购订单号同义)
-            // src_seq=该行对应的采购订单行号(采购订单行 行号,沿 订单→暂收→检验→入库 逐站带下来)
+            // 来源单:行级 src_bill_no=**本行**的采购订单号(2026-11-13 合单生单起,行级优先),
+            // 行上没有才退回表头;src_seq=该行对应的采购订单行号(订单→暂收→检验→入库 逐站带下来)
             // 仅当订单在金蝶解析到(linkSrc)才推整组;src_seq 必须在订单确有该分录时才推,
             // 否则金蝶会因"源单分录不存在"整单被拒(用分录映射当白名单)。
-            if (linkSrc) {
-                if (materialId.isEmpty()) {
-                    throw new RuntimeException("第" + rowNo + "行存货编码[" + materialNo + "]在当前账套金蝶商品档案中无对应ID,"
-                            + "无法挂来源单(采购订单[" + poNo + "]):请核对商品档案或账套后重试");
+            if (isPur) {
+                // ★ 合单生单:一张采购入库单可能跨多张采购订单(行级「源单编号」各带各的),
+                //   表头「采购订单号」这时是"订单1、订单2"这种人读串 —— 不能拿它当 src_bill_no。
+                String linePo = str(line.get("源单编号"));
+                if (linePo.isEmpty()) linePo = str(line.get("采购单号"));   // 兼容口径
+                // 表头是多单串(合单)时,行上没有源单编号 ⇒ 该行不挂源单(不能拿串去当单号)
+                // 计数口径:同一张订单的行 → 全部挂该订单;行上没有号时才用表头(且表头不是多单串)
+                String srcPo = !linePo.isEmpty() ? linePo : (multiOrderHead ? "" : poNo);
+                PoLineRef hit = srcPo.isEmpty() ? null : poLineRefCache.computeIfAbsent(srcPo, this::resolveLinePoRef);
+                if (hit == null && !srcPo.isEmpty()) {
+                    log.warn("采购入库单[{}]第{}行 采购订单[{}]在金蝶账套内未找到:该行不带 src_bill_no/src_seq",
+                            docNo, rowNo, srcPo);
                 }
-                e.put("src_bill_no", poNo);
-                e.put("src_bill_type_id", "pur_bill_order");
-                e.put("src_bill_type_number", "pur_bill_order");
-                e.put("src_bill_type_name", "采购订单");
-                e.put("src_inter_id", poRefs.billId());
-                Integer srcSeq = intOf(lineColumn(line, "源单行号", "采购订单行号"));
-                if (srcSeq == null) {
-                    log.warn("采购入库单[{}]第{}行无采购订单行号:该行不带 src_seq(金蝶侧按订单号挂单,不定位到具体行)", docNo, rowNo);
-                } else {
-                    String entryId = poRefs.entryIdBySeq().get(srcSeq);
-                    if (entryId == null) {
-                        log.warn("采购入库单[{}]第{}行 采购订单行号[{}] 在采购订单[{}]分录中不存在:该行不带 src_seq/src_entry_id",
-                                docNo, rowNo, srcSeq, poNo);
+                if (hit != null) {
+                    PoRefs refs = hit.refs();
+                    if (materialId.isEmpty()) {
+                        throw new RuntimeException("第" + rowNo + "行存货编码[" + materialNo + "]在当前账套金蝶商品档案中无对应ID,"
+                                + "无法挂来源单(采购订单[" + srcPo + "]):请核对商品档案或账套后重试");
+                    }
+                    e.put("src_bill_no", hit.billNo());
+                    e.put("src_bill_type_id", "pur_bill_order");
+                    e.put("src_bill_type_number", "pur_bill_order");
+                    e.put("src_bill_type_name", "采购订单");
+                    e.put("src_inter_id", refs.billId());
+                    Integer srcSeq = intOf(lineColumn(line, "源单行号", "采购订单行号"));
+                    if (srcSeq == null) {
+                        log.warn("采购入库单[{}]第{}行无采购订单行号:该行不带 src_seq(金蝶侧按订单号挂单,不定位到具体行)", docNo, rowNo);
                     } else {
-                        e.put("src_seq", srcSeq);
-                        e.put("src_entry_id", entryId);
+                        String entryId = refs.entryIdBySeq().get(srcSeq);
+                        if (entryId == null) {
+                            log.warn("采购入库单[{}]第{}行 采购订单行号[{}] 在采购订单[{}]分录中不存在:该行不带 src_seq/src_entry_id",
+                                    docNo, rowNo, srcSeq, srcPo);
+                        } else {
+                            e.put("src_seq", srcSeq);
+                            e.put("src_entry_id", entryId);
+                        }
                     }
                 }
             }
@@ -629,6 +713,7 @@ public class KingdeePushService {
         }
 
         // ⑤ 推送(纯 Java HTTP)
+        long tPrepared = System.currentTimeMillis();
         String apiPath = isOrder ? "/jdy/v2/scm/pur_order"
                 : isPur ? "/jdy/v2/scm/pur_inbound"
                 : isMatOut ? "/jdy/v2/scm/inv_pick"   // 材料出库单 → 金蝶「生产领料单」
@@ -638,6 +723,7 @@ public class KingdeePushService {
                 : isQcReturn ? "/jdy/v2/scm/pur_ret"       // 暂收退料单 → 金蝶「采购退货单」(单据类型 pur_bill_outbound)
                 : "/jdy/v2/scm/sal_out_bound";
         JsonNode res = postJson(apiPath, body);
+        long tPushed = System.currentTimeMillis();
         if (res.path("errcode").asInt(-1) != 0) {
             String err = res.path("description_cn").asText(res.path("description").asText(res.toString()));
             throw new RuntimeException("金蝶接口失败: " + err);
@@ -661,6 +747,10 @@ public class KingdeePushService {
         out.put("转ERP操作人", operator);
         out.put("转ERP时间", now);
         out.put("message", "已成功转入金蝶ERP，ERP单号: " + erpBillNo + "（请在金蝶界面审核）" + linkWarning + soLinkWarning + qcReturnWhWarn);
+        // 耗时留痕(2026-11-12「转ERP 反应好慢」):拆成"准备(档案/源单解析)"与"金蝶保存"两段,
+        // 下次再报慢,直接看日志就知道是本地缓存冷启动还是金蝶侧慢,不用再猜。
+        log.info("转ERP[{}] 完成:总 {}ms(准备 {}ms,金蝶保存 {}ms)", docNo,
+                System.currentTimeMillis() - tBegin, tPrepared - tBegin, tPushed - tPrepared);
         return out;
     }
 
@@ -675,6 +765,29 @@ public class KingdeePushService {
 
     /** 采购订单引用缓存(单号→引用;转ERP 为低频操作,进程内缓存即可;失败不缓存以便重试) */
     private final Map<String, PoRefs> poRefsCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 行级订单解析结果:金蝶侧**真实**单号(可能是 MES 号回写后的 ERP单号)+ 引用 */
+    private record PoLineRef(String billNo, PoRefs refs) {}
+
+    /** 行级解析缓存(合单生单后一张入库单可跨多张采购订单,逐行解析;同号只解析一次) */
+    private final Map<String, PoLineRef> poLineRefCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * **行级**采购订单解析(2026-11-13 合单生单):先按 MES 单号解析,解析不到再按该单的 ERP单号 兜底
+     * (直推过金蝶的订单,金蝶侧号已被回写到 bd_pu_order.ERP单号)。返回的 {@code billNo} 是**金蝶侧真实号**
+     * —— src_bill_no 必须写它才挂得上;两者都解析不到返回 null(该行不挂源单,不阻塞整单)。
+     */
+    private PoLineRef resolveLinePoRef(String poNo) {
+        if (poNo == null || poNo.isBlank()) return null;
+        PoRefs refs = resolvePoRefs(poNo);
+        if (refs != null) return new PoLineRef(poNo, refs);
+        String erpNo = mesOrderErpNo(poNo);
+        if (!erpNo.isEmpty()) {
+            PoRefs byErp = resolvePoRefs(erpNo);
+            if (byErp != null) return new PoLineRef(erpNo, byErp);
+        }
+        return null;
+    }
 
     /**
      * 按采购订单号向金蝶解析 订单单据id + 各分录id(推送 src_inter_id/src_entry_id 用)。
@@ -934,17 +1047,81 @@ public class KingdeePushService {
         return null;
     }
 
-    private Map<String, String> unitIdByName;
-    private long unitCacheAt;
+    // ══════════ 档案缓存(编号→金蝶内部id)══════════
+    //
+    // 2026-11-12 客户报障「转ERP 反应好慢,要等很久」的实测拆解(tools/archive/_erp-speed-20261112/probe.mjs,
+    // 每次调用 0.2~0.8s,真实账套 3981 个商品 ⇒ 商品档案要分 20 页):
+    //   · 冷启动(进程刚起 / 缓存过期):取 token ≈ 2s + 商品 20 页 ≈ 8~16s + 仓库/职员/部门/单位 ≈ 1.5s
+    //     ⇒ 第一次点转ERP 要等十几秒,用户以为没反应 → 点第二下 → 与"重复入库"直接相关;
+    //   · 热缓存:只剩"源单解析(2 次 GET)+ 金蝶保存 1 次 POST",实测 1~4s,属正常。
+    // 因此这里做两件事:① 各档案**互不阻塞**(不同档案并行拉,同一档案仍加锁只拉一次);
+    // ② 后台线程启动后预热 + 每 3 小时刷一次,让用户第一次点击就是热的(见 warmUpArchives)。
+
+    /** 档案缓存:缓存键 → {Map<编号,金蝶id>, 加载时刻};键 = material / unit / bd:<path> */
+    private final Map<String, Object[]> idMapCache = new java.util.concurrent.ConcurrentHashMap<>();
+    /** 每个缓存键一把锁:同一档案并发只拉一次,不同档案并行(原来全是 synchronized 方法,只能排队) */
+    private final Map<String, java.util.concurrent.locks.ReentrantLock> idMapLocks = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 拉取一张档案(可能抛异常,由调用方决定是否兜底),返回 编号→金蝶id */
+    @FunctionalInterface
+    private interface IdMapLoader { Map<String, String> load() throws Exception; }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, String> cachedIdMap(String key, String label, IdMapLoader loader) throws Exception {
+        ensureCreds();
+        Object[] hit = idMapCache.get(key);
+        if (hit != null && System.currentTimeMillis() - (long) hit[1] < 22 * 3600_000L) {
+            return (Map<String, String>) hit[0];
+        }
+        java.util.concurrent.locks.ReentrantLock lock =
+                idMapLocks.computeIfAbsent(key, k -> new java.util.concurrent.locks.ReentrantLock());
+        lock.lock();
+        try {
+            hit = idMapCache.get(key);
+            if (hit != null && System.currentTimeMillis() - (long) hit[1] < 22 * 3600_000L) {
+                return (Map<String, String>) hit[0];
+            }
+            Map<String, String> m = loader.load();
+            idMapCache.put(key, new Object[]{m, System.currentTimeMillis()});
+            log.info("金蝶{}档案已加载({}个,按当前账套,缓存22h)", label, m.size());
+            return m;
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /** 作废某个档案缓存(下次取用会重新拉):单位档案补建后重试要用 */
+    private void invalidateIdMap(String key) {
+        idMapCache.remove(key);
+    }
+
+    /** 强制重载(预热用:不看 TTL,拉完直接换掉缓存) */
+    private void reloadIdMap(String key, String label, IdMapLoader loader) throws Exception {
+        ensureCreds();
+        java.util.concurrent.locks.ReentrantLock lock =
+                idMapLocks.computeIfAbsent(key, k -> new java.util.concurrent.locks.ReentrantLock());
+        lock.lock();
+        try {
+            Map<String, String> m = loader.load();
+            idMapCache.put(key, new Object[]{m, System.currentTimeMillis()});
+            log.info("金蝶{}档案已预热({}个)", label, m.size());
+        } finally {
+            lock.unlock();
+        }
+    }
 
     /**
      * 当前账套的 计量单位名称→金蝶单位ID 缓存(22h,随 token 生命周期量级)。
      * 单位ID按账套各不同(米=8 是读入账套的ID,测试套里 id=8 可能是别的单位),
      * 切换测试/真实账套后自动按新凭证重拉,无需改代码或本地档案。
      */
-    private synchronized Map<String, String> unitMap() throws Exception {
-        ensureCreds(); // 凭证先行:本方法可能先于 getToken() 被调用(推送流程④),Spring 未配时须先装 config.json,否则 clientSecret 为空 → SecretKeySpec "Empty key"
-        if (unitIdByName != null && System.currentTimeMillis() - unitCacheAt < 22 * 3600_000L) return unitIdByName;
+    private Map<String, String> unitMap() throws Exception {
+        // 凭证先行:本方法可能先于 getToken() 被调用(推送流程④),Spring 未配时须先装 config.json,
+        // 否则 clientSecret 为空 → SecretKeySpec "Empty key"(cachedIdMap 里已 ensureCreds)
+        return cachedIdMap("unit", "计量单位", this::loadUnitMap);
+    }
+
+    private Map<String, String> loadUnitMap() throws Exception {
         Map<String, String> m = new HashMap<>();
         for (int page = 1; page <= 10; page++) {
             Map<String, String> params = new TreeMap<>();
@@ -973,9 +1150,6 @@ public class KingdeePushService {
             if (n < 200) break;
         }
         if (m.isEmpty()) throw new RuntimeException("金蝶计量单位列表为空(账套无单位档案?)");
-        unitIdByName = m;
-        unitCacheAt = System.currentTimeMillis();
-        log.info("金蝶计量单位档案已加载({}个,按当前账套,缓存22h)", m.size());
         return m;
     }
 
@@ -988,9 +1162,6 @@ public class KingdeePushService {
     private static final String EMP_LIST_PATH = "/jdy/v2/bd/emp";
     /** 部门档案(2026-10-14 产品入库单转ERP 用:金蝶 inv_product 头收 dept_number/dept_id) */
     private static final String DEPT_LIST_PATH = "/jdy/v2/bd/department";
-    /** path → {Map<编号,金蝶id>, 加载时刻};按当前账套 22h 缓存 */
-    private final Map<String, Object[]> basedataCache = new HashMap<>();
-
     /**
      * 基础资料 编号 → 金蝶内部id(按当前账套实时拉取)。
      *
@@ -999,13 +1170,12 @@ public class KingdeePushService {
      * 2026-10-04 沙箱实测实锤:材料出库转ERP 行上只推了 stock_number(=CK00006,仓库档案里确实存在),
      * 金蝶仍报「请填写"材料分录"第1行:"仓库"」;补 stock_id 后才收单。
      */
-    private synchronized Map<String, String> basedataIdMap(String path, String label) throws Exception {
-        ensureCreds();
-        Object[] c = basedataCache.get(path);
-        if (c != null && System.currentTimeMillis() - (long) c[1] < 22 * 3600_000L) {
-            @SuppressWarnings("unchecked") Map<String, String> hit = (Map<String, String>) c[0];
-            return hit;
-        }
+    private Map<String, String> basedataIdMap(String path, String label) throws Exception {
+        return cachedIdMap("bd:" + path, label, () -> loadPagedNumberIdMap(path, label));
+    }
+
+    /** 通用分页拉取:number→id(仓库/职员/部门/*;商品走 {@link #loadMaterialMap} 因为日志口径不同) */
+    private Map<String, String> loadPagedNumberIdMap(String path, String label) throws Exception {
         Map<String, String> m = new HashMap<>();
         for (int page = 1; page <= MATERIAL_MAX_PAGES; page++) {
             JsonNode rows = kingdeeGet(path, Map.of("page", String.valueOf(page), "page_size", "200")).path("rows");
@@ -1020,8 +1190,6 @@ public class KingdeePushService {
             if (n < 200) break;
         }
         if (m.isEmpty()) throw new RuntimeException("金蝶" + label + "档案为空(账套无该基础资料?)");
-        basedataCache.put(path, new Object[]{m, System.currentTimeMillis()});
-        log.info("金蝶{}档案已加载({}个,按当前账套,缓存22h)", label, m.size());
         return m;
     }
 
@@ -1034,8 +1202,6 @@ public class KingdeePushService {
             return Map.of();
         }
     }
-    private Map<String, String> materialIdByNumber;
-    private long materialCacheAt;
 
     /**
      * 当前账套的 存货编码→金蝶商品ID 缓存(22h)。
@@ -1044,9 +1210,11 @@ public class KingdeePushService {
      * 商品ID同样按账套各不同(与单位ID 同理),故按当前凭证实时拉取,测试/真实套切换零改动。
      * 列表接口不支持 number 精确过滤(实测传 number 返回的仍是首页),故整册分页拉取后建索引。
      */
-    private synchronized Map<String, String> materialMap() throws Exception {
-        ensureCreds();
-        if (materialIdByNumber != null && System.currentTimeMillis() - materialCacheAt < 22 * 3600_000L) return materialIdByNumber;
+    private Map<String, String> materialMap() throws Exception {
+        return cachedIdMap("material", "商品", this::loadMaterialMap);
+    }
+
+    private Map<String, String> loadMaterialMap() throws Exception {
         Map<String, String> m = new HashMap<>();
         int page = 0;
         for (; page < MATERIAL_MAX_PAGES; page++) {
@@ -1063,10 +1231,99 @@ public class KingdeePushService {
             if (n < 200) break;
         }
         if (m.isEmpty()) throw new RuntimeException("金蝶商品档案为空(账套无商品?)");
-        materialIdByNumber = m;
-        materialCacheAt = System.currentTimeMillis();
         log.info("金蝶商品档案已加载({}个,{}页,按当前账套,缓存22h)", m.size(), page + 1);
         return m;
+    }
+
+    // ══════════ 档案预热(让"第一次点转ERP"就是热的)══════════
+
+    /** 预热开关(联调/探针环境可关掉:`kingdee.push.warmup=false`,默认开) */
+    @Value("${kingdee.push.warmup:true}")
+    private boolean warmupEnabled;
+
+    /**
+     * 启动后预热 + 每 3 小时刷新一次(远小于 22h 有效期,所以正常使用永远不会踩到冷启动)。
+     *
+     * <p>为什么不在启动时同步预热:会拖慢启动,而且金蝶一通慢就会拖住整个应用;这里起**守护线程**,
+     * 先等 20s(让应用起完),之后每轮把 5 张档案**并行**拉一遍(单张内部仍是分页顺序拉),
+     * 顺手把快过期的 app-token 换新。任何异常只记日志、绝不外抛 —— 预热失败只等于"没变快",不能影响业务。
+     */
+    @jakarta.annotation.PostConstruct
+    void startArchiveWarmUp() {
+        if (!warmupEnabled) {
+            log.info("金蝶档案预热已关闭(kingdee.push.warmup=false)");
+            return;
+        }
+        Thread t = new Thread(() -> {
+            try {
+                Thread.sleep(20_000);
+            } catch (InterruptedException e) {
+                return;
+            }
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    warmUpArchives();
+                } catch (Throwable e) {
+                    log.warn("金蝶档案预热失败(不影响业务,下次点击时按需加载): {}", e.getMessage());
+                }
+                try {
+                    Thread.sleep(3 * 3600_000L);
+                } catch (InterruptedException e) {
+                    return;
+                }
+            }
+        }, "kingdee-archive-warmup");
+        t.setDaemon(true);
+        t.start();
+        log.info("金蝶档案预热已排程(启动 20s 后首轮,之后每 3 小时一轮)");
+    }
+
+    /** 预热一轮:5 张档案并行拉 + token 保鲜。任意一张失败不影响其它张、也不外抛。 */
+    private void warmUpArchives() throws Exception {
+        ensureCreds(); // 没配凭证(纯本地只读环境)直接跳过,不要打扰金蝶
+        // token 剩余寿命 < 6h 就换新:避免"某天第一次点击正好踩上 token 过期"又要多等 2~4s
+        long remain = tokenExpiresAt - System.currentTimeMillis();
+        if (cachedToken == null || remain < 6 * 3600_000L) {
+            cachedToken = null;
+            tokenExpiresAt = 0;
+            getToken();
+        }
+        long t0 = System.currentTimeMillis();
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newFixedThreadPool(5, r -> {
+            Thread th = new Thread(r, "kingdee-archive-warmup-worker");
+            th.setDaemon(true);
+            return th;
+        });
+        try {
+            List<java.util.concurrent.Future<?>> jobs = new ArrayList<>();
+            jobs.add(pool.submit(() -> reloadQuietly("material", "商品", this::loadMaterialMap)));
+            jobs.add(pool.submit(() -> reloadQuietly("bd:" + STORE_LIST_PATH, "仓库",
+                    () -> loadPagedNumberIdMap(STORE_LIST_PATH, "仓库"))));
+            jobs.add(pool.submit(() -> reloadQuietly("bd:" + EMP_LIST_PATH, "职员",
+                    () -> loadPagedNumberIdMap(EMP_LIST_PATH, "职员"))));
+            jobs.add(pool.submit(() -> reloadQuietly("bd:" + DEPT_LIST_PATH, "部门",
+                    () -> loadPagedNumberIdMap(DEPT_LIST_PATH, "部门"))));
+            jobs.add(pool.submit(() -> reloadQuietly("unit", "计量单位", this::loadUnitMap)));
+            for (java.util.concurrent.Future<?> f : jobs) {
+                try {
+                    f.get(3, java.util.concurrent.TimeUnit.MINUTES);
+                } catch (Exception e) {
+                    log.warn("金蝶档案预热有一项未完成: {}", e.getMessage());
+                }
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+        log.info("金蝶档案预热完成(5 张档案并行,共 {}ms):下次点转ERP 不再等冷启动", System.currentTimeMillis() - t0);
+    }
+
+    /** 预热用的"单张失败不影响其它张"包装 */
+    private void reloadQuietly(String key, String label, IdMapLoader loader) {
+        try {
+            reloadIdMap(key, label, loader);
+        } catch (Exception e) {
+            log.warn("金蝶{}档案预热失败({}):不影响使用,点击时按需加载", label, e.getMessage());
+        }
     }
 
     // ══════════ HTTP(原始字节控制) ══════════

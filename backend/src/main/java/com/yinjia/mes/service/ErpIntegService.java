@@ -126,12 +126,20 @@ public class ErpIntegService {
         return out;
     }
 
-    /** 某个面板的字段清单(界面「MES 字段」下拉按面板带出,与 yj_field 元数据同源) */
+    /**
+     * 某个面板的字段清单(界面「MES 字段」下拉按面板带出,与 yj_field 元数据同源)。
+     *
+     * <p><b>2026-11-13 用户红线</b>:「传数据时,不显示的字段也要做到能传 ERP,不能因为隐藏字段就将
+     * 之前转 ERP 的数据给删减」。这里原来带 {@code ISNULL(visible,1)=1},被隐藏的字段在 ERP 映射里
+     * **根本选不到**(= 不显示的字段传不了 ERP)。现改为<b>全量返回</b>,另给一列 {@code 可见},
+     * 由界面标「已隐藏」—— 能不能显示是界面的事,能不能映射是数据的事,两者解耦。</p>
+     */
     public List<Map<String, Object>> panelFields(String panelCode) {
         if (panelCode == null || panelCode.isBlank()) return List.of();
         return jdbc.queryForList(
-                "SELECT [label] AS 字段名, [place] AS 位置, [seq] AS 顺序 FROM yj_field"
-                        + " WHERE panel_code = ? AND ISNULL(visible, 1) = 1"
+                "SELECT [label] AS 字段名, [place] AS 位置, [seq] AS 顺序,"
+                        + " CASE WHEN ISNULL(visible,1)=1 AND ISNULL(hidden,0)=0 THEN 1 ELSE 0 END AS 可见"
+                        + " FROM yj_field WHERE panel_code = ?"
                         + " ORDER BY [seq], [id]", panelCode);
     }
 

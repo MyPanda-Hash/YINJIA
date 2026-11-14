@@ -33,8 +33,50 @@ public class QueryService {
      * 管理员（yj_user.is_admin='Y'）恒放行。
      */
     private static final java.util.Set<String> OWN_DOCS_PANELS = java.util.Set.of(
-            "RD_SAMPLE_EXT",   // 外部开发样品申请单
-            "RD_SAMPLE_INT");  // 内部开发样品申请单
+            "RD_SAMPLE_EXT");  // 外部开发样品申请单
+    // ⚠ RD_SAMPLE_INT（内部）2026-11-11 **退出**本集合。用户口径:「内部单信息是全部共享的，但是
+    //   只能由提交信息行的编辑人和文件管理员和管理员进行修改，就是普通提交人不允许去修改其他的
+    //   同级的人的提交的信息」——**信息共享(读) + 行级归属(写)**。
+    //   原实现用头表 asp_user1 过滤可见性，而内部单是「一张单 = 多条独立行、行各归其主」的模型
+    //   （SPN-2026-11-0004 有 25 行、头表 asp_user1=sampler）⇒ 按单级归属管行级模型必然错：
+    //   别人的行我看不到，可"信息共享"要求我看得到。写权限本来就不靠这里，
+    //   而是 ButtonService.applySampleIntRowRules（申请人本人 ∪ edit_others ∪ 管理员）。
+
+    /**
+     * 「可见全部单据」的权限词组（2026-11-11 用户口径）。
+     *
+     * <p>原话:「刘磊账号需要看到全部外部开发样品单信息」。刘磊 = 文件负责人(1025)，**不是管理员**，
+     * 而 {@link #OWN_DOCS_PANELS} 对非管理员强制 {@code asp_user1 = 当前账号}
+     * ⇒ 生产实测外部样品单 11 张他一张都看不到。
+     *
+     * <p>勾了该词的角色不追加归属过滤；勾给谁由组织架构「角色与面板权限」决定（用户 R7 口径
+     * 「做成面板权限，把个人角色的权限配置好」）。词在 {@code yj_role_panel.perms} 的 csv 里。
+     * 与 {@code edit_others} 分工：view_all 管**看得见**（读），edit_others 管**改得动**（写）。
+     */
+    private static final String PERM_VIEW_ALL = "view_all";
+
+    /** 当前登录人是否对某面板有 view_all 权（管理员恒有；词在 yj_role_panel.perms） */
+    private boolean canViewAllOf(String panelCode) {
+        if (panelCode == null || panelCode.isBlank()) return false;
+        if (isAdminLogin()) return true;
+        String u = currentLogin();
+        if (u == null) return false;
+        try {
+            java.util.List<String> rows = jdbc.queryForList(
+                    "SELECT ISNULL(rp.perms,'') FROM yj_user usr "
+                            + "JOIN yj_role_panel rp ON rp.role_id = usr.role_id "
+                            + "WHERE usr.username = ? AND rp.panel_code = ?",
+                    String.class, u, panelCode);
+            for (String perms : rows) {
+                for (String p : perms.split(",")) {
+                    if (PERM_VIEW_ALL.equals(p.trim())) return true;
+                }
+            }
+        } catch (RuntimeException ignore) {
+            // 表/列缺失时按"没有该权"处理（与 loadOneDoc 的容错口径一致）
+        }
+        return false;
+    }
 
     /** 当前登录账号（无会话返回 null） */
     private String currentLogin() {
@@ -369,6 +411,23 @@ public class QueryService {
         // 口径(见其长注释)。**这里不再把名称位当编码比** —— 2026-10-20 事故就是这里写死了
         // `RTRIM(t.[仓库编码]) = 仓库值`,而弹窗里放的是名称 ⇒ 台账查询恒 0 行明细(只剩期初/期末两行)。
         appendDirectFilters(def, def.lineTable(), where, args, keyword, condition, l2c, "t");
+        // 状态闸门(2026-11-11,声明见 PanelDef.statusGate / yj_panel.config):
+        //   面板可声明「列表默认只返回 某字段=某值 的行」,前端那个「含…」复选框
+        //   会在 condition 里带 `_statusScope='all'` 才放开。
+        //   ⚠ 闸门必须在**服务端**这一层加:否则查询弹窗/高级筛选/关键字/翻页/导出
+        //     都能把被闸住的行捞回来(用户口径「查询也是一样,没勾选之前查询不出来」)。
+        //   ⚠ 字段标签必须已登记(否则拼出「列名无效」直接 500)—— 没登记就不闸,只打一条 warn。
+        PanelRegistry.PanelDef.StatusGate gate = def.statusGate();
+        if (gate != null) {
+            String gateCol = l2c.get(gate.field());
+            if (gateCol == null) {
+                org.slf4j.LoggerFactory.getLogger(QueryService.class)
+                        .warn("[statusGate] 面板 {} 声明的闸门字段「{}」未在 yj_field 登记,闸门不生效", def.code(), gate.field());
+            } else if (!"all".equalsIgnoreCase(strOf(condition == null ? null : condition.get("_statusScope")))) {
+                where.append(" AND t.[").append(gateCol).append("] = ?");
+                args.add(gate.value());
+            }
+        }
         appendAdvFilters(advFilters, where, args, l2c, "t");
 
         Integer total = jdbc.queryForObject(
@@ -683,7 +742,8 @@ public class QueryService {
             String me = currentLogin();
             if (me == null) {
                 where.append(" AND 1 = 0");
-            } else if (!isAdminLogin()) {
+            } else if (!isAdminLogin() && !canViewAllOf(def.code())) {
+                // view_all(2026-11-11)先于归属判定:勾了的角色看全部(刘磊口径),没勾仍只看自己
                 where.append(" AND ISNULL(RTRIM(t.[asp_user1]),'') = ?");
                 args.add(me);
             }
@@ -859,7 +919,8 @@ public class QueryService {
     /** 取一张单据(getFormDescriptor 用) */
     public Map<String, Object> loadOneDoc(PanelRegistry.PanelDef def, String docNo) {
         // 只看自己的单据（2026-11-06）：列表已按 asp_user1 过滤，这里再拦「知道单号直接取」的旁路。
-        if (OWN_DOCS_PANELS.contains(def.code()) && docNo != null && !docNo.isBlank() && !isAdminLogin()) {
+        if (OWN_DOCS_PANELS.contains(def.code()) && docNo != null && !docNo.isBlank()
+                && !isAdminLogin() && !canViewAllOf(def.code())) {
             String me = currentLogin();
             String owner = null;
             try {

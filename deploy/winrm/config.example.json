@@ -1,0 +1,28 @@
+{
+  "_说明": "复制为 config.json 后按需修改；config.json 已被 .gitignore 忽略，口令一律不要提交。服务器口令也可用环境变量 YJ_SERVER_PASS 提供（推荐）。",
+  "server": {
+    "host": "36.140.66.163",
+    "winrm_port": 5985,
+    "user": "administrator",
+    "pass": "",
+    "app_port": 8090,
+    "install_dir": "C:\\yinjia",
+    "deploy_dir": "C:\\yj-deploy",
+    "task_name": "YINJIA-MES",
+    "app_user": "admin",
+    "app_pass": "123456"
+  },
+  "repo": {
+    "owner": "MyPanda-Hash",
+    "name": "YINJIA",
+    "branch": "main"
+  },
+  "sql": {
+    "host": "36.140.66.163",
+    "port": 1433,
+    "user": "yinjia",
+    "pass": "",
+    "db": "HSDZ_MES",
+    "db_test": "HSDZ_MES_TEST"
+  }
+}

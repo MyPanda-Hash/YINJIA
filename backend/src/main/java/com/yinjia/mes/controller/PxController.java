@@ -65,6 +65,8 @@ public class PxController {
      * 送料暂收单按商品档案分流({@link com.yinjia.mes.panel.QcRecvGenerateHandler}),见 generateByAction。
      */
     private final com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate;
+    /** 角色字段视图(2026-11-13):同一面板各角色看到不同字段,只存显隐,不碰 yj_field */
+    private final com.yinjia.mes.service.PanelFieldViewService fieldView;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PxController.class);
 
@@ -84,7 +86,8 @@ public class PxController {
                         com.yinjia.mes.service.RdProjectFlowService rdFlow,
                         com.yinjia.mes.service.WorkOrderPickService woPick,
                         com.yinjia.mes.service.WoPickScanLogService woPickLog,
-                        com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate) {
+                        com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate,
+                        com.yinjia.mes.service.PanelFieldViewService fieldView) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -105,6 +108,7 @@ public class PxController {
         this.woPick = woPick;
         this.woPickLog = woPickLog;
         this.qcRecvGenerate = qcRecvGenerate;
+        this.fieldView = fieldView;
     }
 
     // ============ 工单扫码领料取数(2026-10-21,手机端) ============
@@ -423,6 +427,26 @@ public class PxController {
         return ApiResult.ok(puPrint.detail(docNo));
     }
 
+    // ---- 需方联系人候选(2026-11-11 用户口径「需方的联系人和联系方式改为打印前先弹窗。
+    //      下拉选择名字和联系方式。可以新增」):存在 yj_app_setting,不建表/不建面板,内部账号按采购订单的查看权 ----
+
+    /** 需方联系人候选名单(打印弹窗里的下拉选项) */
+    @GetMapping("/puPrint/buyerContacts")
+    public ApiResult<List<Map<String, Object>>> puPrintBuyerContacts() {
+        perm.requirePanelView("PU_ORDER");
+        return ApiResult.ok(puPrint.buyerContacts());
+    }
+
+    /** 新增一条需方联系人候选(姓名 + 联系方式;同一条重复提交不重复存) */
+    @PostMapping("/puPrint/buyerContacts")
+    public ApiResult<List<Map<String, Object>>> puPrintBuyerContactAdd(@RequestBody Map<String, Object> body) {
+        // 往公司级的候选名单里写东西 —— 要「修改」权,不能靠"能看订单"就改
+        perm.requireButton("PU_ORDER", "修改");
+        String name = body.get("姓名") == null ? "" : String.valueOf(body.get("姓名"));
+        String phone = body.get("联系方式") == null ? "" : String.valueOf(body.get("联系方式"));
+        return ApiResult.ok(puPrint.addBuyerContact(name, phone, currentUser()));
+    }
+
     /**
      * 打印额度(2026-11-09 用户口径「打印的时候没有和材料码一样考虑到超送问题」):
      * 每行「剩余可打」= 订单数量 ×(1 + 超送比例) − 已送 + 已退回 − 已打印,
@@ -560,6 +584,22 @@ public class PxController {
     @GetMapping("/rdFlow/users")
     public ApiResult<List<Map<String, Object>>> rdFlowUsers() {
         perm.requirePanelView("RD_APPROVAL");
+        return ApiResult.ok(devTaskService.enabledUsers());
+    }
+
+    /**
+     * 产品变更申请单:启用账号清单(会签人选人下拉,2026-11-11 用户口径
+     * 「会签人字段改为下拉勾选对应的账号，就是人员姓名」)。
+     *
+     * <p>⚠ **不复用 `/rdDev/users` 或 `/rdFlow/users`** —— 那两个分别挂 RD_PROD_INFO / RD_APPROVAL
+     * 的查看权;填变更单的人不必有产品信息表或立项申请的权限,复用会 403(同 DevTaskService 注释口径)。</p>
+     *
+     * <p>返回 {username, realName}:前端 label 用 realName(人员姓名)、value 用 username(账号)——
+     * 落库仍是账号,`ButtonService.signersOf` 按账号校验启用状态、发通知、写 yj_form_approval.operator。</p>
+     */
+    @GetMapping("/rdChange/users")
+    public ApiResult<List<Map<String, Object>>> rdChangeUsers() {
+        perm.requirePanelView("RD_CHANGE");
         return ApiResult.ok(devTaskService.enabledUsers());
     }
 
@@ -930,6 +970,7 @@ public class PxController {
         String sourceNo = String.valueOf(body.getOrDefault("sourceNo", ""));
         if (!targetPanel.isBlank()) perm.requireButton(targetPanel, "保存");
         Map<String, Double> qtyByLine = null;
+        Map<String, Map<String, Object>> whBinByLine = new java.util.LinkedHashMap<>();
         Object raw = body.get("lines");
         if (raw instanceof List<?> list && !list.isEmpty()) {
             qtyByLine = new java.util.LinkedHashMap<>();
@@ -939,6 +980,8 @@ public class PxController {
                 Object qty = m.get("qty");
                 if (key == null) continue;
                 qtyByLine.put(String.valueOf(key), qty == null ? 0d : Double.parseDouble(String.valueOf(qty)));
+                Map<String, Object> wb = whBinOfLine(m);
+                if (!wb.isEmpty()) whBinByLine.put(String.valueOf(key), wb);
             }
         }
         // 材料码隔离行(行键 `...#行id@打印行id`)的批次号由后端按行自取,前端不需要另传
@@ -947,7 +990,8 @@ public class PxController {
                 qtyByLine,
                 body.get("overRatio") == null || String.valueOf(body.get("overRatio")).isBlank() ? null
                         : Double.parseDouble(String.valueOf(body.get("overRatio"))),
-                body.get("batchNo") == null ? null : String.valueOf(body.get("batchNo")));
+                body.get("batchNo") == null ? null : String.valueOf(body.get("batchNo")),
+                whBinByLine.isEmpty() ? null : whBinByLine);
         return ApiResult.ok(res);
     }
 
@@ -1004,6 +1048,8 @@ public class PxController {
                 String sourceNo = String.valueOf(m.get("sourceNo") == null ? "" : m.get("sourceNo"));
                 if (sourceNo.isBlank()) continue;
                 Map<String, Double> qtyByLine = new java.util.LinkedHashMap<>();
+                // 行级「仓库 / 仓位」预填(2026-11-13 用户口径「生单可以选仓库和仓位,可以每行不一样」)
+                Map<String, Map<String, Object>> whBinByLine = new java.util.LinkedHashMap<>();
                 Object rawLines = m.get("lines");
                 if (rawLines instanceof List<?> lineList) {
                     for (Object lo : lineList) {
@@ -1012,6 +1058,8 @@ public class PxController {
                         if (key == null) continue;
                         qtyByLine.put(String.valueOf(key), lm.get("qty") == null ? 0d
                                 : Double.parseDouble(String.valueOf(lm.get("qty"))));
+                        Map<String, Object> wb = whBinOfLine(lm);
+                        if (!wb.isEmpty()) whBinByLine.put(String.valueOf(key), wb);
                     }
                 }
                 Map<String, Object> row = new java.util.LinkedHashMap<>();
@@ -1019,7 +1067,8 @@ public class PxController {
                 try {
                     Map<String, Object> res = generateByAction(sourcePanel, action, sourceNo, user,
                             qtyByLine.isEmpty() ? null : qtyByLine,
-                            m.get("batchNo") == null ? null : String.valueOf(m.get("batchNo")));
+                            m.get("batchNo") == null ? null : String.valueOf(m.get("batchNo")),
+                            whBinByLine.isEmpty() ? null : whBinByLine);
                     row.put("编号", res.get("编号"));
                     row.put("面板", res.getOrDefault("gotoPanel", target));
                     row.put("批次号", res.get("批次号"));
@@ -1044,6 +1093,42 @@ public class PxController {
         recordUsage(sourcePanel, action,
                 made.stream().map(r -> String.valueOf(r.get("编号"))).collect(java.util.stream.Collectors.joining(",")),
                 request);
+        return ApiResult.ok(out);
+    }
+
+    /**
+     * **合单生单**(2026-11-13 用户口径):多张**同一供应商**的采购订单 → **一张**送料暂收单。
+     *
+     * <p>请求体:{@code {panelCode, action, batchNo?, docs:[{sourceNo, lines:[{lineKey, qty, 仓库/仓位...}]}]}}
+     * —— docs 结构与 {@code /push/generate} 完全一致(前端复用同一份行契约与仓库/仓位预填),
+     * 区别只在于后端把**所有 docs 的行并进同一张目标单**,而不是逐张各出一张。
+     *
+     * <p>行号语义见 {@code PushGenerateHandler.generateMerged} 的类注释:行级「采购单号」= 合单**前**的订单号,
+     * 「采购订单行号」= 合单**前**的订单行号;占用/反查用的 source_line_key 是合单**后**的暂收行 id。
+     */
+    @PostMapping("/push/merge")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> pushMerge(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        String sourcePanel = String.valueOf(body.getOrDefault("panelCode", ""));
+        String action = String.valueOf(body.getOrDefault("action", ""));
+        String target = configService.pushTarget(sourcePanel, action);
+        if (target == null) throw new IllegalArgumentException("该动作没有可用的生单目标:" + action);
+        perm.requirePanelView(sourcePanel);
+        perm.requireButton(target, "保存");
+        String user = SecurityContextHolder.getContext().getAuthentication() == null
+                ? "system" : SecurityContextHolder.getContext().getAuthentication().getName();
+        List<Map<String, Object>> docs = new java.util.ArrayList<>();
+        Object rawDocs = body.get("docs");
+        if (rawDocs instanceof List<?> list) {
+            for (Object o : list) {
+                if (o instanceof Map<?, ?> m) docs.add((Map<String, Object>) m);
+            }
+        }
+        Map<String, Object> res = pushGenerateHandler.generateMerged(sourcePanel, action, docs,
+                body.get("batchNo") == null ? null : String.valueOf(body.get("batchNo")), user);
+        Map<String, Object> out = new java.util.LinkedHashMap<>(res);
+        out.put("targetPanel", target);
+        recordUsage(sourcePanel, action, String.valueOf(res.get("编号")), request);
         return ApiResult.ok(out);
     }
 
@@ -1072,12 +1157,30 @@ public class PxController {
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> generateByAction(String sourcePanel, String action, String sourceNo, String user,
-                                                 Map<String, Double> qtyByLine, String batchNo) {
+                                                 Map<String, Double> qtyByLine, String batchNo,
+                                                 Map<String, Map<String, Object>> whBinByLine) {
         if (com.yinjia.mes.panel.QcRecvGenerateHandler.PANEL.equals(sourcePanel)
                 && com.yinjia.mes.panel.QcRecvGenerateHandler.ACTION.equals(action)) {
             return qcRecvGenerate.generateSelected(sourceNo, user, qtyByLine);
         }
-        return pushGenerateHandler.generateOne(sourcePanel, action, sourceNo, user, qtyByLine, batchNo);
+        return pushGenerateHandler.generateOne(sourcePanel, action, sourceNo, user, qtyByLine, batchNo, whBinByLine);
+    }
+
+    /**
+     * 生单请求里某一行的「仓库 / 仓位」预填(2026-11-13 用户口径:生单时就能按行选仓库仓位)。
+     *
+     * <p>键与 {@code PushGenerateHandler.WHBIN_KEYS} 同口径;空值不进 map(避免把"没选"当成"清空")。
+     */
+    private static Map<String, Object> whBinOfLine(Map<?, ?> line) {
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        for (String k : new String[]{"仓库", "仓库编码", "仓库id", "仓库启用仓位管理", "仓位", "仓位id", "仓位名称"}) {
+            Object v = line.get(k);
+            if (v == null) continue;
+            String s = String.valueOf(v).trim();
+            if (s.isEmpty()) continue;
+            out.put(k, s);
+        }
+        return out;
     }
 
     /** 报表栏目设置读取(报表表头筛选与排序补丁) */    @GetMapping("/reportColumnSettings")
@@ -1098,10 +1201,13 @@ public class PxController {
     }
 
     @GetMapping("/getPanelConfig")
-    public ApiResult<Map<String, Object>> getPanelConfig(@RequestParam String panelCode) {
+    public ApiResult<Map<String, Object>> getPanelConfig(@RequestParam String panelCode,
+                                                        @RequestParam(required = false) String view) {
         // 面板元数据(字段/参照绑定)不是人人可取:按读放行集合(可见 ∪ 参照目标 ∪ 同模块)校验,2026-09-22 补
         perm.requirePanelRead(panelCode);
-        return ApiResult.ok(service.getPanelConfig(panelCode));
+        // view=system ⇒ 不叠角色字段视图(界面设置"字段视图=系统整体"时用);缺省=本角色(2026-11-13)
+        boolean roleView = !"system".equalsIgnoreCase(view);
+        return ApiResult.ok(configService.getPanelConfig(panelCode, roleView));
     }
 
     @GetMapping("/getPermMatrix")
@@ -1170,6 +1276,35 @@ public class PxController {
     public ApiResult<Map<String, Object>> rdDevOverview() {
         perm.requirePanelView("RD_PROGRESS");
         return ApiResult.ok(rdDevProducts.overview());
+    }
+
+    /**
+     * 样品单「进度描述」就地更新(2026-11-11 用户口径)。
+     *
+     * <p>原话:「那个只是像图片的一样加一个进度描述的字段列，由提交人实时去更新状态，
+     * <b>这个字段不受归档约束</b>，但是也是<b>只能谁提交的谁来修改</b>」;
+     * 追问「归档后连 edit_others 也不能改？」→ 答「<b>只锁申请人</b>」。</p>
+     *
+     * <p>为什么单开一个端点而不是走 callButton/保存:常规保存的闸门是 draftEditable（草稿/修改中），
+     * 而本字段明确"不受归档约束"。这条端点只改这一列，不触发审批流、不动其它字段。
+     * 归属校验在 {@link ButtonService#updateSampleProgress}（外部单看头表创建人/申请署名，
+     * 内部单看该明细行的申请人）。</p>
+     *
+     * @param body {panelCode, docNo, rowId(内部单必填), text}
+     * @return 落库后的进度描述
+     */
+    @PostMapping("/sampleProgress")
+    public ApiResult<Map<String, Object>> sampleProgress(@RequestBody Map<String, Object> body) {
+        String panelCode = body.get("panelCode") == null ? "" : String.valueOf(body.get("panelCode"));
+        String docNo = body.get("docNo") == null ? "" : String.valueOf(body.get("docNo"));
+        perm.requirePanelView(panelCode);
+        Object rowId = body.get("rowId");
+        String text = body.get("text") == null ? "" : String.valueOf(body.get("text"));
+        String saved = buttons.updateSampleProgress(panelCode, docNo, rowId, text);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("编号", docNo);
+        out.put("进度描述", saved);
+        return ApiResult.ok(out);
     }
 
     @PostMapping("/queryFormDataList")
@@ -1372,6 +1507,66 @@ public class PxController {
         List<Map<String, Object>> columns = (List<Map<String, Object>>) body.getOrDefault("columns", List.of());
         configService.saveHeaderPrefs(panelCode, columns);
         return ApiResult.ok(null);
+    }
+
+    // ---------- 角色字段视图(2026-11-13,两层:系统整体 → 角色) ----------
+    // 口径:原「表格调整/表头调整」照旧写 yj_field(系统整体,功能不变);
+    // 这里只在其上盖一层"本角色显示/隐藏",同一角色所有账号看到的一样,不细分个人。
+    // 三态:行存在=本角色显式设定,行不存在=跟随系统整体。
+
+    /** 对话框回显:本角色在该面板的表头/明细逐行"显示或隐藏" + 本角色一共定制过几个面板 */
+    @GetMapping("/fieldView")
+    public ApiResult<Map<String, Object>> fieldView(@RequestParam String panelCode) {
+        perm.requirePanelRead(panelCode);
+        return ApiResult.ok(fieldView.dialogOf(panelCode));
+    }
+
+    /** 保存角色视图(只存显隐;与系统整体相同的项自动恢复继承;必填字段跳过并回报) */
+    @PostMapping("/saveRoleFieldView")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> saveRoleFieldView(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        perm.requirePanelRead(panelCode);
+        String place = String.valueOf(body.getOrDefault("place", ""));
+        List<Map<String, Object>> columns = (List<Map<String, Object>>) body.getOrDefault("columns", List.of());
+        return ApiResult.ok(fieldView.saveRoleView(panelCode, place, columns));
+    }
+
+    /** 恢复继承:清掉本角色在该面板(panelCode 为空 = 全部面板)的显隐/序号覆盖 */
+    @PostMapping("/resetRoleFieldView")
+    public ApiResult<Map<String, Object>> resetRoleFieldView(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        if (!panelCode.isBlank()) perm.requirePanelRead(panelCode);
+        int removed = fieldView.resetRoleView(panelCode);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("removed", removed);
+        out.put("panelCount", fieldView.rolePanelCount(fieldView.currentRoleCode()));
+        return ApiResult.ok(out);
+    }
+
+    /** 角色模板 · 从系统整体一键复制到本角色(或管理员指定的角色) */
+    @PostMapping("/copyRoleFieldViewFromSystem")
+    public ApiResult<Map<String, Object>> copyRoleFieldViewFromSystem(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        perm.requirePanelRead(panelCode);
+        String targetRole = String.valueOf(body.getOrDefault("roleCode", ""));
+        return ApiResult.ok(fieldView.copyFromSystem(panelCode, targetRole));
+    }
+
+    /** 角色模板 · 把本角色的视图套用到另一个角色(仅管理员) */
+    @PostMapping("/copyRoleFieldViewToRole")
+    public ApiResult<Map<String, Object>> copyRoleFieldViewToRole(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        perm.requirePanelRead(panelCode);
+        String toRole = String.valueOf(body.getOrDefault("roleCode", ""));
+        return ApiResult.ok(fieldView.copyToRole(panelCode, toRole));
+    }
+
+    /** 可套用的角色清单(套用弹窗的下拉) */
+    @GetMapping("/fieldViewRoles")
+    public ApiResult<List<Map<String, Object>>> fieldViewRoles(@RequestParam String panelCode) {
+        perm.requirePanelRead(panelCode);
+        return ApiResult.ok(fieldView.roleList());
     }
 
     /**

@@ -1,19 +1,34 @@
 <template>
   <!-- ═══════════════════════════════════════════════════════════════════
-       来料品质·检验目录(QC_CATALOG)—— 纸张式控制列表(**不可手工编辑**,只读呈现)
+       来料品质·**待检验目录**(QC_CATALOG)—— 纸张式控制列表(**不可手工编辑**,只读呈现)
        数据来源:检验单生单(暂收单→来料检验单)时按明细物料自动生成,检测物料类别取自商品档案「所属类别」;
        数量=检验单送检数量+单位;批次号靠回填;每行带 检验单号 与 检验数据记录单号(数据挂靠键)。
-       行上动作:「完成」(校验挂靠单据已审批→已完成检验+是否合格)/「修改」(回弹状态并写修改记录)/
-                 「删除记录」(挂靠单据还在时拒绝)。
+       行上动作:「完成」(校验挂靠单据已审批→已完成检验+是否合格)/「删除记录」(挂靠单据还在时拒绝)。
        呈现方式与项目进度查询同族:纸张 + 右侧竖排操作栏(PanelxList approval-layout 提供)。
+
+       2026-11-11 用户口径:「已经完成检验的就不用显示了,现在这个检验目录,改名成待检验目录,
+       只需要待检验的数据。」⇒ 本纸面**只渲染 检验状态≠已完成检验 的行**(pendingRows);
+       已完成的那些不再在这里(它们进「检验数据记录明细表」QC_INSP_REC_DETAIL 查),
+       对应的「取消完成」也一并搬到那张表的行内动作(见 PanelxList 的 qcCatalogReopen)。
+       库与 qc_catalog_detail 仍保留全部行,不是删数据 —— 面板编码 QC_CATALOG 也一个字节没动。
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="catalog-sheet">
     <!-- ① 标题 -->
     <div class="cs-titlerow">
-      <div class="cs-title">{{ tt('检验目录') }}</div>
+      <div class="cs-title">{{ tt('待检验目录') }}</div>
     </div>
 
-    <!-- ② 控制表(两行表头:物料层三列各有列名,检验记录目录跨其后六列) -->
+    <!-- ② 数据定位条(2026-11-12):本面板全部行都在同一张目录单里 ⇒ 查询=在行里定位 -->
+    <div v-if="locateActive" class="cs-locate no-print">
+      <span class="cs-locate-title">{{ tt('数据定位') }}</span>
+      <span v-for="it in locateItems" :key="'lc' + it.k" class="cs-locate-chip">
+        {{ tt(it.k) }}: <b>{{ it.v }}</b>
+      </span>
+      <span class="cs-locate-count">{{ tt('匹配') }} {{ displayRows.length }} {{ tt('行') }}</span>
+      <span class="cs-locate-clear" :title="tt('清除定位，显示全部待检验行')" @click="clearLocate">{{ tt('清除定位') }} ✕</span>
+    </div>
+
+    <!-- ③ 控制表(两行表头:物料层三列各有列名,检验记录目录跨其后六列) -->
     <div class="cs-scroll">
       <table class="cs-table">
         <thead>
@@ -30,7 +45,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(row, i) in displayRows" :key="row.id ?? ('r' + i)">
+          <tr
+            v-for="(row, i) in displayRows"
+            :key="row.id ?? ('r' + i)"
+            :data-row-id="row.id ?? undefined"
+            :class="{ 'is-hit': flashRowId != null && row.id === flashRowId }"
+          >
             <!-- 检测物料类别(第1类):同类别合并;类别为空不归纳(单独成行) -->
             <td v-if="isGroupHead(i, K.CAT)" class="c-cat" :rowspan="groupSpan(i, K.CAT)">
               <span class="cs-cell-text cs-block">{{ row[K.CAT] || '—' }}</span>
@@ -66,7 +86,7 @@
               </span>
               <span v-else class="cs-cell-text">—</span>
             </td>
-            <!-- 行操作:完成检验 / 修改(两钮常在,不适用时置灰并说明)/ 删除记录 -->
+            <!-- 行操作:完成检验 / 删除记录(「修改/取消完成」在检验数据记录明细表的行内) -->
             <td class="c-op no-print">
               <span
                 class="cs-act"
@@ -76,19 +96,15 @@
                   : tt('完成检验（需关联的检验单与检验数据记录都已审批）')"
                 @click.stop="openComplete(row)"
               >{{ tt('完成检验') }}</span>
-              <span
-                class="cs-act warn"
-                :class="{ disabled: row[K.STATUS] !== QC_STATUS_DONE }"
-                :title="row[K.STATUS] === QC_STATUS_DONE
-                  ? tt('取消完成并回弹为正在检验中（之后才可反审核挂靠单据）')
-                  : tt('仅「已完成检验」的行可取消完成')"
-                @click.stop="row[K.STATUS] === QC_STATUS_DONE && doReopen(row)"
-              >{{ tt('修改') }}</span>
               <span class="cs-act danger" :title="tt('删除该目录记录（需先删除挂靠的检验单与检验数据记录）')" @click.stop="doDelete(row)">✕</span>
             </td>
           </tr>
           <tr v-if="!displayRows.length">
-            <td :colspan="catalogCols.length + 4" class="cs-empty">{{ tt('暂无检验记录，暂收单生单生成检验单后自动带入') }}</td>
+            <td :colspan="catalogCols.length + 4" class="cs-empty">
+              {{ locateActive
+                ? tt('没有匹配的行，点上面的「清除定位」看全部待检验行')
+                : tt('暂无待检验记录，暂收单生单生成检验单后自动带入') }}
+            </td>
           </tr>
         </tbody>
       </table>
@@ -97,7 +113,7 @@
     <!-- ③ 页签脚注(原表第16行)+ 只读说明(「修改记录」入口已移至右侧竖排按钮栏) -->
     <div class="cs-note">
       <div>{{ tt('输入批次号后点击批次号可查阅详细或者新增检验') }}</div>
-      <div class="cs-note-sub">{{ tt('目录记录由检验单生单自动生成、不可手工修改；状态变更走行上的「完成 / 修改」。') }}</div>
+      <div class="cs-note-sub">{{ tt('目录记录由检验单生单自动生成、不可手工修改；本表只列待检验（正在检验中）的行，已完成检验的记录请到「检验数据记录明细表」查询。') }}</div>
     </div>
 
     <!-- 完成弹窗:确认 + 是否合格 -->
@@ -144,14 +160,13 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import {
   QC_CATALOG_COLUMNS,
-  QC_STATUS_DOING,
   QC_STATUS_DONE,
   exportHeaderRow,
   exportRow,
@@ -190,12 +205,45 @@ const items = computed(() => {
 })
 
 /**
+ * 待检验行(2026-11-11 用户口径「已经完成检验的就不用显示了…只需要待检验的数据」):
+ * 只留 检验状态 ≠ 已完成检验 的行;状态为空的行也算待检验(老数据没填状态)。
+ * ⚠ 只是**前端过滤**,qc_catalog_detail 一行不删 —— 已完成的记录在
+ * 「检验数据记录明细表」(QC_INSP_REC_DETAIL)里查,「取消完成」也在那张表的行内。
+ */
+const pendingRows = computed(() => (items.value || []).filter((r) => r?.[K.STATUS] !== QC_STATUS_DONE))
+
+/* ══════════ 数据定位(2026-11-12 用户口径)══════════
+ * 「待检目录查询有问题,应该做的是数据定位,因为他的所有数据都在一张单据里」
+ * 本面板是 singleDoc:全部行都在同一张目录单(qc_catalog_detail)里 ⇒ 「查询」不该再去
+ * 查另一张单据(那只会永远返回这一张),而应当**在这张单据的行里定位**:
+ *   · 顶部/右侧的「查询」弹窗照旧填条件(检测物料类别/物料名称/批次号/检验状态…),
+ *     提交后由 PanelxList 调本组件的 applyLocate(conds) —— **不动服务端、不重新取数**;
+ *   · 命中行留下、其余行收起,并自动滚到第一行 + 闪一下;条件条上显示「匹配 N 行」与「清除定位」。
+ * 匹配口径 = 各条件 **包含**(忽略大小写)且 AND;空值条件忽略(与查询弹窗"留空即不限"一致)。
+ */
+const locateConds = ref({})
+const locateActive = computed(() => Object.keys(locateConds.value).length > 0)
+/** 命中行(再交给原来的「同类别归块」排序) */
+const matchedRows = computed(() => {
+  const rows = pendingRows.value || []
+  const conds = Object.entries(locateConds.value)
+    .map(([k, v]) => [k, String(v ?? '').trim()])
+    .filter(([, v]) => v !== '')
+  if (!conds.length) return rows
+  return rows.filter((r) => conds.every(([k, v]) =>
+    String(r?.[k] ?? '').toLowerCase().includes(v.toLowerCase())))
+})
+/** 第一条命中行(定位后闪一下,让人一眼看到落点) */
+const flashRowId = ref(null)
+
+/**
  * 展示顺序(用户口径:类别相同的归为一整个大类):
  * 按「检测物料类别」整块聚合 —— 同类别行不论原来分散在哪都收拢成连续一块(块内保持原顺序),
  * 大类的先后 = 该类别首次出现的位置;类别为空的行不归纳,各自单独成行(在原位置附近输出)。
+ * 定位生效时只对**命中行**做同样的归块。
  */
 const displayRows = computed(() => {
-  const rows = items.value || []
+  const rows = matchedRows.value || []
   const out = []
   const done = new Set()
   for (const r of rows) {
@@ -207,6 +255,29 @@ const displayRows = computed(() => {
   }
   return out
 })
+
+/** 应用定位条件(PanelxList 的「查询」提交时调):空对象 = 清除定位 */
+async function applyLocate(conds) {
+  locateConds.value = Object.fromEntries(
+    Object.entries(conds || {}).filter(([, v]) => String(v ?? '').trim() !== ''))
+  flashRowId.value = null
+  await nextTick()
+  const first = displayRows.value.find((r) => r?.id != null)
+  if (first) {
+    flashRowId.value = first.id
+    const el = document.querySelector(`.cs-table tbody tr[data-row-id="${first.id}"]`)
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' })
+    setTimeout(() => { flashRowId.value = null }, 1600)
+  }
+  return displayRows.value.length
+}
+function clearLocate() {
+  locateConds.value = {}
+  flashRowId.value = null
+}
+/** 条件条上的展示文案(键是中文数据键,显示前过 tt) */
+const locateItems = computed(() => Object.entries(locateConds.value).map(([k, v]) => ({ k, v })))
+
 
 const fieldMap = computed(() => new Map(props.fields.map((f) => [f.dataName || f.code, f])))
 function optionsOf(key) {
@@ -305,19 +376,6 @@ async function doComplete() {
   ElMessage.success(tt('已标记为已完成检验'))
 }
 
-async function doReopen(row) {
-  try {
-    await ElMessageBox.confirm(
-      tt('取消完成后该目录行回到「正在检验中」，之后才可反审核挂靠的检验单与检验数据记录。确定取消完成吗？'),
-      tt('取消完成'),
-      { confirmButtonText: tt('确定'), cancelButtonText: tt('取消'), type: 'warning' },
-    )
-  } catch { return }
-  const res = await callCatalog('修改', { id: row.id })
-  if (!res) return
-  ElMessage.success(tt('已取消完成（已写入修改记录）'))
-}
-
 async function doDelete(row) {
   try {
     await ElMessageBox.confirm(
@@ -390,11 +448,11 @@ async function reloadDoc() {
   } catch { /* 重取失败保持现状 */ }
 }
 
-/** 导出 Excel:标题 + 列头 + 全部目录行(与 qcCatalogColumns 同源) */
+/** 导出 Excel:标题 + 列头 + 全部待检验行(与 qcCatalogColumns 同源) */
 async function exportCatalogExcel() {
   const XLSX = await import('xlsx')
-  const rows = displayRows.value || []   // 导出与纸面同序(类别整块聚合后的顺序)
-  const title = '检验目录'
+  const rows = displayRows.value || []   // 导出与纸面同序(类别整块聚合后的顺序),且只含待检验行
+  const title = '待检验目录'
   const header = exportHeaderRow()
   const aoa = [[title], [], header, ...rows.map((r) => exportRow(r))]
   const ws = XLSX.utils.aoa_to_sheet(aoa)
@@ -411,7 +469,7 @@ async function exportCatalogExcel() {
   XLSX.writeFile(wb, `${title}-${props.head['单据编号'] || '导出'}.xlsx`)
 }
 
-defineExpose({ exportCatalogExcel })
+defineExpose({ exportCatalogExcel, applyLocate, clearLocate })
 </script>
 
 <style scoped>
@@ -505,7 +563,6 @@ defineExpose({ exportCatalogExcel })
   line-height: 20px; cursor: pointer; color: #1c4f8a; background: #f4f9ff; border: 1px solid #8fb4e0;
 }
 .cs-act:hover { background: #e8f2ff; }
-.cs-act.warn { color: #b26a00; background: #fff8ee; border-color: #ffd9a8; }
 .cs-act.danger { color: #c0392b; background: #fff5f5; border-color: #f0b4ae; }
 .cs-act.disabled { opacity: 0.45; cursor: not-allowed; }
 .c-op .cs-act { margin: 1px 1px; padding: 0 4px; font-size: 11.5px; }
@@ -515,6 +572,20 @@ defineExpose({ exportCatalogExcel })
 }
 .cs-note-sub { margin-top: 2px; font-size: 11.5px; color: #8a97a6; }
 .cs-empty { text-align: center; color: #98a4b3; padding: 18px 0 !important; }
+/* ═══ 数据定位条(2026-11-12):查询=在这张单据的行里定位,条件与命中数挂在纸头上 ═══ */
+.cs-locate {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  border-bottom: 1px solid #cfe3f6; background: #f2f9ff; padding: 4px 10px; font-size: 12.5px; color: #1f5fa8;
+}
+.cs-locate-title { font-weight: 600; }
+.cs-locate-chip {
+  padding: 0 8px; border-radius: 10px; background: #e2f0ff; border: 1px solid #b9dbf8; color: #1f5fa8; line-height: 20px;
+}
+.cs-locate-count { margin-left: 4px; color: #1677ff; font-weight: 600; }
+.cs-locate-clear { margin-left: auto; cursor: pointer; color: #b26a00; }
+.cs-locate-clear:hover { text-decoration: underline; }
+/* 定位落点闪一下(1.6s 后自动消失) */
+.cs-table tbody tr.is-hit td { background: #fff6d6 !important; transition: background 0.4s ease; }
 /* ═══ 弹窗 ═══ */
 .cs-dlg-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .cs-dlg-label { width: 100px; text-align: right; color: #333; font-weight: 600; }

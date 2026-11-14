@@ -1,0 +1,12 @@
+﻿
+=== YJ-XH-001 鑫恒（80-250） ===
+custom_field = {"custom_field__1__4swgci5cr1vb":"","custom_field__1__4swgegvojiasxiej":"","custom_field__1__62tvoyr1j4fa":"是","custom_field__1__6jiafyhnnjic0w":""}
+
+=== YJ-TJHZ-001 雅可比CS（80-200） ===
+custom_field = {"custom_field__1__4swgci5cr1vb":"","custom_field__1__4swgegvojiasxiej":"","custom_field__1__62tvoyr1j4fa":"是","custom_field__1__6jiafyhnnjic0w":""}
+
+=== YJ-HKB-001 黑卡载银炭粉 ===
+custom_field = {"custom_field__1__4swgci5cr1vb":"","custom_field__1__4swgegvojiasxiej":"","custom_field__1__62tvoyr1j4fa":"","custom_field__1__6jiafyhnnjic0w":""}
+
+=== YJ-YCYX-020 折叠棉 ===
+custom_field = {"custom_field__1__4swgci5cr1vb":"","custom_field__1__4swgegvojiasxiej":"","custom_field__1__62tvoyr1j4fa":"","custom_field__1__6jiafyhnnjic0w":""}

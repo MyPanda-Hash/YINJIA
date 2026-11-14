@@ -1,0 +1,17 @@
+{
+  "po": "PO-2026-11-0001",
+  "recvNo": "SL-2026-11-0001",
+  "recvLines": [],
+  "chainDocs": [],
+  "chainLines": [],
+  "created": [
+    {
+      "panel": "PU_ORDER",
+      "no": "PO-2026-11-0001"
+    },
+    {
+      "panel": "QC_RECV",
+      "no": "SL-2026-11-0001"
+    }
+  ]
+}

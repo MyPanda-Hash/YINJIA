@@ -1,0 +1,4 @@
+﻿YJ-XH-001 | MES bs_inv.来料检验 = "是" | 所属类别=炭粉
+YJ-TJHZ-001 | MES bs_inv.来料检验 = "是" | 所属类别=炭粉
+YJ-HKB-001 | MES bs_inv.来料检验 = "否" | 所属类别=炭粉
+YJ-YCYX-020 | MES bs_inv.来料检验 = "否" | 所属类别=折叠棉

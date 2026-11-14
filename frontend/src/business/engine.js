@@ -330,8 +330,16 @@ export function fieldOptions(field) {
 
 // ==================== SQL 后端接口 ====================
 
+/**
+ * 面板配置。
+ *
+ * 2026-11-13 角色字段视图:默认带 `view=role`,由后端在 yj_field 之上叠"本角色显示/隐藏"。
+ * 界面设置里把视图切成「系统整体」时,这里改发 `view=system` —— 只是不叠覆盖,数据一行不动。
+ * 直接读 localStorage 而不是拿 pinia store:本模块被大量非组件代码调用,担不起"store 还没装好"。
+ */
 export async function getPanelConfig(panelCode) {
-  return normalizeApprovalConfig(unwrap(await request.get('/px/getPanelConfig', { params: { panelCode } })))
+  const view = localStorage.getItem('mes_field_scope') === 'system' ? 'system' : 'role'
+  return normalizeApprovalConfig(unwrap(await request.get('/px/getPanelConfig', { params: { panelCode, view } })))
 }
 
 export async function getPermMatrix(panelCode) {
@@ -512,6 +520,26 @@ export async function callButton({ panelCode, buttonName, formData, buttonParam,
   return unwrap(await request.post('/px/callButton', { panelCode, buttonName: apiName, formData, buttonParam }, cfg))
 }
 
+/**
+ * 更新样品单「进度描述」(2026-11-11 用户口径)。
+ *
+ * <p>用户原话：「像图片的一样加一个进度描述的字段列，由提交人实时去更新状态，
+ * 这个字段<b>不受归档约束</b>，但是也是<b>只能谁提交的谁来修改</b>」；
+ * 追问「归档后连 edit_others 也不能改？」→ 答「<b>只锁申请人</b>」。</p>
+ *
+ * <p>为什么不走 callButton/保存:常规保存的闸门是 draftEditable（草稿/修改中），
+ * 而本字段归档后仍要能改 ⇒ 服务端单开 /px/sampleProgress 窄接口，
+ * 只校验「是不是这行/这张单的申请人」，只改这一列，不触发审批流。</p>
+ *
+ * @param panelCode RD_SAMPLE_EXT（外部单，头级）| RD_SAMPLE_INT（内部单，行级）
+ * @param docNo     单据编号
+ * @param rowId     内部单必填：明细行 id（一单多行、行各归其主）
+ * @param text      进度描述正文
+ */
+export async function updateSampleProgress({ panelCode, docNo, rowId, text }) {
+  return unwrap(await request.post('/px/sampleProgress', { panelCode, docNo, rowId, text }))
+}
+
 export async function deleteForms({ panelCode, rowCodes }) {
   return unwrap(await request.post('/px/deleteForms', { panelCode, rowCodes }))
 }
@@ -541,6 +569,41 @@ export async function saveColumnPrefs({ panelCode, columns }) {
 /** 表头调整:保存表头字段的排序/栏名/显隐(hidden+visible 同开同关) */
 export async function saveHeaderPrefs({ panelCode, columns }) {
   return unwrap(await request.post('/px/saveHeaderPrefs', { panelCode, columns }))
+}
+
+// ==================== 角色字段视图(2026-11-13,两层:系统整体 → 角色) ====================
+// 口径:原「表格调整 / 表头调整」照旧写 yj_field(系统整体);这一组只写"本角色显示/隐藏",
+// 同一角色所有账号看到的一样,不细分个人;顺序与栏名仍由整体决定。
+// 三态:行存在=本角色显式设定,行不存在=跟随系统整体(与整体相同会被自动删行)。
+
+/** 对话框数据源:本角色在该面板表头/明细逐行的 shown/baseShown/overridden/required */
+export async function getFieldView(panelCode) {
+  return unwrap(await request.get('/px/fieldView', { params: { panelCode } }))
+}
+
+/** 保存本角色视图(显隐 + 角色内序号):place = header | detail;columns = [{label, visible, seq}] */
+export async function saveRoleFieldView({ panelCode, place, columns }) {
+  return unwrap(await request.post('/px/saveRoleFieldView', { panelCode, place, columns }))
+}
+
+/** 恢复继承:清掉本角色在该面板的覆盖(panelCode 传空 = 全部面板) */
+export async function resetRoleFieldView({ panelCode } = {}) {
+  return unwrap(await request.post('/px/resetRoleFieldView', { panelCode: panelCode || '' }))
+}
+
+/** 角色模板 · 从系统整体一键复制到本角色(把整体的显隐与顺序落成显式视图) */
+export async function copyRoleFieldViewFromSystem({ panelCode, roleCode }) {
+  return unwrap(await request.post('/px/copyRoleFieldViewFromSystem', { panelCode, roleCode: roleCode || '' }))
+}
+
+/** 角色模板 · 把本角色的视图套用到另一个角色(仅管理员) */
+export async function copyRoleFieldViewToRole({ panelCode, roleCode }) {
+  return unwrap(await request.post('/px/copyRoleFieldViewToRole', { panelCode, roleCode: roleCode || '' }))
+}
+
+/** 可套用的角色清单 */
+export async function fieldViewRoles(panelCode) {
+  return unwrap(await request.get('/px/fieldViewRoles', { params: { panelCode } }))
 }
 
 // ==================== 动态字段(备用列池;规格 docs/design/动态字段扩展-备用列池-V1.0.md) ====================
@@ -670,6 +733,19 @@ export async function puPrintDetail(printNo) {
   return unwrapStrict(await request.get('/px/puPrint/lines', { params: { docNo: printNo } }))
 }
 
+/**
+ * 需方联系人候选(2026-11-11 用户口径「需方的联系人和联系方式改为打印前先弹窗,
+ * 下拉选择名字和联系方式。可以新增」)—— 存系统参数 `pu_order.buyer_contacts`,返 [{姓名, 联系方式}]。
+ */
+export async function puPrintBuyerContacts() {
+  return unwrapStrict(await request.get('/px/puPrint/buyerContacts'))
+}
+
+/** 新增一条需方联系人候选(姓名 + 联系方式;同一条重复提交不会重复存,返回整份名单) */
+export async function puPrintBuyerContactAdd(payload) {
+  return unwrapStrict(await request.post('/px/puPrint/buyerContacts', payload || {}))
+}
+
 /** 保存「收料超送比例」(生单对话框改动即自动保存):落系统参数 receive_over_ratio,传 0~1 小数 */
 export async function batchFlowSaveOverRatio(overRatio) {
   return unwrap(await request.post('/px/batchFlow/overRatio', { overRatio }))
@@ -692,6 +768,16 @@ export async function pushFlowLines({ panelCode, action, sourceNos }) {
 /** 生单:按「勾选的行 + 本次数量」逐张生成(单张/多张同一入口),返回 { 生成:[], 失败:[] } */
 export async function pushFlowGenerate({ panelCode, action, docs, overRatio }) {
   return unwrapStrict(await request.post('/px/push/generate', { panelCode, action, docs, overRatio }))
+}
+
+/**
+ * **合单生单**(2026-11-13 用户口径):多张**同一供应商**的采购订单 → **一张**送料暂收单。
+ *
+ * 与 {@link pushFlowGenerate} 的入参完全一致(docs 结构相同、仓库/仓位按行带),区别只在后端:
+ * generate 逐张各出一张目标单,merge 把所有行并进同一张。故前端两个对话框可以共用同一份行契约。
+ */
+export async function pushFlowMerge({ panelCode, action, docs, batchNo }) {
+  return unwrapStrict(await request.post('/px/push/merge', { panelCode, action, docs, batchNo }))
 }
 
 

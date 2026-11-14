@@ -1,81 +1,84 @@
 # dump db=HSDZ_MES
-PANEL	PURCHASE_IN	采购入库单	Purchase Receiving Order	库存核算	doc	bd_purchase_in	bl_purchase_in	单据编号	单据日期	PI	50	items	库存管理
+PANEL	PURCHASE_IN	采购入库单	Purchase Receiving Order	库存核算	doc	bd_purchase_in	bl_purchase_in	单据编号	单据日期	PI	50	items	WMS管理
 PANEL	QC_INSP	来料检验单	null	采购管理	doc	qc_insp	qc_insp_detail	单据编号	单据日期	IJ	20	items	品质管理
-PANEL	QC_RECV	送料暂收单	Temporary Material Receipt	库存核算	doc	sl_recv	sl_recv_detail	单据编号	单据日期	SL	20	items	库存管理
-PANEL	QC_RETURN	暂收退回单	null	采购管理	doc	qc_return	qc_return_detail	单据编号	单据日期	TH	20	items	库存管理
+PANEL	QC_RECV	送料暂收单	Temporary Material Receipt	库存核算	doc	sl_recv	sl_recv_detail	单据编号	单据日期	SL	20	items	WMS管理
+PANEL	QC_RETURN	暂收退回单	null	采购管理	doc	qc_return	qc_return_detail	单据编号	单据日期	TH	20	items	WMS管理
 
 ===== QC_RECV =====
 -- yj_field (place, seq)
-FIELD	detail	10	单号	单据编号	文本	150	---V		GFDA	mc	mc					12906
-FIELD	detail	30	采购单号	采购单号	参照	140	E--V		PU_ORDER	单据编号	单据编号					12910
-FIELD	detail	40	采购订单行号	采购订单行号	文本	110	E--V		GFDA	mc	mc					12912
-FIELD	detail	50	物料名称	物料名称	参照	160	E--V		INV	存货名称	存货名称					12914
-FIELD	detail	60	规格型号	规格型号	文本	140	E--V		GFDA	mc	mc					12915
-FIELD	detail	70	批次号	批次号	文本	150	---V									12918
-FIELD	detail	80	物料描述	物料描述	文本	200	E--V		GFDA	mc	mc					12919
-FIELD	detail	90	单价	单价	小数	90	E--V		GFDA	mc	mc					12921
-FIELD	detail	100	数量	数量	小数	100	E--V		GFDA	mc	mc					12924
-FIELD	detail	110	计量单位	计量单位	文本	90	E--V		GFDA	mc	mc					12926
-FIELD	detail	120	数量2	数量2	小数	90	E--V		GFDA	mc	mc					12928
-FIELD	detail	130	计量单位2	计量单位2	文本	90	E--V		GFDA	mc	mc					12929
-FIELD	detail	140	金额	金额	小数	100	E--V		GFDA	mc	mc					12932
-FIELD	detail	150	日期	日期	日期	110	E--V		GFDA	mc	mc					12934
-FIELD	detail	160	税率%	税率%	小数	80	E--V		GFDA	mc	mc					12936
-FIELD	detail	170	含税单价	含税单价	小数	100	E--V		GFDA	mc	mc					12938
-FIELD	detail	180	税额	税额	小数	90	E--V		GFDA	mc	mc					12940
-FIELD	detail	190	含税金额	含税金额	小数	100	E--V		GFDA	mc	mc					12942
-FIELD	detail	200	折扣	折扣	小数	80	E-H-		GFDA	mc	mc					12944
-FIELD	detail	210	供应商	供应商	参照	160	E-H-		GFDA	mc	mc					12945
-FIELD	detail	220	入库数量	入库数量	小数	100	E-H-		GFDA	mc	mc					12947
-FIELD	detail	230	入库单号	入库单号	文本	130	E-H-		GFDA	mc	mc					12949
-FIELD	detail	240	领料单号	领料单号	文本	130	E-H-		GFDA	mc	mc					12951
-FIELD	detail	250	结案	结案	下拉框	80	E-H-		GFDA	mc	mc		SELECT v FROM (VALUES (N'是'),(N'否')) AS t(v)			12953
-FIELD	detail	260	税别代码	税别代码	文本	100	E-H-		GFDA	mc	mc					12954
-FIELD	detail	270	税别说明	税别说明	文本	120	E-H-		GFDA	mc	mc					12955
-FIELD	detail	280	总金额	总金额	小数	100	E-H-		GFDA	mc	mc					12956
-FIELD	detail	290	订单号	订单号	参照	140	E-H-		SO_ORDER	单据编号	单据编号					12957
-FIELD	detail	300	箱数	箱数	小数	80	E-H-		GFDA	mc	mc					12958
-FIELD	detail	310	部门	部门	参照	100	E-H-		DEPT	部门名称	部门名称					12959
-FIELD	detail	320	部门名称	部门名称	文本	100	E-H-		GFDA	mc	mc					12960
-FIELD	detail	330	折扣%	折扣%	小数	80	E--V		GFDA	mc	mc					12961
-FIELD	detail	340	预计到货日期	预计到货日期	日期	120	E--V		GFDA	mc	mc					12962
-FIELD	detail	350	备注	备注	文本	200	E--V		GFDA	mc	mc					12963
-FIELD	detail	360	现存量	现存量	小数	90	E-H-		GFDA	mc	mc					12964
-FIELD	detail	370	仓库	仓库	文本	120	E-H-		GFDA	mc	mc					12965
-FIELD	detail	380	折扣金额	折扣金额	小数	100	E-H-		GFDA	mc	mc					12966
-FIELD	detail	400	发货数量	发货数量	小数	100	E-H-		GFDA	mc	mc					12968
-FIELD	detail	410	剩余数量	剩余数量	小数	100	E-H-		GFDA	mc	mc					12969
-FIELD	detail	420	退料数量	退料数量	小数	100	E-H-		GFDA	mc	mc					12970
-FIELD	detail	430	报废数量	报废数量	小数	100	E-H-		GFDA	mc	mc					12971
-FIELD	detail	440	制单号	制单号	文本	130	E-H-		GFDA	mc	mc					12972
-FIELD	detail	450	品质复核人	品质复核人	参照	100	E-H-		EMP	员工名称	员工名称					12973
-FIELD	detail	460	品质复核时间	品质复核时间	文本	140	E-H-		GFDA	mc	mc					12974
-FIELD	header	60	金额	金额	小数	100	E-H-		GFDA	mc	mc					12916
-FIELD	header	70	税额	税额	小数	100	E-H-		GFDA	mc	mc					12917
-FIELD	header	80	总金额	总金额	小数	100	E-H-		GFDA	mc	mc					12920
-FIELD	header	100	部门	部门	参照	120	E--V		DEPT	部门名称	部门名称					12923
-FIELD	header	120	部门名称	部门名称	文本	120	E-H-		GFDA	mc	mc					12927
-FIELD	header	140	数量	数量	小数	100	E-H-		GFDA	mc	mc					12931
-FIELD	header	150	附件1	附件1	附件	220	E--V		GFDA	mc	mc					12933
-FIELD	header	160	附件2	附件2	附件	220	E--V		GFDA	mc	mc					12935
-FIELD	header	170	附件3	附件3	附件	220	E--V		GFDA	mc	mc					12937
-FIELD	header	180	附件4	附件4	附件	220	E--V		GFDA	mc	mc					12939
-FIELD	header	190	附件5	附件5	附件	220	E--V		GFDA	mc	mc					12941
-FIELD	header	200	附件6	附件6	附件	220	E--V		GFDA	mc	mc					12943
-FIELD	header	220	审核人	审核人	参照	100	---V		EMP	员工名称	员工名称					12948
-FIELD	header	230	审核时间	审核时间	文本	140	---V		GFDA	mc	mc					12950
-FIELD	header	240	批次键	批次键	整数	80	--H-		GFDA	mc	mc					12952
-FIELD	query,detail	20	物料编码	物料编码	参照	130	ER-V		INV	存货编码	存货名称					12908
-FIELD	query,detail	390	条码	条码	文本	140	E-H-		GFDA	mc	mc					12967
-FIELD	query,header	10	单号	单据编号	文本	140	-R-V		GFDA	mc	mc					12905
-FIELD	query,header	20	单据日期	单据日期	日期	120	ER-V		GFDA	mc	mc					12907
-FIELD	query,header	30	业务员	业务员	参照	100	E--V		EMP	员工名称	员工名称					12909
-FIELD	query,header	40	供应商代码	供应商代码	参照	130	E--V		GFDA	dm	mc					12911
-FIELD	query,header	50	供应商	供应商	参照	180	E--V		GFDA	mc	mc					12913
-FIELD	query,header	90	来料性质	来料性质	文本	110	E--V		GFDA	mc	mc					12922
-FIELD	query,header	110	仓库	仓库	参照	150	E-H-		WH	仓库名称	仓库名称					12925
-FIELD	query,header	130	批次号	批次号	文本	160	E--V									12930
-FIELD	query,header	210	采购订单号	采购订单号	文本	150	E--V		GFDA	mc	mc					12946
+FIELD	detail	10	单号	单据编号	文本	150	---V		GFDA	mc	mc					14425
+FIELD	detail	30	采购单号	采购单号	参照	140	E--V		PU_ORDER	单据编号	单据编号					14429
+FIELD	detail	40	采购订单行号	采购订单行号	文本	110	E--V		GFDA	mc	mc					14431
+FIELD	detail	50	物料名称	物料名称	参照	160	E--V		INV	存货名称	存货名称					14433
+FIELD	detail	60	规格型号	规格型号	文本	140	E--V		GFDA	mc	mc					14434
+FIELD	detail	70	批次号	批次号	文本	150	---V									14437
+FIELD	detail	80	物料描述	物料描述	文本	200	E--V		GFDA	mc	mc					14438
+FIELD	detail	90	单价	单价	小数	90	E--V		GFDA	mc	mc					14440
+FIELD	detail	100	数量	数量	小数	100	E--V		GFDA	mc	mc					14443
+FIELD	detail	110	计量单位	计量单位	文本	90	E--V		GFDA	mc	mc					14445
+FIELD	detail	120	数量2	数量2	小数	90	E--V		GFDA	mc	mc					14447
+FIELD	detail	130	计量单位2	计量单位2	文本	90	E--V		GFDA	mc	mc					14448
+FIELD	detail	140	金额	金额	小数	100	E--V		GFDA	mc	mc					14451
+FIELD	detail	150	日期	日期	日期	110	E--V		GFDA	mc	mc					14453
+FIELD	detail	160	税率%	税率%	小数	80	E--V		GFDA	mc	mc					14455
+FIELD	detail	170	含税单价	含税单价	小数	100	E--V		GFDA	mc	mc					14457
+FIELD	detail	180	税额	税额	小数	90	E--V		GFDA	mc	mc					14459
+FIELD	detail	190	含税金额	含税金额	小数	100	E--V		GFDA	mc	mc					14461
+FIELD	detail	200	折扣	折扣	小数	80	E-H-		GFDA	mc	mc					14463
+FIELD	detail	210	供应商	供应商	参照	160	E-H-		GFDA	mc	mc					14464
+FIELD	detail	220	入库数量	入库数量	小数	100	E-H-		GFDA	mc	mc					14466
+FIELD	detail	230	入库单号	入库单号	文本	130	E-H-		GFDA	mc	mc					14468
+FIELD	detail	240	领料单号	领料单号	文本	130	E-H-		GFDA	mc	mc					14470
+FIELD	detail	250	结案	结案	下拉框	80	E-H-		GFDA	mc	mc		SELECT v FROM (VALUES (N'是'),(N'否')) AS t(v)			14472
+FIELD	detail	260	税别代码	税别代码	文本	100	E-H-		GFDA	mc	mc					14473
+FIELD	detail	270	税别说明	税别说明	文本	120	E-H-		GFDA	mc	mc					14474
+FIELD	detail	280	总金额	总金额	小数	100	E-H-		GFDA	mc	mc					14475
+FIELD	detail	290	订单号	订单号	参照	140	E-H-		SO_ORDER	单据编号	单据编号					14476
+FIELD	detail	300	箱数	箱数	小数	80	E-H-		GFDA	mc	mc					14477
+FIELD	detail	310	部门	部门	参照	100	E-H-		DEPT	部门名称	部门名称					14478
+FIELD	detail	320	部门名称	部门名称	文本	100	E-H-		GFDA	mc	mc					14479
+FIELD	detail	330	折扣%	折扣%	小数	80	E--V		GFDA	mc	mc					14480
+FIELD	detail	340	预计到货日期	预计到货日期	日期	120	E--V		GFDA	mc	mc					14481
+FIELD	detail	350	备注	备注	文本	200	E--V		GFDA	mc	mc					14482
+FIELD	detail	360	现存量	现存量	小数	90	---V		GFDA	mc	mc			Current inventory		14483
+FIELD	detail	370	仓库	仓库	文本	120	E--V		GFDA	mc	mc					14484
+FIELD	detail	375	仓位	仓位编码	参照	120	E--V		WHLOC	仓位编码	仓位编码	仓库=$仓库		Bin		14504
+FIELD	detail	376	仓位名称	仓位名称	文本	120	E-H-									14505
+FIELD	detail	377	仓位id	仓位id	文本	120	E-H-									14506
+FIELD	detail	380	折扣金额	折扣金额	小数	100	E-H-		GFDA	mc	mc					14485
+FIELD	detail	400	发货数量	发货数量	小数	100	E-H-		GFDA	mc	mc					14487
+FIELD	detail	410	剩余数量	剩余数量	小数	100	E-H-		GFDA	mc	mc					14488
+FIELD	detail	420	退料数量	退料数量	小数	100	E-H-		GFDA	mc	mc					14489
+FIELD	detail	430	报废数量	报废数量	小数	100	E-H-		GFDA	mc	mc					14490
+FIELD	detail	440	制单号	制单号	文本	130	E-H-		GFDA	mc	mc					14491
+FIELD	detail	450	品质复核人	品质复核人	参照	100	E-H-		EMP	员工名称	员工名称					14492
+FIELD	detail	460	品质复核时间	品质复核时间	文本	140	E-H-		GFDA	mc	mc					14493
+FIELD	header	60	金额	金额	小数	100	E-H-		GFDA	mc	mc					14435
+FIELD	header	70	税额	税额	小数	100	E-H-		GFDA	mc	mc					14436
+FIELD	header	80	总金额	总金额	小数	100	E-H-		GFDA	mc	mc					14439
+FIELD	header	100	部门	部门	参照	120	E--V		DEPT	部门名称	部门名称					14442
+FIELD	header	120	部门名称	部门名称	文本	120	E-H-		GFDA	mc	mc					14446
+FIELD	header	140	数量	数量	小数	100	E-H-		GFDA	mc	mc					14450
+FIELD	header	150	附件1	附件1	附件	220	E--V		GFDA	mc	mc					14452
+FIELD	header	160	附件2	附件2	附件	220	E--V		GFDA	mc	mc					14454
+FIELD	header	170	附件3	附件3	附件	220	E--V		GFDA	mc	mc					14456
+FIELD	header	180	附件4	附件4	附件	220	E--V		GFDA	mc	mc					14458
+FIELD	header	190	附件5	附件5	附件	220	E--V		GFDA	mc	mc					14460
+FIELD	header	200	附件6	附件6	附件	220	E--V		GFDA	mc	mc					14462
+FIELD	header	220	审核人	审核人	参照	100	---V		EMP	员工名称	员工名称					14467
+FIELD	header	230	审核时间	审核时间	文本	140	---V		GFDA	mc	mc					14469
+FIELD	header	240	批次键	批次键	整数	80	--H-		GFDA	mc	mc					14471
+FIELD	query,detail	20	物料编码	物料编码	参照	130	ER-V		INV	存货编码	存货名称					14427
+FIELD	query,detail	390	条码	条码	文本	140	E-H-		GFDA	mc	mc					14486
+FIELD	query,header	10	单号	单据编号	文本	140	-R-V		GFDA	mc	mc					14424
+FIELD	query,header	20	单据日期	单据日期	日期	120	ER-V		GFDA	mc	mc					14426
+FIELD	query,header	30	业务员	业务员	参照	100	E--V		EMP	员工名称	员工名称					14428
+FIELD	query,header	40	供应商代码	供应商代码	参照	130	E--V		GFDA	dm	mc					14430
+FIELD	query,header	50	供应商	供应商	参照	180	E--V		GFDA	mc	mc					14432
+FIELD	query,header	90	来料性质	来料性质	文本	110	E--V		GFDA	mc	mc					14441
+FIELD	query,header	110	仓库	仓库	参照	150	E-H-		WH	仓库名称	仓库名称					14444
+FIELD	query,header	130	批次号	批次号	文本	160	E--V									14449
+FIELD	query,header	210	采购订单号	采购订单号	文本	150	E--V		GFDA	mc	mc					14465
 -- config.json -> (空;运行时配置由 PanelConfigService 现算)
 COL	sl_recv	id	int(4)	NOT NULL	
 COL	sl_recv	单据编号	nvarchar(120)	NOT NULL	
@@ -203,12 +206,16 @@ COL	sl_recv_detail	备用17	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	sl_recv_detail	备用18	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	sl_recv_detail	备用19	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	sl_recv_detail	备用20	nvarchar(1000)	null	预留扩展字段(未绑定)
+COL	sl_recv_detail	仓位编码	nvarchar(400)	null	送料暂收行的仓位编码(界面显示名「仓位」)。由采购订单生单时按行预填;参照仓位档案 WHLOC,按本行仓库级联。
+COL	sl_recv_detail	仓位名称	nvarchar(800)	null	送料暂收行的仓位名称(隐藏辅助列,参照回写用,与采购入库行同构)。
+COL	sl_recv_detail	仓位id	nvarchar(2000)	null	送料暂收行的仓位id(隐藏辅助列,参照回写/反查用)。
 
 ===== QC_INSP =====
 -- yj_field (place, seq)
 FIELD	detail	20	物料名称	物料名称	参照	160	E--V		INV	存货名称	存货名称			Material Name		12854
 FIELD	detail	30	规格型号	规格型号	文本	140	E--V		GFDA	mc	mc			Specification		12855
 FIELD	detail	40	采购订单行号	采购订单行号	文本	110	E--V		GFDA	mc	mc					12858
+FIELD	detail	41	采购单号	采购单号	文本	140	---V							Src PO No.		14510
 FIELD	detail	50	单位	单位	参照	70	E-H-		UOM	计量单位名称	计量单位名称			UOM		12859
 FIELD	detail	60	单价	单价	小数	100	E--V		GFDA	mc	mc			Unit Price		12861
 FIELD	detail	70	计量单位	计量单位	参照	90	E--V		UOM	计量单位名称	计量单位名称			Unit of measurement		12864
@@ -229,7 +236,11 @@ FIELD	detail	220	结案	结案	文本	80	E-H-		GFDA	mc	mc					12893
 FIELD	detail	230	部门	部门	参照	100	E-H-		DEPT	部门名称	部门名称			Department		12895
 FIELD	detail	250	部门名称	部门名称	文本	100	E-H-		GFDA	mc	mc			Department Name		12899
 FIELD	detail	260	入库单号	入库单号	文本	130	---V		GFDA	mc	mc			Receipt No.		12901
-FIELD	detail	270	仓库代码	仓库代码	文本	120	E-H-		GFDA	mc	mc			Warehouse Code		12903
+FIELD	detail	265	现存量	现存量	小数	100	--H-							Current inventory		14421
+FIELD	detail	270	仓库代码	仓库代码	文本	120	E--V		GFDA	mc	mc			Warehouse Code		12903
+FIELD	detail	275	仓位	仓位编码	参照	120	E--V		WHLOC	仓位编码	仓位编码	仓库=$仓库代码		Bin		14507
+FIELD	detail	276	仓位名称	仓位名称	文本	120	E-H-									14508
+FIELD	detail	277	仓位id	仓位id	文本	120	E-H-									14509
 FIELD	header	30	业务员	业务员	参照	100	E--V		EMP	员工名称	员工名称			Salesperson		12856
 FIELD	header	90	部门	部门	参照	140	E--V		DEPT	部门名称	部门名称					12868
 FIELD	header	100	部门编码	部门编码	参照	140	E--V		DEPT	部门编码	部门名称					12870
@@ -382,6 +393,11 @@ COL	qc_insp_detail	抽样方案	nvarchar(200)	null	抽样方案(来料检验抽�
 COL	qc_insp_detail	品质复核人	nvarchar(100)	null	品质复核人(参照职员档案 EMP,检验完成后复核签字的责任人)
 COL	qc_insp_detail	品质复核时间	nvarchar(60)	null	品质复核时间(本地墙钟,与品质复核人成对)
 COL	qc_insp_detail	业务员	nvarchar(100)	null	业务员(供应商侧对接的业务人员,参照职员档案 EMP)
+COL	qc_insp_detail	现存量	decimal(9)	null	现存量(采购链透传字段,2026-11-12 新增,隐藏):采购订单行上的库存快照 —— 金蝶 inv_qty 在**制单那一刻**的库存数量(行上无仓库 = 全仓合计),不是实时库存;沿 采购订单→送料暂收→来料检验 逐站下传,仅供追溯,不可用于可用量/缺料判断。实时库存见 kucun。
+COL	qc_insp_detail	仓位编码	nvarchar(400)	null	来料检验行的仓位编码(界面显示名「仓位」)。随送料暂收单生单带入;参照仓位档案 WHLOC,按本行仓库级联。
+COL	qc_insp_detail	仓位名称	nvarchar(800)	null	来料检验行的仓位名称(隐藏辅助列,参照回写用)。
+COL	qc_insp_detail	仓位id	nvarchar(2000)	null	来料检验行的仓位id(隐藏辅助列,参照回写/反查用)。
+COL	qc_insp_detail	采购单号	nvarchar(400)	null	来料检验行的来源采购订单号(行级)。合单生单后一张暂收单可能跨多张采购订单,靠它与「采购订单行号」一起认出本行原属哪张订单的哪一行。
 
 ===== QC_RETURN =====
 -- yj_field (place, seq)
@@ -394,6 +410,8 @@ FIELD	detail	85	送检数量	送检数量	小数	100	---V									11585
 FIELD	detail	88	特采	特采	是否	60	E--V									11587
 FIELD	detail	90	计量单位	计量单位	参照	90	E--V		UOM	计量单位名称	计量单位名称			Unit of measurement		7546
 FIELD	detail	100	采购订单行号	采购订单行号	文本	110	E--V									7545
+FIELD	detail	101	采购单号	采购单号	文本	140	---V							Src PO No.		14511
+FIELD	detail	105	现存量	现存量	小数	100	--H-							Current inventory		14422
 FIELD	detail	120	报废数量	报废数量	小数	100	E-H-									7654
 FIELD	detail	130	剩余数量	剩余数量	小数	100	E-H-									7655
 FIELD	detail	206	批次号	批次号	文本	150	---V									11465
@@ -519,6 +537,8 @@ COL	qc_return_detail	备用19	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	qc_return_detail	备用20	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	qc_return_detail	送检数量	decimal(9)	null	送检数量:来料检验单明细的送检数量(检验单审核自动生成本退料单时随链带入,只读);特采按钮按它填特采单「总数量」
 COL	qc_return_detail	特采	bit(1)	NOT NULL	特采:勾选=该行做特采(让步接收)。本退料单**审核/审批通过**时,勾了的行逐行生成特采单(总数量=本行送检数量、不合格品数量=本行退货数量);特采单审批通过后全部数量进采购入库单(不走退料)
+COL	qc_return_detail	现存量	decimal(9)	null	现存量(采购链透传字段,2026-11-12 新增,隐藏):采购订单行上的库存快照 —— 金蝶 inv_qty 在**制单那一刻**的库存数量(行上无仓库 = 全仓合计),不是实时库存;沿 采购订单→送料暂收→来料检验→暂收退回 逐站下传(退料行由检验行镜像),仅供追溯。实时库存见 kucun。
+COL	qc_return_detail	采购单号	nvarchar(400)	null	暂收退回行的来源采购订单号(行级),口径同来料检验行。
 
 ===== PURCHASE_IN =====
 -- yj_field (place, seq)
@@ -528,7 +548,7 @@ FIELD	detail	40	实收数量	实收数量	小数	110	ER-V							Actual received 
 FIELD	detail	50	计量单位	计量单位	下拉框	140	ER-V						SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v)	Unit of measurement		13021
 FIELD	detail	60	实收数量2	实收数量2	小数	110	E--V							Paid-in quantity 2		13023
 FIELD	detail	70	计量单位2	计量单位2	下拉框	140	E--V						SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v)	Unit of measurement 2		13024
-FIELD	detail	80	单价	单价	小数	110	ER-V							Unit Price		13027
+FIELD	detail	80	单价	单价	小数	110	E--V							Unit Price		13027
 FIELD	detail	90	金额	金额	小数	110	E--V							Amount		13028
 FIELD	detail	100	税率%	税率%	小数	110	E--V						SELECT v FROM (VALUES (N'0'),(N'3'),(N'6'),(N'9'),(N'13')) AS t(v)	Tax rate%		13030
 FIELD	detail	110	含税单价	含税单价	小数	110	E--V							Unit price including tax		13032
@@ -587,7 +607,7 @@ FIELD	detail	630	默认浮动数量	默认浮动数量	文本	120	E-H-									1
 FIELD	detail	640	辅助换算系数	辅助换算系数	文本	120	E-H-									13139
 FIELD	detail	650	换算系数	换算系数	文本	120	E-H-									13141
 FIELD	detail	660	折扣额	折扣额	文本	120	E-H-									13143
-FIELD	detail	670	源单编号	源单编号	文本	120	E-H-									13145
+FIELD	detail	670	源单编号	源单编号	文本	120	---V									13145
 FIELD	detail	680	源单类型id	源单类型id	文本	120	E-H-									13147
 FIELD	detail	690	源单类型名称	源单类型名称	文本	120	E-H-									13148
 FIELD	detail	700	源单类型编码	源单类型编码	文本	120	E-H-									13150
@@ -674,6 +694,8 @@ FIELD	header	780	审核人编码	审核人编码	文本	130	E-H-									13165
 FIELD	header	800	未结算金额本位币	未结算金额本位币	文本	130	E-H-									13169
 FIELD	header	820	付款方式编码	付款方式编码	文本	130	E-H-									13173
 FIELD	header	840	付款账户编码	付款账户编码	文本	130	E-H-									13177
+FIELD	header	900	来源	来源单据	文本	130	--H-							Source		13045
+FIELD	header	910	来源单号	来源单号	文本	150	--H-							Source no.		13048
 FIELD	query,detail	10	存货编码	存货编码	参照	120	ER-V		INV	存货编码	存货名称			Inventory Code		13012
 FIELD	query,header	10	单据日期	单据日期	日期	140	ER-V							Document Date		13013
 FIELD	query,header	20	单据编号	单据编号	文本	140	ER-V							Document Number		13014
@@ -683,8 +705,6 @@ FIELD	query,header	60	供应商	供应商	参照	140	ER-V		GFDA	mc	mc			Vendor		
 FIELD	query,header	70	匹配来源单号	匹配来源单号	文本	130	E-H-							Matched source no.		13025
 FIELD	query,header	80	经手人	经手人	参照	140	E--V		EMP	员工名称	员工名称			Person in charge		13026
 FIELD	query,header	150	验货人	验货人	参照	100	E-H-		EMP	员工名称	员工名称			Inspector		13041
-FIELD	query,header	170	来源单据	来源单据	文本	110	E-H-							Source doc		13045
-FIELD	query,header	190	来源单号	来源单号	文本	120	E-H-							Source no.		13048
 FIELD	query,header	210	销售订单号	销售订单号	文本	130	E-H-							Sales order no.		13054
 FIELD	query,header	290	批次号	批次号	文本	160	---V									13069
 -- config.json -> (空;运行时配置由 PanelConfigService 现算)

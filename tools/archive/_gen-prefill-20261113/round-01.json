@@ -1,0 +1,34 @@
+{
+  "picked": {
+    "ok": true,
+    "cells": [
+      "YJ-20261110-04",
+      "2026-11-10",
+      "惠州市冠霖实业有限公司",
+      "已审核"
+    ]
+  },
+  "items": [
+    "批量生单"
+  ],
+  "metrics": {
+    "open": true,
+    "title": "生单 → 送料暂收单",
+    "dialogHeight": 313,
+    "viewportH": 707,
+    "rows": 2,
+    "docCards": 1,
+    "scrollers": [],
+    "bodyWrappers": [
+      {
+        "scrollH": 82,
+        "clientH": 82,
+        "inner": false,
+        "overflowY": "hidden"
+      }
+    ],
+    "hasMaxHeight": [
+      "none"
+    ]
+  }
+}

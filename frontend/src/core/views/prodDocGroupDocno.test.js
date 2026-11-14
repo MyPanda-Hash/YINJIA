@@ -43,14 +43,23 @@ test('① 走报告头的 5 张都在配置里,产品文件列表是自定义视
 })
 
 test('② 报告头那格的标识声明为「单据编号」(不是缺省的「编号」)', () => {
+  // ⚠ 2026-11-11 例外：产品变更申请表(RD_CHANGE)按用户口径
+  //   「文件编码挪到右上角，替换单据编号，而且是固定的」——
+  //   那格改为印**受控表单编号** YJ-QR-130（docNoStatic），标识文案随之改成「文件编码」。
+  //   它不再是"本单单据号"，所以不适用本条规则；其余 4 张保持不变。
+  const EXEMPT_FIXED_CODE = new Set(['RD_CHANGE'])
   const problems = []
   for (const p of NEEDS_HEAD) {
+    if (EXEMPT_FIXED_CODE.has(p)) continue
     const v = recordSheetConfigs[p].head?.docnoPrefix
     if (v !== '单据编号') {
       problems.push(`${p} head.docnoPrefix=${JSON.stringify(v)},应为 '单据编号'(缺省 true 会印「编号：」)`)
     }
   }
   assert.deepEqual(problems, [], '\n' + problems.join('\n'))
+  // 例外那张按自己的口径钉住（防止哪天又被改回「单据编号」而没人发现）
+  assert.equal(recordSheetConfigs.RD_CHANGE.head?.docnoPrefix, '文件编码', 'RD_CHANGE 那格标识应为「文件编码」')
+  assert.equal(recordSheetConfigs.RD_CHANGE.docNoStatic, 'YJ-QR-130', 'RD_CHANGE 那格应印固定 YJ-QR-130')
 })
 
 test('③ 那一格绑的键强制为「单据编号」(检验计划表原先误绑「文档编号」YJ-RD001)', () => {

@@ -127,6 +127,10 @@ const MSG_TPL = {
   APPROVAL_SUBMITTED: { title: '新的待审批单据', body: '{actor} 提交了「{panelName} {docNo}」，等待您审批。' },
   APPROVAL_APPROVED: { title: '审批通过', body: '您提交的「{panelName} {docNo}」已由 {actor} 审批通过。' },
   APPROVAL_REJECTED: { title: '审批被驳回', body: '您提交的「{panelName} {docNo}」被 {actor} 驳回。意见：{opinion}' },
+  // 审批结果 → **单据上的检验人**(2026-11-11 用户口径「审批通过和驳回也要有消息提示对应的检验人」)。
+  // 与上面两条的区别只是称呼:收件人是纸面「检验人/检验员」那一格的人,未必是建单的人。
+  APPROVAL_APPROVED_INSPECTOR: { title: '审批通过', body: '您检验的「{panelName} {docNo}」已由 {actor} 审批通过。' },
+  APPROVAL_REJECTED_INSPECTOR: { title: '审批被驳回', body: '您检验的「{panelName} {docNo}」被 {actor} 驳回。意见：{opinion}' },
   MODIFY_REQUESTED: { title: '新的修改申请', body: '{actor} 申请修改「{panelName} {docNo}」，等待您审批。' },
   DELETE_REQUESTED: { title: '新的删除申请', body: '{actor} 申请删除「{panelName} {docNo}」，等待您审批。' },
   // 规格书检验项目及标准变更 → 关联出货检验计划表核对(2026-09-11;仅变更提醒,不比对内容)
@@ -270,9 +274,12 @@ function openHistory(cfg) {
 
 async function goCurrent() {
   if (!current.value?.targetPath) return
+  // 2026-11-11 用户报障「根据消息跳转要能够跳转到对应单据的页面,现在只能跳转到首页」:
+  // 原来带的是 `?focus=<单号>`,而面板列表(PanelxList)只认 **`?docNo=`**(applyDocNoQuery →
+  // 条件 _docNo → 直接定位到那张单)。focus 没人读 ⇒ 落回面板默认视图,看着就像"没跳"。
   const target = {
     path: current.value.targetPath,
-    query: current.value.formNo ? { focus: current.value.formNo } : {},
+    query: current.value.formNo ? { docNo: current.value.formNo } : {},
   }
   detailVisible.value = false
   historyVisible.value = false

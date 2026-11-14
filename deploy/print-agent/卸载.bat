@@ -1,25 +1,25 @@
-@echo off
-chcp 65001 >nul
-title И⌠╤Е≤┴MES Ф┴⌠Е█╟Д╩ёГ░├ - Е█╦Х╫╫
+echo off
+chcp 936 >nul
+title рЬ╪нMES ╢Рс║╢ЗюМ - п╤ть
 cd /d "%~dp0"
 
 echo.
 echo ============================================
-echo   И⌠╤Е≤┴ MES . Ф┴⌠Е█╟Д╩ёГ░├ Е█╦Х╫╫
+echo   рЬ╪н MES . ╢Рс║╢ЗюМ п╤ть
 echo ============================================
 echo.
 
-if not exist "Е█╦Х╫╫.ps1" (
-  echo [FAIL] Е░▄Г⌡╝Е╫∙Д╦▀Ф┴╬Д╦█Е┬╟ Е█╦Х╫╫.ps1
-  echo        Х╞╥Ф┼┼Ф∙╢Д╦╙Ф√┤Д╩╤Е╓╧Д╦─Х╣╥Ф▀╥Х╢²Х©┤Ф²╔Ц─┌
+if not exist "п╤ть.ps1" (
+  echo [FAIL] м╛д©б╪обур╡╩╣╫ п╤ть.ps1
+  echo        гК╟яуШ╦Жнд╪Ч╪пр╩фП©╫╠╢╧Щю╢║ё
   echo.
   pause
   exit /b 1
 )
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Е█╦Х╫╫.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0п╤ть.ps1"
 
 echo.
-echo Х©≥Д╦╙Г╙≈Е▐ёЕ▐╞Д╩╔Е┘ЁФ▌┴Д╨├Ц─┌
+echo уБ╦Ж╢╟©з©ирт╧ь╣Так║ё
 echo.
 pause

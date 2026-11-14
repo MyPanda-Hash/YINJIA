@@ -12,7 +12,7 @@
       <!-- 表头字段（fieldCols 列 × N 行，默认 2 列） -->
       <div class="fields udl-fields" :style="{ gridTemplateColumns: 'repeat(' + fieldCols + ', 1fr)' }">
         <div v-for="r in visibleMeta" :key="r.code" class="field">
-          <label :title="tt(r.name)">{{ tt(r.name) }}<span v-if="r.isNotNull" class="req">*</span></label>
+          <label :title="tt(r.name)">{{ tt(r.name) }}</label>
           <el-input v-if="isText(r)" v-model="form[r.code]" :disabled="fieldLocked(r)" :placeholder="tt(r.name)" />
           <el-input-number v-else-if="isNumber(r)" v-model="form[r.code]" :disabled="fieldLocked(r)" :controls="false" style="width: 100%" />
           <!-- 参照字段：点击弹窗拉取基础档案面板数据，勾选导入（开发约束十一-1） -->
@@ -41,7 +41,7 @@
         <el-tabs v-model="activeTab">
           <el-tab-pane v-for="tab in tabs" :key="tab.key" :name="tab.key">
             <template #label>
-              <span>{{ tab.label }}<span v-if="tab.isRequired" class="req">*</span></span>
+              <span>{{ tab.label }}</span>
             </template>
             <div class="tab-toolbar">
               <el-button size="small" type="primary" :icon="Plus" @click="addDetailRow(tab)">新增数据</el-button>
@@ -349,8 +349,9 @@ async function onSave() {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 必填红星已于 2026-11-13 按用户口径去掉（「保留必填项的属性就行，只是去掉红点」）：
+   只删视觉，isNotNull/isRequired 判据与保存校验全部保留 */
 .field .req {
-  color: #dc2626;
 }
 .detail {
   margin-top: 8px;

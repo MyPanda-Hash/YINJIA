@@ -389,9 +389,16 @@ test('成型工艺清单 3 页签:每页有 grid/showHead,且修订记录页与�
  *      ⇒ 报告头 / 表头块 / 表体三处同宽,竖线才对得齐。
  *
  * 另钉两条**会静默出错**的配置事实:
- *   ④ 本面板的数据表**不得**有 filterKey —— rd_insp_plan_detail 连 [表区] 物理列都没有
- *      (yj_field 里那条是 header 遗留),按它过滤只会得到一张**空表**;
+ *   ④ 本面板的**检验项目表**不得有 filterKey(**修订记录表除外**,它必须有,见下);
  *      检验类别改由 libGroupKey 承载,且内置兜底库的每一行都要带分组值(否则勾选落明细时分组丢失)。
+ *      ⚠ 2026-11-11 口径变更(用户要求本面板加「修订记录」页签):
+ *        原话「这个面板也加一个修订记录 tap 页」。加页签就必须给两张逻辑表分块 ⇒ 需要 [表区] 物理列,
+ *        而 rd_insp_plan_detail 当时没有这一列(原注释"连物理列都没有"是对的)。
+ *        处置:tools/migrate-insp-plan-revision-page-20261111.sql 补 [表区] 列 + 登记 yj_field
+ *        + 存量行回填 '检验项目'。补完后原担忧("按它过滤只会得到一张空表")不再成立 ——
+ *        实测(admin 编辑态)检验项目页 21 行、修订记录页 18 行,两页互不干扰;
+ *        保存后库:picture IP-2026-11-0002 下 18 行 表区='修订记录',值正确落 备用3。
+ *        ⇒ 现在**必须**有两条 dataTable:一条无 filterKey(检验项目)、一条 filterKey='表区'(修订记录)。
  *   ⑤ autoFillSpec 的 from/to 必须都是真实存在的字段名 —— 它跨面板取 RD_SPEC_DOC 的列,
  *      那边改个 label,这边就静默填空白(与文件头讲的数据键漂移同一个坑)。
  */
@@ -399,8 +406,24 @@ test('出货检验计划表:一张表 7 列的三处同宽 + 自动填充规格�
   const cfg = recordSheetConfigs.RD_INSP_PLAN
   assert.ok(cfg, 'RD_INSP_PLAN 配置缺失')
 
-  // ── 单 sheet = 单页,不应有页签 ──
-  assert.ok(!cfg.pages, '设计是单 sheet,不应配 pages(配了会出页签)')
+  // ── 页签(2026-11-11 用户口径:「这个面板也加一个修订记录 tap 页」)──
+  //     两页:0=出货检验项目控制计划、1=修订记录。
+  assert.ok(Array.isArray(cfg.pages) && cfg.pages.length === 2,
+    '本面板应为 2 页(控制计划 + 修订记录)')
+  const revDt = (cfg.dataTables || []).find((d) => d.filterVal === '修订记录')
+  assert.ok(revDt, '缺修订记录表(filterVal=修订记录)')
+  // 修订记录必须按 [表区] 分块,且带 A4 固定行数 + 隐藏手工加行
+  assert.equal(revDt.filterKey, '表区', '修订记录表必须用 [表区] 分块(项目唯一约定)')
+  assert.ok(Number(revDt.blankRows) > 0, '修订记录表要预铺 A4 行数(blankRows)')
+  assert.equal(revDt.fixedRows, true, '修订记录表要 fixedRows:true(不出手工加行按钮)')
+  // 原「检验项目表不得有 filterKey」仍成立(它靠 libGroupKey 承载检验类别)
+  // ⚠ 2026-11-11 修正(同日第二轮)：检验项目表**也必须分块**。
+  //   上一版写的是「检验项目表应无 filterVal」,而它与修订记录共用 rd_insp_plan_detail 一张行表,
+  //   不分块 ⇒ rowsOf 返回全部 items ⇒ 修订记录预铺的 18 行空行整片显示在检验项目页
+  //   （用户截图报「出货检验的不需要预留」）。两张表都分块才是对的。
+  const inspDt = (cfg.dataTables || []).find((d) => d.filterVal === '检验项目')
+  assert.ok(inspDt, '检验项目表必须分块(filterVal=检验项目)')
+  assert.equal(inspDt.filterKey, '表区', '检验项目表同样用 [表区] 分块')
   assert.equal(cfg.headMode, 'report', '报告头版式')
 
   // ── ①grid 7 格,总宽 1187(设计 B..H) ──
@@ -451,12 +474,15 @@ test('出货检验计划表:一张表 7 列的三处同宽 + 自动填充规格�
     assert.equal(hole, -1, `第 ${ri + 1} 行第 ${hole + 1} 格空着 ⇒ 整页缺格、竖线断(${detail.join(' / ')})`)
   }
 
-  // ── ④表体:一张表、无 filterKey/表区、可见列宽之和 = grid 之和 ──
+  // ── ④表体:检验项目表也分块(与修订记录共用一张行表)、可见列宽之和 = grid 之和 ──
+  //     2026-11-11 起本面板有**两张**逻辑表(检验项目 + 修订记录),两张都必须 filterKey='表区':
+  //     不带 filterKey 的那张会被 rowsOf 当成"全部行",于是修订记录预铺的空行整片漏进来
+  //     （同日实测回归，见 11674afa7）。
   const dts = cfg.dataTables || []
-  assert.equal(dts.length, 1, '设计只有一张表')
-  const dt = dts[0]
-  assert.ok(!dt.filterKey, '⚠ 不得有 filterKey:rd_insp_plan_detail 没有 [表区] 物理列,按它过滤会得到空表')
-  assert.ok(!dt.filterVal, '不得有 filterVal(同上)')
+  assert.equal(dts.length, 2, '本面板应有 2 张逻辑表(检验项目 + 修订记录)')
+  const dt = dts.find((d) => d.filterVal === '检验项目')
+  assert.ok(dt, '缺检验项目表(filterVal=检验项目 的那张)')
+  assert.equal(dt.filterKey, '表区', '检验项目表同样要用 [表区] 分块')
   const vis = (dt.cols || []).filter((c) => !c.hiddenCol)
   assert.equal(vis.length, 7, '可见列应恰好 7 列(设计 B..H)')
   const visSum = vis.reduce((a, c) => a + (c.w || 100), 0)

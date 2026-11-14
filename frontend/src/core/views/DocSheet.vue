@@ -8,7 +8,7 @@
        ④ 底部签名:signCells(蓝格标签 + 值区)
        数据键全部为字段 label;保存/审批/导出复用引擎既有逻辑,本组件只负责呈现与置脏。
        ═══════════════════════════════════════════════════════════════════ -->
-  <div class="approval-sheet" :style="sheetStyle">
+  <div ref="sheetRef" class="approval-sheet" :style="sheetStyle">
     <!-- ⛔ 终止审批横幅(项目实施计划:申请终止(阶段处)二级审批 立项人→管理员→落实;打印隐藏) -->
     <div v-if="panelCode === 'RD_PLAN' && term" class="as-term-banner no-print-term" :class="'term-' + term.state">
       <template v-if="term.state === 'T'">
@@ -181,6 +181,16 @@
               <el-input
                 v-else-if="editable && c.kind === 'docno'" v-model="row[c.key]" size="small"
                 maxlength="30" class="as-docno-input sg-cell-input" @input="emit('dirty')"
+              />
+              <!-- 进度描述列(2026-11-11 用户口径):「这个字段**不受归档约束**，但只能谁提交的谁来修改」。
+                   ⚠ 刻意**不看 editable**:editable 的语义是"整张纸能否编辑"(归档后为假),
+                   而进度描述归档后仍要能改 ⇒ 走独立的 progress-save 通道,由父组件调 /px/sampleProgress。
+                   只读态/无权限时仍显示纯文本(sg-ro),不会给一个点了没反应的输入框。 -->
+              <el-input
+                v-else-if="c.key === '进度描述' && progressEditable(row)"
+                v-model="row[c.key]" type="textarea" :maxlength="500" :rows="gridTextRows" resize="none"
+                class="as-fill-input sg-cell-area sg-progress" :placeholder="tt('填写实时进度')"
+                @blur="emit('progress-save', { row, text: row[c.key] })"
               />
               <!-- 长文本列一律文本域:模板给的行高(150px)足够写多行,单行输入框会显得空 -->
               <el-input
@@ -721,8 +731,27 @@
         </div>
       </div>
       <div v-else class="as-sign-row">
-        <div v-for="(c, ci) in config.signCells" :key="c.key" class="as-sign-pair" :style="{ flex: c.flex }">
-          <div class="as-sign-cell" :class="{ 'white-shell': c.white }" :style="{ width: c.w + 'px' }">{{ tt(c.label) }}</div>
+        <!-- 2026-11-13 用户口径「申请立项时间可以往右边挪」——
+             原来 `:style="{ flex: c.flex }"` 传的是**裸数字**（53 / 47），CSS 里 flex 简写的
+             flex-grow 虽可无单位，但这里同时想要"按占比铺满整行"，裸值会被当作 flex-basis:0%
+             之外的另一种解释，实测两个项只吃到 266+302=568（签名行宽 541 之外还有余量没用上）。
+             改成显式 flex-grow + flex-basis:0 ⇒ 严格按 53:47 铺满签名行。 -->
+        <div
+          v-for="(c, ci) in config.signCells" :key="c.key" class="as-sign-pair"
+          :style="{ flexGrow: c.flex || 1, flexShrink: 1, flexBasis: '0%' }"
+        >
+          <!-- 2026-11-13：标签格原先写死 `width: c.w px`（202 / 150）内联宽 —— 内联样式压过
+               样式表的 min-width，于是压到 A4 宽（733px）时标签仍占 202px，值区只剩 85px，
+               「系统管理员」被折成两行。改成 **basis + 上限**：宽时保持设计宽（202px），
+               窄时按 flex 收缩（min-width:68px 兜底），把宽度让给值区。 -->
+          <!-- 2026-11-13：标签格宽度改 `flex: 0 1 <设计宽>` 语义 ——
+               宽时按设计宽（202/150）、窄时**先缩标签保住值区**（min-width:68px）。
+               ⚠ 不能用 `max-width: 设计宽` + flexBasis：那样在窄排版里 basis 撑住不让，
+                 标签仍吃满 202px，值区只剩 85px ⇒「系统管理员」折两行。 -->
+          <div
+            class="as-sign-cell" :class="{ 'white-shell': c.white }"
+            :style="{ flexBasis: (c.w || 120) + 'px' }"
+          >{{ tt(c.label) }}</div>
           <div class="as-sign-val">
             <el-input
               v-if="editable && c.type === 'text' && !signLocked(c)"
@@ -788,7 +817,7 @@
 </template>
 
 <script setup>
-import { computed, reactive, nextTick, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, nextTick, ref, watch } from 'vue'
 import { ElMessage, ElButton, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import { Search } from '@element-plus/icons-vue'
@@ -826,7 +855,7 @@ const props = defineProps({
    */
   canEditOthers: { type: Boolean, default: false },
 })
-const emit = defineEmits(['dirty', 'term-changed'])
+const emit = defineEmits(['dirty', 'term-changed', 'progress-save'])
 
 /**
  * 备注栏旁的附件入口(元数据驱动):从下发的 fields 里发现 dataType='附件' 的字段。
@@ -867,12 +896,68 @@ function gotoLink(row) {
  *   带 !important,仍压过这里的内联样式。
  * 其余文书式面板宽度为 0 ⇒ 不套内联样式,保持原有的自适应行为。
  */
+/**
+ * 窄窗口自适应缩放(2026-11-11 用户口径)。
+ *
+ * <p>用户原话:「项目实施计划，填写不会换行，表格宽度会限制重叠在一起」;追问后确认 =
+ * <b>窗口窄时要横向滚动、内容被挤</b>。</p>
+ *
+ * <p>【改动前】纸宽由 {@link fixedSheetWidth} 定死(1242/1188/1220/1365),
+ * 外层 `.sheet-scroll{overflow-x:auto}` 兜住 ⇒ 1280 窗口下容器约 1100px、纸 1242px,
+ * <b>必须左右拖</b>才能看全(实测 clientW 1102 / scrollW 1242)。</p>
+ *
+ * <p>【口径】装不下就整体缩放:<code>zoom = 容器内宽 ÷ 纸宽</code>,
+ * 上限 1(宽屏**不放大**,保持设计字号) / 下限 {@link MIN_FIT_ZOOM}(再小就没法读了);
+ * 缩到下限仍装不下时才由 `.sheet-scroll` 横向滚动兜底 —— 两条路互补,不是二选一。</p>
+ *
+ * <p>⚠ 只对**定死纸宽**的面板生效:自适应宽的纸(width:940 + max-width:100%)本来就不会溢出,
+ * 对它套 zoom 只会把字变小。</p>
+ * <p>⚠ 打印不受影响:`@media print` 的 `body.approval-printing .approval-sheet{width:100%!important}`
+ * 带 !important,压得过这里写进 style 的 zoom;而且打印前会另算 `--print-zoom`。</p>
+ */
+const MIN_FIT_ZOOM = 0.6
+const sheetRef = ref(null)
+/** 纸面可用宽(容器内宽 - 两侧留白),0 = 还没量到 */
+const availWidth = ref(0)
+let fitObserver = null
+onMounted(() => {
+  const el = sheetRef.value
+  const host = el && el.parentElement
+  if (!host || typeof ResizeObserver === 'undefined') return
+  const measure = () => {
+    // 用**父容器**的 clientWidth:纸面自己会被 zoom 影响,拿它量会自激(越缩越窄)
+    const w = host.clientWidth || 0
+    if (w > 0) availWidth.value = w
+  }
+  measure()
+  fitObserver = new ResizeObserver(measure)
+  fitObserver.observe(host)
+})
+onBeforeUnmount(() => {
+  if (fitObserver) { fitObserver.disconnect(); fitObserver = null }
+})
+const sheetZoom = computed(() => {
+  const paperW = fixedSheetWidth(props.panelCode)
+  if (!paperW) return 1                 // 自适应宽的纸不缩放
+  const avail = availWidth.value
+  if (!avail) return 1                  // 还没量到 ⇒ 先按原样
+  // 两侧各留 8px,免得滚动条/边框把纸挤掉 1px 又触发横向滚动
+  const usable = avail - 16
+  // 先封底(再小就看不清)再封顶(装得下时比例会 >1,但不许放大)
+  return Math.min(1, Math.max(MIN_FIT_ZOOM, usable / paperW))
+})
+
 const sheetStyle = computed(() => {
   const w = fixedSheetWidth(props.panelCode)
   // 表格式纸面（样品申请单）：@media print 用 `width: var(--sg-print-w)` 定死纸宽 —— 两张纸宽度不同
-  // （1188 / 1450），不能像 QC 那样在 CSS 里写死像素。
+  // （1188 / 1220），不能像 QC 那样在 CSS 里写死像素。
   const printVar = isGrid.value ? { '--sg-print-w': gridW.value + 'px' } : {}
-  return w ? { width: w + 'px', maxWidth: 'none', flex: 'none', ...printVar } : (isGrid.value ? printVar : null)
+  // 窄窗缩放:见 sheetZoom 注释。zoom 与 width 一起写在纸面根节点上,
+  // 打印时被 @media print 的 width:100%!important 覆盖(它压得过内联样式)。
+  const zoomVar = sheetZoom.value !== 1 ? { zoom: String(sheetZoom.value) } : {}
+  return w
+    ? { width: w + 'px', maxWidth: 'none', flex: 'none', ...printVar, ...zoomVar }
+    : (isGrid.value ? { ...printVar, ...zoomVar } : null)
 })
 
 /** 阶段完成按钮可用:非编辑态 + 已审核 */
@@ -934,6 +1019,27 @@ watch(gridRows, () => { if (gridPage.value > gridPageCount.value) gridPage.value
 /** 申请人格:已保存的行(有 id)默认锁定,除非有「改他人行」权限 */
 function cellLocked(row, c) {
   return String(c?.key || '') === '申请人' && !!row?.id && props.canEditOthers !== true
+}
+/**
+ * 进度描述这一格能不能编辑(2026-11-11 用户口径)。
+ *
+ * <p>原话:「这个字段<b>不受归档约束</b>，但是也是<b>只能谁提交的谁来修改</b>」;
+ * 追问「归档后连 edit_others 也不能改？」→ 答「<b>只锁申请人</b>」。</p>
+ *
+ * <p>判据 = **当前登录人就是这一行的申请人**（内部单看行上的「申请人」，外部单看头表创建人归属）。
+ * ⚠ 刻意**不看 props.editable**:editable 表示"整张纸能否编辑"（归档后为假），
+ *   而本字段归档后仍要能改;也**不看 canEditOthers**:用户明确说"只锁申请人"，
+ *   文档管理员(edit_others)对进度描述同样没有写权 —— 服务端 /px/sampleProgress 同口径硬校验。</p>
+ */
+function progressEditable(row) {
+  if (!props.user?.realName && !props.user?.userName) return false
+  // 新行(还没保存,没有 id):谁在填就是谁的，给编辑权（保存后由服务端把申请人落成当前用户）
+  if (!row?.id) return true
+  const owner = String(row?.['申请人'] ?? '').trim()
+  if (!owner) return true
+  const ownerName = owner.includes('/') ? owner.slice(0, owner.indexOf('/')).trim() : owner
+  const me = String(props.user?.realName ?? '').trim()
+  return !!me && ownerName === me
 }
 /**
  * 子表模式下一张新单必须至少有 1 行可填（用户口径「单个样品单下面可以添加多个样品」）：
@@ -1495,8 +1601,12 @@ defineExpose({ focusField })
 .approval-sheet :deep(.as-cell-input) {
   width: 100%;
 }
+/* 2026-11-13：导出压到 A4 宽（733px）后，签名行的日期格只剩 ~100px，
+   固定 132px 会把日期截成「2026-...」。改成"尽量 132，装不下就吃掉可用宽度但不小于 108px"。 */
 .approval-sheet :deep(.as-date) {
   width: 132px;
+  max-width: 100%;
+  min-width: 108px;
 }
 /* 输入控件去边框:保持原版表格线条(编辑/聚焦均无提示线) */
 .approval-sheet :deep(.el-input__wrapper),
@@ -1740,7 +1850,8 @@ defineExpose({ focusField })
 }
 .as-no {
   width: 52px;
-  flex: none;
+  min-width: 34px;
+  flex: 0 1 auto;
   background: #29b8f0;
   color: #fff;
   font-size: 15px;
@@ -1749,8 +1860,12 @@ defineExpose({ focusField })
   padding: 0 0 0 10px;
 }
 .as-name {
+  /* 2026-11-13：允许在窄排版（A4 733px）下收缩，但保住最小宽度 —— 否则标签会被压成竖排字 */
   width: 150px;
-  flex: none;
+  min-width: 84px;
+  flex: 0 1 auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
   background: #29b8f0;
   color: #fff;
   font-size: 19px;
@@ -1814,8 +1929,20 @@ defineExpose({ focusField })
   min-width: 0;
 }
 .as-remark {
-  width: 250px;
-  flex: none;
+  /* 2026-11-13 用户口径：「申请立项时间可以往右边挪，因为备注不会写那么多」。
+     原来是 `width:250px; flex:none` —— 它**永远**占满右侧 250px，于是底部签名行
+     （申请立项人 / 申请立项日期）被截在纸宽 3/4 处，右边空着却用不上。
+     现在：给一个**上限**（备注仍要能写字），但允许收缩 —— 正文（.as-body > .as-table
+     是 flex:1）优先拿宽度，窄排版（导出 A4 733px）时备注先让路。
+     base 宽度 250 → 190：实际单据的备注基本是空的，200 左右足够写两行字。 */
+  flex: 0 1 auto;
+  /* 2026-11-13 第二轮（「调整为单行显示」）：备注再收一档 190 → 150。
+     实测 733px 纸宽下：备注 190px 时表格只剩 541px，签名项各约 287/254，
+     「系统管理员」在 85px 的值区里折两行；收到 150px 后表格 581px，
+     值区约 125px ⇒ 能放下 6 个字（用户口径「备注不会写那么多」）。 */
+  width: 150px;
+  min-width: 88px;
+  max-width: 190px;
   border-left: 3px dotted #9a9a9a;
   display: flex;
   flex-direction: column;
@@ -2364,9 +2491,23 @@ defineExpose({ focusField })
 }
 .as-sign-pair {
   display: flex;
+  /* 允许收缩到比内容更窄（否则长值会把整行撑破、或让相邻项吃不到宽度） */
+  min-width: 0;
 }
 .as-sign-cell {
-  flex: none;
+  /* 2026-11-13 用户口径「宽度不够填写数据自动换行，适配 A4 纸」——
+     导出时纸面会被压到 A4 内容宽（733px）。此前这里是 `flex:none` + 内联 px 宽（202/150），
+     完全不收缩 ⇒ 压窄后值区只剩几十像素，**「系统管理员」被挤成一字一行**（截图实测）。
+     现在：允许收缩但保住最小可读宽度（min-width + 文字不换行），
+     多余的空间缺口由 .as-sign-val 承担（它的 min-width 见下）。 */
+  /* 2026-11-13 用户口径「调整为单行显示」：
+     标签格在**窄排版**下要主动让宽给值区，否则值区只有 85px，「系统管理员」被折两行。
+     做法：`flex-shrink` 放大（让收缩发生在标签上，而不是值区），并且下限压到文字宽（68px）。
+     basis 由内联样式给（= 设计宽 202/150）。 */
+  flex-grow: 0;
+  flex-shrink: 8;
+  min-width: 68px;
+  white-space: nowrap;
   background: #29b8f0;
   color: #fff;
   font-size: 16px;
@@ -2382,11 +2523,18 @@ defineExpose({ focusField })
   color: #1f5fa8;
 }
 .as-sign-val {
-  flex: 1;
+  /* 值区优先吃剩余宽度（grow 比标签格大很多），并在单行放得下时不换行 ——
+     用户口径「调整为单行显示」（2026-11-13）：同一行里标签在左、值在右，值不折行。 */
+  flex: 100 1 0%;
+  /* 最小宽度 = 能放下 4 个中文字（约 64px）；再窄就会变成一字一行（2026-11-13 实测）。
+     真装不下时由 .as-sign-row 溢出/换行处理，而不是把字竖排。 */
+  min-width: 64px;
   display: flex;
   align-items: center;
   padding: 0 10px;
   min-height: 50px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 </style>
 
@@ -2467,9 +2615,9 @@ defineExpose({ focusField })
     page-break-inside: avoid !important;
   }
   /* 表格式纸面（样品申请单 layout:'grid'，2026-11-06）：
-   * 两张纸 1188/1450px，竖向 A4 只装得下 733px ⇒ 字会缩到 0.5 以下。
+   * 两张纸 1188/1220px，竖向 A4 只装得下 733px ⇒ 字会缩到 0.5 以下。
    * 由 PanelxList.printApprovalSheet 注入 `@page{size:A4 landscape}`（281mm ≈ 1062px）并把
-   * --print-zoom 按横向可打印宽算好（1188 ⇒ 0.89、1450 ⇒ 0.73），这里只负责定宽 + 缩放 + 不截断。
+   * --print-zoom 按横向可打印宽算好（1188 ⇒ 0.89、1220 ⇒ 0.87），这里只负责定宽 + 缩放 + 不截断。
    * ⚠ 纸宽走 --sg-print-w（内联在 .approval-sheet 上，由 sheetStyle 给），不写死 —— 两张纸宽度不同。 */
   body.approval-printing .approval-sheet:has(.sg-table) {
     width: var(--sg-print-w, 1188px) !important;

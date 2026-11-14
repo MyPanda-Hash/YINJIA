@@ -155,12 +155,12 @@ public class PushGenerateHandler implements PanelActionHandler {
             Object v = head.get(m.get("from"));
             if (v != null) targetHead.put(m.get("to"), v);
         }
-        targetHead.put("来源单据", srcDef.name());
-        targetHead.put("来源单号", sourceNo);
+        PanelRegistry.PanelDef tgtDef = registry.panel(target);
+        targetHead.put(colLabel(tgtDef, "来源单据", "来源单据"), srcDef.name());
+        targetHead.put(colLabel(tgtDef, "来源单号", "来源单号"), sourceNo);
         // 单据日期=创建当日,不继承来源单日期(2026-09-17 用户口径)。注意:head 键=目标字段标签
         // (save 按标签映射列),而 yj_panel.date_col 是列名(如 QC_RECV 列=单据日期/标签=日期),
         // 故先按列名反查目标字段再用其标签写入;查不到时兜底「单据日期」标签。
-        PanelRegistry.PanelDef tgtDef = registry.panel(target);
         String dateLabel = "单据日期";
         if (tgtDef.dateCol() != null && !tgtDef.dateCol().isBlank()) {
             PanelRegistry.FieldDef df = tgtDef.byCol(tgtDef.dateCol());
@@ -238,11 +238,61 @@ public class PushGenerateHandler implements PanelActionHandler {
         // 口径与 ButtonService.inspAutoPurchaseIn(检验审核→入库)完全一致 —— 共用 presetBinFor 一份实现:
         //   物料默认(bs_inv.默认仓位) ⇢ 该仓默认(bs_wh_loc.是否默认),且仅当该仓启用仓位管理=1。
         // 仓库取本行已映射的值;取不到时回落来源行的「仓库」(detailMap 未登记该列时的兜底)。
+        // ⚠ 2026-11-13:只有本行**还没有**仓位时才预设 —— 用户/上游链路已经带下来的仓位不许被覆盖
+        //    (生单对话框按行选的仓位、暂收行带下来的仓位都走这条路,覆盖等于把用户的选择改掉)。
+        if (row.get("仓位") != null && !String.valueOf(row.get("仓位")).isBlank()) return;
         Object wh = row.get("仓库") != null ? row.get("仓库") : (srcItem == null ? null : srcItem.get("仓库"));
         String bin = buttonService.presetBinFor(
                 srcItem == null || srcItem.get("物料编码") == null ? null : String.valueOf(srcItem.get("物料编码")),
                 wh == null ? null : String.valueOf(wh));
         if (bin != null) row.put("仓位", bin);
+    }
+
+    /**
+     * 生单对话框里按行选的「仓库 / 仓位」键(2026-11-13 用户口径)。
+     * 目标面板**没有**对应明细标签的键静默丢弃(与通用保存"按标签映射列"同一口径);
+     * 唯一例外是仓库:来料检验单的仓库列叫「仓库代码」,按异名落上去。
+     */
+    private static final List<String> WHBIN_KEYS = List.of(
+            "仓库", "仓库编码", "仓库id", "仓库启用仓位管理", "仓位", "仓位编码", "仓位名称", "仓位id");
+
+    /** 取某行的仓库/仓位预填(没有则 null;空 map 也按没有处理) */
+    private static Map<String, Object> whBinOf(Map<String, Map<String, Object>> whBinByLine, String lineKey) {
+        if (whBinByLine == null || lineKey == null) return null;
+        Map<String, Object> v = whBinByLine.get(lineKey);
+        return v == null || v.isEmpty() ? null : v;
+    }
+
+    /** 把「仓库 / 仓位」预填落到目标明细行(见 {@link #WHBIN_KEYS}) */
+    private void applyWhBin(Map<String, Object> row, Map<String, Object> whBin,
+                            PanelRegistry.PanelDef tgtDef) {
+        if (row == null || whBin == null || whBin.isEmpty() || tgtDef == null) return;
+        java.util.Set<String> det = new java.util.HashSet<>();
+        for (PanelRegistry.FieldDef f : tgtDef.fieldsAt("detail")) det.add(f.label());
+        for (String k : WHBIN_KEYS) {
+            Object v = whBin.get(k);
+            if (v == null || String.valueOf(v).isBlank()) continue;
+            if (det.contains(k)) {
+                row.put(k, v);
+            } else if ("仓库".equals(k) && det.contains("仓库代码")) {
+                row.put("仓库代码", v);     // 来料检验行的仓库列异名
+            }
+        }
+    }
+
+    /**
+     * 目标面板「来源单据 / 来源单号」两列的**字段标签** —— 按列名反查,不写死标签。
+     *
+     * <p>为什么:2026-11-11 用户口径「采购入库单表头最末尾加一个来源…和显示对应的单据编号」,
+     * 采购入库单把这两列的显示名正名为 **来源** / 来源单号,并挪到表头末尾
+     * (见 {@code tools/migrate-purchase-in-source-20261111.sql}),其余面板仍叫「来源单据」。
+     * 通用保存是**按标签映射列**的,查不到标签的键会被静默丢弃 —— 写死「来源单据」就等于
+     * 入库单这两个字段永远空着,而其余面板照旧(极难察觉)。
+     */
+    private static String colLabel(PanelRegistry.PanelDef def, String col, String fallback) {
+        if (def == null) return fallback;
+        PanelRegistry.FieldDef f = def.byCol(col);
+        return f == null ? fallback : f.label();
     }
 
     private double numOf(Object v) {
@@ -499,6 +549,23 @@ public class PushGenerateHandler implements PanelActionHandler {
     public Map<String, Object> generateBatch(String sourcePanel, String targetPanel, String sourceNo,
                                              String user, Map<String, Double> qtyByLineKey,
                                              Double overRatioOverride, String batchNoOverride) {
+        return generateBatch(sourcePanel, targetPanel, sourceNo, user, qtyByLineKey, overRatioOverride,
+                batchNoOverride, null);
+    }
+
+    /**
+     * 分批生单(带**行级仓库/仓位**预填):whBinByLine = lineKey → {仓库,仓位,...}(生单对话框按行选的)。
+     *
+     * <p>见 {@link #generateOne} 的同名参数说明。落点在这条链路的**合并行之后**:同一订单行的
+     * 隔离行 + 原行会被合并成一行,这时取该组里第一个带了仓库/仓位的成员(同一订单行本就是同一物料,
+     * 仓库/仓位也该是同一个值)。
+     */
+    @Transactional
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> generateBatch(String sourcePanel, String targetPanel, String sourceNo,
+                                             String user, Map<String, Double> qtyByLineKey,
+                                             Double overRatioOverride, String batchNoOverride,
+                                             Map<String, Map<String, Object>> whBinByLine) {
         PanelRegistry.PanelDef srcDef = registry.panel(sourcePanel);
         PanelRegistry.PanelDef tgtDef = registry.panel(targetPanel);
         if (!isBatchTarget(targetPanel)) throw new IllegalStateException("目标面板未启用分批送料:" + targetPanel);
@@ -614,8 +681,8 @@ public class PushGenerateHandler implements PanelActionHandler {
             Object v = head.get(m.get("from"));
             if (v != null) targetHead.put(m.get("to"), v);
         }
-        targetHead.put("来源单据", srcDef.name());
-        targetHead.put("来源单号", sourceNo);
+        targetHead.put(colLabel(tgtDef, "来源单据", "来源单据"), srcDef.name());
+        targetHead.put(colLabel(tgtDef, "来源单号", "来源单号"), sourceNo);
 
         // 批次键 + 批次号(2026-10-04 口径:**生单即定号**,且在生单对话框里可当场改)
         // · 批次键:来源单已带「批次键」时**继承**它(键在「采购订单→送料暂收单」这一跳产生),
@@ -668,6 +735,8 @@ public class PushGenerateHandler implements PanelActionHandler {
         targetHead.put(dateLabel, java.time.LocalDate.now().toString());
 
         boolean rowHasBatch = tgtDef.fieldsAt("detail").stream().anyMatch(f -> "批次号".equals(f.label()));
+        // 行级「采购单号」(2026-11-13 用户口径「明细行都要带采购订单号,不能只有表头有」)
+        boolean rowHasPoNo = detailHas(tgtDef, "采购单号");
         // ★ 合并成一行明细(2026-10-04 用户口径「与打印的明细组合生单是需要合并的」):
         //   同一个采购订单行上,"已打印那一行(隔离行)"与"原行未打印量"如果被一起勾上,
         //   生成的单据里**只出现一行、数量相加**(400 = 350 + 50),不再出现同一物料两行。
@@ -695,7 +764,18 @@ public class PushGenerateHandler implements PanelActionHandler {
             }
             row.put(tgtQtyLabel, round2(qty));      // 合并后的本次送料数量(打印量 + 未打印量)
             if (rowHasBatch) row.put("批次号", batchNo);   // 行随单头(同一批次号,头行一致)
+            // 行级「采购单号」(2026-11-13 用户口径「明细行都要带采购订单号,不能只有表头有」):
+            // 头一跳(来源 = 采购订单)时把**订单号**写进每一行;下游各站由 detailMap 的
+            // 采购单号→采购单号 同义词原样继承(这里不覆盖,否则会把上游订单号写成暂收单号)。
+            if (rowHasPoNo && isOrderSource(sourcePanel)) row.put("采购单号", sourceNo);
             applySourceFlags(sourcePanel, targetPanel, item, row);
+            // 生单对话框按行选的 仓库/仓位:合并组里取第一个有值的成员(同一订单行 = 同一物料同一仓位)
+            Map<String, Object> whBin = null;
+            for (Map<String, Object> p : members) {
+                whBin = whBinOf(whBinByLine, str(p.get("lineKey")));
+                if (whBin != null) break;
+            }
+            applyWhBin(row, whBin, tgtDef);
             targetItems.add(row);
         }
 
@@ -921,12 +1001,28 @@ public class PushGenerateHandler implements PanelActionHandler {
     @Transactional
     public Map<String, Object> generateOne(String sourcePanel, String action, String sourceNo, String user,
                                            Map<String, Double> qtyByLineKey, String batchNo) {
+        return generateOne(sourcePanel, action, sourceNo, user, qtyByLineKey, batchNo, null);
+    }
+
+    /**
+     * 生单(带**行级仓库/仓位**预填)。
+     *
+     * <p>2026-11-13 用户口径:「从采购订单生单的时候就开始预填仓库仓位」「生单可以选仓库和仓位,
+     * 可以每行不一样,也可以所有行带入第一个填入的仓库和仓位」。
+     * 前端在生单对话框里按行选好 仓库/仓位 后随行一起提交({@code whBinByLine}: lineKey → 值),
+     * 这里在**行映射之后**落到目标行上(用户选的优先于来源行自动带过来的值),
+     * 后续各站(暂收→检验→入库)只要目标面板有对应字段,就由映射继续往下带。
+     */
+    @Transactional
+    public Map<String, Object> generateOne(String sourcePanel, String action, String sourceNo, String user,
+                                           Map<String, Double> qtyByLineKey, String batchNo,
+                                           Map<String, Map<String, Object>> whBinByLine) {
         String target = pushTarget(sourcePanel, action);
         if (target == null) throw new IllegalStateException("该动作没有可用的生单目标:" + action);
         if (isBatchTarget(target)) {
-            return generateBatch(sourcePanel, target, sourceNo, user, qtyByLineKey, null, batchNo);
+            return generateBatch(sourcePanel, target, sourceNo, user, qtyByLineKey, null, batchNo, whBinByLine);
         }
-        return generateLines(sourcePanel, action, target, sourceNo, user, qtyByLineKey);
+        return generateLines(sourcePanel, action, target, sourceNo, user, qtyByLineKey, whBinByLine);
     }
 
     /**
@@ -943,7 +1039,8 @@ public class PushGenerateHandler implements PanelActionHandler {
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> generateLines(String sourcePanel, String action, String target,
-                                              String sourceNo, String user, Map<String, Double> qtyByLineKey) {
+                                              String sourceNo, String user, Map<String, Double> qtyByLineKey,
+                                              Map<String, Map<String, Object>> whBinByLine) {
         // 1) 来源必须已审核(与整单推式生单同一句话,前端置灰 + 后端兜底)
         String status = str(buttonService.docStatus(sourcePanel, sourceNo).get("status"));
         if (!"已审核".equals(status)) throw new IllegalStateException("仅已审核单据可生单,当前状态:" + status);
@@ -1007,8 +1104,8 @@ public class PushGenerateHandler implements PanelActionHandler {
             Object v = head.get(m.get("from"));
             if (v != null) targetHead.put(m.get("to"), v);
         }
-        targetHead.put("来源单据", srcDef.name());
-        targetHead.put("来源单号", sourceNo);
+        targetHead.put(colLabel(tgtDef, "来源单据", "来源单据"), srcDef.name());
+        targetHead.put(colLabel(tgtDef, "来源单号", "来源单号"), sourceNo);
         String dateLabel = "单据日期";
         if (tgtDef.dateCol() != null && !tgtDef.dateCol().isBlank()) {
             PanelRegistry.FieldDef df = tgtDef.byCol(tgtDef.dateCol());
@@ -1027,6 +1124,8 @@ public class PushGenerateHandler implements PanelActionHandler {
             // 本次数量**压掉**映射带过来的整行数量(这正是"可以选择数量"的落点)
             row.put(tgtQtyLabel, round2((double) p.get("qty")));
             applySourceFlags(sourcePanel, target, item, row);
+            // 生单对话框里按行选的 仓库/仓位(用户选择优先于映射带过来的值,见 applyWhBin)
+            applyWhBin(row, whBinOf(whBinByLine, str(p.get("lineKey"))), tgtDef);
             targetItems.add(row);
         }
 
@@ -1085,5 +1184,275 @@ public class PushGenerateHandler implements PanelActionHandler {
     private static void setIfRegistered(Map<String, Object> target, PanelRegistry.PanelDef def,
                                        String place, String label, Object value) {
         if (def.fieldsAt(place).stream().anyMatch(f -> label.equals(f.label()))) target.put(label, value);
+    }
+
+    /** 目标面板明细里有没有这个标签(合单生单写行级「采购单号」前先判) */
+    private static boolean detailHas(PanelRegistry.PanelDef def, String label) {
+        return def != null && def.fieldsAt("detail").stream().anyMatch(f -> label.equals(f.label()));
+    }
+
+    /**
+     * 来源面板是不是**采购订单**(含供应商门户的采购订单副本)。
+     *
+     * <p>用来判断"本跳要不要把采购单号写进行":链路头一跳(采购订单)必须写;
+     * 下游(暂收→检验→退回/入库)一律由映射继承,绝不拿 sourceNo 覆盖
+     * —— 否则会把「采购单号」写成暂收单号,整条溯源就断了。
+     */
+    private static boolean isOrderSource(String sourcePanel) {
+        return "PU_ORDER".equals(sourcePanel) || "SUPPLIER_PU_ORDER".equals(sourcePanel);
+    }
+
+    // ==================== 合单生单(2026-11-13 用户口径) ====================
+
+    /**
+     * **合单生单**:多张**同一供应商**的采购订单 → **一张**送料暂收单。
+     *
+     * <p>用户口径(2026-11-13):
+     * 「采购订单新增一个合单生单在生单按钮下面,可以选择同一供应商的单据,进行合单,合成一张送料暂收单。
+     *   并且要注意后面的逻辑(对应的行号有的是对应采购订单行号,是合单前的行号。有些对应行号的送料暂收后的
+     *   行号是送料暂收的行号,是合单后的行号)」
+     *
+     * <p>与"批量生单"的区别(别混):批量生单 = N 张来源单各生成 N 张目标单(逐张、各自批次号);
+     * 合单生单 = N 张来源单的**行并进同一张**目标单,共用**一个**批次号/单据号。
+     *
+     * <p><b>行号语义(本方法的核心约定)</b>:
+     * <ul>
+     *   <li><b>采购单号</b>(行级)= 合单**前**的采购订单号 —— 合单后唯一能认出"这行原属哪张订单"的键,
+     *       逐站带下去(暂收→检验→退回/入库),转ERP 作行级 {@code src_bill_no};</li>
+     *   <li><b>采购订单行号</b> = 合单**前**来源订单上的行号,照旧由 detailMap 的 行号→采购订单行号 带下,
+     *       转ERP 作 {@code src_seq};</li>
+     *   <li><b>暂收单自己的行 id / form_flow_link.source_line_key</b>({@code 暂收单号#行id})= 合单**后**
+     *       的行标识,占用与反查一律走它 —— 本方法按保存顺序回查目标行 id 建占用,口径与原分批生单一致。</li>
+     * </ul>
+     *
+     * <p>校验:每张来源单都必须**已审核**、且有本次勾选的行;所有来源单的**供应商必须相同**
+     * (用户口径「选择同一供应商的单据」)—— 不同供应商直接拒绝,并点名是哪两张单不一致。
+     *
+     * @param docs 每张来源单一条:{@code sourceNo, lines:[{lineKey, qty, 仓库/仓位...}]}
+     */
+    @Transactional
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> generateMerged(String sourcePanel, String action,
+                                              List<Map<String, Object>> docs, String batchNoOverride,
+                                              String user) {
+        String target = pushTarget(sourcePanel, action);
+        if (target == null) throw new IllegalStateException("该动作没有可用的生单目标:" + action);
+        if (!isBatchTarget(target)) {
+            throw new IllegalStateException("合单生单只支持分批链路(目标面板表头有「批次号」):" + target);
+        }
+        if (docs == null || docs.size() < 2) throw new IllegalStateException("合单生单至少要选两张来源单据");
+
+        PanelRegistry.PanelDef srcDef = registry.panel(sourcePanel);
+        PanelRegistry.PanelDef tgtDef = registry.panel(target);
+        Map<String, Object> maps = configService.flowMaps(sourcePanel, target);
+        if (maps == null) throw new IllegalStateException("目标面板未配置流转来源:" + target);
+        List<Map<String, String>> headerMap = (List<Map<String, String>>) maps.get("headerMap");
+        List<Map<String, String>> detailMap = (List<Map<String, String>>) maps.get("detailMap");
+        String tgtQtyLabel = qtyLabelOf(tgtDef, "detail");
+        boolean rowHasBatch = detailHas(tgtDef, "批次号");
+        boolean rowHasPoNo = detailHas(tgtDef, "采购单号");
+
+        double ratio = batchService.overRatio();
+        // 头:供应商必须全同;其余头字段取第一张单(日期一律当天)
+        Map<String, Object> firstHead = null;
+        String supplier = "";
+        String supplierCode = "";
+        List<String> orderNos = new ArrayList<>();
+        // 勾选行收集(顺序 = 文档顺序 × 行顺序;最终 targetItems 与 links 共用这一份顺序)
+        record Pick(String sourceNo, Map<String, Object> item, Map<String, Object> row,
+                    double qty, String lineKey) { }
+        List<Pick> picks = new ArrayList<>();
+
+        // ── 第一轮:**先**把所有来源单的状态与供应商核完(业务规则优先于数量校验)──
+        // 用户口径「可以选择同一供应商的单据」——混了别的供应商要第一句就说清,而不是先报某行超量。
+        Map<String, Map<String, Object>> srcOf = new LinkedHashMap<>();
+        for (Map<String, Object> doc : docs) {
+            String no = str(doc.get("sourceNo"));
+            if (no.isEmpty()) continue;
+            String status = str(buttonService.docStatus(sourcePanel, no).get("status"));
+            if (!"已审核".equals(status)) throw new IllegalStateException("仅已审核单据可生单:" + no + "(当前 " + status + ")");
+            Map<String, Object> src = queryService.loadOneDoc(srcDef, no);
+            if (src == null || src.isEmpty()) throw new IllegalStateException("来源单据不存在:" + no);
+            Map<String, Object> head = new LinkedHashMap<>(src);
+            head.remove("detail");
+            if (firstHead == null) firstHead = head;
+            String sup = str(head.get("供应商"));
+            String supCode = str(head.get("供应商编码"));
+            if (supplier.isEmpty()) { supplier = sup; supplierCode = supCode; }
+            else if (!supplier.equals(sup)) {
+                throw new IllegalStateException("合单生单只允许**同一供应商**的单据:" + orderNos.get(0)
+                        + " 是「" + supplier + "」," + no + " 是「" + sup + "」");
+            }
+            orderNos.add(no);
+            srcOf.put(no, src);
+        }
+        if (orderNos.size() < 2) throw new IllegalStateException("合单生单至少要两张来源单据");
+
+        // ── 第二轮:逐单逐行取本次送料量并校验上限 ──
+        for (Map<String, Object> doc : docs) {
+            String no = str(doc.get("sourceNo"));
+            if (no.isEmpty()) continue;
+            Map<String, Object> src = srcOf.get(no);
+
+            Map<String, Double> qtyByLine = new LinkedHashMap<>();
+            Object rawLines = doc.get("lines");
+            if (rawLines instanceof List<?> lineList) {
+                for (Object lo : lineList) {
+                    if (!(lo instanceof Map<?, ?> lm)) continue;
+                    String key = str(lm.get("lineKey"));
+                    if (key.isEmpty()) continue;
+                    qtyByLine.put(key, lm.get("qty") == null ? 0d : numOf(lm.get("qty")));
+                }
+            }
+            if (qtyByLine.isEmpty()) throw new IllegalStateException("合单生单的来源单没有勾选行:" + no);
+
+            // 候选行与单张分批生单同一份口径(batchRows),逐行校验可送上限
+            List<Map<String, Object>> srcItems = new ArrayList<>(itemsOf(src));
+            if (srcItems.isEmpty()) throw new IllegalStateException("来源单据无明细行,不能生单:" + no);
+            Map<String, Map<String, Object>> byKey = new LinkedHashMap<>();
+            for (Map<String, Object> r : batchRows(sourcePanel, no, srcItems,
+                    batchService.sentByLineKey(sourcePanel, no), batchService.returnedByOrderLine(no), ratio)) {
+                byKey.put(str(r.get("lineKey")), r);
+            }
+            for (Map.Entry<String, Double> e : qtyByLine.entrySet()) {
+                String lineKey = e.getKey();
+                double qty = e.getValue() == null ? 0d : e.getValue();
+                if (qty <= 0.000001) continue;
+                Map<String, Object> r = byKey.get(lineKey);
+                if (r == null) throw new IllegalStateException("送料行不存在或已失效:" + lineKey);
+                Map<String, Object> item = sourceItemOf(srcItems, orderKeyOf(lineKey));
+                if (item == null) throw new IllegalStateException("送料行对应的来源明细已不存在:" + lineKey);
+                double cap = isIsolatedKey(lineKey) ? numOf(r.get("剩余数量")) : numOf(r.get("可送上限"));
+                if (qty > cap + 0.000001) {
+                    // 行号可能为空(部分面板明细没 seq),别把提示写成「第 null 行」
+                    String label = str(r.get("行号")).isBlank()
+                            ? "物料 " + str(item.get("物料编码")) + " 这一行" : "第 " + r.get("行号") + " 行";
+                    throw new IllegalStateException(no + " " + label + "本次送料量 " + round2(qty)
+                            + " 超出允许上限 " + round2(cap));
+                }
+                picks.add(new Pick(no, item, r, qty, lineKey));
+            }
+        }
+        if (picks.size() < 1) throw new IllegalStateException("合单生单没有可送的行");
+        if (supplier.isEmpty() && supplierCode.isEmpty()) {
+            throw new IllegalStateException("来源单据没有供应商,不能合单生单");
+        }
+
+        // —— 目标单头(一张)——
+        Map<String, Object> targetHead = new LinkedHashMap<>();
+        if (firstHead != null) {
+            for (Map<String, String> m : headerMap) {
+                Object v = firstHead.get(m.get("from"));
+                if (v != null) targetHead.put(m.get("to"), v);
+            }
+        }
+        setIfRegistered(targetHead, tgtDef, "header", "供应商", supplier);
+        // 暂收单头的供应商编码字段叫「供应商代码」(其余面板叫「供应商编码」)—— 两个名字都试,谁注册写谁
+        setIfRegistered(targetHead, tgtDef, "header", "供应商代码", supplierCode);
+        setIfRegistered(targetHead, tgtDef, "header", "供应商编码", supplierCode);
+        // 合单后表头「采购订单号」放**全部订单号**(给人看);真正的行级归属看每行的「采购单号」。
+        setIfRegistered(targetHead, tgtDef, "header", "采购订单号", String.join("、", orderNos));
+        targetHead.put(colLabel(tgtDef, "来源单据", "来源单据"), srcDef.name() + "(合单)");
+        targetHead.put(colLabel(tgtDef, "来源单号", "来源单号"), String.join("、", orderNos));
+        String dateLabel = "单据日期";
+        if (tgtDef.dateCol() != null && !tgtDef.dateCol().isBlank()) {
+            PanelRegistry.FieldDef df = tgtDef.byCol(tgtDef.dateCol());
+            if (df != null) dateLabel = df.label();
+        }
+        targetHead.put(dateLabel, java.time.LocalDate.now().toString());
+
+        // —— 批次号/批次台账:一张合单 = 一个号 ——
+        String batchNo;
+        String manual = str(batchNoOverride);
+        if (manual.length() > BATCH_NO_MAX) {
+            throw new IllegalArgumentException("批次号过长(最多 " + BATCH_NO_MAX + " 个字符):" + manual);
+        }
+        batchNo = manual.isEmpty() ? BatchService.buildBatchNo(java.time.LocalDate.now()) : manual;
+        int batchId = batchService.createBatch(sourcePanel, orderNos.get(0), target, batchNo, user);
+        targetHead.put("批次键", batchId);
+        setIfRegistered(targetHead, tgtDef, "header", "批次号", batchNo);
+
+        // —— 目标行:N 张单的行并进同一张,逐行记住「采购单号(合单前订单号)」——
+        List<Map<String, Object>> targetItems = new ArrayList<>();
+        List<Pick> rowPick = new ArrayList<>();      // targetItems 下标 ↔ Pick(占用建 link 用)
+        for (Pick p : picks) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            for (Map<String, String> m : detailMap) {
+                Object v = p.item().get(m.get("from"));
+                if (v != null) row.put(m.get("to"), v);
+            }
+            row.put(tgtQtyLabel, round2(p.qty()));
+            if (rowHasBatch) row.put("批次号", batchNo);
+            // ★ 合单**前**的订单号(行级):合单后一行一个号,不能靠表头
+            if (rowHasPoNo) row.put("采购单号", p.sourceNo());
+            applySourceFlags(sourcePanel, target, p.item(), row);
+            Map<String, Object> whBin = whBinCacheOf(docs, p.sourceNo(), p.lineKey());
+            applyWhBin(row, whBin.isEmpty() ? null : whBin, tgtDef);
+            targetItems.add(row);
+            rowPick.add(p);
+        }
+
+        Map<String, Object> formData = new LinkedHashMap<>(targetHead);
+        formData.put("detail", Map.of("items", targetItems));
+        Map<String, Object> saved = buttonService.save(tgtDef, formData, false);
+        String newNo = String.valueOf(saved.get("编号"));
+
+        // —— 占用(行级):按保存顺序取目标行 id,与 rowPick 一一对应 ——
+        List<Integer> tgtIds = jdbc.queryForList("SELECT id FROM " + tgtDef.lineTable()
+                        + " WHERE [" + tgtDef.groupCol() + "] = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id",
+                Integer.class, newNo);
+        Map<String, List<VoucherFlowService.BatchLine>> linksBySource = new LinkedHashMap<>();
+        double sum = 0;
+        for (int i = 0; i < rowPick.size(); i++) {
+            Pick p = rowPick.get(i);
+            if (p.qty() <= 0) continue;
+            sum += p.qty();
+            Integer tgtId = i < tgtIds.size() ? tgtIds.get(i) : null;
+            linksBySource.computeIfAbsent(p.sourceNo(), k -> new ArrayList<>()).add(new VoucherFlowService.BatchLine(
+                    p.lineKey(),
+                    tgtId == null ? null : newNo + "#" + tgtId,
+                    p.item().get("物料编码") == null ? null : String.valueOf(p.item().get("物料编码")),
+                    numOf(p.row() == null ? p.item().get("数量") : p.row().get("数量")), p.qty()));
+        }
+        for (Map.Entry<String, List<VoucherFlowService.BatchLine>> e : linksBySource.entrySet()) {
+            voucherFlow.linkBatch(sourcePanel, e.getKey(), target, newNo, null, batchId, e.getValue());
+        }
+        jdbc.update("UPDATE form_flow_link SET batch_no = ? WHERE batch_id = ? AND ISNULL(batch_no, N'') = N''",
+                batchNo, batchId);
+        batchService.bind(batchId, target, newNo, round2(sum));
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("编号", newNo);
+        out.put("批次号", batchNo);
+        out.put("批次键", batchId);
+        out.put("单据状态", "草稿");
+        out.put("gotoPanel", target);
+        out.put("本次送料合计", round2(sum));
+        out.put("合单来源", orderNos);
+        out.put("合单行数", rowPick.size());
+        return out;
+    }
+
+    /**
+     * 合单生单里某行的仓库/仓位预填:从该来源单的 lines 里按 lineKey 取回
+     * (合单是"按单据 × 行"两组循环,预填值挂在原始请求体上,不在 picked 里)。
+     */
+    private Map<String, Object> whBinCacheOf(List<Map<String, Object>> docs, String sourceNo, String lineKey) {
+        for (Map<String, Object> doc : docs) {
+            if (!sourceNo.equals(str(doc.get("sourceNo")))) continue;
+            Object rawLines = doc.get("lines");
+            if (!(rawLines instanceof List<?> list)) return Map.of();
+            for (Object lo : list) {
+                if (!(lo instanceof Map<?, ?> lm)) continue;
+                if (!lineKey.equals(str(lm.get("lineKey")))) continue;
+                Map<String, Object> out = new LinkedHashMap<>();
+                for (String k : WHBIN_KEYS) {
+                    Object v = lm.get(k);
+                    if (v != null && !String.valueOf(v).isBlank()) out.put(k, v);
+                }
+                return out;
+            }
+        }
+        return Map.of();
     }
 }

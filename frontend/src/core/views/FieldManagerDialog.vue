@@ -31,12 +31,31 @@ const extFieldRetire = (payload) => engine.extFieldRetire(payload)
 const loading = ref(false)
 const saving = ref(false)
 const data = ref({ capacity: 20, fields: [], linePool: [] })
-const form = ref({ label: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false, tab: '', parent: '' })
+const form = ref({ label: '', label2: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false, tab: '', parent: '' })
 /** 需要指定「所属页签」的面板:传了 tabs 就是 */
 const needTab = () => Array.isArray(props.tabs) && props.tabs.length > 0
-const blankForm = () => ({ label: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false, tab: needTab() ? (props.defaultTab || props.tabs[0].value) : '', parent: '' })
+const blankForm = () => ({ label: '', label2: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false, tab: needTab() ? (props.defaultTab || props.tabs[0].value) : '', parent: '' })
 /** 当前所选页签的父字段候选 */
 const parentOptions = computed(() => (needTab() && props.parentOptionsOf ? props.parentOptionsOf(form.value.tab) || [] : []))
+/**
+ * 该面板是否支持「父字段(分组)」= 分页签面板(下拉候选) 或 支持自定义列的数据记录表(自由输入)。
+ * 判据取后端下发的 cap<capacity(数据记录表 8 < 20),避免前端再写一份面板码白名单。
+ */
+const supportsGroup = computed(() => {
+  if (needTab()) return true
+  const cap = Number(data.value?.cap)
+  const base = Number(data.value?.capacity)
+  return Number.isFinite(cap) && Number.isFinite(base) && cap < base
+})
+/** 自定义列上限用量(数据记录表 8 列;其余面板 = 备用列池总数,不提示) */
+const capInfo = computed(() => {
+  const cap = Number(data.value?.cap)
+  const used = Number(data.value?.usedOfCap)
+  if (!Number.isFinite(cap) || !Number.isFinite(cap)) return null
+  const base = Number(data.value?.capacity)
+  if (!Number.isFinite(base) || cap >= base) return null
+  return { cap, used: Number.isFinite(used) ? used : 0, full: Number.isFinite(used) && used >= cap }
+})
 /** 父字段下拉没有候选(该表还没任何分组名)—— 提示"直接输入一个新名字即可新建" */
 const parentEmptyHint = computed(() => needTab() && parentOptions.value.length === 0)
 /** 字段列表**只显示当前所选页签自己的**自定义字段(用户口径 2026-10-04:切页签要显示他自己的页面的自定义字段)。
@@ -84,9 +103,25 @@ function usedOf(pool) { return (pool || []).filter((p) => p.bound).length }
 async function submit() {
   saving.value = true
   try {
-    const payload = { ...form.value, panel: props.panelCode }
-    const res = await extFieldAdd(payload)
-    ElMessage.success(tt('字段已添加') + ':' + res.colName)
+    // 2026-11-11 用户口径:分页签面板(两个来料检验要求)的自定义字段**必须是「一个父目录 + 两个子目录」**
+    // —— 一次提交就建两个子列(同一 parent、同一页签),检验报告带入时按 父目录第1行/子1第2行/子2第3行。
+    const twoChildren = needTab()
+    if (twoChildren) {
+      const p = String(form.value.parent || '').trim()
+      const c1 = String(form.value.label || '').trim()
+      const c2 = String(form.value.label2 || '').trim()
+      if (!p) { ElMessage.warning(tt('请先填写父目录名称')); saving.value = false; return }
+      if (!c1 || !c2) { ElMessage.warning(tt('请把子目录1、子目录2 都填上')); saving.value = false; return }
+      if (c1 === c2) { ElMessage.warning(tt('两个子目录不能同名')); saving.value = false; return }
+    }
+    const labels = twoChildren ? [form.value.label, form.value.label2] : [form.value.label]
+    const made = []
+    for (const label of labels) {
+      const payload = { ...form.value, label, label2: undefined, panel: props.panelCode }
+      const res = await extFieldAdd(payload)
+      made.push(res.colName)
+    }
+    ElMessage.success(tt('字段已添加') + ':' + made.join('、'))
     form.value = blankForm()
     await load()
     emit('done')
@@ -119,6 +154,23 @@ async function retire(f) {
 <template>
   <el-dialog :model-value="modelValue" :title="tt('字段管理')" width="640px" append-to-body :close-on-click-modal="false" @update:model-value="emit('update:modelValue', $event)">
     <div v-loading="loading">
+      <!-- 用途说明(2026-11-11 用户口径「这样子的操作指引不够明确」):
+           一句话讲清 做什么 / 加完在哪能看到 / 最多几列。原来只有一行"动态字段 0 · 上限 0/8 列 / 20…"
+           的业务黑话，用户看不出这块是干嘛的。 -->
+      <div class="fm-intro">
+        <div class="fm-intro-main">{{ tt('在这里给这张纸面「加列」。填字段名 →（可选）填分组 → 点「添加」；保存单据后，新列出现在纸面表格的最后一列。') }}</div>
+        <div class="fm-intro-sub">
+          <template v-if="capInfo">{{ tt('最多') }} <b :class="{ 'fm-cap-full': capInfo.full }">{{ capInfo.cap }}</b> {{ tt('列，已用') }} <b :class="{ 'fm-cap-full': capInfo.full }">{{ capInfo.used }}</b> {{ tt('列') }}</template>
+          <template v-else>{{ tt('上限') }} {{ data.capacity }} {{ tt('列') }}</template>
+          <span class="fm-intro-note">{{ tt('（「承载列」是系统分配的占用列，不用管）') }}</span>
+        </div>
+      </div>
+      <!-- 满额提示:比"添加按钮变灰"更能说明该怎么办 -->
+      <el-alert
+        v-if="capInfo?.full && !loading"
+        type="warning" :closable="false" show-icon
+        :title="tt('自定义列已达上限（已用满），如需再加请先在下方列表「停用」不用的列')"
+      />
       <!-- 承载表没有备用列池:说清楚"为什么不能加",而不是让用户点添加再吃一个 500 -->
       <el-alert
         v-if="poolUnavailable && !loading"
@@ -126,13 +178,8 @@ async function retire(f) {
         :title="tt('该表的承载表未预置备用列池（缺少 备用1..20 列），无法新增自定义字段')"
         :description="tt('需要新增字段时：请让管理员先为这张表补 备用1..20 列（见 tools/migrate-share-file-spare-cols-20261016.sql 的做法），补完即可在界面上加字段。')"
       />
-      <div class="fm-summary">
-        {{ tt('动态字段') }} {{ visibleFields.length }}
-        <template v-if="data.tabPools">
-          · {{ tt('每张表各 20 个扩展位') }} · {{ tt('本表已用') }} <b>{{ tabPool ? tabPool.used : 0 }}</b>/{{ data.capacity }}
-        </template>
-        <template v-else-if="data.headPool"> / {{ data.capacity }} · {{ tt('表头池') }} {{ usedOf(data.headPool) }}/{{ (data.headPool || []).length }} · {{ tt('明细池') }} {{ usedOf(data.linePool) }}/{{ (data.linePool || []).length }}</template>
-        <template v-else> / {{ data.capacity }} · {{ tt('池') }} {{ usedOf(data.linePool) }}/{{ (data.linePool || []).length }}</template>
+      <div v-if="data.tabPools" class="fm-summary">
+        {{ tt('本表已用') }} <b>{{ tabPool ? tabPool.used : 0 }}</b>/{{ data.capacity }}
       </div>
       <!-- 各页签用量一览:一眼看出别的表用了多少(列表本身只显示当前页签的) -->
       <div v-if="tabUsage.length" class="fm-tabusage">
@@ -152,7 +199,12 @@ async function retire(f) {
             <el-button link type="danger" size="small" @click="retire(row)">{{ tt('停用') }}</el-button>
           </template>
         </el-table-column>
-        <template #empty>{{ tt('这张表还没有自定义列') }}</template>
+        <template #empty>
+          <div class="fm-empty">
+            <div>{{ tt('这张表还没有自定义列。') }}</div>
+            <div class="fm-empty-steps">{{ tt('① 在下面「新增字段」填字段名　② 想单独一列就留空分组；想和别的列共用一个表头就填分组名　③ 点「添加」') }}</div>
+          </div>
+        </template>
       </el-table>
       <el-divider content-position="left">{{ tt('新增字段') }}</el-divider>
       <el-form :model="form" label-width="90px" size="small" @submit.prevent>
@@ -163,47 +215,72 @@ async function retire(f) {
           </el-select>
           <el-tooltip :content="tt('该列只出现在这张表里;检验数据记录带入时也按这张表的列走')" placement="top"><span class="fm-help">?</span></el-tooltip>
         </el-form-item>
-        <el-form-item :label="tt('字段名')"><el-input v-model="form.label" :placeholder="tt('中文,禁 . % / ( ) 空格')" maxlength="60" /></el-form-item>
-        <!-- 父字段(分组表头):选了父,这一列就并到那个分组标题下;父只是标题、没有数据格,
-             检验数据记录只带入子字段(用户口径 2026-10-04) -->
-        <el-form-item v-if="needTab()" :label="tt('父字段(分组)')">
+        <!-- 2026-11-11 用户口径(第二轮):两个来料检验要求面板**只填这三项**
+             「直接父目录,子目录1,子目录2就行了」—— 其余(类型/位置/查询/必填/列宽)一律按默认走,
+             不再给选;父目录**必填**(不再是"留空=独立列")。
+             2026-11-11 云端再放开:8 张数据记录表也要能「设计分叉…自己新建一个分组」——
+             它们不是分页签面板,故用 supportsGroup 放开**自由输入分组名**(分页签面板仍走下拉)。 -->
+        <el-form-item v-if="supportsGroup" :label="needTab() ? tt('父目录') : tt('分组（分叉）')">
           <div class="fm-parent">
             <el-select
+              v-if="needTab()"
               v-model="form.parent"
               style="width: 220px"
               filterable
               clearable
               allow-create
               default-first-option
-              :placeholder="tt('留空=独立列;可直接输入新分组名')"
+              :placeholder="tt('选择或输入父目录名(必填)')"
             >
               <el-option v-for="p in parentOptions" :key="p" :label="tt(p)" :value="p" />
             </el-select>
-            <span v-if="parentEmptyHint" class="fm-parent-hint">{{ tt('该表还没有分组名：直接输入一个名字（回车）即可新建') }}</span>
+            <el-input
+              v-else
+              v-model="form.parent"
+              style="width: 220px"
+              maxlength="50"
+              clearable
+              :placeholder="tt('留空=独立列;可直接输入新分组名')"
+            />
+            <span v-if="parentEmptyHint" class="fm-parent-hint">{{ needTab() ? tt('该表还没有父目录：直接输入一个名字（回车）即可新建') : tt('该表还没有分组名：直接输入一个名字（回车）即可新建') }}</span>
           </div>
-          <el-tooltip :content="tt('父只做表头分组、没有数据格;检验数据记录只带入子字段')" placement="top"><span class="fm-help">?</span></el-tooltip>
+          <!-- 业务口径说明(云端):留空/填名两种结果,用大白话讲清"两级表头" -->
+          <div v-if="!needTab()" class="fm-hint-line">{{ tt('留空＝单独一列；输入一个新名字＝新建一个表头分组（纸面表头上方会多出一格跨列标题，与「压力 / 出水 / 去除率」同款）。') }}</div>
+          <el-tooltip :content="needTab() ? tt('父目录只做表头分组、没有数据格;检验数据记录带入时按 父目录一行 + 两个子目录各一行') : tt('父只做表头分组、没有数据格;检验数据记录只带入子字段')" placement="top"><span class="fm-help">?</span></el-tooltip>
+        </el-form-item>
+        <el-form-item v-if="needTab()" :label="tt('子目录1')">
+          <el-input v-model="form.label" :placeholder="tt('第一个子目录名(中文,禁 . % / ( ) 空格)')" maxlength="60" />
+        </el-form-item>
+        <el-form-item v-if="!needTab()" :label="tt('字段名')"><el-input v-model="form.label" :placeholder="tt('中文,禁 . % / ( ) 空格')" maxlength="60" /></el-form-item>
+        <el-form-item v-if="needTab()" :label="tt('子目录2')">
+          <el-input v-model="form.label2" :placeholder="tt('第二个子目录名(与子目录1成一对)')" maxlength="60" />
+          <el-tooltip :content="tt('必须一个父目录带两个子目录:子目录1 与 子目录2 一次添加')" placement="top"><span class="fm-help">?</span></el-tooltip>
         </el-form-item>
         <el-form-item :label="tt('英文名')"><el-input v-model="form.labelEn" maxlength="60" /></el-form-item>
-        <el-form-item :label="tt('类型')">
+        <el-form-item v-if="!needTab()" :label="tt('类型')">
           <el-select v-model="form.dataType" style="width: 160px">
             <el-option label="文本" value="文本" /><el-option label="下拉框" value="下拉框" /><el-option label="日期" value="日期" /><el-option label="是否" value="是否" />
           </el-select>
           <el-tooltip :content="tt('日期按 ISO 文本存储,排序正确;数值型请走正式迁移(需合计/排序精度)')" placement="top"><span class="fm-help">?</span></el-tooltip>
         </el-form-item>
-        <el-form-item v-if="form.dataType === '下拉框'" :label="tt('词表')"><el-input v-model="form.dictOptions" :placeholder="tt('逗号分隔,如: 是,否,待定')" /></el-form-item>
-        <el-form-item v-if="data.headPool" :label="tt('位置')">
+        <el-form-item v-if="!needTab() && form.dataType === '下拉框'" :label="tt('词表')"><el-input v-model="form.dictOptions" :placeholder="tt('逗号分隔,如: 是,否,待定')" /></el-form-item>
+        <el-form-item v-if="!needTab() && data.headPool" :label="tt('位置')">
           <el-radio-group v-model="form.place">
             <el-radio value="detail">{{ tt('明细行') }}</el-radio><el-radio value="header">{{ tt('表头') }}</el-radio>
           </el-radio-group>
+          <div class="fm-hint-line fm-hint-inline">{{ tt('明细行＝纸面表格里的数据列（最常用）；表头＝单据抬头字段。') }}</div>
         </el-form-item>
-        <el-form-item :label="tt('进查询区')"><el-switch v-model="form.inQuery" /></el-form-item>
-        <el-form-item :label="tt('必填')"><el-switch v-model="form.required" /></el-form-item>
-        <el-form-item :label="tt('列宽')"><el-input-number v-model="form.width" :min="60" :max="400" /></el-form-item>
+        <el-form-item v-if="!needTab()" :label="tt('进查询区')"><el-switch v-model="form.inQuery" /></el-form-item>
+        <el-form-item v-if="!needTab()" :label="tt('必填')"><el-switch v-model="form.required" /></el-form-item>
+        <el-form-item v-if="!needTab()" :label="tt('列宽')"><el-input-number v-model="form.width" :min="60" :max="400" /></el-form-item>
       </el-form>
     </div>
     <template #footer>
       <el-button @click="emit('update:modelValue', false)">{{ tt('关闭') }}</el-button>
-      <el-button type="primary" :loading="saving" :disabled="poolUnavailable || !form.label" @click="submit">{{ tt('添加') }}</el-button>
+      <span v-if="capInfo" class="fm-cap" :class="{ full: capInfo.full }">
+        {{ tt('自定义列') }} {{ capInfo.used }}/{{ capInfo.cap }}
+      </span>
+      <el-button type="primary" :loading="saving" :disabled="poolUnavailable || !form.label || capInfo?.full || (needTab() && !form.label2)" @click="submit">{{ tt('添加') }}</el-button>
     </template>
   </el-dialog>
 </template>
@@ -215,5 +292,18 @@ async function retire(f) {
 .fm-tabusage-item.cur { color: #1c4f8a; font-weight: 600; }
 .fm-parent { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .fm-parent-hint { font-size: 12px; color: #c08a00; }
+/* 自定义列用量(数据记录表上限 8):满额转红,与"添加"按钮的禁用状态配套说明原因 */
+.fm-cap { font-size: 12px; color: #666; margin-right: 10px; }
+.fm-cap.full, .fm-cap-full { color: #d03050; font-weight: 600; }
+/* 操作指引(2026-11-11 用户口径「操作指引不够明确」)：顶部一句用途+用量、空态三步、字段旁白话说明 */
+.fm-intro { margin-bottom: 10px; padding: 10px 12px; background: #f5f8fb; border: 1px solid #e3eaf2; border-radius: 6px; }
+.fm-intro-main { font-size: 13px; color: #1f2d3d; line-height: 20px; }
+.fm-intro-sub { margin-top: 4px; font-size: 12px; color: #5a6b7b; }
+.fm-intro-note { margin-left: 6px; color: #8a97a5; }
+.fm-empty { padding: 10px 0; color: #5a6b7b; }
+.fm-empty-steps { margin-top: 6px; font-size: 12px; color: #1f2d3d; line-height: 20px; }
+.fm-hint-line { font-size: 12px; color: #5a6b7b; line-height: 18px; margin-top: 2px; }
+/* flex-basis:100% 让说明独占一行 —— el-form-item__content 是 flex 行，不加会跟控件挤在一排 */
+.fm-hint-inline { margin: 2px 0 8px; flex-basis: 100%; }
 .fm-help { margin-left: 6px; color: #909399; cursor: help; }
 </style>

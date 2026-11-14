@@ -116,6 +116,43 @@ public class ButtonService {
         }
     }
 
+    /**
+     * 审批结果消息(2026-11-11 用户口径「审批通过和驳回也要有消息提示对应的检验人」)。
+     *
+     * <p>收件人两端各一条:
+     * <ul>
+     *   <li><b>制单人</b>(头表 asp_user1)→ APPROVAL_APPROVED / APPROVAL_REJECTED(原口径不变);</li>
+     *   <li><b>单据上的检验人/检验员</b> → APPROVAL_APPROVED_INSPECTOR / APPROVAL_REJECTED_INSPECTOR
+     *       (文案「您检验的…」)。整条链路是「检验人 → 提交审批 → 审核人 → 审批通过/驳回」,
+     *       所以审批结果必须回到**做检验的那个人**手上,而不只是"谁建的单"。</li>
+     * </ul>
+     * 同一个人不重复发(检验人 = 制单人时只收制单人那条),操作者本人不收自己的动作消息。
+     *
+     * @param approved true=审批通过,false=审批驳回
+     * @return 实际发送条数
+     */
+    private int notifyApprovalResult(PanelRegistry.PanelDef def, String no, boolean approved,
+                                     Map<String, Object> params, String actor) {
+        String head = def.hasHeadTable() ? def.headTable() : def.lineTable();
+        String author = messageService.authorOf(head, no).trim();
+        // 检验人格里写的是**账号或姓名**(历史两种都有)⇒ 由 MessageService 解析成账号再发
+        List<String> inspectors = messageService.inspectorAccounts(head, no);
+        String code = approved ? MessageService.APPROVAL_APPROVED : MessageService.APPROVAL_REJECTED;
+        String inspCode = approved ? MessageService.APPROVAL_APPROVED_INSPECTOR : MessageService.APPROVAL_REJECTED_INSPECTOR;
+        int sent = 0;
+        if (!author.isBlank() && !author.equals(actor)) {
+            sent += messageService.send(java.util.List.of(author), code, def.code(), no, params, actor);
+        }
+        List<String> toInsp = inspectors.stream()
+                .filter((u) -> u != null && !u.isBlank())
+                .filter((u) -> !u.equals(actor) && !u.equals(author))
+                .distinct().toList();
+        if (!toInsp.isEmpty()) {
+            sent += messageService.send(toInsp, inspCode, def.code(), no, params, actor);
+        }
+        return sent;
+    }
+
     @Transactional
     public Map<String, Object> callButton(String panelCode, String buttonName,
                                           Map<String, Object> formData, Map<String, Object> buttonParam) {
@@ -233,7 +270,7 @@ public class ButtonService {
     private Long catalogRowId(Map<String, Object> formData, Map<String, Object> buttonParam) {
         Object v = formData == null ? null : formData.get("id");
         if (v == null && buttonParam != null) v = buttonParam.get("id");
-        if (v == null) throw new IllegalArgumentException("缺少检验目录行 id");
+        if (v == null) throw new IllegalArgumentException("缺少检验目录行 id(待检验目录/明细表的行 id)");
         return v instanceof Number n ? n.longValue() : Long.valueOf(String.valueOf(v));
     }
 
@@ -249,7 +286,7 @@ public class ButtonService {
      */
     private Map<String, Object> completeCatalogRow(PanelRegistry.PanelDef def, Map<String, Object> formData,
                                                    Map<String, Object> buttonParam) {
-        if (!QcCatalogService.CATALOG_PANEL.equals(def.code())) throw new IllegalStateException("该按钮仅检验目录可用");
+        if (!QcCatalogService.CATALOG_PANEL.equals(def.code())) throw new IllegalStateException("该按钮仅待检验目录可用");
         Long id = catalogRowId(formData, buttonParam);
         Map<String, Object> row = jdbc.queryForMap("SELECT 检验单号, 检验数据记录单号 FROM qc_catalog_detail WHERE id=?", id);
         String inspNo = row.get("检验单号") == null ? "" : String.valueOf(row.get("检验单号"));
@@ -262,13 +299,13 @@ public class ButtonService {
 
     /** 目录行「修改」:已完成 → 正在检验中(回弹)+ 写修改记录 */
     private Map<String, Object> reopenCatalogRow(PanelRegistry.PanelDef def, Map<String, Object> formData) {
-        if (!QcCatalogService.CATALOG_PANEL.equals(def.code())) throw new IllegalStateException("该按钮仅检验目录可用");
+        if (!QcCatalogService.CATALOG_PANEL.equals(def.code())) throw new IllegalStateException("该按钮仅待检验目录可用");
         return qcCatalog.reopenRow(docNoOf(formData), catalogRowId(formData, null), currentUserName());
     }
 
     /** 目录行「删除记录」:挂靠单据还在时拒绝(提示先删除),否则软删该行 */
     private Map<String, Object> deleteCatalogRow(PanelRegistry.PanelDef def, Map<String, Object> formData) {
-        if (!QcCatalogService.CATALOG_PANEL.equals(def.code())) throw new IllegalStateException("该按钮仅检验目录可用");
+        if (!QcCatalogService.CATALOG_PANEL.equals(def.code())) throw new IllegalStateException("该按钮仅待检验目录可用");
         Long id = catalogRowId(formData, null);
         int n = qcCatalog.deleteRow(id, currentUserName());
         Map<String, Object> out = new LinkedHashMap<>();
@@ -598,6 +635,75 @@ public class ButtonService {
         return protect;
     }
 
+    /**
+     * 更新样品单「进度描述」(2026-11-11 用户口径)。
+     *
+     * <p>原话:「那个只是像图片的一样加一个进度描述的字段列，由提交人实时去更新状态，
+     * <b>这个字段不受归档约束</b>，但是也是<b>只能谁提交的谁来修改</b>」；
+     * 追问「归档后连 edit_others 也不能改？」→ 答「<b>只锁申请人</b>」。</p>
+     *
+     * <p>为什么单开一条窄接口、不塞进 saveDoc:saveDoc 的闸门是 draftEditable（草稿/修改中才可写），
+     * 而进度描述明确"不受归档约束" —— 归进常规保存会让它在归档后一起被锁死。
+     * 这条路径只做三件事:① 认出这是哪张单/哪一行;② 校验当前登录人就是该行(该单)的申请人;
+     * ③ 只 UPDATE 进度描述这一列。**不碰**归档态、不碰其它字段、不触发审批流。</p>
+     *
+     * <p>外部单(RD_SAMPLE_EXT):一张单 = 一个样品 ⇒ 归属看头表 asp_user1(创建人)，
+     * 也接受纸面「申请」署名里的姓名(申请人可能是代录)。</p>
+     * <p>内部单(RD_SAMPLE_INT):一单多行、行各归其主 ⇒ 归属看**该明细行的「申请人」**。</p>
+     *
+     * @return 更新后的进度描述
+     */
+    public String updateSampleProgress(String panelCode, String docNo, Object rowId, String text) {
+        String actor = currentUserName();
+        if (panelCode == null || docNo == null || docNo.isBlank())
+            throw new IllegalArgumentException("缺少单据编号");
+        String val = text == null ? "" : text.trim();
+        if (val.length() > 500) val = val.substring(0, 500);
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        if (def == null) throw new IllegalArgumentException("未知面板：" + panelCode);
+        String me = actor;
+        String myName = realNameOf(actor);
+
+        if ("RD_SAMPLE_INT".equals(panelCode)) {
+            // 行级归属:必须是这一行的申请人本人
+            if (rowId == null || String.valueOf(rowId).isBlank())
+                throw new IllegalArgumentException("内部样品单需要指定行(id)");
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT id, 申请人 FROM " + def.lineTable()
+                            + " WHERE id = ? AND " + def.groupCol() + " = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    rowId, docNo);
+            if (rows.isEmpty()) throw new IllegalArgumentException("明细行不存在或已删除：" + rowId);
+            String owner = blankSafe(rows.get(0).get("申请人"));
+            // 申请人格存的是「姓名/日期」这种署名串，取斜杠前的姓名比对
+            String ownerName = owner.contains("/") ? owner.substring(0, owner.indexOf('/')).trim() : owner;
+            if (!owner.isEmpty() && !ownerName.equals(myName) && !ownerName.equals(me))
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "只能修改自己提交的样品进度（该行申请人是 " + ownerName + "）");
+            jdbc.update("UPDATE " + def.lineTable() + " SET 进度描述 = ?, asp_user2 = ?, asp_time2 = GETDATE()"
+                    + " WHERE id = ? AND " + def.groupCol() + " = ?", val, actor, rowId, docNo);
+            return val;
+        }
+
+        if ("RD_SAMPLE_EXT".equals(panelCode)) {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT asp_user1, 申请 FROM " + def.headTable()
+                            + " WHERE " + def.groupCol() + " = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
+            if (rows.isEmpty()) throw new IllegalArgumentException("单据不存在：" + docNo);
+            String ownerAcct = blankSafe(rows.get(0).get("asp_user1"));
+            String sign = blankSafe(rows.get(0).get("申请"));
+            String signName = sign.contains("/") ? sign.substring(0, sign.indexOf('/')).trim() : sign;
+            boolean mine = ownerAcct.equals(me) || signName.equals(myName);
+            if (!mine)
+                throw new org.springframework.security.access.AccessDeniedException(
+                        "只能修改自己提交的样品进度（该单申请人是 " + (signName.isEmpty() ? ownerAcct : signName) + "）");
+            jdbc.update("UPDATE " + def.headTable() + " SET 进度描述 = ?, asp_user2 = ?, asp_time2 = GETDATE()"
+                    + " WHERE " + def.groupCol() + " = ?", val, actor, docNo);
+            return val;
+        }
+
+        throw new IllegalArgumentException("该面板没有进度描述：" + panelCode);
+    }
+
     /** 当前账号在该面板是否持有「改他人行」(edit_others)词 —— 管理员恒有 */
     private boolean canEditOtherRows(String panelCode, String actor) {
         if (isAdminUser(actor)) return true;
@@ -754,7 +860,18 @@ public class ButtonService {
         if ("已中止".equals(stStatus)) throw new IllegalStateException("已中止单据不可保存，请先恢复");
         if ("已终止".equals(stStatus)) throw new IllegalStateException("已终止单据不可保存");
         // 产品变更申请单(2026-09-21):已生效=终态(要改只能再开一张变更单);会签中锁编辑(免得签的和改的不是一版)
-        if ("已生效".equals(stStatus)) throw new IllegalStateException("已生效单据不可保存，如需再次变更请另开一张变更申请单");
+        // 产品变更申请表(2026-11-11 用户口径 B)：会签流程保留（审批前会签），
+        //   「后续归档之后，会签人可以根据自己的所属部门在对应的部门的行框里面进行填写」。
+        //   ⇒ 已生效/已归档**整体仍封存**，只对"本单会签人填本部门那一行"开一个窄口子：
+        //     · 只放 RD_CHANGE；管理员不放（他要改走「修改申请」，别绕开契约）；
+        //     · 账号必须有匹配的部门行（changeDeptsOf），否则照旧拒绝；
+        //     · 进这个模式后**只写明细、不写表头**（见下面 upsertHeadRow 的 deptFillOnly 判断）；
+        //     · 状态不变（不退回草稿、不改 pending）。
+        boolean deptFillOnly = false;
+        if ("已生效".equals(stStatus) || "已归档".equals(stStatus)) {
+            deptFillOnly = allowChangeDeptFill(def, no, user);
+            if (!deptFillOnly) throw new IllegalStateException("已生效单据不可保存，如需再次变更请另开一张变更申请单");
+        }
         if ("会签中".equals(stStatus)) throw new IllegalStateException("会签中单据不可保存，请等会签完成或由发起人撤回会签");
         if (stStatus.startsWith("终止审批中")) throw new IllegalStateException("终止审批中单据不可保存，请等待审批完成或撤回");
         // 在途申请期间锁定(2026-09-12):删除/修改申请待审批时单据不可保存——此前只拦审批中,
@@ -803,7 +920,9 @@ public class ButtonService {
         // 明细「行序」自动补号(2026-11-04,组装物料清单 ASM_BOM 连加两行保存撞唯一索引):见方法注释
         assignNewLineSeq(def, items, no);
         if (split) {
-            upsertHeadRow(def, head, no, user);
+            // 已生效/已归档的"部门填写"模式**只写明细**：表头字段（产品编号/变更事由/会签人…）
+            // 一律不落库，否则会签人顺手就能把这张已生效单的实质内容改掉。
+            if (!deptFillOnly) upsertHeadRow(def, head, no, user);
             upsertLineRows(def, items, no, l2c, user, protectRowIds);
         } else {
             // 单表式:头字段并入每行
@@ -1520,6 +1639,8 @@ public class ButtonService {
                     jdbc.update("UPDATE d SET d.物料编码 = s.物料编码, d.物料名称 = s.物料名称, d.规格型号 = s.规格型号,"
                                     + " d.物料描述 = s.物料描述, d.数量 = s.数量, d.箱数 = s.箱数, d.日期 = s.日期,"
                                     + " d.计量单位 = s.计量单位, d.单价 = s.单价, d.采购订单行号 = s.采购订单行号,"
+                                    // 现存量(2026-11-12):采购链透传字段,暂收行 → 检验行镜像同值(隐藏字段)
+                                    + " d.现存量 = s.现存量,"
                                     + " d.备注 = s.备注, d.结案 = s.结案,"
                                     + " d.asp_user2 = ?, d.asp_time2 = GETDATE()"
                                     + " FROM qc_insp_detail d JOIN sl_recv_detail s ON s.id = ?"
@@ -2177,7 +2298,16 @@ public class ButtonService {
             Object v = row.get(f.label());
             Object normalized = v == null ? null : normalizeByType(f, v);
             if (normalized != null) out.put(f.col(), normalized);
-            else if (keepClearedAsNull) out.put(f.col(), null);   // 清空:显式写 NULL
+            else if (keepClearedAsNull) {
+                // 🔴 用户红线(2026-11-13):「不显示的字段也要能传 ERP,不能因为隐藏字段就把之前的数据删减」。
+                //    界面上不显示的字段(hidden / !visible),前端可能以空串占位提交(新行物化、
+                //    局部回填都会这样);这时**绝不能**当成"用户清空了它"写 NULL ——
+                //    那些列一旦被清,转 ERP 读的就是空值(KingdeePushService 是 SELECT * + 物理列名,
+                //    显隐不影响它,但**数据库里没值**它也就没得推)。
+                //    所以:隐藏字段只接受"有值就写",一律不接受空串清空。
+                if (f.hidden() || !f.visible()) continue;
+                out.put(f.col(), null);   // 可见字段:清空 = 显式写 NULL
+            }
         }
         return out;
     }
@@ -2489,12 +2619,38 @@ public class ButtonService {
     }
 
 
+    /**
+     * 直接「审核」:草稿(或修改中)→ 已审核,**一步到位**。
+     *
+     * <p>🔴 2026-11-13 用户口径(本方法的权限口径来源):
+     * 「这个审批要有个审核按钮,否则对自填自审的角色来说,操作过于麻烦。单据的按钮界面都需要加上这个按钮。
+     *   然后只有有审核权限的角色,并且没有提交审批状态的单据才可以点击这个按钮。
+     *   如果已经提交审核了,就正常用审批通过来就行,不能点击审核按钮」。
+     *
+     * <p>⇒ 权限从「仅管理员」(2026-09-22 收权)改为**与「审批通过」同一把尺子**:
+     * <ol>
+     *   <li>必须有该面板审批权({@link #requireApprover}:yj_role_panel.can_approve ∪ 管理员)——
+     *       接口层 PanelPermissionService 的「审核」→audit 词表是第一道闸,这里是第二道;</li>
+     *   <li>「编制与审批分离」照旧生效,但豁免口径与审批通过完全一致({@link #canSelfAudit}:
+     *       角色勾了「本人自审」∪ 该面板除我之外没有别的启用审批人)。不这么放宽,自填自审的角色
+     *       仍会被自己这道门挡回去,等于没修;</li>
+     *   <li>只为**未提交审批**的单据服务:审批中/待二级审批一律拒绝,让用户走「审批通过」——
+     *       否则审批留痕里会混进一条与流程无关的 AUDIT 行;</li>
+     *   <li>两级审批面板(RD_PROD_INFO / RD_SAMPLE_EXT / 质量单据一族)继续拒绝直审:一步跨过
+     *       第二级签核会让纸面「审核/批准」两格与流程打架。</li>
+     * </ol>
+     */
     private Map<String, Object> audit(PanelRegistry.PanelDef def, Map<String, Object> formData) {
-        // 直审收权(2026-09-22):直接「审核」仅管理员——此前与审批通过/驳回同口径(管理员 ∪ can_approve),
-        // 有审批权的角色现在走 提交审批→审批通过(同效已审核,钩子同口径);前端审批下拉对非管理员同步隐藏
         String auditor = currentUserName();
-        if (!isAdminUser(auditor))
-            throw new org.springframework.security.access.AccessDeniedException("仅管理员可直接审核，其他角色请走提交审批");
+        boolean admin = isAdminUser(auditor);
+        // 2026-11-13 用户口径「本人自审权限绑定审核按钮」:
+        //   原来这里无条件 requireApprover —— 只勾了「本人自审」的角色连**自己的单**都点不动
+        //   (接口层先 403,前端按钮也整颗不渲染)。现在改成**条件式**:
+        //     · 有审批权(∪管理员) → 照旧,和以前逐字一致;
+        //     · 没有审批权、但本面板授了「本人自审」且这单是**本人制的** → 放行(记 self_audit='Y');
+        //     · 没有审批权、别人制的单 → 仍然 403(不会因为勾了自审就能审所有人)。
+        //   byAuthor 要取到单号和制单人才知道,故把闸门挪到下面取完 author 之后再判。
+        boolean hasApprove = canApprove(auditor, def.code());
         if (!def.isDoc()) throw new IllegalStateException("档案面板无审核动作");
         String no = requireNo(formData);
         ensureDocExists(def, no);
@@ -2503,17 +2659,31 @@ public class ButtonService {
         if ("已作废".equals(st.get("status"))) throw new IllegalStateException("已作废单据不可审核");
         if ("已中止".equals(st.get("status"))) throw new IllegalStateException("已中止单据不可审核，请先恢复");
         if ("已审核".equals(st.get("status"))) throw new IllegalStateException("单据已是已审核状态");
-        // 两级审批(远端 2026-09-20):「待二级审批」同样不可直审,与「审批中」同口径拦截
-        if ("审批中".equals(st.get("status")) || "待二级审批".equals(st.get("status"))) throw new IllegalStateException("审批中单据不可直接审核，请走审批流");
-        // 质量单据(2026-10-04 用户口径「取消直审」):一律走 提交审批 → 一级审核 → 超级管理员批准,
-        // 直审会让二级形同虚设(纸面「审核/批准」两格也就没了两级留痕)。接口层同口径拒绝。
-        // 2026-11-04 出厂检验报告、2026-11-06 首件/制程检验单加入后自动继承本拦截(靠 ADMIN_L2_PANELS)。
-        if (ADMIN_L2_PANELS.contains(def.code()))
-            throw new IllegalStateException(def.name() + "走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核");
-        // 编制审核分离(2026-09-12):审核人不得是制单人本人——此前有审批权的用户可自审自己制的单;
-        // 管理员豁免(管理员保存即归档本就是等价权力,堵死反而制造死路)
-        if (!isAdminUser(auditor) && auditor.equals(authorOfDoc(def, no)))
-            throw new org.springframework.security.access.AccessDeniedException("审核人不能与制单人相同（编制与审批分离）");
+        // 两级审批(远端 2026-09-20):「待二级审批」同样不可直审,与「审批中」同口径拦截。
+        // 2026-11-13 用户口径:「如果已经提交审核了,就正常用审批通过来就行,不能点击审核按钮」。
+        if ("审批中".equals(st.get("status")) || "待二级审批".equals(st.get("status")))
+            throw new IllegalStateException("该单已提交审批：请用「审批通过」完成审批，不能直接「审核」");
+        // 两级审批面板(2026-10-04 用户口径「取消直审」):一律走 提交审批 → 一级审批通过 → 超级管理员批准,
+        // 直审会让第二级形同虚设(纸面「审核/批准」两格也就没了两级留痕)。接口层同口径拒绝。
+        // · 固定超级管理员作二级的(ADMIN_L2_PANELS:特采单 + 质量单据一族 + 出厂检验报告)= 管理员也拒(原口径不变);
+        // · 一级选人的(RD_PROD_INFO / RD_SAMPLE_EXT)= 2026-11-13 起非管理员也拒(管理员维持原有直审捷径)。
+        if (ADMIN_L2_PANELS.contains(def.code()) || (!admin && TWO_LEVEL_PANELS.contains(def.code())))
+            throw new IllegalStateException(def.name() + "走两级审批：请用「提交审批」→「审批通过」逐级签核，不支持直接审核");
+        // 编制审核分离(2026-09-12):审核人不得是制单人本人——此前有审批权的用户可自审自己制的单。
+        // 2026-11-13 起豁免口径与「审批通过」对齐(canSelfAudit:本人自审授权 ∪ 单人审批兜底 ∪ 管理员),
+        // 否则「自填自审的角色」仍会被自己挡在门外(那正是本次要解决的场景)。
+        String author = authorOfDoc(def, no);
+        boolean byAuthor = !author.isBlank() && author.equals(auditor);
+        boolean selfGranted = byAuthor && canSelfAudit(auditor, def.code());
+        // 审批权闸门(2026-11-13 条件化,见方法开头注释):只有「非本人的单」才硬要求审批权
+        if (!hasApprove && !selfGranted)
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "当前用户无审批权限（如需审核自己制的单，请让管理员在组织架构为本角色勾「本人自审」）");
+        if (byAuthor && !admin && !selfGranted)
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "审核人不能与制单人相同（编制与审批分离）：本面板未授「本人自审」，请走「提交审批」→「审批通过」由他人审核");
+        // 自审标记:与审批通过同口径,只有**非管理员**本人审自己制的单才记 self_audit='Y'(审批情况里显示「自审」)
+        boolean selfAudit = selfGranted && !admin;
         jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
                         + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
                         + "WHEN MATCHED THEN UPDATE SET shr = ?, shsj = GETDATE(), canceled = 'N', pending = 'N', saved = 'Y', update_at = GETDATE() "
@@ -2530,7 +2700,8 @@ public class ButtonService {
         // 否则「审批情况」里看不到直接审核 —— 研发管理那套动作(提交/通过/驳回/会签/弃审…)全都有留痕,
         // 直审是唯一漏网的;制程检验单只有直审这一条路 ⇒ 不补就是"审了但查不到谁审的、意见是什么"。
         // 位置在竞态守卫**之后**:被守卫挡下的那次不该留痕。
-        recordApproval(def.code(), no, "AUDIT", "APPROVED", auditOpinionOf(formData));
+        // 2026-11-13:带 self_audit 标记(与「审批通过」同口径),审批情况里本人审自己的单会显示「自审」。
+        recordApproval(def.code(), no, "AUDIT", "APPROVED", auditOpinionOf(formData), 1, selfAudit);
         // 批次号自洽(2026-10-04 口径:批次号在**生单那一刻**就写在单头+全部明细行,不再有"入库审核取号回填"):
         // 保存后把单头值同步到全部明细行、缺号则按「供应商编码 + 当天」取号、顺批次键补齐历史台账。
         // 位置在库存过账**之前** —— kucun.lot_no 的口径是"批次号优先、批号兜底"(见 StockLedgerService.loadRows)。
@@ -2557,9 +2728,9 @@ public class ButtonService {
         if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
         // 文件类面板:经审核收尾(修改闭环/弃审留痕) → 计算修改记录并再归档
         if (DOC_ARCHIVE_PANELS.contains(def.code()) && finalizeOpenModify(def, no, auditor)) {
-            return result(no, "已归档");
+            return result(def, no, "已归档");
         }
-        return result(no, "已审核");
+        return result(def, no, "已审核");
     }
 
     /**
@@ -2720,16 +2891,16 @@ public class ButtonService {
         // 转ERP联动:弃审清 是否已转ERP/ERP单号/转ERP操作人/转ERP时间(重新审核后可再转)
         // 产品入库单 / 其他入库单 / 其他出库单 2026-10-14 接入转ERP,同批纳入本联动
         // 暂收退料单 2026-10-19 接入(《10.19 问题》第 8 条),同样纳入
-        if (List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT", "FINISH_IN", "OTHER_IN", "OTHER_OUT",
-                "QC_RETURN").contains(def.code())) {
-            String tbl = "PURCHASE_IN".equals(def.code()) ? "bd_purchase_in"
-                    : "PU_ORDER".equals(def.code()) ? "bd_pu_order"
-                    : "MATERIAL_OUT".equals(def.code()) ? "bd_material_out"
-                    : "FINISH_IN".equals(def.code()) ? "bd_finish_in"
-                    : "OTHER_IN".equals(def.code()) ? "bd_other_in"
-                    : "OTHER_OUT".equals(def.code()) ? "bd_other_out"
-                    : "QC_RETURN".equals(def.code()) ? "qc_return" : "bd_sale_out";
-            jdbc.update("UPDATE " + tbl + " SET 是否已转ERP = N'否', ERP单号 = NULL, 转ERP操作人 = NULL, 转ERP时间 = NULL WHERE 单据编号 = ?", no);
+        //
+        // ⚠ 面板清单与表名统一取 ERP_HEAD_TABLE(唯一真源):用户 2026-11-12 明确要的
+        //   「弃审后重新审核要确保可以重新转ERP(MES 改错、ERP 重新同步)」就靠这一段 ——
+        //   这里漏清标记,重审后点转ERP 会被「是否已转ERP=是」守卫挡住,等于单据被永久焊死。
+        if (supportsErp(def.code())) {
+            String tbl = ERP_HEAD_TABLE.get(def.code());
+            int cleared = jdbc.update("UPDATE " + tbl + " SET 是否已转ERP = N'否', ERP单号 = NULL,"
+                    + " 转ERP操作人 = NULL, 转ERP时间 = NULL WHERE 单据编号 = ?", no);
+            // 留痕:清了几行(0 行 = 该单本就没转过,属正常;>1 行 = 头上同号重复,值得排查)
+            if (cleared != 0) log.info("[弃审清ERP标记] {} {} → {} 行", tbl, no, cleared);
         }
         recordApproval(def.code(), no, "UNAUDIT", "PENDING", opinionOf(formData));
         // 2026-11-09:首件/制程检验单单级审批弃审 ⇒ 纸面「审核人/审核时间」与两级节点标记一并清空
@@ -3323,7 +3494,7 @@ public class ButtonService {
         // 2026-11-06 用户口径:「因为配方及工艺要求是在一级审批的时候填进去的 ⇒ 一级审批时弹窗回填
         //   这个字段，审批通过回填进去，再进二级审批(管理员)，管理员审批完成归档」。
         // 落库时机放在状态迁移**之前**:写失败就直接失败,不会出现"已转二级但内容没写进"的半截状态。
-        applyL1Backfill(def, no, formData);
+        applySampleBackfill(def, no, formData, 1);
         // ── 两级面板:一级通过 = 转「待二级审批」,不归档 ──
         if (TWO_LEVEL_PANELS.contains(def.code())) {
             // 固定二级面板(质量单据一族,含出厂检验报告/首件/制程检验单):第二级恒为超级管理员,一级不选人;
@@ -3382,6 +3553,13 @@ public class ButtonService {
         if ("RD_SPEC_DOC".equals(def.code())) {
             writeSpecSignCell(def.code(), no, SPEC_SIGN_AUDIT, operator);
         }
+        // 产品变更申请表(2026-11-11 用户口径):「审批的时候弹出弹窗，审批人可以进行批准，还有签字，
+        //   把信息回填进这里面，还有日期」—— 纸面「批准 / 签字 / 日期」三格由**这一次审批**回填。
+        //   落点是 rd_change_head 的备用列池(批准人=备用2 / 批准签字=备用3 / 批准日期=备用4,
+        //   见 migrate-rd-change-approval-sign-20261111.sql),三格 yj_field.editable=0 ⇒ 只有这里能写。
+        if ("RD_CHANGE".equals(def.code())) {
+            writeChangeApprovalSign(def, no, formData, operator);
+        }
         // 内部开发样品申请单(单节点:提交 → 确认人确认 → 制备):纸面「确认人」= 审批通过的人
         writeSampleSign(def.code(), no, SAMPLE_SIGN_CONFIRM, operator);
         // 立项申请:审批与定级是**同一步骤的两个动作**(2026-10-08 用户口径②「冯总审核及定级」)——
@@ -3437,9 +3615,8 @@ public class ButtonService {
         // 走 提交审批→审批通过 的库存单据(采购入库/产成品入库/材料出库等)漏记台账。
         // 与 audit() 同序:批次号自洽在前、过账在后;非记账面板 postIn 内部直接跳过。
         stockLedger.postIn(def.code(), no, operator);
-        // 消息:审批通过 → 制单人
-        notify(() -> messageService.sendToAuthor(def.hasHeadTable() ? def.headTable() : def.lineTable(),
-                def.code(), no, MessageService.APPROVAL_APPROVED,
+        // 消息:审批通过 → 制单人 + 单据上的检验人(2026-11-11:检验人也要收到结果)
+        notify(() -> notifyApprovalResult(def, no, true,
                 Map.of("docNo", no, "actor", operator, "opinion", opinion == null ? "" : opinion), operator));
         // 文件类面板:审批通过后归档(修改闭环/弃审留痕走 finalizeOpenModify 收尾;随后统一归档)
         if (DOC_ARCHIVE_PANELS.contains(def.code())) {
@@ -3450,9 +3627,9 @@ public class ButtonService {
             //   普通用户保存 → 送审 → 管理员「审批通过」→ 归档**走的正是本方法 ⇒ 从来没同步过,
             //   只能靠侧栏「同步进度」手工补。口径与另两处一致(RD_PLAN 归档即同步,幂等可重跑)。
             if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
-            return result(no, "已归档");
+            return result(def, no, "已归档");
         }
-        return result(no, "已审核");
+        return result(def, no, "已审核");
     }
 
     /**
@@ -3475,6 +3652,10 @@ public class ButtonService {
                 throw new org.springframework.security.access.AccessDeniedException("仅被选定的二级审核人（或管理员）可完成二级审批");
         }
         String opinion = opinionOf(formData);
+        // 二级签核回填(2026-11-11 用户口径:「二级签核无法修改配方」→ 需要修改配方)。
+        // 与一级同一份白名单、同一个方法,只是 node=2 ⇒ 留痕记 L2_BACKFILL 并带原值→新值的 diff。
+        // 时机同一级:放在状态迁移**之前**,写失败就直接失败,不会出现"已通过但内容没写进"的半截状态。
+        applySampleBackfill(def, no, formData, 2);
         int n = jdbc.update("UPDATE yj_doc_status SET pending = 'N', shr = ?, shsj = GETDATE(), approve_node = NULL, update_at = GETDATE()"
                         + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y' AND approve_node = 2", operator, def.code(), no);
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
@@ -3492,10 +3673,13 @@ public class ButtonService {
             writeBackSignCell(def, no, "审批人", "审批时间", operator);
             tcInApprovedGenerate(def.code(), no, operator);
             // 消息:批准通过 → 提交人(编制人) + 一级审核人,两端都知情
+            //        + 单据上的检验人(2026-11-11:「审批通过也要提示对应的检验人」)
             final String opA = operator;
             final String sub = submitterOf(def, no);
             final String l1 = l1ApproverOf(def.code(), no);
             final boolean l1Distinct = !l1.isBlank() && !l1.equals(opA) && !l1.equals(sub);
+            // 检验人可能是账号或姓名两种写法 ⇒ 由 MessageService 解析成账号
+            final List<String> inspAcc = messageService.inspectorAccounts(def.headTable(), no);
             notify(() -> {
                 Map<String, Object> ps = Map.of("docNo", no, "actor", opA, "opinion", opinion == null ? "" : opinion);
                 int sent = 0;
@@ -3503,12 +3687,14 @@ public class ButtonService {
                     sent += messageService.send(List.of(sub), MessageService.APPROVAL_APPROVED, def.code(), no, ps, opA);
                 if (l1Distinct)
                     sent += messageService.send(List.of(l1), MessageService.APPROVAL_L2_DONE, def.code(), no, ps, opA);
+                List<String> toInsp = inspAcc.stream().filter((u) -> !u.equals(opA) && !u.equals(sub)).distinct().toList();
+                if (!toInsp.isEmpty())
+                    sent += messageService.send(toInsp, MessageService.APPROVAL_APPROVED_INSPECTOR, def.code(), no, ps, opA);
                 return sent;
             });
             return result(no, "已审核");
         }
-        notify(() -> messageService.sendToAuthor(def.hasHeadTable() ? def.headTable() : def.lineTable(),
-                def.code(), no, MessageService.APPROVAL_APPROVED,
+        notify(() -> notifyApprovalResult(def, no, true,
                 Map.of("docNo", no, "actor", operator, "opinion", opinion == null ? "" : opinion), operator));
         if (DOC_ARCHIVE_PANELS.contains(def.code())) {
             finalizeOpenModify(def, no, operator);
@@ -3518,9 +3704,9 @@ public class ButtonService {
             //   普通用户保存 → 送审 → 管理员「审批通过」→ 归档**走的正是本方法 ⇒ 从来没同步过,
             //   只能靠侧栏「同步进度」手工补。口径与另两处一致(RD_PLAN 归档即同步,幂等可重跑)。
             if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
-            return result(no, "已归档");
+            return result(def, no, "已归档");
         }
-        return result(no, "已审核");
+        return result(def, no, "已审核");
     }
 
     /** 审批驳回:仅审批中/待二级审批 → 草稿(意见必填,驳回后修改可重新提交)
@@ -3573,6 +3759,7 @@ public class ButtonService {
             clearAuditSignCells(def, no);
             final String l1f = l1Before;
             final String sub = submitterOf(def, no);
+            final List<String> inspAcc = messageService.inspectorAccounts(def.headTable(), no);
             notify(() -> {
                 Map<String, Object> ps = Map.of("docNo", no, "actor", rejectBy, "opinion", opinion, "node", String.valueOf(node));
                 int sent = 0;
@@ -3581,13 +3768,16 @@ public class ButtonService {
                 // 二级驳回还要让一级审核人知道(他签过的那张被退了)
                 if (node == 2 && !l1f.isBlank() && !l1f.equals(rejectBy) && !l1f.equals(sub))
                     sent += messageService.send(List.of(l1f), MessageService.APPROVAL_L2_REJECTED, def.code(), no, ps, rejectBy);
+                // 驳回同样要回到检验人手上(2026-11-11)
+                List<String> toInsp = inspAcc.stream().filter((u) -> !u.equals(rejectBy) && !u.equals(sub)).distinct().toList();
+                if (!toInsp.isEmpty())
+                    sent += messageService.send(toInsp, MessageService.APPROVAL_REJECTED_INSPECTOR, def.code(), no, ps, rejectBy);
                 return sent;
             });
             return result(no, "草稿");
         }
-        // 消息:审批驳回 → 制单人(驳回意见随消息带上)
-        notify(() -> messageService.sendToAuthor(def.hasHeadTable() ? def.headTable() : def.lineTable(),
-                def.code(), no, MessageService.APPROVAL_REJECTED,
+        // 消息:审批驳回 → 制单人 + 单据上的检验人(驳回意见随消息带上)
+        notify(() -> notifyApprovalResult(def, no, false,
                 Map.of("docNo", no, "actor", rejectBy, "opinion", opinion), rejectBy));
         // 产品变更申请单:驳回还要通知**已填写的部门**(部门行的签字人 → 账号),他们会知道要重填(口径 E)
         if (CHANGE_PANEL.equals(def.code())) notifyChangeRejected(def, no, rejectBy, opinion);
@@ -4042,16 +4232,61 @@ public class ButtonService {
         return n != null && n > 0;
     }
 
-    /** 一级通过:把选定的二级审核人姓名写回纸面「审核人（二级审批人）」格 */
+    /**
+     * 一级通过:把选定的二级审核人姓名写回纸面「审核人（二级审批人）」**和**「产品负责人」两格。
+     *
+     * <p>用户口径(2026-11-11):「二级审核人是分配的产品责任人（规格书的责任人）是谁就回填显示谁的名字…
+     * 这三个都是只读的，但是都要有对应的数据回填进去」;追问后补充:
+     * 「责任人在一级审批选择二级签核人之前都是空的，选了二级签核人就回填二级签核人进去，后续改动也对应改动」。</p>
+     *
+     * <p>⇒ 两格一起写:纸面「审核人（二级审核）」的物理列是 {@code 审核人二级},
+     * 纸面「产品负责人」的物理列是 {@code 责任人}（实测 yj_field.col_name）。
+     * **时机**固定在"一级审批通过、转待二级"那一刻 —— 选人之前两格都保持空,
+     * 与用户口径「选择之前都是空的」一致。</p>
+     *
+     * <p>⚠ 两格现在都是只读(recordSheetConfigs 的 ro:true + yj_field.editable=0, 见
+     * migrate-prodinfo-approver-cells-20261111.sql) ⇒ 这里是**唯一**能把它们填上的路径,
+     * 别的入口(前端保存)已经写不进来了。改这里前先确认没有别的链路需要写入。</p>
+     */
     private void writeBackL2Approver(String panelCode, String no, String l2Account) {
         if (!"RD_PROD_INFO".equals(panelCode)) return;
         List<String> names = jdbc.queryForList("SELECT real_name FROM yj_user WHERE username = ?", String.class, l2Account);
         String name = names.isEmpty() || names.get(0) == null ? l2Account : names.get(0);
         try {
-            jdbc.update("UPDATE rd_prod_info_head SET 审核人二级 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
-                    name, no);
+            jdbc.update("UPDATE rd_prod_info_head SET 审核人二级 = ?, 责任人 = ?"
+                            + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    name, name, no);
         } catch (Exception e) {
-            log.warn("[两级审批] 写回审核人二级失败 panel={} no={}: {}", panelCode, no, e.getMessage());
+            log.warn("[两级审批] 写回审核人二级/责任人失败 panel={} no={}: {}", panelCode, no, e.getMessage());
+        }
+    }
+
+    /**
+     * 产品变更申请表：把「批准人 / 批准签字 / 批准日期」写回纸面三格（2026-11-11 用户口径）。
+     *
+     * <p>用户原话：「审批的时候弹出弹窗，审批人可以进行批准，还有签字，把信息回填进这里面，
+     * 还有日期，…保存之后该单据可见内容，打印出来也是有数据的」。</p>
+     *
+     * <p>三格绑在 rd_change_head 的备用列池（批准人=备用2 / 批准签字=备用3 / 批准日期=备用4），
+     * 且这三个 yj_field 是 editable=0 ⇒ **本方法就是唯一真源**；前端保存链写不进这三格。</p>
+     *
+     * <p>取值：批准人 = 审批通过的人（姓名，不接受前端传）；签字与日期优先取弹窗载荷，
+     * 没带则兜底为「审批人姓名」与「当天」—— 这样老前端/老的确认框流程也不会留空白。</p>
+     */
+    private void writeChangeApprovalSign(PanelRegistry.PanelDef def, String no, Map<String, Object> formData, String operator) {
+        String approver = signNameOf(operator);
+        if (approver.isEmpty()) return;
+        String sign = pickOf(formData, "批准签字").trim();
+        if (sign.isEmpty()) sign = approver;
+        String date = pickOf(formData, "批准日期").trim();
+        if (date.isEmpty()) date = java.time.LocalDate.now().toString();
+        try {
+            jdbc.update("UPDATE rd_change_head SET 备用2 = ?, 备用3 = ?, 备用4 = ?"
+                            + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    approver, sign, date, no);
+        } catch (Exception e) {
+            // 备用列缺失(未跑迁移)不该阻断审批 —— 与 writeBackSignCell 同一口径,静默降级
+            log.warn("[变更审批] 写回批准人/签字/日期失败 no={}: {}", no, e.getMessage());
         }
     }
 
@@ -4738,7 +4973,10 @@ public class ButtonService {
                 //   (注释写着"退回行另有单位列,原先只写计量单位 → 单位全空"却没把列取回来)⇒ 补进 SELECT。
                 //   「数量」是 2026-09-20 已改名为「送检数量」的旧列(无 yj_field、恒 NULL),不再取。
                 "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号,"
-                        + " 送检数量, 部门名称, 生产日期, 备注"
+                        // 行级采购单号(2026-11-13 合单生单):合单后一张检验单跨多张采购订单,
+                        // 入库行必须逐行带自己的订单号(转ERP 行级 src_bill_no),所以这里要取回来。
+                        + " 采购单号,"
+                        + " 送检数量, 部门名称, 生产日期, 备注, 现存量"
                         + " FROM qc_insp_detail"
                         // 2026-10-04:特采判定已移到「暂收退料单」按钮 —— 检验行不再分流,
                         // 合格数量>0 一律进采购入库单(特采与否由退料单→特采单那条链表达)
@@ -4775,15 +5013,29 @@ public class ButtonService {
             if (r.get("备注") != null) line.put("备注", r.get("备注"));
             // 采购订单行号 → 采购入库行(列 源单行号,标签 采购订单行号):转ERP 时推 src_seq
             if (r.get("采购订单行号") != null) line.put("采购订单行号", r.get("采购订单行号"));
+            // 行级「采购单号」(2026-11-13 合单生单):合单后一张暂收/检验单跨多张采购订单,
+            // 每行必须自己带订单号 —— 转ERP 的行级 src_bill_no 就用它(见 KingdeePushService)。
+            // ⚠ 落到入库行时用的列是**已有的 源单编号**(与金蝶 src_bill_no 同名同义,见
+            //   docs/development/金蝶采购入库单-多订单混装核查.md §四.1),不再另开 采购单号 列。
+            if (r.get("采购单号") != null) line.put("源单编号", r.get("采购单号"));
+            // 现存量(2026-11-12 用户口径):采购链透传字段,检验行 → 采购入库行,隐藏但全流程都在
+            if (r.get("现存量") != null) line.put("现存量", r.get("现存量"));
             // 批次号随链带入采购入库行(2026-09-20 分批送料:同一批次可反查四单)
             if (h.get("批次号") != null && !String.valueOf(h.get("批次号")).isBlank()) line.put("批次号", h.get("批次号"));
             // 行仓库(2026-09-23 正名):检验行「仓库代码」的值(名称形)落入库行「仓库」——
             // 单据选仓库字段已全局统一叫「仓库」(migrate-wh-field-rename),参照/必填/推送兜底同列
             Object wh = r.get("仓库代码");
             if (wh != null && !String.valueOf(wh).isBlank()) line.put("仓库", wh);
-            // 仓位预设(2026-10-09 用户口径「物料默认 ⇢ 仓位默认兜底」):该仓启用仓位管理才预设
-            Object binA = presetBinFor(str(r.get("物料编码")), str(wh));
-            if (binA != null) line.put("仓位", binA);
+            // 仓位:先吃**上游带下来的**(2026-11-13 用户口径「从采购订单生单时就开始预填仓库仓位」——
+            // 采购订单生单 → 暂收 → 检验 逐站继承,检验行已有 仓位 列),没有才按
+            // 「物料默认 ⇢ 仓位默认兜底」预设(2026-10-09 口径)。不能反过来:预设会盖掉用户选的值。
+            Object binCarried = r.get("仓位");
+            if (binCarried != null && !String.valueOf(binCarried).isBlank()) {
+                line.put("仓位", binCarried);
+            } else {
+                Object binA = presetBinFor(str(r.get("物料编码")), str(wh));
+                if (binA != null) line.put("仓位", binA);
+            }
             items.add(line);
         }
         Map<String, Object> head = new LinkedHashMap<>();
@@ -4800,10 +5052,14 @@ public class ButtonService {
         // 批次键随链带入:链路身份(按批次反查/链路终点解析用),与批次号各司其职。
         if (h.get("批次键") != null) head.put("批次键", h.get("批次键"));
         head.put("外部单据号", no);
-        head.put("来源单据", "来料检验单");
-        head.put("来源单号", no);
+        // 来源 / 来源单号(2026-11-11 用户口径:采购入库单表头最末尾要看得见「这批货从哪来」+ 来源单据编号)。
+        // 标签按**列名反查**:采购入库单这两列的显示名是「来源」「来源单号」
+        // (tools/migrate-purchase-in-source-20261111.sql),其余面板仍叫「来源单据」。
+        PanelRegistry.PanelDef piDef = registry.panel("PURCHASE_IN");
+        head.put(colLabel(piDef, "来源单据", "来源单据"), "来料检验单");
+        head.put(colLabel(piDef, "来源单号", "来源单号"), no);
         head.put("detail", Map.of("items", items));
-        Map<String, Object> saved = save(registry.panel("PURCHASE_IN"), head, false);
+        Map<String, Object> saved = save(piDef, head, false);
         String piNo = String.valueOf(saved.get("编号"));
         // 行级占用 + 入库单号回填(目标行按保存顺序取 id,与 pass 一一对应)
         List<Integer> tgtIds = jdbc.queryForList(
@@ -4880,7 +5136,7 @@ public class ButtonService {
                 "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号,"
                         + " ISNULL(NULLIF(送检数量,0), 数量) AS 送检数量,"
                         + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量,"
-                        + " 备注, 单位, 计量单位, 单价, 采购订单行号"
+                        + " 备注, 单位, 计量单位, 单价, 采购订单行号, 采购单号, 现存量"
                         + " FROM qc_insp_detail"
                         // 2026-10-04:不再排除特采行 —— 特采改由本退料单审批通过后的「特采」按钮发起,
                         // 退料单因此成为特采的前置单据(它的「送检数量」就是特采单总数量的来源)
@@ -4912,6 +5168,10 @@ public class ButtonService {
             if (r.get("单位") != null) line.put("单位", r.get("单位")); // 退回行另有「单位」列(2026-09-21 补齐,原先只写计量单位 → 单位全空)
             line.put("单价", r.get("单价"));
             if (r.get("采购订单行号") != null) line.put("采购订单行号", r.get("采购订单行号"));
+            // 行级「采购单号」(2026-11-13 合单生单):退回行也要能认出该行原属哪张采购订单
+            if (r.get("采购单号") != null) line.put("采购单号", r.get("采购单号"));
+            // 现存量(2026-11-12 用户口径):检验行 → 暂收退回行(隐藏字段,退料链也留痕)
+            if (r.get("现存量") != null) line.put("现存量", r.get("现存量"));
             // 批次号随链带入退回行(2026-09-20 分批送料:退回不回冲送货量,但批次号要能追到同一批)
             if (h.get("批次号") != null && !String.valueOf(h.get("批次号")).isBlank()) line.put("批次号", h.get("批次号"));
             Object m = r.get("备注");
@@ -5059,7 +5319,10 @@ public class ButtonService {
         try {
             rows = jdbc.queryForList(
                     "SELECT id, 物料编码, 物料名称, ISNULL(规格型号, N'') AS 规格型号, 计量单位, 单位,"
-                            + " 送检数量, " + qtyLabel + " AS 退货数量"
+                            // 行级采购单号(2026-11-13 合单/全链):特采单是"一物料一单、只有表头",
+                            // 订单号要落在表头,取值必须取**退料行**的这一行(合单后表头可能是多单串)
+                            + " 采购单号, 采购订单行号,"
+                            + " 送检数量, " + qtyLabel + " AS 退货数量, 现存量"
                             + " FROM qc_return_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                             + " AND ISNULL(特采, 0) = 1 ORDER BY id", no);
         } catch (org.springframework.dao.DataAccessException e) {
@@ -5095,10 +5358,17 @@ public class ButtonService {
             head.put("单据日期", LocalDate.now().toString());
             Object sup = h.get("供应商") != null ? h.get("供应商") : ih.get("供应商");
             if (sup != null) head.put("供应商", sup);
-            Object poNo = h.get("采购订单号") != null && !String.valueOf(h.get("采购订单号")).isBlank()
-                    ? h.get("采购订单号") : ih.get("采购订单号");
+            // 采购单号(2026-11-13):**行级优先** —— 合单后退料单头可能是"订单1、订单2"的人读串,
+            // 而特采单是"一物料一单",它的采购单号必须是这一行自己的订单号(下游入库单要拿它挂源单)。
+            Object poNo = r.get("采购单号") != null && !String.valueOf(r.get("采购单号")).isBlank()
+                    ? r.get("采购单号")
+                    : (h.get("采购订单号") != null && !String.valueOf(h.get("采购订单号")).isBlank()
+                    ? h.get("采购订单号") : ih.get("采购订单号"));
             if (poNo != null && !String.valueOf(poNo).isBlank()) head.put("采购单号", poNo);
             head.put("产品名称", r.get("物料名称"));
+            // 现存量(2026-11-12 用户口径):特采单是**一物料一单**、只有表头,故落在表头;
+            // 值取退料行(它由检验行镜像、检验行由暂收行/采购订单带来),隐藏字段仅供追溯
+            if (r.get("现存量") != null) head.put("现存量", r.get("现存量"));
             head.put("不合格品数量", bad);
             head.put("不合格品比例", trimZero(Math.round(bad / tot * 1000.0) / 10.0) + "%");
             // 总数量 = 数值+单位拼合(2026-09-24 用户口径:三面板数量与单位合在一起,不拆列;
@@ -5219,7 +5489,7 @@ public class ButtonService {
             rowId = idOfLineKey(str(src.get(0).get("lineKey")));
         }
         List<Map<String, Object>> tcs = jdbc.queryForList(
-                "SELECT 总数量, 采购单号, 产品名称 FROM qc_tc_in WHERE 单据编号=? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+                "SELECT 总数量, 采购单号, 产品名称, 现存量 FROM qc_tc_in WHERE 单据编号=? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (tcs.isEmpty()) throw new IllegalStateException("特采单不存在:" + no);
         Map<String, Object> tc = tcs.get(0);
         List<Map<String, Object>> iheads = jdbc.queryForList(
@@ -5230,13 +5500,13 @@ public class ButtonService {
         List<Map<String, Object>> drows;
         if (rowId != null) {
             drows = jdbc.queryForList("SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 合格数量,"
-                    + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号,"
-                    + " 送检数量, 部门名称, 生产日期, 备注 FROM qc_insp_detail WHERE id = ? AND ISNULL(asp_cancel,'N') <> 'Y'", rowId);
+                    + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号, 采购单号,"
+                    + " 送检数量, 部门名称, 生产日期, 备注, 现存量 FROM qc_insp_detail WHERE id = ? AND ISNULL(asp_cancel,'N') <> 'Y'", rowId);
         } else {
             // 链路断了的兜底:按「检验单号 + 物料名称」取检验行(特采单头的产品名称就是从检验行物料名称带下来的)
             drows = jdbc.queryForList("SELECT TOP 1 id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 合格数量,"
-                    + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号,"
-                    + " 送检数量, 部门名称, 生产日期, 备注 FROM qc_insp_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                    + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号, 采购单号,"
+                    + " 送检数量, 部门名称, 生产日期, 备注, 现存量 FROM qc_insp_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                     + " AND (物料名称 = ? OR 物料编码 IS NULL) ORDER BY id", inspNo, str(tc.get("产品名称")));
         }
         if (drows.isEmpty()) throw new IllegalStateException("来源检验行不存在(特采单 " + no + " 的检验单号 " + inspNo + ")");
@@ -5289,6 +5559,14 @@ public class ButtonService {
         if (r.get("生产日期") != null) line.put("生产日期", r.get("生产日期"));
         if (r.get("备注") != null && !String.valueOf(r.get("备注")).isBlank()) line.put("备注", r.get("备注"));
         if (r.get("采购订单行号") != null) line.put("采购订单行号", r.get("采购订单行号"));
+        // 行级订单号(2026-11-13 全链口径):入库行落「源单编号」(= 金蝶 src_bill_no)。
+        // 值取**检验行**的采购单号,退到特采单头(它是本物料那一个订单号)—— 合单后靠它逐行挂对源单。
+        Object poLine = r.get("采购单号") != null && !String.valueOf(r.get("采购单号")).isBlank()
+                ? r.get("采购单号") : tc.get("采购单号");
+        if (poLine != null && !String.valueOf(poLine).isBlank()) line.put("源单编号", poLine);
+        // 现存量(2026-11-12 用户口径):特采链也要留痕 —— 优先取检验行(真源),检验行没有则回落特采单头
+        Object stockQty = r.get("现存量") != null ? r.get("现存量") : tc.get("现存量");
+        if (stockQty != null) line.put("现存量", stockQty);
         // 批次号随链带入入库行(2026-10-04 口径:号在生单那一刻就有,逐站继承,不再逆流回填)
         if (ih.get("批次号") != null && !String.valueOf(ih.get("批次号")).isBlank()) {
             line.put("批次号", ih.get("批次号"));
@@ -5305,17 +5583,25 @@ public class ButtonService {
         head.put("供应商编码", ih.get("供应商代码"));
         String poNo = tc.get("采购单号") != null && !String.valueOf(tc.get("采购单号")).isBlank()
                 ? String.valueOf(tc.get("采购单号")) : String.valueOf(ih.get("采购订单号") == null ? "" : ih.get("采购订单号"));
-        if (!poNo.isBlank()) head.put("采购订单号", poNo);
+        // 表头采购订单号:优先**行级**(本行那个订单号);检验单头在合单后可能是"订单1、订单2"的人读串,
+        // 拿它当单值会让下游按号查询/挂源单落空。逐行订单号在「源单编号」上,这里只放单值便于查看。
+        String headPo = r.get("采购单号") != null && !String.valueOf(r.get("采购单号")).isBlank()
+                ? String.valueOf(r.get("采购单号")) : poNo;
+        if (!headPo.isBlank()) head.put("采购订单号", headPo);
         head.put("批次键", ih.get("批次键"));
         // 批次号:继承来源检验单/特采链的号(2026-10-04 口径);为空时由 saveDoc→BatchService.syncBatchNo
         // 按「供应商编码 + 当天」兜底取号,保证入库单绝不会没有批次号。
         if (ih.get("批次号") != null && !String.valueOf(ih.get("批次号")).isBlank()) {
             head.put("批次号", ih.get("批次号"));
         }
-        // 注:不写 外部单据号/来源单据/来源单号 —— 采购入库单已按 2026-09-21 用户口径
-        // 「入库单用采购订单号就够了」下线这三列;追溯走 form_flow_link 与检验行「入库单号」
+        // 来源 / 来源单号 = 特采单(2026-11-11 用户口径:特采来的那批也要在入库单表头看得见来源和单号)。
+        // 旧注释「不写 外部单据号/来源单据/来源单号 —— 入库单用采购订单号就够了(2026-09-21 口径)」
+        // 已被本条口径取代:来源列已在表头末尾显示,特采这条链不写就会是空的。
+        PanelRegistry.PanelDef piDef = registry.panel("PURCHASE_IN");
+        head.put(colLabel(piDef, "来源单据", "来源单据"), "特采单");
+        head.put(colLabel(piDef, "来源单号", "来源单号"), no);
         head.put("detail", Map.of("items", List.of(line)));
-        Map<String, Object> saved = save(registry.panel("PURCHASE_IN"), head, false);
+        Map<String, Object> saved = save(piDef, head, false);
         String piNo = String.valueOf(saved.get("编号"));
         List<Integer> tgtIds = jdbc.queryForList(
                 "SELECT id FROM bl_purchase_in WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id",
@@ -5747,6 +6033,13 @@ public class ButtonService {
         sel.append(", (SELECT TOP 1 CONVERT(nvarchar(19), s2.archived_at, 120) FROM rd_approval a"
                 + " JOIN yj_doc_status s2 ON s2.panel_code = 'RD_APPROVAL' AND s2.doc_no = a.[单据编号]"
                 + " WHERE a.[文档编号] = p.[文档编号] AND ISNULL(a.asp_cancel,'N') <> 'Y') AS appr_archived_at");
+        // 2026-11-11 用户口径:「项目负责人要显示项目实施计划的负责人,这个负责人是谁填写的
+        //   项目实施计划就是谁」⇒ 计划表头那格「负责人」空着时,回落到**这张计划是谁建的**
+        //   (rd_plan.asp_user1 → yj_user.real_name,取不到名字就退回账号),不让进度表留空。
+        //   为什么要回落:纸面「负责人」是手填格,现场大量单据建好就归档、那一格根本没填,
+        //   于是项目进度查询的「项目负责人」整列空着(用户截图)。
+        sel.append(", COALESCE(NULLIF((SELECT TOP 1 u.[real_name] FROM yj_user u"
+                + " WHERE u.[username] = p.[asp_user1]), N''), p.[asp_user1]) AS plan_owner_by");
         sel.append(" FROM rd_plan p WHERE p.[单据编号] = ? AND ISNULL(p.asp_cancel,'N') <> 'Y'");
         sel.append(" AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = 'RD_PLAN'"
                 + " AND s.doc_no = p.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')");
@@ -5798,7 +6091,9 @@ public class ButtonService {
         //   立项里取不到才退回实施计划自己的参照带入值。
         String level = str(plan.get("appr_level"));
         if (level == null || level.isBlank()) level = str(plan.get("项目定级"));
+        // 「项目负责人」= 计划的负责人;那格空着就按"谁填写的实施计划就是谁"回落制单人
         String owner = str(plan.get("负责人"));
+        if (owner == null) owner = str(plan.get("plan_owner_by"));
         String due = latestDone != null ? latestDone : lastPlanDue;
         String initiator = str(plan.get("appr_initiator"));       // → 进度表「项目发起人」
         String startDate = str(plan.get("appr_archived_at"));     // → 进度表「立项日期」= 立项申请的归档日期
@@ -5852,6 +6147,18 @@ public class ButtonService {
 
     private static String str(Object o) {
         return o == null || String.valueOf(o).isBlank() ? null : String.valueOf(o).trim();
+    }
+
+    /**
+     * 目标面板「来源单据 / 来源单号」两列的**字段标签** —— 按列名反查,不写死标签。
+     * 通用保存按标签映射列,查不到标签的键会被静默丢弃:2026-11-11 起采购入库单把这两列的
+     * 显示名正名为「来源」「来源单号」(tools/migrate-purchase-in-source-20261111.sql),
+     * 其余面板仍叫「来源单据」,故这里不能写死。
+     */
+    private static String colLabel(PanelRegistry.PanelDef def, String col, String fallback) {
+        if (def == null) return fallback;
+        PanelRegistry.FieldDef f = def.byCol(col);
+        return f == null ? fallback : f.label();
     }
 
     private int COL_LENGTH(String table, String col) {
@@ -5940,18 +6247,39 @@ public class ButtonService {
         return out;
     }
 
+    /**
+     * 支持转ERP 的面板 → 单据头表(**唯一真源**)。
+     *
+     * <p>为什么收成一张表:这三件事原先各写了一份面板清单,只要有一处漏更新,后果都是"这张单的转ERP 坏掉":
+     * <ol>
+     *   <li>转ERP 白名单({@link #pushToErp} / {@link #listPushableErp});</li>
+     *   <li>批量转ERP 的取数表;</li>
+     *   <li>**弃审时清 是否已转ERP/ERP单号/操作人/时间**({@code unaudit}) ——
+     *       这一处漏了就会出现「弃审重审后点转ERP 仍被'已转'守卫挡住」,
+     *       也就是用户 2026-11-12 明确要的「弃审后重新审核要可以重新转ERP(MES 改错、ERP 重新同步)」失效。</li>
+     * </ol>
+     * 新增转ERP 面板时**只改这一处**,三处自动跟随。
+     */
+    private static final Map<String, String> ERP_HEAD_TABLE = Map.of(
+            "PURCHASE_IN", "bd_purchase_in",
+            "SALE_OUT", "bd_sale_out",
+            "PU_ORDER", "bd_pu_order",
+            "MATERIAL_OUT", "bd_material_out",
+            "FINISH_IN", "bd_finish_in",
+            "OTHER_IN", "bd_other_in",
+            "OTHER_OUT", "bd_other_out",
+            // 2026-10-19《10.19 问题》第 8 条:暂收退料单接转ERP(金蝶「采购退货单」pur_ret)
+            "QC_RETURN", "qc_return");
+
+    /** 支持转ERP 的面板清单(= {@link #ERP_HEAD_TABLE} 的键) */
+    private static boolean supportsErp(String panelCode) {
+        return ERP_HEAD_TABLE.containsKey(panelCode);
+    }
+
     private Map<String, Object> listPushableErp(PanelRegistry.PanelDef def) {
-        if (!List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT", "FINISH_IN", "OTHER_IN", "OTHER_OUT",
-                // 2026-10-19《10.19 问题》第 8 条:暂收退料单接转ERP(金蝶「采购退货单」pur_ret)
-                "QC_RETURN").contains(def.code()))
+        if (!supportsErp(def.code()))
             throw new IllegalStateException("仅采购订单/采购入库/销售出库/材料出库/产品入库/其他入库/其他出库/暂收退料单支持转ERP");
-        String tbl = "PURCHASE_IN".equals(def.code()) ? "bd_purchase_in"
-                : "PU_ORDER".equals(def.code()) ? "bd_pu_order"
-                : "MATERIAL_OUT".equals(def.code()) ? "bd_material_out"
-                : "FINISH_IN".equals(def.code()) ? "bd_finish_in"
-                : "OTHER_IN".equals(def.code()) ? "bd_other_in"
-                : "OTHER_OUT".equals(def.code()) ? "bd_other_out"
-                : "QC_RETURN".equals(def.code()) ? "qc_return" : "bd_sale_out";
+        String tbl = ERP_HEAD_TABLE.get(def.code());
         // 材料出库单没有 客户/供应商 列(领料是内部单据),往来单位取「领用人」
         // 产品入库单(2026-10-14 接入转ERP)是生产完工入库,同样无 客户/供应商 列,往来单位取「经手人」
         // 其他入库单=供应商往来;其他出库单=内部领用,往来单位取「经手人」
@@ -5974,8 +6302,7 @@ public class ButtonService {
 
     /** 转ERP:已审核+未转过的采购入库/销售出库/材料出库/产品入库/其他入库/其他出库/暂收退料单 → 推金蝶,回写ERP单号 */
     private Map<String, Object> pushToErp(PanelRegistry.PanelDef def, Map<String, Object> formData) {
-        if (!List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT", "FINISH_IN", "OTHER_IN", "OTHER_OUT",
-                "QC_RETURN").contains(def.code()))
+        if (!supportsErp(def.code()))
             throw new IllegalStateException("仅采购订单/采购入库/销售出库/材料出库/产品入库/其他入库/其他出库/暂收退料单支持转ERP");
         String docNo = String.valueOf(formData.getOrDefault("编号", formData.getOrDefault("单据编号", "")));
         if (docNo.isBlank()) throw new IllegalArgumentException("缺少单据编号");
@@ -6601,6 +6928,30 @@ public class ButtonService {
             cols.put("变更后内容", "");
             insertRow(def.lineTable(), cols, user);
         }
+    }
+
+    /**
+     * 已生效/已归档状态下，是否允许"会签人填本部门那一行"（2026-11-11 用户口径 B）。
+     *
+     * <p>用户原话：「后续归档之后，会签人可以根据自己的所属部门在对应的部门的行框里面进行填写，
+     * 保存之后该单据可见内容，打印出来也是有数据的」。同时确认会签流程**保留**
+     * （审批前先会签），所以这里是"封存后的例外"，不是把归档打开。</p>
+     *
+     * <p>判据（四条全过才放行）：
+     * ① 面板是 RD_CHANGE；
+     * ② **不是管理员** —— 管理员要改已生效单请走「修改申请」，别用这个口子绕开封存契约；
+     * ③ 账号在「部门↔账号」映射里有至少一个部门（changeDeptsOf）；
+     * ④ 单据状态是 已生效 / 已归档。</p>
+     *
+     * <p>放行后真正能改到哪些格子仍由 {@link #gateChangeDetail} 兜底：非本部门的行、
+     * 本部门的非 lockCols 列一律还原成库内现值。</p>
+     */
+    private boolean allowChangeDeptFill(PanelRegistry.PanelDef def, String no, String user) {
+        if (def == null || !CHANGE_PANEL.equals(def.code())) return false;
+        if (isAdminUser(user)) return false;
+        if (changeDeptsOf(user).isEmpty()) return false;
+        String st = String.valueOf(docStatusOf(def.code(), no).get("status"));
+        return "已生效".equals(st) || "已归档".equals(st);
     }
 
     /**
@@ -7685,17 +8036,30 @@ public class ButtonService {
      * (空串表示"本次没改",不许把已填内容清掉)。仅对 RD_SAMPLE_EXT 生效 —— 别的面板没有这个动作语义,
      * 多一条入口就是多一条误写数据的路。
      */
-    private void applyL1Backfill(PanelRegistry.PanelDef def, String no, Map<String, Object> formData) {
+    private void applySampleBackfill(PanelRegistry.PanelDef def, String no, Map<String, Object> formData, int node) {
         if (!"RD_SAMPLE_EXT".equals(def.code()) || formData == null) return;
         Object raw = formData.get("明细回填");
         if (!(raw instanceof List<?> rows) || rows.isEmpty()) return;
         Map<String, String> l2c = def.labelToCol();
         java.util.Set<String> allowed = java.util.Set.of("配方及工艺要求", "组装要求", "性能要求");
+        // 用户 2026-11-11 明确要求「留」原值→新值的 diff ⇒ 写之前先把旧值读出来。
+        // 只在**值真变了**的时候记一条,不是"提交了就记",否则审批留痕会被空改动灌满。
+        List<String> diffs = new ArrayList<>();
         int hit = 0;
         for (Object o : rows) {
             if (!(o instanceof Map<?, ?> m)) continue;
             Object id = m.get("id");
             if (id == null || String.valueOf(id).isBlank()) continue;
+            // 旧值(限定本单号,防止跨单读到别人的行)
+            Map<String, Object> old = null;
+            try {
+                List<Map<String, Object>> found = jdbc.queryForList(
+                        "SELECT * FROM " + def.lineTable() + " WHERE " + def.pkCol() + " = ? AND " + def.groupCol() + " = ?"
+                                + " AND ISNULL(asp_cancel,'N') <> 'Y'", id, no);
+                if (!found.isEmpty()) old = found.get(0);
+            } catch (RuntimeException ignore) {
+                // 读旧值失败不阻断回填（留痕降级为"值已写入"），但下面按无旧值处理
+            }
             StringBuilder set = new StringBuilder();
             List<Object> args = new ArrayList<>();
             for (String label : allowed) {
@@ -7703,8 +8067,13 @@ public class ButtonService {
                 if (v == null) continue;
                 String col = l2c.get(label);
                 if (col == null || col.isBlank()) continue;
+                String newV = String.valueOf(v);
+                String oldV = old == null || old.get(col) == null ? "" : String.valueOf(old.get(col));
+                if (!newV.equals(oldV)) {
+                    diffs.add(label + " 行" + id + "：「" + oldV + "」→「" + newV + "」");
+                }
                 set.append(set.length() == 0 ? "" : ", ").append("[").append(col).append("] = ?");
-                args.add(String.valueOf(v));
+                args.add(newV);
             }
             if (set.length() == 0) continue;
             args.add(id);
@@ -7715,8 +8084,15 @@ public class ButtonService {
                     + " WHERE " + def.pkCol() + " = ? AND " + def.groupCol() + " = ?"
                     + " AND ISNULL(asp_cancel,'N') <> 'Y'", args.toArray());
         }
-        if (hit > 0) {
-            recordApproval(def.code(), no, "L1_BACKFILL", "FILLED", "一级审批回填配方及工艺要求（" + hit + " 行）");
+        if (hit > 0 || !diffs.isEmpty()) {
+            String nodeName = node == 2 ? "二级" : "一级";
+            String word = node == 2 ? "L2_BACKFILL" : "L1_BACKFILL";
+            // 留痕正文带原值→新值(用户 2026-11-11 明确要 diff)。空 diff(值没变)时如实说明,
+            // 避免"审批人以为改了、其实内容一致"被误读成一次真实修改。
+            String detail = diffs.isEmpty()
+                    ? nodeName + "审批回填配方及工艺要求（" + hit + " 行，值无变化）"
+                    : nodeName + "审批回填配方及工艺要求（" + hit + " 行）：" + String.join("；", diffs);
+            recordApproval(def.code(), no, word, "FILLED", detail);
         }
     }
 
@@ -8403,6 +8779,38 @@ public class ButtonService {
         Map<String, Object> out = new HashMap<>();
         out.put("编号", no);
         out.put("单据状态", status);
+        return out;
+    }
+
+    // ============ 库存口径提示(2026-11-10 用户口径「以金蝶库存数量为准」) ============
+    /**
+     * 会改库存、且**能**推金蝶的 6 类单据(与 {@link #listPushableErp} 白名单同源;
+     * 采购订单/暂收退料单不记账,故不在此列)。
+     */
+    private static final Set<String> STOCK_ERP_PUSHABLE = Set.of(
+            "PURCHASE_IN", "SALE_OUT", "MATERIAL_OUT", "FINISH_IN", "OTHER_IN", "OTHER_OUT");
+    /** 会改库存但**推不了金蝶**的两类 ⇒ 审核后那笔库存一定会被下一轮同步抹平。 */
+    private static final Set<String> STOCK_LOCAL_ONLY = Set.of("TRANSFER", "STOCKTAKE");
+
+    /**
+     * 审核 / 审批通过 的返回体,附带「库存提示」码(前端据此追加一句说明)。
+     *
+     * <p>为什么必须提示(用户 2026-11-10 口径「以金蝶库存数量为准」,选了严格 A 口径):库存的唯一真源是
+     * 金蝶现存量(`deploy/sync-stock.mjs` 每 5 分钟覆盖 `kucun.yl`),而 MES 审核**仍会当场记账** ——
+     * 那笔改动只是临时值:单据没转ERP、或转了过去但金蝶没审核,下一轮同步就把它抹平。
+     * 不提示的话,业务会觉得"审核了库存就该减",然后在库存页看到数字又回去了。
+     *
+     * <p>码值(前端映射成多语言文案,不要在返回体里写整句中文):
+     * <ul>
+     *   <li>{@code 待转ERP} —— 本单需「转ERP + 金蝶审核」后才真正改变库存;</li>
+     *   <li>{@code 不推送金蝶} —— 调拨/盘点没有转ERP,审核不改变库存(只留流水)。</li>
+     * </ul>
+     */
+    private Map<String, Object> result(PanelRegistry.PanelDef def, String no, String status) {
+        Map<String, Object> out = result(no, status);
+        if (StockLedgerService.postsStock(def.code())) {
+            out.put("库存提示", STOCK_LOCAL_ONLY.contains(def.code()) ? "不推送金蝶" : "待转ERP");
+        }
         return out;
     }
 

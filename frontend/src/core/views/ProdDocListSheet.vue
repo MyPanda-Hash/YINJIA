@@ -88,6 +88,12 @@
         <thead>
           <tr>
             <th class="pds-c-no">{{ tt('产品编号') }}</th>
+            <!-- 产品信息表信息（2026-11-11 用户口径：「给产品文件列表前面加上对应的产品信息表信息，
+                 填写人这些」）：矩阵第一列是产品编号，紧接着给它所属**来源单据**（RD_PROD_INFO）的
+                 产品名称与填写人，再往后才是 4 张文件 —— 这样一眼能看出"这份文件是给谁填的/谁填的"。
+                 填写人 = 产品信息表单据的制单人（后端 board() 的「填写人」，asp_user1 → 姓名）。 -->
+            <th class="pds-c-name">{{ tt('产品名称') }}</th>
+            <th class="pds-c-filler">{{ tt('填写人') }}</th>
             <!-- 表头一律叫「文件N」(设计第 8 行 C8/D8 = 文件1/状态 …):**文件名写在数据格里**
                  (设计第 9 行 C9=规格书),不再把面板名放到表头上 —— 这样 4 列的文件名各自可读,
                  与 状态 列一一成对。文件列顺序由后端 DevTaskService.DEV_PANELS 给出(规格书在前)。 -->
@@ -103,6 +109,8 @@
         <tbody>
           <tr v-for="(row, i) in shownRows" :key="row['产品编号'] || ('r' + i)">
             <td class="pds-c-no">{{ row['产品编号'] || '' }}</td>
+            <td class="pds-c-name">{{ row['产品名称'] || '' }}</td>
+            <td class="pds-c-filler">{{ row['填写人'] || '' }}</td>
             <template v-for="c in columns" :key="'c' + c.panelCode + (row['产品编号'] || i)">
               <td class="pds-c-file">{{ tt(c.panelName) }}</td>
               <!-- 点状态 = 跳到该文件面板查看这张单(2026-09-30 用户口径):
@@ -140,9 +148,9 @@
             <td class="pds-c-date">{{ row['受控日期'] || '' }}</td>
           </tr>
           <tr v-if="!shownRows.length">
-            <!-- 列数 = 产品编号 1 + 4×(文件+状态) 8 + 产品负责人/是否受控/受控日期 3 = 12
-                 (原写 14 是错的:空态那行会多撑出两格) -->
-            <td :colspan="12" class="pds-empty">
+            <!-- 列数 = 产品编号 1 + 产品名称/填写人 2 + 4×(文件+状态) 8
+                 + 产品负责人/是否受控/受控日期 3 = 14 -->
+            <td :colspan="14" class="pds-empty">
               {{ activeFilter
                 ? tt('没有符合筛选条件的产品（点上方「清除筛选」看全部）')
                 : tt('暂无已下发的产品文件记录（先在产品信息表归档后点「产品开发」下发）') }}
@@ -290,6 +298,19 @@ function canApprove(c) {
   const p = user?.pagePerms || {}
   const csv = p.RD_SPEC_DOC || ''
   return String(csv).split(',').map((s) => s.trim()).includes('specapprove')
+}
+
+/**
+ * 批准按钮的悬停提示。
+ *
+ * ⚠ 2026-11-10 事故：模板里 `:title="approveTitle(row, c)"` 先落了地，函数却漏写 ⇒ 只要这一格
+ *   命中（管理员 × 规格书列 × 状态=开发完毕）渲染就抛 `TypeError: approveTitle is not a function`，
+ *   Vue 把整棵子树丢掉 —— 用户看到的是**整个产品文件列表一片空白**（生产 11-10 报障）。
+ *   组件里"模板用了、脚本没定义"的漏写不会在构建期报错，只能靠这条注释与测试兜住。
+ */
+function approveTitle(row, c) {
+  const no = docNoOf(row, c.panelCode)
+  return no ? tt('批准规格书 {no}（回填批准人与日期）').replace('{no}', no) : tt('批准')
 }
 
 /** 已批准时那格显示的落款（后端 board 回填 批准日期：姓名/yyyy.M.d） */
@@ -505,6 +526,9 @@ watch(() => [props.panelCode, props.head && props.head['单据编号']], load)
 .pds-table tbody tr:hover td { background: #fafbfc; }
 
 .pds-c-no { min-width: 112px; font-weight: 600; color: var(--pds-ink); }
+/* 产品信息表信息（2026-11-11）：名称给宽一点（产品名较长），填写人窄；都单行省略，不撑破纸面 */
+.pds-c-name { min-width: 150px; max-width: 220px; color: var(--pds-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pds-c-filler { min-width: 84px; color: var(--pds-ink-2); white-space: nowrap; }
 .pds-c-file { min-width: 108px; white-space: nowrap; color: var(--pds-ink-2); }
 /* 2026-11-06 规格书「批准」按钮：紧贴状态标签右侧，体量小于标签（它是动作不是状态） */
 .pds-approve {

@@ -1,0 +1,117 @@
+[
+  {
+    "panel": "OTHER_IN",
+    "label": "其他入库-沙箱物料",
+    "no": "OI-2026-11-0003",
+    "save": {
+      "status": 200,
+      "msg": "success"
+    },
+    "audit": {
+      "status": 200,
+      "code": 200,
+      "msg": "success"
+    },
+    "erp": {
+      "status": 200,
+      "code": 200,
+      "msg": "success",
+      "data": {
+        "是否已转ERP": "是",
+        "ERP单号": "QTRK-20261113-00005",
+        "转ERP操作人": "admin",
+        "转ERP时间": "2026-11-13 13:52:13",
+        "message": "已成功转入金蝶ERP，ERP单号: QTRK-20261113-00005（请在金蝶界面审核）"
+      }
+    }
+  },
+  {
+    "panel": "OTHER_OUT",
+    "label": "其他出库-沙箱物料",
+    "no": "OO-2026-11-0001",
+    "save": {
+      "status": 200,
+      "msg": "success"
+    },
+    "audit": {
+      "status": 200,
+      "code": 200,
+      "msg": "success"
+    },
+    "erp": {
+      "status": 500,
+      "code": 500,
+      "msg": "服务异常：转ERP失败: 金蝶接口失败: 请求接口返回失败:基础资料(业务员)数据不存在或者不符合字段筛选条件：编码“GD”",
+      "data": null
+    }
+  },
+  {
+    "panel": "SALE_OUT",
+    "label": "销售出库-沙箱成品",
+    "no": "",
+    "save": {
+      "status": 400,
+      "msg": "仓库不能为空"
+    }
+  },
+  {
+    "panel": "QC_RETURN",
+    "label": "暂收退料-沙箱采购料",
+    "no": "TH-2026-11-0006",
+    "save": {
+      "status": 200,
+      "msg": "success"
+    },
+    "audit": {
+      "status": 200,
+      "code": 200,
+      "msg": "success"
+    },
+    "erp": {
+      "status": 500,
+      "code": 500,
+      "msg": "服务异常：转ERP失败: 金蝶接口失败: 请求接口返回失败:单据[CGTH-20261113-00001]商品[YJ-TS-004，PP棉(YJ-TS-004)]在仓库[正品仓]库存扣减后，即时库存不足",
+      "data": null
+    }
+  },
+  {
+    "panel": "FINISH_IN",
+    "label": "产品入库-沙箱成品",
+    "no": "FI-2026-11-0001",
+    "save": {
+      "status": 200,
+      "msg": "success"
+    },
+    "audit": {
+      "status": 200,
+      "code": 200,
+      "msg": "success"
+    },
+    "erp": {
+      "status": 500,
+      "code": 500,
+      "msg": "服务异常：转ERP失败: 金蝶接口失败: 请求接口返回失败:第1行分录:基本单位为空,请重新录入商品第1行分录:单位为空,请重新选择单位请填写“商品分录”第1行：“单位”。",
+      "data": null
+    }
+  },
+  {
+    "panel": "MATERIAL_OUT",
+    "label": "材料出库-沙箱物料",
+    "no": "LL-2026-11-0018",
+    "save": {
+      "status": 200,
+      "msg": "success"
+    },
+    "audit": {
+      "status": 200,
+      "code": 200,
+      "msg": "success"
+    },
+    "erp": {
+      "status": 500,
+      "code": 500,
+      "msg": "服务异常：转ERP失败: 金蝶接口失败: 请求接口返回失败:第1行分录:基本单位为空,请重新录入商品第1行分录:单位为空,请重新选择单位请填写“材料分录”第1行：“单位”。",
+      "data": null
+    }
+  }
+]

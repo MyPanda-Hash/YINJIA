@@ -1,0 +1,32 @@
+{
+  "before": {
+    "qty": "240",
+    "box": "100",
+    "banner": ""
+  },
+  "clicked": {
+    "ok": true,
+    "text": "按这次打印打码",
+    "cls": "el-button el-button--primary is-link"
+  },
+  "after": {
+    "rows": [
+      {
+        "qty": "240",
+        "qtyDisabled": false,
+        "box": "100",
+        "boxDisabled": false
+      },
+      {
+        "qty": "18",
+        "qtyDisabled": false,
+        "box": "",
+        "boxDisabled": false
+      }
+    ],
+    "banner": "",
+    "cancelBtn": false,
+    "msgs": [],
+    "probe": []
+  }
+}
