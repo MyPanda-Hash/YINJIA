@@ -4630,3 +4630,6 @@ migrate-wo-draft-20261113.sql
 
 # 2026-11-13 生产工单「删除工单」(第二轮):页面动作词 del(删除)授权,给已有 create 的角色补授(零DDL;幂等;两账套)
 migrate-wo-list-del-perm-20261113.sql
+
+# 2026-11-14 商品档案「是否过程检验」开关(bs_inv 加 bit 列默认否 + yj_field INV 一行 + 10 语种译名;默认否,受控「首件检验单/出货检验单功能/出货检验表观」三张单是否随报工自动生成;手工新增不受影响;幂等;两账套)
+migrate-inv-process-inspection-20261114.sql
