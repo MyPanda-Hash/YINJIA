@@ -678,12 +678,13 @@ test('成型检验单 / 切炭检验单 / 成品检验规范 已下架:菜单树
   for (const t of ['成型检验单', '切炭检验单', '成品检验规范']) {
     assert.ok(!all.includes(t), `菜单树里不应再有「${t}」标题`)
   }
-  // 制程品质组现役 = 首件 / 制程 / 组装成品 / 出厂检验报告 四张(2026-10-30 增 QC_OQC_REPORT);质量单据组现役 = 7 张
+  // 制程品质组现役 = 首件 / 制程 / 组装成品 / 出厂检验报告 / 巡线检验 五张(2026-10-30 增 QC_OQC_REPORT;
+  // 2026-11-14 增 QC_LINE_PATROL「巡线检验」——用户口径「设定在品质模块下面,放在出厂检验报告后面」);质量单据组现役 = 7 张
   // (2026-10-23:该组 code 由 'process' 改为 'qcProcess' —— 与「工序 OP」叶子重名,菜单覆盖表要求 code 全树唯一)
   const qc = menuTree.find((n) => n.code === 'qc')
   const group = (code) => (qc.children || []).find((c) => c.code === code)
   assert.deepEqual((group('qcProcess').children || []).map((c) => c.panelCode),
-    ['QC_FIRST_INSP', 'QC_PROC_INSP', 'QC_ASM_INSP', 'QC_OQC_REPORT'])
+    ['QC_FIRST_INSP', 'QC_PROC_INSP', 'QC_ASM_INSP', 'QC_OQC_REPORT', 'QC_LINE_PATROL'])
   assert.equal((group('qcDoc').children || []).length, 7)
 })
 

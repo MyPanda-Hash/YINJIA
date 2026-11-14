@@ -238,6 +238,18 @@
           :head="cur" :fields="headerFields" :editable="draftEditable && !annOn"
           @dirty="markInlineDirty"
         />
+        <!-- 巡线检验·成型车间巡线记录表(QC_LINE_PATROL,2026-11-14 用户口径「新增成型车间巡线记录表,
+             巡线检验入口,设定在品质模块下面。先可填即可」):
+             纸面版式照用户给的第二张纸样(脱模检验记录表 1843×1109);
+             与首件检验单/出厂检验报告同一形态 —— 整页纸居中 + 左单据选择栏 + 右侧按钮竖栏,
+             纸上是 12 列 × 每块 4 子行(块级列 rowspan=4),可增删块。
+             契约唯一真源 docs/design/成型车间巡线记录表-首版.md(§一 版式 / §二 库表)。 -->
+        <QcLinePatrolSheet
+          v-else-if="panelCode === 'QC_LINE_PATROL'"
+          ref="approvalSheetRef"
+          :head="cur" :fields="headerFields" :editable="draftEditable && !annOn"
+          @dirty="markInlineDirty"
+        />
         <!-- 产品文件列表:4 文件×状态矩阵(设计《文件汇总表》)。只读视图 ——
              数据源与产品信息表侧栏「产品开发」按钮同一份(DevTaskService),不另存状态 -->
         <ProdDocListSheet
@@ -2627,6 +2639,8 @@ import QcProcInspSheet from '@core/qc/QcProcInspSheet.vue'
 import QcFirstInspSheet from '@core/qc/QcFirstInspSheet.vue'
 // 出厂检验报告(2026-11-01):与首件检验单同款纸张式受控记录表(c-95-12 / YJ-QR-05/A1)
 import QcOqcSheet from '@core/qc/QcOqcSheet.vue'
+// 巡线检验·成型车间巡线记录表(2026-11-14):纸面 12 列 × 每块 4 子行(契约见 docs/design/成型车间巡线记录表-首版.md)
+import QcLinePatrolSheet from '@core/qc/QcLinePatrolSheet.vue'
 // 首件检验单的列模型(「取成型工艺清单」按列合并时用:已有列只刷标准、保留已填数据)
 import { mergeFetchedColumns } from '@core/qc/firstInspCols.js'
 import QcProcInspWoPicker from '@core/qc/QcProcInspWoPicker.vue'
@@ -2743,6 +2757,12 @@ const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', '
   // 出厂检验报告(2026-11-01 用户口径):「和首件检验单相同的形式」——
   // 改为纸张式受控表单(QcOqcSheet,c-95-12 / YJ-QR-05/A1),不再是表头+17 列明细的数据页。
   'QC_OQC_REPORT',
+  // 巡线检验·成型车间巡线记录表(QC_LINE_PATROL,2026-11-14 用户口径「照第二张图纸面样式,先可填即可」):
+  // 纸张式记录表(QcLinePatrolSheet:标题/日期/审核人 + 12 列表头 + 每块 4 子行),
+  // 不列进来会退回「表头字段平铺 + 明细表格」的数据页,与用户给的纸样不符。
+  // 本期**不做审批流**(契约 §一):故不进 hasApprovalBtns / L2_DOC_PANELS,侧栏只有新增/保存/打印。
+  // 契约唯一真源 docs/design/成型车间巡线记录表-首版.md。
+  'QC_LINE_PATROL',
   // 样品二级目录两张单（2026-11-06）：各自有 DocSheet 版式（sampleExt/IntSheetCfg），
   // 不列进来会退回「表头字段平铺」的数据页，与《新系统-样品流程和相关表格式.xlsx》的表格版式不符。
   // ⚠ 2026-11-06 第二轮：内部单**恢复纸面版式**（用户纠正「格式还是要和 Excel 一样的，只是行操作
@@ -5772,6 +5792,14 @@ const DOC_RAIL_PANELS = {
   //   一个工单行 = 一个生产批次 ⇒ 左栏给工单号,业务能一眼对上生产批次;
   //   客户名称改由纸面抬头显示(报告按工单行/产品定位,不再以客户为索引)。
   QC_OQC_REPORT: ['工单号', '产品名称'],
+  // 巡线检验(成型车间巡线记录表 QC_LINE_PATROL,2026-11-14):
+  //   一张记录表 = 一个班次/一条线的巡线记录,现场会按天开多张 ⇒ 与首件/出厂检验报告同款左栏
+  //   (单号 | 日期 | 中间列 | 审核状态),点行即切单。
+  //   ⚠ 中间列只留空数组:左栏的列取的是**列表行(=表头字段)**的值,而本面板表头只有
+  //     单据编号/单据日期/审核人/审核时间/单据状态 —— 「车间 / 巡线人员」是**明细块级列**,
+  //     列表行上根本没有这两个键(实测配上去就是两列空白)。故左栏只给 单号|日期|审核状态,
+  //     车间/巡线人员进纸面里看。
+  QC_LINE_PATROL: [],
 }
 /**
  * 左栏「单据状态」页签(2026-11-10,出货检验单 = 制程检验单 QC_PROC_INSP)。
@@ -7924,7 +7952,7 @@ async function collectSheetShots() {
   const el = el0 instanceof HTMLElement && el0.offsetWidth > 0 ? el0 : document.querySelector(
     '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, '
     + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
-    + '.approval-layout .oqc-sheet, .approval-layout .qr-sheet')
+    + '.approval-layout .oqc-sheet, .approval-layout .qr-sheet, .approval-layout .lp-sheet')
   if (!el || !(el instanceof HTMLElement)) return null
   const [{ domToPng }] = await Promise.all([import('modern-screenshot')])
   await nextTick()
@@ -8316,7 +8344,7 @@ async function printApprovalSheet() {
   const paperEl = document.querySelector(
     '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, '
     + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
-    + '.approval-layout .oqc-sheet, .approval-layout .qr-sheet, .record-sheet')
+    + '.approval-layout .oqc-sheet, .approval-layout .qr-sheet, .approval-layout .lp-sheet, .record-sheet')
   if (paperEl && paperEl.querySelector('.sg-table')) {
     A4_CONTENT_PX = Math.round((297 - 16) / 25.4 * 96)    // 281mm @96dpi ≈ 1062px
     sgPageStyle = document.createElement('style')
@@ -8658,7 +8686,12 @@ async function downloadReport(fmt) {
  *     元素截成 PDF),所见即所得;服务端报表仍保留给「导出报表 → 导出 PDF / Excel」,
  *     以及其它面板(销售订单/送料暂收单/出厂检验报告)。
  */
-const SHEET_PREVIEW_PANELS = ['QC_PROC_INSP', 'QC_FIRST_INSP']
+const SHEET_PREVIEW_PANELS = ['QC_PROC_INSP', 'QC_FIRST_INSP',
+  // 巡线检验(成型车间巡线记录表 QC_LINE_PATROL,2026-11-14):没有服务端 .jrxml 模板
+  // ⇒ 若不加进来,「导出报表 → 打印预览」会去 fetchReportBlob('pdf') 拿**通用字段流水报表**,
+  // 打出来不是这张纸(与首件/制程当初踩的坑同源)。加进来 = 预览与「打印」同一个渲染源
+  // (buildSheetPdfBlob 把当前纸张元素截成 PDF),所见即所得。
+  'QC_LINE_PATROL']
 /** 「导出报表 → 打印预览」在本面板是否走纸张(= 与「打印」同一份渲染);弹窗文案据此换话术 */
 const sheetPreviewUsesPaper = computed(() => SHEET_PREVIEW_PANELS.includes(String(panelCode.value)))
 async function previewServerReport() {

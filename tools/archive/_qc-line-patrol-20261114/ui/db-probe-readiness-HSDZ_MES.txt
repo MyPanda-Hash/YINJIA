@@ -1,0 +1,9 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== probe-readiness.sql ==
+  | panel | 1 | 
+  | tables | qc_line_patrol_detail | 
+  | tables | qc_line_patrol_head | 
+  | detail_cols | 32 | 
+  | head_cols | 12 | 
+  | migration_log | 1 | 
+[OK] probe-readiness.sql (1 batches)

@@ -5916,6 +5916,25 @@ export default {
     '排产数量小于需求数量时，剩余数量会自动切出子工单（子工单进待排产池，可单独排产）':
       'If the scheduled quantity is less than the required quantity, the remainder is automatically split into a child work order (it goes to the pending pool and can be scheduled separately).',
     '剩余数量已自动切出子工单': 'The remaining quantity was automatically split into a child work order:',
+    // ---- 巡线检验 · 成型车间巡线记录表(QC_LINE_PATROL,2026-11-14)----
+    "巡线检验": "Line Patrol Inspection",
+    "成型车间巡线记录表": "Forming Workshop Line Patrol Record",
+    "巡线时间": "Patrol Time",
+    "巡线人员": "Patrol Inspector",
+    "产品信息确认（重点产品标注★）": "Product Information Confirmation (mark key products with ★)",
+    "炭棒长度范围mm": "Carbon Rod Length Range mm",
+    "内径检查mm": "Inner Diameter Check mm",
+    "重量范围g": "Weight Range g",
+    "两液密度（伊玛印品耐水煮要求测试）": "Two-Liquid Density (Yima printed products boil-resistance test)",
+    "表面状态": "Surface Condition",
+    "结果判定": "Result Judgment",
+    "标准值": "Standard",
+    "实测": "Measured",
+    "增删": "Add/Del",
+    "在本块之后插入一块": "Insert a block after this one",
+    "删除本块": "Delete this block",
+    "新增巡线记录": "Add Patrol Record",
+    "暂无巡线记录": "No patrol records",
   },
 
 }

@@ -4633,3 +4633,6 @@ migrate-wo-list-del-perm-20261113.sql
 
 # 2026-11-14 商品档案「是否过程检验」开关(bs_inv 加 bit 列默认否 + yj_field INV 一行 + 10 语种译名;默认否,受控「首件检验单/出货检验单功能/出货检验表观」三张单是否随报工自动生成;手工新增不受影响;幂等;两账套)
 migrate-inv-process-inspection-20261114.sql
+
+# 2026-11-14 成型车间巡线记录表「巡线检验」QC_LINE_PATROL:新表 qc_line_patrol_head/12列 + qc_line_patrol_detail/32列(一行=纸面一个记录块) + 面板 + 头 5/明细 25 字段 + 全角色授权(照抄 QC_OQC_REPORT) + 面板与 21 个新标签 en 译名;幂等;两账套
+migrate-qc-line-patrol-20261114.sql

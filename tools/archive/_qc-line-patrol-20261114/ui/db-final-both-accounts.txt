@@ -1,0 +1,18 @@
+########## HSDZ_MES ##########
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== probe-both-dbs.sql ==
+  | HSDZ_MES | head | 0 | 
+  | HSDZ_MES | detail | 0 | 
+  | HSDZ_MES | doc_status | 0 | 
+[OK] probe-both-dbs.sql (1 batches)
+########## HSDZ_MES_TEST ##########
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== probe-both-dbs.sql ==
+  | HSDZ_MES_TEST | head | 1 | 
+  | HSDZ_MES_TEST | detail | 3 | 
+  | HSDZ_MES_TEST | doc_status | 1 | 
+  | HSDZ_MES_TEST | head_row | XJ-2026-11-0001 | 2026-11-14 | null | 
+  | HSDZ_MES_TEST | detail_row | XJ-2026-11-0001 | 1 | 09:15 | 成型一车间 | CR-T01 | A-900 | 112.05 | 1.02 | 无粘模 | 合格 | 测试员 | 
+  | HSDZ_MES_TEST | detail_row | XJ-2026-11-0001 | 2 | null | null | null | null | null | null | null | null | null | 
+  | HSDZ_MES_TEST | detail_row | XJ-2026-11-0001 | 3 | null | null | null | null | null | null | null | null | null | 
+[OK] probe-both-dbs.sql (1 batches)

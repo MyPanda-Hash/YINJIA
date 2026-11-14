@@ -1,0 +1,39 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== probe-metadata.sql ==
+  | panel | QC_LINE_PATROL | 成型车间巡线记录表 | 品质管理 | doc | qc_line_patrol_head | qc_line_patrol_detail | 单据编号 | id | 单据编号 | XJ | 单据日期 | 20 | items | 品质管理 | 
+  | fields_by_place | detail | 25 | 10 | 260 | 
+  | fields_by_place | query,header | 5 | 10 | 210 | 
+  | header_fields | 单据编号 | query,header | 10 | 0 | 1 | 0 | 1 | 
+  | header_fields | 单据日期 | query,header | 20 | 0 | 1 | 1 | 1 | 
+  | header_fields | 单据状态 | query,header | 190 | 0 | 1 | 0 | 0 | 
+  | header_fields | 审核人 | query,header | 200 | 0 | 1 | 0 | 0 | 
+  | header_fields | 审核时间 | query,header | 210 | 0 | 1 | 0 | 0 | 
+  | detail_fields | 巡线时间 | detail | 10 | 0 | 1 | 1 | 
+  | detail_fields | 车间 | detail | 20 | 0 | 1 | 1 | 
+  | detail_fields | 编号1 | detail | 30 | 0 | 1 | 1 | 
+  | detail_fields | 型号1 | detail | 40 | 0 | 1 | 1 | 
+  | detail_fields | 长度标准1 | detail | 50 | 0 | 1 | 1 | 
+  | detail_fields | 长度实测1 | detail | 60 | 0 | 1 | 1 | 
+  | detail_fields | 内径标准1 | detail | 70 | 0 | 1 | 1 | 
+  | detail_fields | 内径实测1 | detail | 80 | 0 | 1 | 1 | 
+  | detail_fields | 重量标准1 | detail | 90 | 0 | 1 | 1 | 
+  | detail_fields | 重量实测1 | detail | 100 | 0 | 1 | 1 | 
+  | detail_fields | 编号2 | detail | 110 | 0 | 1 | 1 | 
+  | detail_fields | 型号2 | detail | 120 | 0 | 1 | 1 | 
+  | detail_fields | 长度标准2 | detail | 130 | 0 | 1 | 1 | 
+  | detail_fields | 长度实测2 | detail | 140 | 0 | 1 | 1 | 
+  | detail_fields | 内径标准2 | detail | 150 | 0 | 1 | 1 | 
+  | detail_fields | 内径实测2 | detail | 160 | 0 | 1 | 1 | 
+  | detail_fields | 重量标准2 | detail | 170 | 0 | 1 | 1 | 
+  | detail_fields | 重量实测2 | detail | 180 | 0 | 1 | 1 | 
+  | detail_fields | 两液密度 | detail | 190 | 0 | 1 | 1 | 
+  | detail_fields | 表面状态 | detail | 200 | 0 | 1 | 1 | 
+  | detail_fields | 跌落强度 | detail | 210 | 0 | 1 | 1 | 
+  | detail_fields | 抗压强度 | detail | 220 | 0 | 1 | 1 | 
+  | detail_fields | 结果判定 | detail | 230 | 0 | 1 | 1 | 
+  | detail_fields | 巡线人员 | detail | 240 | 0 | 1 | 1 | 
+  | detail_fields | 行号 | detail | 260 | 1 | 0 | 0 | 
+  | role_panel | 13 | 
+  | translations | field | en | 8 | 
+  | translations | panel | en | 1 | 
+[OK] probe-metadata.sql (1 batches)

@@ -1,0 +1,76 @@
+{
+ "menu": {
+  "groups": [
+   "My Dashboard",
+   "R&D Management",
+   "Smart SCM",
+   "WMS",
+   "Mobile Scanning",
+   "Production Planning",
+   "Production execution",
+   "Quality Management",
+   "Data Modeling",
+   "ERP Integration",
+   "Data Collection",
+   "System Management Platform"
+  ],
+  "hovered": "Quality Management"
+ },
+ "card": {
+  "groups": [
+   "Incoming Quality",
+   "Process Quality",
+   "Quality Documents"
+  ],
+  "items": [
+   "Incoming inspection",
+   "Inspection catalogue",
+   "Inspection data record",
+   "Incoming Inspection Requirements",
+   "Incoming Inspection Requirements (Series)",
+   "First article inspection",
+   "Outgoing Inspection Sheet (Functional)",
+   "Outgoing Inspection (Appearance)",
+   "Factory Inspection Report",
+   "Line Patrol Inspection",
+   "Nonconformance Report (Process)",
+   "Nonconforming handling (process)",
+   "Nonconforming Product Disposition (Self-made Material)",
+   "Emergency Release Application",
+   "Trial Material Usage Application",
+   "Incoming Abnormality Analysis Report",
+   "Production Abnormality Analysis Report"
+  ]
+ },
+ "patrolItem": "Line Patrol Inspection",
+ "en": {
+  "locale": "en",
+  "sheet": true,
+  "title": "Forming Workshop Line Patrol Record",
+  "heads": [
+   "Patrol Time",
+   "Workshop",
+   "Product Information Confirmation (mark key products with ★)",
+   "Carbon Rod Length Range mm",
+   "Inner Diameter Check mm",
+   "Weight Range g",
+   "Two-Liquid Density (Yima printed products boil-resistance test)",
+   "Surface Condition",
+   "Drop Strength",
+   "Compressive Strength",
+   "Result Judgment",
+   "Patrol Inspector",
+   "Add/Del"
+  ],
+  "labels": [
+   "Date：",
+   "Approved by："
+  ],
+  "bad": {
+   "title": null,
+   "headers": [],
+   "labels": [],
+   "sideBtns": []
+  }
+ }
+}

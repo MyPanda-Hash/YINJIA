@@ -613,6 +613,11 @@ export const menuTree = [
           // 的只读视图 v_oqc_std(不改该表任何一列),实测值按 qc_oqc_item_map 的优先级从三张单并集取。
           // 设计定稿 docs/design/出厂检验报告-从三张检验单并集生成.md。
           { code: 'qcOqcReport', title: '出厂检验报告', path: '/panelx/list/QC_OQC_REPORT', icon: 'Stamp', panelCode: 'QC_OQC_REPORT', operationName: '新增流程' },
+          // 巡线检验(2026-11-14 用户口径「新增成型车间巡线记录表,巡线检验入口,设定在品质模块下面」+
+          // 追问后「品质管理 → 制程品质(放在出厂检验报告下面)」):面板 QC_LINE_PATROL,
+          // 纸面照用户给的第二张图(脱模检验记录表)样式,先可填即可。
+          // 契约唯一真源 docs/design/成型车间巡线记录表-首版.md。
+          { code: 'qcLinePatrol', title: '巡线检验', path: '/panelx/list/QC_LINE_PATROL', icon: 'Document', panelCode: 'QC_LINE_PATROL', operationName: '新增流程' },
         ],
       },
       // 2026-10-09 下架:「不良处理」整组(不良品处理单 QC_DISPOSAL / 炭棒不良退货登记 ROD_RETURN)、
