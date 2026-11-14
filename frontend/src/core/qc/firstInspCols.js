@@ -33,27 +33,28 @@ export function isCheckColumn(col) {
 }
 
 /**
- * 纸面「可填样品行」矩阵(**第十轮 2026-11-14 现行口径**,唯一真源见
- * `docs/design/首件检验单-可填范围.md`;逐格量色自用户给的原图)。
+ * 纸面「可填样品行」矩阵(**第十一轮 2026-11-15 现行口径**,唯一真源见
+ * `docs/design/首件检验单-可填范围.md`;初版逐格量色自用户给的原图)。
  *
  * 用户口径:「**没有黄色的格子就打上斜杠、不可填写**,对应的表格改成黄色」——
  * 纸面上黄格(#FFF3CA)才是要填的格,白格一律打 `/`。四对样品行按**列名**认:
  *
  *   表观状态 / 脱粉情况(勾选式)   → 1#、2#
  *   外径 / 内径 / 长度 / 重量        → 3#、4#
- *   跌落                            → 5#、6#
- *   挤压强度 / 压降 / 浊度NTU        → 7#、8#
+ *   跌落 / 挤压强度(抗压强度)       → 5#、6#
+ *   压降 / 浊度NTU                  → 7#、8#
  *   认不出列名的新增列               → 按**分组**兜底(见 {@link GROUP_SAMPLE_PAIRS})
  *
- * ⚠ 别照第六/七轮抄:纸面的「跌落」在 5#/6#、而「挤压强度」在 7#/8# ——
- *   **不是按分组一刀切**,是逐格量色量出来的(强度组被纸面拆成了两对)。
- * ⚠ 第九轮「只限前两列、其余列八行全开」的口径已被本轮推翻(用户 2026-11-14 重新按纸面拍板)。
+ * ⚠ 与第十轮(2026-11-14、照原图)的差别 = **挤压强度从 7#/8# 上移到 5#/6#**:
+ *   用户 2026-11-15 口径「把挤压强度的格子提上去」(追问后选「和跌落强度同一对样品行」)
+ *   ⇒ 强度组两项(跌落、挤压)同记 5#/6# 两支样品;压降/浊度仍在 7#/8#。
+ * ⚠ 第九轮「只限前两列、其余列八行全开」的口径已被第十轮推翻,别再照抄。
  */
 export const PAPER_SAMPLE_PAIRS = Object.freeze({
   check: Object.freeze([1, 2]),   // 表观及脱粉(勾选式两列)
   size: Object.freeze([3, 4]),    // 尺寸及重量(外径/内径/长度/重量)
-  drop: Object.freeze([5, 6]),    // 跌落
-  last: Object.freeze([7, 8]),    // 挤压强度 / 压降 / 浊度 / 认不出列名时的兜底
+  drop: Object.freeze([5, 6]),    // 跌落 / 挤压强度(强度组同一对)
+  last: Object.freeze([7, 8]),    // 压降 / 浊度 / 认不出列名时的兜底
 })
 
 /**
@@ -83,7 +84,8 @@ export function sampleRowsOf(col) {
   const label = String(col?.label ?? '')
   if (/外径|内径|长度|重量/.test(label)) return PAPER_SAMPLE_PAIRS.size
   if (/跌落/.test(label)) return PAPER_SAMPLE_PAIRS.drop
-  if (/挤压|抗压/.test(label)) return PAPER_SAMPLE_PAIRS.last
+  // 挤压强度 / 抗压强度:2026-11-15 起与「跌落」同一对(强度组两支样品)
+  if (/挤压|抗压/.test(label)) return PAPER_SAMPLE_PAIRS.drop
   if (/压降|压缩/.test(label)) return PAPER_SAMPLE_PAIRS.last
   if (/浊度/.test(label)) return PAPER_SAMPLE_PAIRS.last
   return GROUP_SAMPLE_PAIRS[String(col?.group ?? '')] || PAPER_SAMPLE_PAIRS.last

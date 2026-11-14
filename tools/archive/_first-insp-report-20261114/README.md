@@ -4,6 +4,10 @@
 > 可填矩阵唯一真源 = **`docs/design/首件检验单-可填范围.md`**（前端口径真源 =
 > `frontend/src/core/qc/firstInspCols.js` 的 `sampleRowsOf / isFillableCell / isCheckColumn`）。
 
+> ⚠ **2026-11-15 第十一轮追加（挤压强度上移，现行口径）**：用户「把挤压强度的格子提上去一行」→ 选「和跌落强度同一对样品行」
+> ⇒ 服务端报表里 **挤压强度可填行 7#/8# → 5#/6#**（`ROWS_7_8` → `ROWS_5_6`）；压降/浊度仍 7#/8#；
+> 黄格总数仍 20、灰格仍 2。本文 §一/§三 的矩阵与冒烟输出是**第十轮**的原始记录；**本轮复跑结果**见文末追加节。
+
 ## 一、口径
 
 用户口径（2026-11-14，随《炭棒成型车间首件检验记录表》原图给）：
@@ -327,3 +331,24 @@ SMOKE OK
    （已有按列宽估行高的逻辑，属既有行为）。
 6. **xlsx 的合并/空行是 JR 导出器既有行为**（本次只加样式，不改版式）；xlsx 只作"导出成功 + 占位格
    数量"复核，纸面观感以 PDF 为准。
+
+## 追加：2026-11-15 第十一轮复跑（现行）
+
+改动：`QcFirstInspReportSupport.sampleRowsOf()` 的「挤压(抗压)强度」分支由 `ROWS_7_8` 改为 `ROWS_5_6`
+（与前端 `firstInspCols.sampleRowsOf` 同序）；`EXPECT_ROWS` / FALLBACKS / 落值样例同步改 5#/6#。
+
+离线冒烟复跑（JDK 25，classpath = `backend/target/classes` + `backend/target/cp.txt`）：
+**133 PASS / 0 FAIL**，其中与本轮相关的关键行：
+
+```
+[PASS] 列[7] 跌落 PDF 黄格行 = [5, 6]       7  跌落    强度  [5, 6] [5, 6]
+[PASS] 列[8] 挤压强度 PDF 黄格行 = [5, 6]   8  挤压强度 强度  [5, 6] [5, 6]
+[PASS] 列[9] 浊度NTU PDF 黄格行 = [7, 8]    9  浊度NTU 浊度及压降 [7, 8] [7, 8]
+[PASS] 列[10] 压降kPa PDF 黄格行 = [7, 8]  10 压降kPa 浊度及压降 [7, 8] [7, 8]
+[PASS] PDF 黄底填充次数 = 20     [PASS] PDF 灰底填充次数 = 2
+[PASS] PDF MediaBox 宽 = 842.0   [PASS] PDF MediaBox 高 = 595.0   [PASS] PDF 页对象数 = 1
+[PASS] xlsx 样品行里的 `/` 单元格数 = 60
+```
+
+产物已用新口径重新生成：`_first-insp-report-yellow.pdf / .xlsx / .png`。
+8090 需 Lead 重打包后才生效（本轮同批已重打包）。

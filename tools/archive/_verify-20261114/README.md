@@ -11,7 +11,8 @@
 | A 首件检验单 | A1~A4 | **4** | 0 | 0 | A4 在 Lead 换包后完成（8090 新 jar + 服务端 Jasper PDF 取证） |
 | B 巡线检验 | B1~B6 | **6** | 0 | 0 | 含只读态、打印预览新窗口、英文界面（Lead 额外项） |
 | C 静态/构建/DB | C1~C5 | **5** | 0 | 0 | 两账套 |
-| **合计** | **15** | **15** | **0** | **0** | 1 个 P2 缺陷（非验收条款、不阻塞）见 §4 |
+| **第十一轮补验**（2026-11-15 · 挤压强度上移 5#/6#） | 1~3 | **3** | 0 | 0 | 新包 SHA256 `6FA1CF34…`；5173 DOM / 真落库 / 8090 服务端 Jasper PDF 全 PASS，见 §8 |
+| **合计** | **18** | **18** | **0** | **0** | 1 个 P2 缺陷（非验收条款、不阻塞）见 §4 |
 
 环境指纹（取证时）：
 - 5173 = vite 源码版（PID 33072，`✓ built in 27.40s` 的产物亦为当前源码）；8090 = 新 jar（PID **1848**，JDK25 `-jar target\yinjia-mes-backend-0.1.0.jar`）。
@@ -19,6 +20,7 @@
 - DB：127.0.0.1:1433 `HSDZ_MES`（正式）/ `HSDZ_MES_TEST`（测试）；登录工厂 `YJ` / `YJ_TEST`。
 - 工具：前端 `node --test`（Node v22.20.0）；后端 JDK **25.0.4.1**（`C:/Users/vigna/.jdks/ms-25.0.4`）；DB 用 `tools/lib/mssql-jdbc.jar` + 本目录 `Q.java`/`SqlRunner`。
 - ego-browser：taskSpace `verify-20261114`；脚本源 `C:/Users/vigna/ego/verify-20261114/round-01..35.mjs`（已全部拷入本目录）。
+- **第十一轮补验（2026-11-15 00:05 换包）**：8090 新 jar SHA256 = `6fa1cf346c589384c559bbf5cc8c99c833b42d884a5eec930315786eaad8453a`（= Lead 公布的 `6FA1CF34…`，`app.jar` 与 `yinjia-mes-backend-0.1.0.jar` 同哈希）；static 入口 chunk = `index-Dc3ViIde.js`；本轮 ego 任务空间 `verify-20261114-r11`（上一轮空间已按规范关闭），脚本 `round-40..46.mjs`。
 
 ---
 
@@ -239,6 +241,54 @@ DOM 实测逐列可填行：表观 `1/2`、脱粉 `1/2`、外径 `3/4`、内径 
 | C4 | `_c4-git-status.txt` |
 | C5 | `_c5-matrix.mjs`、`_c5-matrix.log`、`_c5-impl-matrix.log` |
 | 清理 | `_cleanup-prod.sql`、`_cleanup-test.sql`、`_cleanup-evidence.txt`、`_cleanup-probe.sql` |
+| 第十一轮补验 | `_r11-matrix.mjs`/`.log`、`_r11-db.sql`/`.log`、`_r11-cleanup-test.sql`/`_r11-cleanup.log`、`r11-dom.json`、`r11-dom-8090.json`、`r11-save2.json`、`r11-report-server.pdf`、`r11-report-server.txt`、`r11-report-ui.pdf`、`round-40..46.mjs` |
 | 环境 | `_ego-skill.md`（ego-browser 用法快照）、`round-12..18/22/23/24` 等过程脚本 |
 
-> 复跑方式：ego 脚本 `ego-browser nodejs -e "await import('file:///C:/Users/vigna/ego/verify-20261114/round-NN.mjs')"`（脚本已拷入本目录，可直接放回该路径复跑）；DB 查询 `java -cp tools/lib/mssql-jdbc.jar tools/archive/_verify-20261114/Q.java <DB> <sql>`；矩阵 `node tools/archive/_verify-20261114/_c5-matrix.mjs`。
+> 复跑方式：ego 脚本 `ego-browser nodejs -e "await import('file:///C:/Users/vigna/ego/verify-20261114/round-NN.mjs')"`（脚本已拷入本目录，可直接放回该路径复跑）；DB 查询 `java -cp tools/lib/mssql-jdbc.jar tools/archive/_verify-20261114/Q.java <DB> <sql>`；矩阵 `node tools/archive/_verify-20261114/_c5-matrix.mjs`（第十轮）、`node tools/archive/_verify-20261114/_r11-matrix.mjs`（第十一轮）。
+
+---
+
+## 8. 第十一轮补验（2026-11-15 · 挤压强度上移到 5#/6#）：**PASS（3/3）**
+
+> 用户 2026-11-15 口径：「帮我把挤压强度的格子提上去一行」→ 追问后选「和跌落强度同一对样品行」。
+> 现行矩阵唯一变化：**挤压强度 可填行 7#/8# → 5#/6#**；其余不变（表观/脱粉 1#/2#、外径/内径/长度/重量 3#/4#、跌落 5#/6#、浊度NTU/压降kPa 7#/8#）；合计仍 **可填 20 / `/` 60**。
+> 新包：8090 jar SHA256 `6fa1cf34…`（Lead 公布 `6FA1CF34…`），static `index-Dc3ViIde.js`，2026-11-15 00:05 重启；本地单测 65/65（验收者复跑确认）。
+
+### 8.1 5173 DOM（测试库，`SJ-2026-11-0010` 草稿）：**PASS**
+证据：`r11-dom.json`、`round-43.mjs`（`round-40/42` 为过程脚本）、`_r11-matrix.log`
+
+| 判据 | 期望 | 实测 |
+|---|---|---|
+| `td.gz-y` 总数 | 20 | **20**，色唯一值 `rgb(255, 243, 202)` |
+| `/` 只读格 | 60 | **60**（8 行×10 列 = 80 − 20） |
+| 挤压强度列可填行 | **5#、6#** | **`compressRows=[5,6]`**；5#/6# 格 = 黄底 + input |
+| 7#/8# 挤压格 | `/` 且无输入控件 | `text="/"`、`hasInput=false`、`boxes=0`、`bg=transparent`（白底） |
+| 7#/8# 挤压格 title | 本列两行（5#、6#） | **`按相关要求：本组测试只记录 2 支样品（5#、6#）`** |
+| 其余列未变 | 表观/脱粉 1/2、尺寸 3/4、跌落 5/6、浊度 7/8、压降 7/8 | **逐列一致**：`炭棒表观状态:1/2、炭棒脱粉情况:1/2、炭棒外径:3/4、炭棒内径:3/4、炭棒长度:3/4、炭棒重量:3/4、跌落:5/6、浊度NTU:7/8、压降kPa:7/8` |
+| 标准行 | 2 个 `td.std-check`、灰 `rgb(217,217,217)`、无控件 | **2 / `rgb(217, 217, 217)` / 0 个 input,textarea** |
+| 合计 | 可填 20 | **fillableTotal = 20** |
+
+静态同源复核：`node tools/archive/_verify-20261114/_r11-matrix.mjs`（期望矩阵手抄契约 §一 第十一轮）→ `[PASS] frontend 列模型 + Excel 导出与契约 §一 逐格一致(可填 20 / 斜杠 60)`，且导出同源（可填格落值 20 / `/` 60）。
+
+### 8.2 真落库（测试库）：**PASS**
+证据：`_r11-db.log`（SQL 输出实录）、`r11-save2.json`、`_r11-db.sql`
+
+- 在 挤压强度 **5#** 填 `32.5` → 保存：UI 提示「「保存」成功」（`r11-save2.json` AFTER.msgs），单号 **`SJ-2026-11-0010`**（单据日期 2026-11-15、工单号 MO-2026-09-0108、admin、00:07:24）。
+- `qc_first_insp_detail` 该单 90 行；`compress` 列逐行：**仅 `5#` = 32.5**，`1#~4#/6#/7#/8#/标准` 全 null；全单「实测数值非空」**只有这 1 格**。
+- 保存后页面取值：挤压 5# = `32.5`、6# 空、**7#/8# = `/`**（无输入框）——`r11-save2.json` valuesAfter。
+- 造数已清理：`_r11-cleanup-test.sql` / `_r11-cleanup.log`（删前 head 1 / detail 90 / doc_status 1 → 删后全 0；测试库最新单据回到 `SJ-2026-11-0007`）。
+
+### 8.3 8090 新 jar DOM + 导出报表服务端 Jasper PDF：**PASS**
+证据：`r11-dom-8090.json`、`r11-report-server.pdf`、`r11-report-server.txt`、`r11-report-ui.pdf`、`round-44.mjs`
+
+- **8090 DOM**（测试库同一单 `SJ-2026-11-0010`）：`gzY=20`、`/`=60、`stdCheck=2`、挤压可填行 = **5#/6#**、5# = `32.5`、7#/8# 挤压格 = `/` 无输入且 title = “（5#、6#）”；10 列表头与 5173 一致（`r11-dom-8090.json`）。
+- **服务端 Jasper PDF**（`/api/report/export?code=qc_first_insp&panelCode=QC_FIRST_INSP&docNo=SJ-2026-11-0010&format=pdf`，`r11-report-server.pdf` 95,296 B）：
+  - `/Type /Page` = **1**；`/MediaBox[0 0 842 595]`（A4 横向）；**无内嵌图片**（矢量文本）；
+  - 内容流取色：**黄 `1 0.95294 0.79216 rg`（#FFF3CA）恰好 20 次**、**灰 `0.85098 0.85098 0.85098 rg`（#D9D9D9）恰好 2 次**；
+  - 文本层（openpdf 抽取，1,514 字）：两级表头 + 标准行 + 1#..8# 齐全；**`5#` 行含 `32.5`（落在「挤压强度」列位）**，`6#/7#/8#` 行无挤压值（`r11-report-server.txt` 第 5# 行 = `/ / / / / / 32.5 / /`，7#/8# 行无该值）。
+- 备注：UI「导出报表→导出 PDF」对首件单仍按 2026-10-21 既有口径走**客户端纸张渲染**（`r11-report-ui.pdf`：595×842 单页图、无颜色算子、无文本层）——与 §4 说明-1 一致；**服务端 Jasper 版式**经上面的 API 通道取证（判据要求全部满足）。
+
+### 8.4 本轮未取得的东西（说明）
+- 本轮 ego 浏览器截图通道异常（`Page.captureScreenshot` 连续超时；页面本身可正常 evaluate/取 DOM），因此 §8 无新截图，界面证据以**结构化 DOM JSON**（`r11-dom.json` / `r11-dom-8090.json`）为准；PDF 证据见 `r11-report-server.pdf`（可用任意 PDF 阅读器打开复核）。上一轮同页面的视觉截图可参照 `round-02-first-insp-full.png`。
+- 本轮未改实现、未 git add/commit、未重启 5173/8090；测试任务空间 `verify-20261114-r11` 已按规范关闭。
+
