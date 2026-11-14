@@ -28,6 +28,10 @@
     存量单表内为空时 QueryService 退回 yj_doc_status.shr 兜底),由 ReportService.headParams
     按 yj_field.label **自动下发** ⇒ 模板只取值,不必改 ReportService。
 
+  ⚠ 2026-11-14 第十轮「纸面黄格」(用户口径:「没有黄色的格子就打上斜杠、不可填写;对应格子改黄色」):
+    明细**可填**样品格黄底 #FFF3CA、标准行的「表观/脱粉」两格灰底 #D9D9D9 —— 就是 styles 里的
+    cellY / smallG,由生成器按列选样式;可填矩阵的唯一真源 = docs/design/首件检验单-可填范围.md。
+
   参数契约(由生成器 QcFirstInspReportSupport 在 <title> 前插入,本骨架**不声明** <parameter>):
     产品编号 / 产品型号 / 生产日期 / 组别 / 总结论 / 检验员 / 审核人 / 审批人 / 打印时间
     + 生成的:表头列名 N1..Nn、标准 STD1..STDn、每格 V{样品}_{列}
@@ -59,6 +63,13 @@
   <style name="cellL" style="cell" hAlign="Left"/>
   <style name="small" style="cell" fontSize="7"/>
   <style name="smallC" style="small" hAlign="Center"/>
+  <!-- 2026-11-14 第十轮「纸面黄格」的两个底色样式(颜色口径见 docs/design/首件检验单-可填范围.md):
+         cellY  = 明细**可填**样品格(纸面淡黄 #FFF3CA);
+         smallG = 标准行的「表观/脱粉」两格(纸面灰底 #D9D9D9)。
+       ⚠ 底色必须 mode="Opaque" 才画得出来(与 th/thGroup 同款);
+       ⚠ 样式名被 QcFirstInspReportSupport 按格选用(STYLE_CELL_FILL/STYLE_STD_GRAY),改名必须同步。 -->
+  <style name="cellY" style="cellC" mode="Opaque" backcolor="#FFF3CA"/>
+  <style name="smallG" style="small" mode="Opaque" backcolor="#D9D9D9"/>
   <style name="th" style="cellC" fontSize="8" isBold="true" mode="Opaque" backcolor="#EFEFEF"/>
   <style name="thGroup" style="th" fontSize="9" backcolor="#E0E0E0"/>
   <!-- 左上角斜线格:两行字分开画(右上=测试项目、左下=样品序号),拼出纸面那条斜线的观感 -->

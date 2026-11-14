@@ -61,10 +61,26 @@ import java.util.concurrent.ConcurrentHashMap;
  *    yj_field.label 自动下发)
  * </pre>
  *
- * <h3>可填格口径(与面板、Excel 导出**逐字同源**)</h3>
- * 相关要求第 1 条「…各记录 2 支样品」= **每个分组各占一对样品行**:
- * 表观及脱粉→1#/2#、尺寸及重量→3#/4#、强度→5#/6#、浊度及压降→7#/8#(未知分组落最后一对)。
- * 本组那一对写实测值(<b>没值就是空格</b>,与纸面一致),其余格一律写 {@code /}。
+ * <h3>可填格口径(2026-11-14 第十轮 · 纸面黄格;与面板、Excel 导出**逐字同源**)</h3>
+ * 契约唯一真源 = {@code docs/design/首件检验单-可填范围.md};前端真源 =
+ * {@code frontend/src/core/qc/firstInspCols.js}({@code sampleRowsOf / isFillableSample / isCheckColumn})。
+ * 用户口径:「**没有黄色的格子就打上斜杠、不可填写**,对应格子修改为黄色」——
+ * <ul>
+ *   <li>表观状态 / 脱粉(炭粉)情况 → 1#、2#;</li>
+ *   <li>外径 / 内径 / 长度 / 重量 → 3#、4#;</li>
+ *   <li>跌落 → 5#、6#;</li>
+ *   <li>挤压(抗压)强度、压降(压缩kPa)、浊度NTU → 7#、8#;</li>
+ *   <li>认不出列名的新增列 → 按「项目分组」兜底:表观及脱粉 1#/2#、尺寸及重量 3#/4#、
+ *       强度 5#/6#、浊度及压降 7#/8#、未知分组 7#/8#。</li>
+ * </ul>
+ * 可填格:淡黄底 {@code #FFF3CA}(纸面要填的格子);不可填格:白底 + 占位符 {@code /}。
+ * 标准行:表观/脱粉两格灰底 {@code #D9D9D9}(纸面如此),其余列照旧。
+ * <p>⚠ 与第六/七轮的「分组一刀切」不同:**强度组的「跌落」在 5#/6#、「挤压强度」在 7#/8#**
+ * (纸面黄格就是这样) ⇒ {@link #sampleRowsOf} 里「挤压/抗压」必须**显式判**,不能落到
+ * "强度组 → 5#/6#"的分组兜底上;判定顺序与前端 {@code firstInspCols.sampleRowsOf} 逐条一致,
+ * 改顺序前先看那边。</p>
+ * <p>⚠ 老单据里落在不可填格上的历史值:本报表按纸面写 {@code /}(数据不删 —— 库里/面板原样
+ * 只读保留,与历史口径一致;报表是"纸面"语义,不把不该填的格子印出来)。</p>
  */
 public final class QcFirstInspReportSupport {
 
@@ -95,8 +111,25 @@ public final class QcFirstInspReportSupport {
 
     /** 分组先后(与 core/qc/firstInspCols.js 的 GROUP_ORDER 逐字一致) */
     private static final String[] GROUP_ORDER = {"表观及脱粉", "尺寸及重量", "强度", "浊度及压降"};
-    /** 每个分组各占哪一对样品行(与 firstInspCols.GROUP_SAMPLES 一致;未知分组落最后一对) */
-    private static final int[][] GROUP_SAMPLES = {{1, 2}, {3, 4}, {5, 6}, {7, 8}};
+
+    // ---- 纸面黄格:每列可填哪一对样品行(2026-11-14 第十轮;与 firstInspCols.sampleRowsOf 同口径) ----
+    private static final int[] ROWS_1_2 = {1, 2};
+    private static final int[] ROWS_3_4 = {3, 4};
+    private static final int[] ROWS_5_6 = {5, 6};
+    private static final int[] ROWS_7_8 = {7, 8};
+    /** 各分组**兜底**用哪一对样品行(认不出列名的新增列按项目分组落这里;未知分组落最后一对) */
+    private static final int[][] GROUP_SAMPLES = {ROWS_1_2, ROWS_3_4, ROWS_5_6, ROWS_7_8};
+
+    // ---- 样式名(定义在骨架 reports/qc_first_insp.jrxml 的 <style> 段;改名必须同步骨架) ----
+    /** 不可填样品格:白底 + 占位符 `/` */
+    private static final String STYLE_CELL = "cellC";
+    /** 可填样品格:淡黄底 `#FFF3CA`(纸面要填的格子) */
+    private static final String STYLE_CELL_FILL = "cellY";
+    /** 标准行的普通格 */
+    private static final String STYLE_STD = "small";
+    /** 标准行的「表观/脱粉」两格:灰底 `#D9D9D9`(纸面如此) */
+    private static final String STYLE_STD_GRAY = "smallG";
+
     private static final int SAMPLE_COUNT = 8;
     private static final String ROW_STANDARD = "标准";
     private static final String ROW_SAMPLE = "样品";
@@ -202,16 +235,28 @@ public final class QcFirstInspReportSupport {
         return new Matrix(groups, pairs, result, inspector, itemW, signature(raw));
     }
 
-    /** 结构签名:列数 + 每列的(分组|key|列头|标准)。同签名 ⇒ 同一份编译产物(值走参数) */
+    /** 结构签名:列数 + 每列的(分组|key|列头|标准|可填样品行)。同签名 ⇒ 同一份编译产物(值走参数) */
     private static String signature(Matrix m) {
         StringBuilder sb = new StringBuilder();
         sb.append(m.groups().size()).append('|').append(m.colCount());
         for (Group g : m.groups()) {
             sb.append('#').append(g.name());
-            for (Col c : g.cols()) sb.append('~').append(c.key()).append('=').append(c.headText())
-                    .append('@').append(c.standard());
+            for (Col c : g.cols()) {
+                // 黄格位置也是**结构**:同列名/标准但可填行不同 ⇒ 生成出来的 XML 不同,必须进签名
+                // (否则改列名命中旧缓存,纸面黄格会错位)。
+                sb.append('~').append(c.key()).append('=').append(c.headText())
+                        .append('@').append(c.standard())
+                        .append('!').append(rowsCode(sampleRowsOf(c)));
+            }
         }
         return Integer.toHexString(sb.toString().hashCode()) + "-" + m.colCount();
+    }
+
+    /** 可填样品行的签名片段:`{1,2}` → `"12"` */
+    private static String rowsCode(int[] rows) {
+        StringBuilder sb = new StringBuilder();
+        for (int s : rows) sb.append(s);
+        return sb.toString();
     }
 
     // ============================================================ 生成 → 编译(带缓存)
@@ -259,12 +304,20 @@ public final class QcFirstInspReportSupport {
 
         // ---- 标准行 + 1#..8# 样品行 ----
         List<Col> cols = m.flatCols();
+        // 每列的可填样品行(纸面黄格)+ 是不是「表观/脱粉」勾选列(标准行那两格要灰底)
+        int[][] fillRows = new int[n][];
+        boolean[] checkCol = new boolean[n];
+        for (int c = 0; c < n; c++) {
+            fillRows[c] = sampleRowsOf(cols.get(c));
+            checkCol[c] = isCheckColumn(cols.get(c).key(), cols.get(c).label());
+        }
         int stdH = stdRowHeight(cols, itemW);
         StringBuilder body = new StringBuilder();
         body.append(staticText("标准", 0, LABEL_W, 0, stdH, "th"));
         x = LABEL_W;
         for (int c = 0; c < n; c++) {
-            body.append(textField("small", x, itemW[c], 0, stdH, "$P{STD" + (c + 1) + "}"));
+            body.append(textField(checkCol[c] ? STYLE_STD_GRAY : STYLE_STD, x, itemW[c], 0, stdH,
+                    "$P{STD" + (c + 1) + "}"));
             x += itemW[c];
         }
         for (int s = 1; s <= SAMPLE_COUNT; s++) {
@@ -272,7 +325,9 @@ public final class QcFirstInspReportSupport {
             body.append(staticText(s + "#", 0, LABEL_W, y, SAMPLE_ROW_H, "th"));
             x = LABEL_W;
             for (int c = 0; c < n; c++) {
-                body.append(textField("cellC", x, itemW[c], y, SAMPLE_ROW_H, "$P{V" + s + "_" + (c + 1) + "}"));
+                // 纸面黄格 = 可填(淡黄底);其余格白底 + 参数里已经写好的 `/`
+                String st = fillable(s, fillRows[c]) ? STYLE_CELL_FILL : STYLE_CELL;
+                body.append(textField(st, x, itemW[c], y, SAMPLE_ROW_H, "$P{V" + s + "_" + (c + 1) + "}"));
                 x += itemW[c];
             }
         }
@@ -416,7 +471,8 @@ public final class QcFirstInspReportSupport {
         for (Group g : m.groups()) {
             sb.append("\n  [").append(g.name()).append(']');
             for (Col c : g.cols()) {
-                sb.append(' ').append(c.headText()).append("(标准=").append(c.standard()).append("; 格=")
+                sb.append(' ').append(c.headText()).append("(标准=").append(c.standard())
+                        .append("; 可填=").append(rowsText(sampleRowsOf(c))).append("; 格=")
                         .append(String.join(",", c.cells())).append(')');
             }
         }
@@ -432,16 +488,75 @@ public final class QcFirstInspReportSupport {
         return s.isEmpty() ? GROUP_ORDER[GROUP_ORDER.length - 1] : s;
     }
 
-    /** 本分组用哪一对样品行(未知分组落最后一对,与前端 samplesOfGroup 一致) */
+    /** 本分组**兜底**用哪一对样品行(认不出列名的列;未知分组落最后一对,与前端 samplesOfGroup 一致) */
     private static int[] samplesOf(String group) {
         for (int i = 0; i < GROUP_ORDER.length; i++) if (GROUP_ORDER[i].equals(group)) return GROUP_SAMPLES[i];
         return GROUP_SAMPLES[GROUP_SAMPLES.length - 1];
     }
 
-    /** 这一格要不要填(与前端 isFillableCell 同口径) */
-    private static boolean fillable(int sample, String group) {
-        for (int s : samplesOf(group)) if (s == sample) return true;
+    /** 按列取可填样品行(Col 版;report()/签名/摘要都用它) */
+    private static int[] sampleRowsOf(Col col) {
+        return sampleRowsOf(col.key(), col.label(), col.group());
+    }
+
+    /**
+     * 本列**可填**哪一对样品行 = 纸面黄格(契约见类头注释;与前端 firstInspCols.sampleRowsOf **同口径**)。
+     *
+     * <p>判定**按列名认**,顺序与前端逐条一致(**顺序不能换**,换一条就会在某些列名上分叉):</p>
+     * <ol>
+     *   <li>勾选式两列(表观状态 / 脱粉情况 / 炭粉情况)→ 1#/2#(key=appearance/depowder 兜底);</li>
+     *   <li>外径 / 内径 / 长度 / 重量 → 3#/4#;</li>
+     *   <li>跌落(跌落强度)→ 5#/6#;</li>
+     *   <li>挤压(抗压)强度 → 7#/8#(⚠ 必须显式判:强度组的分组兜底是 5#/6#);</li>
+     *   <li>压降(压缩kPa)→ 7#/8#;</li>
+     *   <li>浊度NTU → 7#/8#;</li>
+     *   <li>认不出列名的新增列 → 按「项目分组」兜底(未知分组落最后一对 7#/8#)。</li>
+     * </ol>
+     */
+    private static int[] sampleRowsOf(String key, String label, String group) {
+        String l = str(label);
+        String k = str(key);
+        // ① 勾选式两列 → 1#/2#(前端 sampleRowsOf 第一步也是它)
+        if (isCheckColumn(k, l)) return ROWS_1_2;
+        // ② 外径 / 内径 / 长度 / 重量 → 3#/4#
+        if (l.contains("外径") || l.contains("内径") || l.contains("长度") || l.contains("重量")) return ROWS_3_4;
+        // ③ 跌落 → 5#/6#
+        if (l.contains("跌落")) return ROWS_5_6;
+        // ④ 挤压强度 / 抗压强度 → 7#/8#(⚠ 必须显式判:下面 ⑦ 的「强度」分组兜底是 5#/6#)
+        if (l.contains("挤压") || l.contains("抗压")) return ROWS_7_8;
+        // ⑤ 压降(压缩kPa) → 7#/8#
+        if (l.contains("压降") || l.contains("压缩")) return ROWS_7_8;
+        // ⑥ 浊度NTU → 7#/8#
+        if (l.contains("浊度")) return ROWS_7_8;
+        // ⑦ 认不出列名:按项目分组兜底
+        return samplesOf(groupName(group));
+    }
+
+    /**
+     * 是不是「表观及脱粉」那种勾选式的两列(标准行那两格要灰底):**按列名认**,key 兜底 ——
+     * 与前端 firstInspCols.isCheckColumn 的正则 `/表观状态|表观|粘模|脱粉|炭粉情况/` 同口径。
+     */
+    private static boolean isCheckColumn(String key, String label) {
+        String l = str(label);
+        String k = str(key);
+        return l.contains("表观状态") || l.contains("表观") || l.contains("粘模") || l.contains("脱粉")
+                || l.contains("炭粉情况") || "appearance".equals(k) || "depowder".equals(k);
+    }
+
+    /** 这一格要不要填:本列的可填样品行里有没有它(与前端 isFillableSample 同口径) */
+    private static boolean fillable(int sample, int[] rows) {
+        for (int s : rows) if (s == sample) return true;
         return false;
+    }
+
+    /** 可填样品行的可读文字:`{1,2}` → `"1#,2#"`(摘要/日志用) */
+    private static String rowsText(int[] rows) {
+        StringBuilder sb = new StringBuilder();
+        for (int s : rows) {
+            if (sb.length() > 0) sb.append(',');
+            sb.append(s).append('#');
+        }
+        return sb.toString();
     }
 
     /** 「3#」→ 3;解析不出给 -1 */
@@ -561,10 +676,11 @@ public final class QcFirstInspReportSupport {
         Col build() {
             String g = groupName(group);
             String unit = declaredUnit(key, label);
+            // 纸面黄格 = 本列可填的那两行:写实测值(**没值就是空格**);其余格:纸面上的占位符 `/`
+            int[] rows = sampleRowsOf(key, label, g);
             List<String> cells = new ArrayList<>(SAMPLE_COUNT);
             for (int s = 1; s <= SAMPLE_COUNT; s++) {
-                // 本组那一对:写实测值(**没值就是空格**);其余格:纸面上的占位符 `/`
-                cells.add(fillable(s, g) ? (raw[s - 1] == null ? "" : raw[s - 1]) : BLANK);
+                cells.add(fillable(s, rows) ? (raw[s - 1] == null ? "" : raw[s - 1]) : BLANK);
             }
             return new Col(key, label, g, columnHeadText(label, unit), standard, List.copyOf(cells));
         }
