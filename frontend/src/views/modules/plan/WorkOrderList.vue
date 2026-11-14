@@ -127,45 +127,11 @@
               @selection-change="(r) => (checked = r)" @current-change="(r) => (currentRow = r)" ref="tableRef"
               highlight-current-row row-key="rowKey">
       <el-table-column type="selection" width="40" fixed="left" reserve-selection />
-      <!-- 按量流转·逐道明细(2026-11-12 方案A):一行只显示"当前工序",后道(如装箱 可加工1000/待流入4000)
-           必须展开才看得到 —— 展开区直接渲染后端给的「工序流转明细」,只读。
-           ⚠ 不能加 fixed:固定列的展开内容会被压成列宽,只剩前两列可见(实测)。 -->
-      <el-table-column type="expand" width="34">
-        <template #default="{ row }">
-          <div class="wol-flow-box">
-            <div class="wol-flow-title">{{ tt('工序流转明细') }}（{{ tt('按量流转:上一道报多少,下一道最多做多少') }}）</div>
-            <table class="wol-flow-tbl">
-              <thead>
-                <tr>
-                  <th>{{ tt('工序') }}</th>
-                  <th class="num">{{ tt('换算率') }}</th>
-                  <th class="num">{{ tt('计划量') }}</th>
-                  <th class="num">{{ tt('可加工量') }}</th>
-                  <th class="num">{{ tt('已审完工') }}</th>
-                  <th class="num">{{ tt('待报量') }}</th>
-                  <th class="num">{{ tt('待流入量') }}</th>
-                  <th>{{ tt('状态') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(f, i) in (row.工序流转明细 || [])" :key="i" :class="{ 'is-cur': f.当前 }">
-                  <td>{{ tt(f.工序) }}</td>
-                  <td class="num">{{ flowNum(f.换算率) }}</td>
-                  <td class="num">{{ flowNum(f.计划量) }}</td>
-                  <td class="num">{{ flowNum(f.可加工量) }}</td>
-                  <td class="num">{{ flowNum(f.已审完工) }}</td>
-                  <td class="num">{{ flowNum(f.待报量) }}</td>
-                  <td class="num" :class="{ 'wol-flow-gap': Number(f.待流入量 || 0) > 0 }">{{ flowNum(f.待流入量) }}</td>
-                  <td>{{ tt(f.状态) }}</td>
-                </tr>
-                <tr v-if="!(row.工序流转明细 || []).length">
-                  <td colspan="9" class="empty">{{ tt('该工单行没有工序台账(没预排产)') }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </template>
-      </el-table-column>
+      <!-- 按量流转·逐道明细的展开行(2026-11-12 方案A)**已于 2026-11-14 删除**:
+           用户口径「删除掉这个工序流转明细,这个作用不明显还很丑,除非有其他方法」——
+           行内已有「当前工序/工序进度/上道完工量/可加工量/待报量/待流入量」,
+           全工序进度看「生产工序进度看板」;同样的数字改成「当前工序」格的悬停提示
+           (business/woFlowChain.js),列与展开箭头都不再占位。 -->
       <!-- 工单号(锁定常显·fixed left,2026-11-13 列设置):点号进「工单详情·追溯」,链接交互不变。
            「工单号#工单行号」是本页的行身份(同工单号可多行),所以它**不进列设置**、也不允许隐藏。 -->
       <el-table-column :label="tt('工单号')" prop="加工单号" width="150" sortable show-overflow-tooltip fixed="left">
@@ -178,7 +144,7 @@
       <!-- 可调整列(2026-11-13 用户口径「生产工单增加列设置,像订单结转那样」):
            顺序与显隐都由「列设置」决定 ⇒ 这里按 orderedColumns 的**草稿顺序**渲染(草稿即预览,点「保存」才落库)。
            列定义(宽/对齐/排序/溢出省略/表头 tooltip)在 MID_COLUMNS,标签走 tt();
-           锁定列(选择/展开/工单号/生产状态/结案)固定在两端,不进列设置。 -->
+           锁定列(选择/工单号/生产状态/结案)固定在两端,不进列设置。 -->
       <el-table-column v-for="col in orderedColumns" :key="col.prop" :label="tt(col.label || col.prop)"
                        :prop="col.key || col.prop" :width="col.width" :min-width="col.minWidth"
                        :align="col.align" :sortable="!!col.sortable" :show-overflow-tooltip="!!col.showOverflow">
@@ -189,7 +155,10 @@
           <span v-if="col.prop === '源工单号'">{{ row.源工单号 || '-' }}</span>
           <span v-else-if="col.prop === '拆分序号'">{{ row.拆分序号 ?? '-' }}</span>
           <span v-else-if="col.prop === '成型配方'">{{ row['成型配方单号'] || '-' }}{{ row['成型配方版本'] ? ` / ${row['成型配方版本']}` : '' }}</span>
-          <span v-else-if="col.prop === '当前工序'" :class="{ 'wol-closed': row.当前工序 === '组装' }">{{ row.当前工序 ? tt(row.当前工序) : '-' }}</span>
+          <!-- 当前工序(2026-11-14):悬停 = 该行逐道工序的计划量/已审完工/可加工量/待流入量
+               (原「工序流转明细」展开区的内容收在这里,平时看不见;▶ = 当前工序) -->
+          <span v-else-if="col.prop === '当前工序'" :class="{ 'wol-closed': row.当前工序 === '组装' }"
+                :title="flowTip(row)">{{ row.当前工序 ? tt(row.当前工序) : '-' }}</span>
           <span v-else-if="col.prop === '计划开工日期'" class="dp-date-cell" :title="tt('双击可改排产日期')"
                 @dblclick="openQuick(row, planToday)">{{ row.计划开工日期 || '-' }}</span>
           <span v-else-if="col.prop === '计划完工日期'" class="dp-date-cell" :title="tt('双击可改排产日期')"
@@ -418,6 +387,8 @@ import request from '@core/request'
 import { tt } from '@/i18n'
 import DateRangeQuery from '@core/ui/DateRangeQuery.vue'
 import { printWorkTaskSheet } from '@/business/print-formats'
+// 逐道工序的悬停提示文本(2026-11-14:原「工序流转明细」展开区删除后,数字收到「当前工序」格)
+import { flowChainTip } from '@/business/woFlowChain'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
 import ScheduleBoard from './ScheduleBoard.vue'
@@ -620,7 +591,8 @@ const filtered = computed(() => rows.value.filter((r) => {
 // 复用系统级实现:useReportColumns(列显隐/顺序 + 后端持久化 /px/reportColumnSettings,panelCode=WORK_ORDER_LIST)。
 // 弹窗里只放**可调整列**(显隐 + 顺序);以下列永远显示且固定在两端(它们是行标识与状态判据,
 //   隐藏后按钮点不了/看不出为什么不能操作):
-//   选择框(selection) / 展开(expand) / 工单号(fixed left,链接进追溯) / 生产状态(fixed right) / 结案(fixed right)。
+//   选择框(selection) / 工单号(fixed left,链接进追溯) / 生产状态(fixed right) / 结案(fixed right)。
+//   (2026-11-14:原「展开(expand)」锁定列随「工序流转明细」大表一起删除)
 // ⚠ 顺序:草稿数组顺序 = 表格列顺序(visibleProps 按草稿顺序返回),保存后刷新仍按该顺序渲染。
 // prop = 列设置里的稳定键(= 中文标签,存进设置 JSON 里可读);key = 行数据键(默认同 prop;
 //   「工单行号→行号」「工单日期→单据日期」「转单数量→排产数量」这类列名与数据键不同的必须给 key,
@@ -827,6 +799,14 @@ function onQuery() { resetScrollLoad(); load() }
 function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '0' }
 /** 按量流转字段展示(2026-11-12):后端没给数(未排产/无台账)显示 '-'，0 也要显示 0(缺口 0 有意义) */
 function flowNum(v) { return (v === null || v === undefined || v === '') ? '-' : num(v) }
+/**
+ * 「当前工序」格的悬停提示(2026-11-14 用户口径「删除掉这个工序流转明细,这个作用不明显还很丑,
+ * 除非有其他方法」):原展开行 8 列大表删除,逐道工序的计划量/已审完工/可加工量/待流入量收到这里,
+ * 每行一道工序、当前工序带 ▶;没有工序台账(没预排产)返回空串 ⇒ title 为空不弹提示。
+ */
+function flowTip(row) {
+  return flowChainTip(row && row.工序流转明细, { t: tt, fmt: flowNum })
+}
 function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 
 // ───────── 日排产(2026-10-29):直接长在本页明细表的日期列 ─────────
@@ -1575,15 +1555,8 @@ onBeforeUnmount(() => unbindTableScroll())
 .wol-closed { color: #f56c6c; font-weight: 600; }
 /* 按量流转「待流入量」>0 = 还在等上一道流下来,标红提示 */
 .wol-flow-gap { color: #e6a23c; font-weight: 600; }
-/* 按量流转·逐道明细(展开行) */
-.wol-flow-box { padding: 8px 12px 10px 12px; background: #fafbfc; }
-.wol-flow-title { font-size: 12px; color: #909399; margin-bottom: 6px; }
-.wol-flow-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
-.wol-flow-tbl th, .wol-flow-tbl td { border: 1px solid #ebeef5; padding: 4px 8px; text-align: left; }
-.wol-flow-tbl th { background: #f5f7fa; color: #606266; font-weight: 600; }
-.wol-flow-tbl td.num, .wol-flow-tbl th.num { text-align: right; font-variant-numeric: tabular-nums; }
-.wol-flow-tbl tr.is-cur td { background: #eef6ff; font-weight: 600; }
-.wol-flow-tbl td.empty { text-align: center; color: #909399; }
+/* 按量流转·逐道明细的展开行样式(2026-11-14 用户口径删除,数字改到「当前工序」悬停提示):
+   已随 <el-table-column type="expand"> 一并撤掉,别再把 .wol-flow-box/.wol-flow-tbl 找回来 */
 .wol-split { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
 .wol-split-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .wol-split-row > span:first-child { color: #909399; }

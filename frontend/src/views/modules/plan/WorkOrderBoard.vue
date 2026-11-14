@@ -11,8 +11,12 @@
      `DayPlanSpread.mergeReported` 向今天及以后重排,前端只负责显示。
      2026-11-13(契约 tools/archive/_wo-progress-click-20261113/CONTRACT.md §3.1):新增**深链定位** ——
      从「生产工序进度看板」点某道工序跳来(?line&wo&rowid&op):按 line 选线 → 定位该工单行
-     (浅蓝底高亮 + 滚到表格中间 + 自动展开「工序流转明细」并把该工序标出来)→ 上下文区提示「已定位」;
-     参数用完即摘(router.replace),keep-alive 再次跳入靠 watch(route.query)/onActivated 重新定位。 -->
+     (浅蓝底高亮 + 滚到表格中间)→ 上下文区提示「已定位:工单号#行号 · 工序」;
+     参数用完即摘(router.replace),keep-alive 再次跳入靠 watch(route.query)/onActivated 重新定位。
+     2026-11-14(用户口径「删除掉这个工序流转明细,这个作用不明显还很丑,除非有其他方法」):
+     **展开行那道 8 列大表整体删除**;同样的数字收进「当前工序」格的悬停提示
+     (business/woFlowChain.js;当前工序标 ▶、深链定位的那道标 ★),平时看不见,要看鼠标停一下;
+     全工序进度仍看「生产工序进度看板」的环/圆点链。 -->
 <template>
   <div class="wb-page">
     <!-- 顶部:开工日期 + 汇总条 -->
@@ -161,55 +165,21 @@
                    数据源 bs_bom 与后端 /px/scheduleBoard/toPicking 端点同期删除 ⇒ 按钮一并撤掉 -->
             </div>
           </div>
-          <!-- ⚠ 深链定位(2026-11-13,契约 §3.1)给表格补了 4 个绑定,别删:
+          <!-- ⚠ 深链定位(2026-11-13,契约 §3.1)给表格留了两个绑定,别删:
                ref=schedTable   → 定位后从表格内部 .el-table__body 找高亮行做 scrollIntoView
-               :row-key         → el-table 展开行 / expand-row-keys 的**行身份**,必须唯一
-                                  (行id 优先,极端缺 id 时用 工单号|行号|批次号 兜底,见 rowKeyOf)
                :row-class-name  → 命中的行挂 .wb-focus-row(浅蓝底 + 左侧 3px 蓝边)
-               :expand-row-keys → 自动展开该行「工序流转明细」(受控:展开/收起变化由 @expand-change 回写) -->
+               (:row-key 只用来让 el-table 认行身份 —— 同号工单行多批时不串行;此前它还喂
+                expand-row-keys,2026-11-14 展开区删除后已无此用途) -->
           <el-table ref="schedTable" :data="schedRows" size="small" border height="100%" empty-text=""
-                    :row-key="rowKeyOf" :row-class-name="rowClassName" :expand-row-keys="expandedKeys"
-                    @selection-change="(r) => (checkedSched = r)" @expand-change="onExpandChange">
+                    :row-key="rowKeyOf" :row-class-name="rowClassName"
+                    @selection-change="(r) => (checkedSched = r)">
             <el-table-column type="selection" width="42" />
-            <!-- 按量流转·逐道明细(2026-11-12 方案A):一行只显示"当前工序",后道必须展开才看得到;
-                 展开区渲染后端给的「工序流转明细」,只读。 -->
-            <el-table-column type="expand" width="30">
-              <template #default="{ row }">
-                <div class="wb-flow-box">
-                  <div class="wb-flow-title">{{ tt('工序流转明细') }}（{{ tt('按量流转:上一道报多少,下一道最多做多少') }}）</div>
-                  <table class="wb-flow-tbl">
-                    <thead>
-                      <tr>
-                        <th>{{ tt('工序') }}</th>
-                        <th class="num">{{ tt('换算率') }}</th>
-                        <th class="num">{{ tt('计划量') }}</th>
-                        <th class="num">{{ tt('可加工量') }}</th>
-                        <th class="num">{{ tt('已审完工') }}</th>
-                        <th class="num">{{ tt('待报量') }}</th>
-                        <th class="num">{{ tt('待流入量') }}</th>
-                        <th>{{ tt('状态') }}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-for="(f, i) in (row.工序流转明细 || [])" :key="i"
-                          :class="{ 'is-cur': f.当前, 'is-focus': isFocusFlow(row, f) }">
-                        <td>{{ tt(f.工序) }}</td>
-                        <td class="num">{{ flowNum(f.换算率) }}</td>
-                        <td class="num">{{ flowNum(f.计划量) }}</td>
-                        <td class="num">{{ flowNum(f.可加工量) }}</td>
-                        <td class="num">{{ flowNum(f.已审完工) }}</td>
-                        <td class="num">{{ flowNum(f.待报量) }}</td>
-                        <td class="num" :class="{ 'wb-flow-gap': Number(f.待流入量 || 0) > 0 }">{{ flowNum(f.待流入量) }}</td>
-                        <td>{{ tt(f.状态) }}</td>
-                      </tr>
-                      <tr v-if="!(row.工序流转明细 || []).length">
-                        <td colspan="9" class="empty">{{ tt('该工单行没有工序台账(没预排产)') }}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </template>
-            </el-table-column>
+            <!-- 按量流转·逐道明细(2026-11-12 方案A 的展开行)**已于 2026-11-14 删除**:
+                 用户口径「删除掉这个工序流转明细,这个作用不明显还很丑,除非有其他方法」——
+                 行内已有「当前工序/当前工序计划量/当前工序完工量/上道工序/上道完工量/可加工量/
+                 待报量/待流入量」八列,展开表把同样的数字再说一遍;全工序进度看
+                 「生产工序进度看板」。同样的数字改成「当前工序」格的悬停提示
+                 (business/woFlowChain.js),列与展开箭头都不再占位。 -->
             <!-- ══════════ 冻结区(2026-11-08 用户口径)══════════
                  用户原话:「排单界面物产品编码、产品规格、订单数量,显示在前面冻结,方便看。……进行修改还需要
                  考虑当前冻结后如何显示其他的信息对其他信息进行处理要如何实现。」
@@ -270,8 +240,12 @@
                  工序块从左到右读成一条链 ——
                  当前工序 → 本道计划量 → 本道已做 → 上道工序/上道已做 → 能做多少 → 还能报 → 还缺。
                  上道工序/上道完工量从原来的"日期列后面"前移到这里;未交量属整单口径,留在原位不动。 -->
+            <!-- 当前工序(2026-11-14):悬停 = 该行逐道工序的计划量/已审完工/可加工量/待流入量
+                 (原「工序流转明细」展开区的内容收在这里,平时看不见;▶ = 当前工序,★ = 深链定位的那道) -->
             <el-table-column :label="tt('当前工序')" prop="当前工序" width="95" sortable>
-              <template #default="{ row }">{{ row.当前工序 ? tt(row.当前工序) : '-' }}</template>
+              <template #default="{ row }">
+                <span :title="flowTip(row)">{{ row.当前工序 ? tt(row.当前工序) : '-' }}</span>
+              </template>
             </el-table-column>
             <el-table-column :label="tt('当前工序计划量')" prop="当前工序计划量" width="120" align="right" />
             <el-table-column :label="tt('当前工序完工量')" prop="当前工序完工量" width="120" align="right" />
@@ -461,6 +435,8 @@ import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
 import { qtyText, isOverCapacity, dayColState, isToday, isPast, isOutOfPlanRange,
   dayCellView, historyShortfalls, shortfallTotals } from '@/business/dayPlan'
+// 逐道工序的悬停提示文本(2026-11-14:原「工序流转明细」展开区删除后,数字收到「当前工序」格)
+import { flowChainTip } from '@/business/woFlowChain'
 import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
@@ -596,7 +572,7 @@ const overQty = computed(() => Number(s.value['今日超额合计'] || 0))
 
 /** 选中一条产线:重取该线排产明细 + 日计划(既有行为不变)。
  *  2026-11-13 深链定位要复用同一条路径 ⇒ 返回 Promise(模板点击忽略返回值,深链里 await 它再定位行);
- *  同时清掉上一次的定位高亮/展开/提示(用户主动切线 = 不再"定位在某行")。 */
+ *  同时清掉上一次的定位高亮/提示(用户主动切线 = 不再"定位在某行")。 */
 function select(l) {
   clearFocus()
   sel.line = l.生产线
@@ -813,8 +789,9 @@ function onScope() {
 //   ① loadSummary() 后按 line **精确匹配** linesSummary 的生产线 → select(该线)(复用既有 select:
 //      loadScheduled + loadDayPlan),不另写一套取数;
 //   ② 定位行:行id 精确匹配 rowid 优先,其次 加工单号===wo(有行号时再按 工单行号 收窄);
-//   ③ 命中:该行高亮(.wb-focus-row)+ scrollIntoView 居中 + 自动展开「工序流转明细」并把 工序===op
-//      那道标 .is-focus + 上下文区提示「已定位:工单号#行号 · 工序」;
+//   ③ 命中:该行高亮(.wb-focus-row)+ scrollIntoView 居中 + 上下文区提示「已定位:工单号#行号 · 工序」;
+//      (2026-11-14 起不再自动展开任何表格 —— 原「工序流转明细」展开区已删除,
+//       定位的那道工序标在「当前工序」格的悬停提示里,见 flowTip)
 //   ④ 参数**用完即摘**(router.replace 只删这 4 个 key),避免 keep-alive 回到本页被旧参数反复复写;
 //      同一页面再次从看板点别的工序进来(只变 query 不重新挂载)⇒ watch(route.query) 重新定位。
 //   ⚠ 找不到行 / 该线不在 linesSummary:ElMessage.warning + 摘参数后照常可用(不白屏、不死循环);
@@ -830,12 +807,10 @@ const FOCUS_ROWNO_KEYS = ['行号', 'rowno']
 const SELF_PATH = '/prod/plan/workOrderBoard'
 /** 高亮行的 row-key 值(空 = 无高亮) */
 const focusKey = ref('')
-/** 要高亮的工序(定位行「工序流转明细」里那道) */
+/** 深链定位的那道工序(2026-11-14 起:不再展开任何表格,只在「当前工序」悬停提示里标 ★) */
 const focusOp = ref('')
 /** 上下文区提示文案,如「已定位:WO001#2 · 成型」 */
 const focusTip = ref('')
-/** el-table 展开行 keys(:expand-row-keys 受控) */
-const expandedKeys = ref([])
 /** 竞态计数:连续跳入/连点时只让最后一次定位生效,前一次 await 的结果作废 */
 let focusSeq = 0
 /** 正在消费的参数指纹:keep-alive 下 onActivated 与 watch(route.query) 会在同一 tick 各触发一次,
@@ -845,9 +820,9 @@ let focusInflight = ''
 const schedTable = ref(null)
 
 /**
- * 行身份 key(2026-11-13):`:row-key` / `:expand-row-keys` 依赖它,**必须唯一** ——
+ * 行身份 key(2026-11-13):`:row-key` 依赖它,**必须唯一** ——
  * 正常行 = 行id(plang.id);极端情况下缺 行id 时用 工单号|行号|批次号 兜底,
- * 否则多行共用 'undefined' 会被 expand-row-keys 一起展开。
+ * 否则多行共用 'undefined' 会让 el-table 把不同行当成同一行(勾选/高亮串行)。
  */
 function rowKeyOf(r) {
   if (r && r.行id !== undefined && r.行id !== null && r.行id !== '') return String(r.行id)
@@ -857,22 +832,19 @@ function rowKeyOf(r) {
 function rowClassName({ row }) {
   return focusKey.value && rowKeyOf(row) === focusKey.value ? 'wb-focus-row' : ''
 }
-/** 展开区里 工序===op 的那道高亮(且只高亮**定位的那一行**的展开区,手动展开别的行不会跟着亮) */
-function isFocusFlow(row, f) {
-  return !!focusOp.value && rowKeyOf(row) === focusKey.value
-    && String(f?.工序 ?? '') === String(focusOp.value)
-}
-/** 展开/收起变化回写 keys(受控 prop 与表格内部状态保持一致;setExpandRowKeys 不回发事件,不会死循环) */
-function onExpandChange(row, expanded) {
-  const rows = Array.isArray(expanded) ? expanded : (Array.isArray(row) ? row : [])
-  expandedKeys.value = rows.map(rowKeyOf)
+/**
+ * 「当前工序」格的悬停提示(2026-11-14):原「工序流转明细」展开表删除后,逐道工序的
+ * 计划量/已审完工/可加工量/待流入量收到这里 —— 每行一道工序,当前工序带 ▶、深链定位的带 ★。
+ * 没有工序台账(没预排产)返回空串 ⇒ title 为空,不弹空提示。
+ */
+function flowTip(row) {
+  return flowChainTip(row && row.工序流转明细, { t: tt, fmt: flowNum, focusOp: focusOp.value })
 }
 /** 清掉定位痕迹(切产线/切片签/重新定位前调用) */
 function clearFocus() {
   focusKey.value = ''
   focusOp.value = ''
   focusTip.value = ''
-  expandedKeys.value = []
 }
 /** 取这条路由 query 里的深链参数(空串/undefined 一律视为没传) */
 function focusQueryOf(q) {
@@ -931,7 +903,7 @@ function scrollToFocusRow() {
   if (!tr || typeof tr.scrollIntoView !== 'function') return
   try { tr.scrollIntoView({ block: 'center', inline: 'nearest' }) } catch { /* 老浏览器忽略 */ }
 }
-/** 展开行插入/表格重排会把行位置挪一点 ⇒ nextTick 滚一次,下一帧再校正一次(幂等,不循环) */
+/** 表格重排会把行位置挪一点 ⇒ nextTick 滚一次,下一帧再校正一次(幂等,不循环) */
 function scheduleScroll() {
   nextTick(() => {
     scrollToFocusRow()
@@ -940,7 +912,7 @@ function scheduleScroll() {
 }
 /**
  * 消费深链参数并定位(幂等:没有深链参数直接返回,所以 watch/onActivated/onMounted 都可安全调用)。
- * 顺序:摘参数 → 骨架就绪 → 按 line 选线 → 定位行 → 高亮/展开/提示/滚动。
+ * 顺序:摘参数 → 骨架就绪 → 按 line 选线 → 定位行 → 高亮/提示/滚动。
  */
 async function consumeFocus() {
   if (!hasFocusQuery(route.query)) return
@@ -989,10 +961,10 @@ async function consumeFocus() {
       ElMessage.warning(tt('未在工单排产中找到该工单行'))
       return
     }
-    // ③ 高亮 + 自动展开 + 展开区 op 那道高亮 + 上下文提示 + 滚到中间
+    // ③ 高亮 + 上下文提示 + 滚到中间(2026-11-14:不再展开「工序流转明细」;
+    //    q.op 只用于提示文案与「当前工序」悬停提示里的 ★ 标记)
     focusKey.value = rowKeyOf(row)
     focusOp.value = q.op || ''
-    expandedKeys.value = [focusKey.value]
     const no = row.加工单号 ?? row.工单号 ?? q.wo ?? ''
     const ln = row.工单行号
     let tip = tt('已定位') + '：' + no + (ln !== undefined && ln !== null && ln !== '' ? '#' + ln : '')
@@ -1351,15 +1323,8 @@ watch(() => route.query, () => {
 .wb-closed { color: #f56c6c; font-weight: 600; }
 /* 按量流转「待流入量」>0 = 还在等上一道流下来,标橙提示 */
 .wb-flow-gap { color: #e6a23c; font-weight: 600; }
-/* 按量流转·逐道明细(展开行) */
-.wb-flow-box { padding: 8px 12px 10px 12px; background: #fafbfc; }
-.wb-flow-title { font-size: 12px; color: #909399; margin-bottom: 6px; }
-.wb-flow-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
-.wb-flow-tbl th, .wb-flow-tbl td { border: 1px solid #ebeef5; padding: 4px 8px; text-align: left; }
-.wb-flow-tbl th { background: #f5f7fa; color: #606266; font-weight: 600; }
-.wb-flow-tbl td.num, .wb-flow-tbl th.num { text-align: right; font-variant-numeric: tabular-nums; }
-.wb-flow-tbl tr.is-cur td { background: #eef6ff; font-weight: 600; }
-.wb-flow-tbl td.empty { text-align: center; color: #909399; }
+/* 按量流转·逐道明细的展开行样式(2026-11-14 用户口径删除,数字改到「当前工序」悬停提示):
+   已随 <el-table-column type="expand"> 一并撤掉,别再把 .wb-flow-box/.wb-flow-tbl 找回来 */
 .wb-trace-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .wb-trace-no { font-size: 16px; font-weight: 700; color: #1e6fb8; }
 .wb-trace-desc { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: #606266; background: #fdf6ec; border: 1px solid #f5dab1; border-radius: 4px; padding: 8px 10px; margin-bottom: 10px; }
@@ -1369,8 +1334,9 @@ watch(() => route.query, () => {
 
 /* ── 深链定位(2026-11-13,契约 CONTRACT.md §3.1)──────────────────────────────────
    从「生产工序进度看板」点某道工序跳过来时,告诉用户"定位到哪一行、哪一道工序":
-   ① 上下文区一枚小提示(与上下文条同色系,不抢眼);② 命中行浅蓝底 + 左侧 3px 蓝边;
-   ③ 展开区里 工序===op 的那道同样浅蓝底 + 左蓝边(比 .is-cur 更强调,后写覆盖)。
+   ① 上下文区一枚小提示(与上下文条同色系,不抢眼);② 命中行浅蓝底 + 左侧 3px 蓝边。
+   (2026-11-14 展开区删除后,原 ③「展开区里定位那道工序再标一次」不再存在;
+    那道工序改为在「当前工序」悬停提示里打 ★,见 business/woFlowChain.js)
    全部是静态样式(不用发光动画):截图/打印稳定,也符合本页"信息为主"的风格。 */
 .wb-focus-tip { padding: 1px 8px; background: #ecf5ff; border: 1px solid #b3d4f5; border-radius: 3px;
   font-size: 12px; font-weight: 600; color: #1e6fb8; white-space: nowrap; max-width: 100%;
@@ -1381,7 +1347,4 @@ watch(() => route.query, () => {
 :deep(.el-table__body tr.wb-focus-row:hover > td.el-table__cell),
 :deep(.el-table__body tr.wb-focus-row.hover-row > td.el-table__cell) { background-color: #ecf5ff; }
 :deep(.el-table__body tr.wb-focus-row > td.el-table__cell:first-child) { box-shadow: inset 3px 0 0 #409eff; }
-/* 展开区里目标工序那一道(与 .is-cur 同优先级,写在后面 ⇒ 定位工序既是当前工序时以定位色为准) */
-.wb-flow-tbl tr.is-focus td { background: #ecf5ff; font-weight: 700; }
-.wb-flow-tbl tr.is-focus td:first-child { box-shadow: inset 3px 0 0 #409eff; }
 </style>

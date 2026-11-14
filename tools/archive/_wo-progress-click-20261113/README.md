@@ -14,6 +14,11 @@
 
 ## 二、交付内容
 
+> **2026-11-14 变更**：用户口径「删除掉这个工序流转明细，这个作用不明显还很丑，除非有其他方法」⇒
+> 工单排产页的「工序流转明细」展开区已整列删除（生产工单页同一块一并删除），下面表格里
+> 「自动展开 + 把该工序标出来」那半句已作废；深链定位仍保留行高亮 + 「已定位」提示，
+> 定位工序改在「当前工序」悬停提示里打 ★（`frontend/src/business/woFlowChain.js`）。检验单跳转不变。
+
 ### 1. 后端（1 个文件，+64 行，只读）
 
 [`WorkOrderProgressService.java`](../../../backend/src/main/java/com/yinjia/mes/service/WorkOrderProgressService.java)：
