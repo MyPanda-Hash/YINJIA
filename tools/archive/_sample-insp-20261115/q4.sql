@@ -1,0 +1,1 @@
+SELECT * FROM s_allno ORDER BY 1;

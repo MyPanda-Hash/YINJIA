@@ -250,6 +250,18 @@
           :head="cur" :fields="headerFields" :editable="draftEditable && !annOn"
           @dirty="markInlineDirty"
         />
+        <!-- 检验委托单(INSP_COMMISSION,2026-11-15 用户口径「检验委托单为主要实际单据,需要这个单据完成形式
+             实现为图片中的,可以在检验类别这里带入到送样登记表的内容,需要完成基础的审批流程」):
+             纸面照《水家电综合检测中心 检验委托单(委托检验合同)》YJ-QP-701-1-01 (00) 一比一,
+             「检验类别」格给「选择检验项目」按钮 → 从送样登记表 SAMPLE_REG(内部检测目录)勾选带入,
+             带入内容 = 行表(head.detail.items)+ 检验类别/检验依据/合计收费。
+             契约唯一真源 docs/design/检验委托单-首版.md(§四 纸面组件契约)。 -->
+        <InspCommissionSheet
+          v-else-if="panelCode === 'INSP_COMMISSION'"
+          ref="approvalSheetRef"
+          :head="cur" :fields="headerFields" :editable="draftEditable && !annOn"
+          @dirty="markInlineDirty"
+        />
         <!-- 产品文件列表:4 文件×状态矩阵(设计《文件汇总表》)。只读视图 ——
              数据源与产品信息表侧栏「产品开发」按钮同一份(DevTaskService),不另存状态 -->
         <ProdDocListSheet
@@ -2641,6 +2653,9 @@ import QcFirstInspSheet from '@core/qc/QcFirstInspSheet.vue'
 import QcOqcSheet from '@core/qc/QcOqcSheet.vue'
 // 巡线检验·成型车间巡线记录表(2026-11-14):纸面 12 列 × 每块 4 子行(契约见 docs/design/成型车间巡线记录表-首版.md)
 import QcLinePatrolSheet from '@core/qc/QcLinePatrolSheet.vue'
+// 检验委托单(2026-11-15):纸面照《检验委托单(委托检验合同)》YJ-QP-701-1-01 (00);
+// 「检验类别」从送样登记表 SAMPLE_REG 的检测目录勾选带入(契约 docs/design/检验委托单-首版.md)
+import InspCommissionSheet from '@core/qc/InspCommissionSheet.vue'
 // 首件检验单的列模型(「取成型工艺清单」按列合并时用:已有列只刷标准、保留已填数据)
 import { mergeFetchedColumns } from '@core/qc/firstInspCols.js'
 import QcProcInspWoPicker from '@core/qc/QcProcInspWoPicker.vue'
@@ -2770,6 +2785,11 @@ const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', '
   //   内部单的行源改成明细（见 docSheetConfigs.sampleIntSheetCfg 与
   //   tools/migrate-sample-int-paper-rows-20261106.sql）。上一版 archive 数据面板做法已撤销。
   'RD_SAMPLE_EXT', 'RD_SAMPLE_INT',
+  // 检验委托单(INSP_COMMISSION,2026-11-15 用户口径「检验委托单为主要实际单据,需要这个单据完成形式
+  // 实现为图片中的」):纸面由 InspCommissionSheet 接管(委托检验合同 YJ-QP-701-1-01 (00)),
+  // 「检验类别」从送样登记表的检测目录勾选带入。不列进来会退回「表头字段平铺 + 明细表格」的数据页。
+  // 契约唯一真源 docs/design/检验委托单-首版.md。
+  'INSP_COMMISSION',
   ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
 /**
@@ -4445,7 +4465,12 @@ const hasApprovalBtns = computed(() => isStandardFlowSheet.value
   //   外部单 提交 → 审核(一级,选确认人) → 确认(二级) → 已审核。
   // 只放开**显示**：能不能点仍由 isDisabled(状态×身份) + 后端 ButtonService 裁决。
   // ⚠ 内部单 2026-11-06 起改成共享表（无审批），不在这里 —— 见 migrate-sample-int-flat-20261106.sql。
-  || String(panelCode.value) === 'RD_SAMPLE_EXT')
+  || String(panelCode.value) === 'RD_SAMPLE_EXT'
+  // 检验委托单(INSP_COMMISSION,2026-11-15 用户口径「需要完成基础的审批流程」):
+  //   走**通用单级审批**(草稿 → 提交审批 → 审批中 → 审批通过 → 已审核 → 弃审 → 草稿),
+  //   不进 ADMIN_L2_PANELS(两级)/ 不进 SINGLE_LEVEL_INSP_PANELS(那两张的编制格是「检验员」),
+  //   后端零改动;审批权 = yj_role_panel.can_approve(迁移里照 QC_INSP 授权,4 个质量角色可审批)。
+  || String(panelCode.value) === 'INSP_COMMISSION')
 /**
  * 侧栏是否放出**直接「审核 / 弃审」**按钮(2026-10-17 用户口径「为当前制程检验单增加审核」)。
  *
@@ -5800,6 +5825,14 @@ const DOC_RAIL_PANELS = {
   //     列表行上根本没有这两个键(实测配上去就是两列空白)。故左栏只给 单号|日期|审核状态,
   //     车间/巡线人员进纸面里看。
   QC_LINE_PATROL: [],
+  // 检验委托单(INSP_COMMISSION,2026-11-15):一张委托单 = 一次委托检验,会按客户/样品开多张
+  // ⇒ 与来料检验单/首件/出厂检验报告同款左栏(单号 | 日期 | 中间列 | 审核状态),点行即切单。
+  //   中间列取表头里真实有值的三个业务键(全部是 yj_field 的 header 字段,随列表行下发):
+  //   · 委托单位 —— 委托方(与「来料检验单」左栏的供应商同义,一眼看出是谁的委托);
+  //   · 样品名称 —— 送检的是哪个样品;
+  //   · 检验类别 —— 本单从送样登记表带入的检验项目摘要(纸面/列表同源),
+  //     左栏能看到"这单测了哪些项",不用逐张点开。
+  INSP_COMMISSION: ['委托单位', '样品名称', '检验类别'],
 }
 /**
  * 左栏「单据状态」页签(2026-11-10,出货检验单 = 制程检验单 QC_PROC_INSP)。
@@ -7952,7 +7985,7 @@ async function collectSheetShots() {
   const el = el0 instanceof HTMLElement && el0.offsetWidth > 0 ? el0 : document.querySelector(
     '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, '
     + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
-    + '.approval-layout .oqc-sheet, .approval-layout .qr-sheet, .approval-layout .lp-sheet')
+    + '.approval-layout .oqc-sheet, .approval-layout .qr-sheet, .approval-layout .lp-sheet, .approval-layout .ic-sheet')
   if (!el || !(el instanceof HTMLElement)) return null
   const [{ domToPng }] = await Promise.all([import('modern-screenshot')])
   await nextTick()
@@ -8344,12 +8377,22 @@ async function printApprovalSheet() {
   const paperEl = document.querySelector(
     '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, '
     + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
-    + '.approval-layout .oqc-sheet, .approval-layout .qr-sheet, .approval-layout .lp-sheet, .record-sheet')
+    + '.approval-layout .oqc-sheet, .approval-layout .qr-sheet, .approval-layout .lp-sheet, .approval-layout .ic-sheet, .record-sheet')
   if (paperEl && paperEl.querySelector('.sg-table')) {
     A4_CONTENT_PX = Math.round((297 - 16) / 25.4 * 96)    // 281mm @96dpi ≈ 1062px
     sgPageStyle = document.createElement('style')
     sgPageStyle.id = 'sg-print-page'
     sgPageStyle.textContent = '@page { size: A4 landscape; margin: 8mm; }'
+    document.head.appendChild(sgPageStyle)
+  } else if (paperEl && paperEl.classList.contains('ic-sheet')) {
+    // 检验委托单(INSP_COMMISSION,2026-11-15):委托检验合同是**A4 竖版**单页纸(照 .doc 原件)。
+    // 必须动态注入 @page —— QcLinePatrolSheet 在全局声明了 `@page { size: A4 landscape }`,
+    // @page 又不认类选择器、无法按面板条件化;不注入就会被铺到横版纸上(实测裁半张 + 空白第 2 页)。
+    // 注入的 style 在组件样式之后 ⇒ 覆盖全局 landscape;afterprint 时连同 body 样式一起移除,
+    // 不影响之后再打别的纸(与上面 sg-table 分支同一套收尾)。
+    sgPageStyle = document.createElement('style')
+    sgPageStyle.id = 'ic-print-page'
+    sgPageStyle.textContent = '@page { size: A4 portrait; margin: 8mm; }'
     document.head.appendChild(sgPageStyle)
   }
   const paperW = paperEl ? Math.max(paperEl.scrollWidth, paperEl.offsetWidth) : 0

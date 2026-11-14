@@ -646,6 +646,21 @@ export const menuTree = [
           { code: 'qcScy', title: '生产异常分析报告', path: '/panelx/list/QC_SCY', icon: 'TrendCharts', panelCode: 'QC_SCY', operationName: '新增流程' },
         ],
       },
+      // 样品检验(2026-11-15 用户口径:「送样登记表和这个检验委托单都放在品质管理中,增加一列为样品检验」)
+      // 两张单只互相引用、不与其他单据发生关系:
+      //   · 送样登记表 SAMPLE_REG = 档案模式(内部检测目录),一行=一个可检验项目,
+      //     是检验委托单「检验类别」的引用源(纸面点「选择检验项目」从这里带入);
+      //   · 检验委托单 INSP_COMMISSION = 主要实际单据(头行式 + 纸面 + 基础单级审批),
+      //     纸面照《水家电综合检测中心 检验委托单(委托检验合同)》YJ-QP-701-1-01 (00) 一比一。
+      // 契约唯一真源 docs/design/检验委托单-首版.md;迁移 tools/migrate-sample-insp-20261115.sql。
+      {
+        code: 'qcSample',
+        title: '样品检验',
+        children: [
+          { code: 'qcSampleReg', title: '送样登记表', path: '/panelx/list/SAMPLE_REG', icon: 'Notebook', panelCode: 'SAMPLE_REG' },
+          { code: 'qcInspCommission', title: '检验委托单', path: '/panelx/list/INSP_COMMISSION', icon: 'Document', panelCode: 'INSP_COMMISSION', operationName: '新增流程' },
+        ],
+      },
     ],
   },
   // 2026-10-18 用户口径:「写一个数据建模目录」——其下依次放 字段管理 / 数据字典。
