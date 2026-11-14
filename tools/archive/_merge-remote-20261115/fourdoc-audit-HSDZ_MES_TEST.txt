@@ -1,0 +1,28 @@
+[库] HSDZ_MES_TEST  基线快照 fourdoc-baseline.tsv(337 行)
+  QC_RECV      现役  70 行 / 基线  73 行  | 多出 0 · 缺失 3 · 内容变 2 · 名次不符 9  ❌
+       · 缺失 仓位(仓位编码) @detail seq=375
+       · 缺失 仓位名称(仓位名称) @detail seq=376
+       · 缺失 仓位id(仓位id) @detail seq=377
+  QC_INSP      现役  54 行 / 基线  59 行  | 多出 0 · 缺失 5 · 内容变 1 · 名次不符 46  ❌
+       · 缺失 采购单号(采购单号) @detail seq=41
+       · 缺失 现存量(现存量) @detail seq=265
+       · 缺失 仓位(仓位编码) @detail seq=275
+       · 缺失 仓位名称(仓位名称) @detail seq=276
+       · 缺失 仓位id(仓位id) @detail seq=277
+  QC_RETURN    现役  38 行 / 基线  40 行  | 多出 0 · 缺失 2 · 内容变 0 · 名次不符 18  ❌
+       · 缺失 采购单号(采购单号) @detail seq=101
+       · 缺失 现存量(现存量) @detail seq=105
+  PURCHASE_IN  现役 165 行 / 基线 165 行  | 多出 2 · 缺失 2 · 内容变 2 · 名次不符 130  ❌
+       · 多出 来源单据(来源单据) @query,header seq=170
+       · 多出 来源单号(来源单号) @query,header seq=190
+       · 缺失 来源(来源单据) @header seq=900
+       · 缺失 来源单号(来源单号) @header seq=910
+  越界污染(非供应商语义却指 GFDA,§5.3 应 0): 0 ✅
+  物理列对账(文档认定的表列 vs 本库):
+    sl_recv_detail       文档 75 列 / 现库 72 列  ❌ 缺: 仓位编码、仓位名称、仓位id
+    qc_insp_detail       文档 68 列 / 现库 63 列  ❌ 缺: 现存量、仓位编码、仓位名称、仓位id、采购单号
+    qc_return            文档 52 列 / 现库 57 列  ℹ 多出 5 列(未登记即不显示)
+    qc_return_detail     文档 45 列 / 现库 62 列  ❌ 缺: 现存量  ℹ 多出 18 列(未登记即不显示)
+    bd_purchase_in       文档 182 列 / 现库 183 列  ℹ 多出 1 列(未登记即不显示)
+    结论: 文档认定列缺失 9 个 ❌;本库多出 24 列(rebuild 血统,未登记即不显示,不判 FAIL)
+[FAIL] 四单偏离基线 231 处 —— 按文档 §8 判定「有意改动还是回归」;回归即重跑:YINJIA_SQL_DB=<库> java -cp lib\mssql-jdbc.jar DbSync.java run migrate-fourdoc-baseline-restore-20261008.sql

@@ -32,7 +32,7 @@ public class Q {
                                 b.append(v == null ? "<null>" : String.valueOf(v).replace("\n", "\\n").replace("\r", ""));
                             }
                             System.out.println(b);
-                            if (++rows > 500) { System.out.println("... (truncated at 500 rows)"); break; }
+                            if (++rows > 5000) { System.out.println("... (truncated at 5000 rows)"); break; }
                         }
                         System.out.println("-- rows=" + rows);
                     }

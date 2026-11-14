@@ -97,10 +97,17 @@ test('PanelxList:页签接线(railBind + load 控制键 + 切面板复位 + 两�
   assert.match(list, /guardPageAction\(async \(\) => \{ railStatusTab\.value = k; query\.pageNo = 1; await load\(\); curIdx\.value = 0 \}\)/,
     'onRailTab 必须走 guardPageAction,并 pageNo=1 / curIdx=0 / 重新 load()')
   // 两处 DocSelectRail(纸面 + 网格)都要绑定 @tab —— 统计出现次数,少一处就是某分支点页签没反应
+  // ⚠ 2026-11-15 合并 origin/main 后:**第三处 DocSelectRail 是右栏「单据预览」**
+  //    (远程 2026-11-13 用户口径「我要左边栏的展示效果在右边展示」⇒ 右栏直接复用同一个组件)。
+  //    那一处只渲染列表/翻页/搜索、**不挂页签**(previewRailBind 不下发 tabs),
+  //    所以「绑 @tab 的处数」仍是 2,但组件出现次数 >= 2(当前 3)。
   const rails = [...list.matchAll(/<DocSelectRail\b/g)].length
   const tabBinds = [...list.matchAll(/@tab="onRailTab"/g)].length
-  assert.equal(rails, 2, 'DocSelectRail 应有两处渲染(approval-layout 纸面分支 + 网格单据卡片分支)')
-  assert.equal(tabBinds, rails, '每一处 DocSelectRail 都必须绑 @tab="onRailTab"')
+  assert.ok(rails >= 2, 'DocSelectRail 至少两处渲染(approval-layout 纸面分支 + 网格单据卡片分支;右栏单据预览复用第三处)')
+  assert.equal(tabBinds, 2, '只有两处「列表左栏」绑 @tab="onRailTab"(右栏单据预览不挂页签)')
+  assert.match(list, /const previewRailBind = computed/, '右栏单据预览必须走独立 previewRailBind(不在它里面下发 tabs)')
+  const previewBlock = list.slice(list.indexOf('const previewRailBind = computed'), list.indexOf('function onRailSelect'))
+  assert.ok(!/tabs:/.test(previewBlock), 'previewRailBind 不得下发 tabs(否则页签点了没反应)')
 })
 
 test('DocSelectRail:页签条存在、三个 label 都走 tt()、模板区没有裸中文页签行', () => {

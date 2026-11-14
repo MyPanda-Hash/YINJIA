@@ -15,7 +15,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8')
+// 2026-11-15 合并 origin/main 后:Windows 检出(core.autocrlf=true)把 .vue 换成 CRLF,
+// 而断言里写的是 `{\n  position` 这类 LF 形态 ⇒ 统一归一化行尾再匹配(内容契约不变)。
+const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8').replace(/\r\n/g, '\n')
 const sheet = read('./RecordSheetPanels.vue')
 const panelxList = read('./PanelxList.vue')
 const headMig = read('../../../../tools/migrate-lab-mobile-20261109.sql')
