@@ -20,33 +20,37 @@ SET NOCOUNT ON;
 
 DECLARE @before int, @n int, @after int;
 
-/* 改前基线:全表 required=1 的行数(改后要么不变=幂等跳过,要么恰好少 2 行) */
+/* 改前基线:全表 required=1 的行数(改后 = 改前 − 本次实际改动行数;已全放开时为不变) */
 SELECT @before = COUNT(*) FROM yj_field WHERE required = 1;
 
-/* 前置守卫:目标必须正好 2 行,否则中止(防面板/标签变动后误改,或只匹配到一半) */
+/* 前置守卫:两行**必须都在**(防面板/标签改名后误改)。
+   ⚠ 2026-11-15 修:旧守卫要求「恰有 2 行 required=1」,而生产库实测「仓库」早已是非必填、
+   只有「单价」=1 ⇒ 直接 RAISERROR 中止(部署时才暴露)。改为「在就都置 0」,用 @@ROWCOUNT 自检,
+   对「两行都必填 / 只一行必填 / 都已放开」三种真实状态都幂等。 */
 SELECT @n = COUNT(*) FROM yj_field
+ WHERE RTRIM(panel_code) = 'PU_ORDER'
+   AND place LIKE '%detail%'
+   AND label IN (N'单价', N'仓库');
+IF @n <> 2
+    RAISERROR(N'前置校验失败:PU_ORDER 明细「单价」「仓库」应恰有 2 行(不论必填),实际 %d —— 未改任何数据', 16, 1, @n);
+
+DECLARE @changed int = 0;
+UPDATE yj_field SET required = 0
  WHERE RTRIM(panel_code) = 'PU_ORDER'
    AND place LIKE '%detail%'
    AND label IN (N'单价', N'仓库')
    AND required = 1;
+SET @changed = @@ROWCOUNT;
 
-IF @n = 0
+IF @changed = 0
     PRINT N'[跳过] PU_ORDER 明细「单价/仓库」已经都不是必填(幂等)';
-ELSE IF @n <> 2
-    RAISERROR(N'前置校验失败:PU_ORDER 明细「单价」「仓库」应恰有 2 行 required=1,实际 %d —— 未改任何数据', 16, 1, @n);
 ELSE
-BEGIN
-    UPDATE yj_field SET required = 0
-     WHERE RTRIM(panel_code) = 'PU_ORDER'
-       AND place LIKE '%detail%'
-       AND label IN (N'单价', N'仓库');
-    PRINT N'[更新] PU_ORDER 明细「单价」「仓库」required 1 → 0';
-END
+    PRINT N'[更新] PU_ORDER 明细「单价/仓库」required 1 → 0,共 ' + CAST(@changed AS nvarchar(10)) + N' 行';
 
-/* 改后自检 1:全表必填行数只能是"不变(幂等)"或"少 2 行" */
+/* 改后自检 1:全表必填行数应正好少了本次改动的行数 */
 SELECT @after = COUNT(*) FROM yj_field WHERE required = 1;
-IF @after <> @before AND @after <> @before - 2
-    RAISERROR(N'自检失败:required=1 行数 改前 %d / 改后 %d,不是预期的「不变」或「少 2」', 16, 1, @before, @after);
+IF @after <> @before - @changed
+    RAISERROR(N'自检失败:required=1 行数 改前 %d / 改后 %d,与本次改动 %d 行不符', 16, 1, @before, @after, @changed);
 
 /* 改后自检 2:这两行确实都不再是必填 */
 IF EXISTS (SELECT 1 FROM yj_field
