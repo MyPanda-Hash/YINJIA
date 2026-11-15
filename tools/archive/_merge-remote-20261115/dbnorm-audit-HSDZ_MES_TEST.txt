@@ -1,51 +1,29 @@
 === 数据库规范体检 @ HSDZ_MES_TEST ===
 (豁免登记:table 53, panel 2, col 67, dupkey 90, count 3, skiplabel 27)
 
-[FAIL] 01 表命名合规(白名单外) —— 1 处
-        _zz_idx_test
-[FAIL] 02 表级中文注明(白名单外) —— 2 处
-        _zz_idx_test
+[PASS] 01 表命名合规(白名单外)
+[FAIL] 02 表级中文注明(白名单外) —— 1 处
         rd_sample_int_detail
-[FAIL] 03 拼音/英文列名的列注明(共 4 列;存量收敛) —— 实际 4,超过存量基线 0(棘轮:只许降不许升)
-        _zz_idx_test.code
-        bl_pu_order.kf_period
-        bs_inv.parent_name
-        bs_inv.is_show_aux_barcode
+[PASS] 03 拼音/英文列名的列注明(共 0 列;存量收敛)
 [PASS] 04 业务表主键与审计四件套
-[FAIL] 05 元数据漂移(字段不在其所在对象里) —— 14 处
-        DISPATCH_STATS.部门(query → v_dispatch_stats)
-        PURCHASE_IN_DETAIL.单价2(detail → v_purchase_in_detail)
-        SALES_ORDER_STATS.客户编码(detail → v_sales_order_stats)
-        SALES_ORDER_STATS.客户(query,detail → v_sales_order_stats)
-        SALES_ORDER_STATS.部门(detail → v_sales_order_stats)
-        SALES_ORDER_STATS.业务员(detail → v_sales_order_stats)
-        SALES_ORDER_STATS.存货编码(detail → v_sales_order_stats)
-        SALES_ORDER_STATS.存货(query,detail → v_sales_order_stats)
-        SALES_ORDER_STATS.主单位(detail → v_sales_order_stats)
-        SALES_ORDER_STATS.单据数(detail → v_sales_order_stats)
-        SALES_ORDER_STATS.数量(主单位)(detail → v_sales_order_stats)
-        SALES_ORDER_STATS.单价(detail → v_sales_order_stats)
-        …(还有 2 项)
+[PASS] 05 元数据漂移(字段不在其所在对象里)
 [PASS] 06 面板指向不存在的表/视图
 [PASS] 07 完全重复的字段登记行
-[WARN] 08 同一列多标签(数据键不唯一;已登记 81 组) —— 48 处
-        MANU_ORDER.单价
-        MANU_ORDER.金额
-        MANU_ORDER.排产数量
-        MANU_ORDER.批号
-        MANU_ORDER.入库数量
-        MANU_ORDER.需求数量
-        MANU_ORDER.余量
-        MANU_SCHEDULE.产品编码
-        MANU_SCHEDULE.产品名称
-        MANU_SCHEDULE.成型完成
-        MANU_SCHEDULE.单据日期
-        MANU_SCHEDULE.工序交期
-        …(还有 36 项)
-[FAIL] 09 缺 en 译名(面板 17 / 字段标签 201) —— 实际 218,超过存量基线 0(棘轮:只许降不许升)
-        面板缺: 17 个;字段标签缺: 201 个
-        asp_time1
-        asp_user1
+[WARN] 08 同一列多标签(数据键不唯一;已登记 81 组) —— 12 处
+        PURCHASE_IN.仓位编码
+        RD_X_SINTER.备注
+        WO_SCHEDULE.产品编码
+        WO_SCHEDULE.产品名称
+        WO_SCHEDULE.工单号
+        WO_SCHEDULE.工单状态
+        WO_SCHEDULE.交期
+        WO_SCHEDULE.交期紧迫度
+        WO_SCHEDULE.客户
+        WO_SCHEDULE.生产车间
+        WO_SCHEDULE.未完成数量
+        WO_SCHEDULE.销售订单号
+[FAIL] 09 缺 en 译名(面板 17 / 字段标签 197) —— 实际 214,超过存量基线 0(棘轮:只许降不许升)
+        面板缺: 17 个;字段标签缺: 197 个
         Z-G-C批次
         Z-HP-C批次
         安装车间
@@ -56,7 +34,9 @@
         保养周期
         保养周期(天)
         本次结算金额本位币
-        …(还有 189 项)
+        本期出库金额
+        本期出库数量
+        …(还有 185 项)
         补齐:tools/scripts/trigger-mt.ps1;免译标签登记见 §5
 [PASS] 10 备份/临时表(应清零)
 [PASS] 11 ≥10 万行且无非聚集索引的表(现存 0 张大表)
@@ -74,13 +54,7 @@
         未登记的脚本: rollback-test-convert-20261030.sql
         未登记的脚本: rollback-wo-mixing-list.sql
         …(还有 5 项)
-[FAIL] 13 面板引用对象缺 pk_col / asp_cancel(打开即 500) —— 6 处
-        MATERIAL_OUT_DETAIL → v_material_out_detail 缺 id
-        MATERIAL_OUT_STATS → v_material_out_stats 缺 id
-        PURCHASE_IN_DETAIL → v_purchase_in_detail 缺 id
-        PURCHASE_IN_STATS → v_purchase_in_stats 缺 id
-        SALE_OUT_DETAIL → v_sale_out_detail 缺 id
-        SALE_OUT_STATS → v_sale_out_stats 缺 id
+[PASS] 13 面板引用对象缺 pk_col / asp_cancel(打开即 500)
 
-=== 汇总: FAIL 7 / WARN 1 ===
-RESULT: FAIL-7
+=== 汇总: FAIL 3 / WARN 1 ===
+RESULT: FAIL-3
