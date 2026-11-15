@@ -2880,6 +2880,8 @@ export default {
     '工单行号': 'Dòng phiếu công việc',
     '当前工序': 'Công đoạn hiện tại',
     '待审': 'Chờ duyệt',
+    '待审数量': 'Số lượng chờ duyệt',
+    '含草稿': 'Có bản nháp',
     '数据时间': 'Dữ liệu tại thời điểm',
     '产品规格': 'Quy cách sản phẩm',
     '混料': 'Trộn',

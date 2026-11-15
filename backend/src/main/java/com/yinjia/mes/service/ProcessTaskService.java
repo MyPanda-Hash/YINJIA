@@ -788,14 +788,17 @@ public class ProcessTaskService {
      *   <li>状态四态:已完工(=) / 超产(>) / 进行中(已审 0&lt;完工&lt;计划,或只有待审)/ 未开始;</li>
      *   <li>待审量**不参与**达标判定(计划量封顶/转序/结案只看已审),只影响"是否已开始"的着色;</li>
      *   <li>当前工序 = **最后一道有已审产出**的工序(草稿不算,与 plang.当前工序 同口径);</li>
-     *   <li>**不做成品收口**:产出 = 路线最后一道有完工量工序的完工量(允许超产)。</li>
+     *   <li>**不做成品收口**:产出取路线最后一道有完工量工序的完工量(允许超产),但
+     *       **折成品**(÷ 该道换算率)后才与 {@code 计划合计}(成品口径)比 —— 2026-11-15 修口径混用,
+     *       见方法内注释;</li>
      * </ul>
      *
-     * @param basePlan 本工单行排产数量(各工序计划量的共同基数)
+     * @param basePlan 本工单行排产数量(各工序计划量的共同基数,成品口径)
      * @param qty      各工序**已审**完工量(键=工序名)
      * @param pendQty  各工序待审量(草稿,只作着色);可为 null
      * @param cnt      各工序已审报工单数;可为 null
-     * @return 键:工序步骤 / 当前工序 / 当前工序序 / 已完成步骤数 / 计划合计 / 产出 / 未完成合计 / 进度
+     * @return 键:工序步骤 / 当前工序 / 当前工序序 / 已完成步骤数 / 计划合计 / 产出(成品口径) /
+     *         产出工序口径 / 未完成合计 / 进度
      */
     public Map<String, Object> stepsSummary(String route, double basePlan,
             Map<String, Double> qty, Map<String, Double> pendQty, Map<String, Integer> cnt) {
@@ -848,20 +851,37 @@ public class ProcessTaskService {
             s.put("已完成", finished);
             steps.add(s);
         }
+        // 产出 = 路线里**最后一道有已审完工量**的工序的完工量(允许超产,不做成品收口)。
+        // 🔴 2026-11-15 修口径混用:完工量是**工序口径**,而「计划合计」是**成品口径**(basePlan = pl_sl);
+        //   原来直接 `outQty / basePlan` ⇒ 与上面步骤条(该道完工量/该道计划量)差 1/换算率 倍,
+        //   实测 GD-2026-11-0028 行3209(成型率0.5、成型已审1):表头 产出1/计划50=**2%**,
+        //   而步骤条 成型 1/25=**4%**,同一弹窗自相矛盾;换算率>1 的道(切炭 3.0)还会算出 >100%。
+        //   现按 {@link ProcessFlow} 的「折成品」同一算法先把实绩折回成品(工序量 ÷ 该道换算率)再比,
+        //   「产出」与「计划合计」同为单位(成品),进度 = 折成品产出 / 排产数量。
+        //   工序口径的原始产出另给 产出工序口径(界面不显示,供探针/排障核对)。
         double outQty = 0;
+        double outRate = 1;
         for (int i = lines.size() - 1; i >= 0; i--) {
-            double qv = q.getOrDefault(String.valueOf(lines.get(i).get("工序名称")).trim(), 0d);
-            if (qv > 0) { outQty = qv; break; }
+            String op = String.valueOf(lines.get(i).get("工序名称")).trim();
+            double qv = q.getOrDefault(op, 0d);
+            if (qv > 0) {
+                outQty = qv;
+                double r = num(lines.get(i).get("换算率"));
+                outRate = r > 0 ? r : 1;
+                break;
+            }
         }
+        double outBase = outRate == 0 ? outQty : outQty / outRate;   // 折成品(率>0)
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("工序步骤", steps);
         out.put("当前工序", cur);
         out.put("当前工序序", indexOfProcess(cur));
         out.put("已完成步骤数", doneSteps);
         out.put("计划合计", round(basePlan));
-        out.put("产出", round(outQty));
-        out.put("未完成合计", round(Math.max(basePlan - outQty, 0)));
-        out.put("进度", basePlan <= 0 ? 0 : Math.round(outQty / basePlan * 10000d) / 100d);
+        out.put("产出", round(outBase));                 // 成品口径(与计划合计可比)
+        out.put("产出工序口径", round(outQty));            // 末道原始完工量(工序口径)
+        out.put("未完成合计", round(Math.max(basePlan - outBase, 0)));
+        out.put("进度", basePlan <= 0 ? 0 : Math.round(outBase / basePlan * 10000d) / 100d);
         return out;
     }
 

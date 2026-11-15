@@ -284,9 +284,30 @@
                  每个日期格都可填计划(含今天以前的日期 —— 用户口径「23~28 号填不了」);
                  格下方小灰字 = 该天已审核报工量(含手机端),只读。 -->
             <el-table-column :label="tt('交期紧迫度')" prop="交期紧迫度" width="90" align="right" />
-            <el-table-column :label="tt('7天需交付')" prop="7天需交付" width="92" align="right" />
-            <el-table-column :label="tt('15天需交付')" prop="15天需交付" width="96" align="right" />
-            <el-table-column :label="tt('大于15天需交付')" prop="大于15天需交付" width="112" align="right" />
+            <!-- 需交付三桶(2026-11-15 用户口径「这里原来也应该是工序计划量的」):后端已改成**工序计划量**
+                 (= 排产数量 × 该道换算率),与下面「已排」三桶(日计划合计)同一把尺;
+                 原来是「需求数量」(成品口径)⇒ 成型换算率 0.5 的行会出现 需交付 50 / 已排 25 两个单位在比。
+                 值走 num() 显式渲染:0 显示 0(与已排三桶一致,不用 prop 默认渲染)。
+                 ⚠ 2026-11-15 实测踩坑:同一行里 `prop` 默认渲染 `0` 竟然出空格(合并进 row 的 0 值),
+                 用默认插槽 + num() 才稳定显示 0。 -->
+            <el-table-column width="92" align="right">
+              <template #header>
+                <span :title="tt('需交付 = 工序计划量(排产数量 × 该道换算率),按交期落桶;与「已排」三桶同一口径')">{{ tt('7天需交付') }}</span>
+              </template>
+              <template #default="{ row }">{{ num(row['7天需交付']) }}</template>
+            </el-table-column>
+            <el-table-column width="96" align="right">
+              <template #header>
+                <span :title="tt('需交付 = 工序计划量(排产数量 × 该道换算率),按交期落桶;与「已排」三桶同一口径')">{{ tt('15天需交付') }}</span>
+              </template>
+              <template #default="{ row }">{{ num(row['15天需交付']) }}</template>
+            </el-table-column>
+            <el-table-column width="112" align="right">
+              <template #header>
+                <span :title="tt('需交付 = 工序计划量(排产数量 × 该道换算率),按交期落桶;与「已排」三桶同一口径')">{{ tt('大于15天需交付') }}</span>
+              </template>
+              <template #default="{ row }">{{ num(row['大于15天需交付']) }}</template>
+            </el-table-column>
             <el-table-column :label="tt('7天已排')" prop="7天已排" width="88" align="right" />
             <el-table-column :label="tt('15天已排')" prop="15天已排" width="92" align="right" />
             <el-table-column :label="tt('大于15天已排')" prop="大于15天已排" width="108" align="right" />
@@ -327,8 +348,15 @@
             </el-table-column>
             <!-- 成品口径:未交量 = 排产数量 − 入库数量(此前误减工序口径报工量 ⇒ 换算率 >1 时出负数)
                  ⚠ 2026-11-12 用户口径:未交量是**整张工单**的口径,不属于工序块 ⇒ 保持原位(日期列之后),
-                   不随「上道工序/上道完工量」一起前移到工序列。 -->
-            <el-table-column :label="tt('未交量')" prop="未交量" width="85" align="right" />
+                   不随「上道工序/上道完工量」一起前移到工序列。
+                 2026-11-15 用户再次确认:「未交量应该是当前整个工单剩余的成品数量」⇒ 本列**不折工序**,
+                   与上面需交付/已排(工序口径)刻意不同;表头 tooltip 写清,避免又按工序口径去读。 -->
+            <el-table-column width="85" align="right">
+              <template #header>
+                <span :title="tt('未交量 = 排产数量 − 入库数量(成品口径,整单剩余;不折工序)')">{{ tt('未交量') }}</span>
+              </template>
+              <template #default="{ row }">{{ flowNum(row.未交量) }}</template>
+            </el-table-column>
             <!-- 「余量」列已隐藏(2026-11-08 用户口径「直接隐藏吧」):它是「本工单行需求 − 本行订单占用」
                  (form_flow_link SO→PLANG)的口径 —— 新口径下需求=转单量、占用链也写同一个数,余量恒为 0
                  (正式库实测 399 行里 397 行为 0),与「当前工序还剩多少未生产」无关、极易误读;
@@ -428,7 +456,7 @@ import { ref, reactive, computed, onMounted, onActivated, nextTick, watch } from
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
-import { printWorkTaskSheet, printSchedPlanSheet, pickPlanSheetRows, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS } from '@/business/print-formats'
+import { printWorkTaskSheet, printSchedPlanSheet, pickPlanSheetRows, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS, moldPlanQty } from '@/business/print-formats'
 import { Setting } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
@@ -1095,6 +1123,18 @@ async function printPlanSheet() {
 async function printTask(mode) {
   const rows = checkedSched.value
   if (!rows.length) return
+  // 成型生产任务单的「成型折算后数量」(2026-11-15 用户截图报障):原来直接印 排产数量(成品口径)
+  //   ⇒ 成型换算率 0.5 的单印出 50,应为 25。现按统一函数 moldPlanQty 取**成型工序计划量**
+  //   (与生产工单页同一实现;取不到 detail 时用 当前工序计划量 / 排产数量 逐级回退)。
+  const moldQty = {}
+  if (mode === '成型生产任务单') {
+    await Promise.all(rows.map(async (r) => {
+      try {
+        const d = (await request.post('/px/processTask/detail', { 工单号: r['加工单号'], 工单行id: r['行id'] })).data || {}
+        moldQty[r['行id']] = moldPlanQty(r, d)
+      } catch { moldQty[r['行id']] = moldPlanQty(r, null) }
+    }))
+  }
   const rowsToPrint = rows.map((r) => ({
     单据编号: r.加工单号,
     公司代码: r.公司代码 || '', 工单行号: r.工单行号, // 工单二维码=公司代码@工单号@1000+工单行号(2026-10-09 规则改版)
@@ -1103,7 +1143,7 @@ async function printTask(mode) {
     商品名称: r.产品名称 || '',
     规格型号: r.规格型号 || '',
     订单数量: r.需求数量,
-    成型折算后数量: r.行来源 === '本线工序' ? (r.本线排产数量 ?? r.当前工序计划量 ?? r.排产数量) : r.排产数量,
+    成型折算后数量: moldQty[r['行id']] ?? moldPlanQty(r, null),
     计划完工日期: r.计划完工日期 || '',
     批号: r.批号 || '', 物料编码: r.物料编码 || '',
     排产数量: r.行来源 === '本线工序' ? (r.本线排产数量 ?? r.排产数量) : r.排产数量, 生产线: r.生产线 || sel.line || '',

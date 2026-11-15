@@ -1491,27 +1491,37 @@ public class ScheduleBoardService {
                         + " ORDER BY pc.pl_xc, pc.[批次号]",
                 byRow ? new Object[]{doc, curRow.get("行id")} : new Object[]{doc});
 
-        // 完工数据:报工记录(scjl,参考库口径;按 工序 汇总:完成数量=Σsl,计划数量=排产冗余)
+        // 完工数据:报工记录(scjl)按 工序 汇总。本段口径(2026-11-15 一次收口):
+        //   · **完成数量只算已审**(wgzt='Y'),与工序进度「完工量」同源;草稿不再冒充完工;
+        //   · 新增 **待审数量**(草稿/未审),与工序进度「待审量」同源 —— 原来 SUM(sl) 把草稿混进完成数,
+        //     而「单据状态」只要有一条已审就写"已审核"(实测 GD-2026-10-0226-1 组装:完成 10/状态已审核,
+        //     同弹窗工序进度却是 0/待审 10);拆开后两段同源。
+        //   · 单据状态三态:含草稿 / 已审核 / 草稿;
+        //   · 报工人+报工时间取**同一条**(最近一张报工单)—— 原来各自 MAX,多张单时会 A 的人名配 B 的时间;
+        //   · **计划数量不再取 scjl.pl_sl**(报工单上是**成品口径**,成型率 0.5 的单也写 50),改由
+        //     {@link #fillDonePlanQty} 按**工序口径**回填,并下发 换算率。用户口径(2026-11-15):
+        //     「工序的数据应该是换算后的数量,因为当前的工单工序存在换算机制」。
         // 2026-10-15:按行追溯时只统计**本行**的报工(gd_id=本行排产行id;历史空 gd_id 用本行批次兜底)。
         // 2026-10-16:锚定补第②级 scjl.[工单行号](草稿报工尚未写 gd_id,靠保存时落库的行号归属),
-        //   并**一并返回审核状态** —— 与「工序进度」段同源,避免两段一个说"有报工"、一个说"0/未开始"。
+        //   并一并返回审核状态 —— 与「工序进度」段同源,避免两段一个说"有报工"、一个说"0/未开始"。
+        final String repAggSql = "SELECT ISNULL(s.gxdm, N'') AS 工序,"
+                + " SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN ISNULL(s.sl,0) ELSE 0 END) AS 完成数量,"
+                + " SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN 0 ELSE ISNULL(s.sl,0) END) AS 待审数量,"
+                + " MAX(CASE WHEN s.rn=1 THEN s.asp_user1 END) AS 报工人,"
+                + " MAX(CASE WHEN s.rn=1 THEN CONVERT(varchar(16), s.asp_time1, 120) END) AS 报工时间,"
+                + " CASE WHEN SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN ISNULL(s.sl,0) ELSE 0 END) > 0"
+                + "           AND SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN 0 ELSE ISNULL(s.sl,0) END) > 0 THEN N'含草稿'"
+                + "      WHEN SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN ISNULL(s.sl,0) ELSE 0 END) > 0 THEN N'已审核'"
+                + "      ELSE N'草稿' END AS 单据状态"
+                + " FROM (SELECT s.*, ROW_NUMBER() OVER (PARTITION BY ISNULL(s.gxdm,N'')"
+                + "         ORDER BY s.asp_time1 DESC, s.id DESC) AS rn"
+                + "       FROM dbo.scjl s WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y'" + repRowCond + ") s"
+                + " GROUP BY s.gxdm ORDER BY s.gxdm";
         List<Map<String, Object>> done = byRow
-                ? jdbc.queryForList(
-                        "SELECT ISNULL(s.gxdm, N'') AS 工序, MAX(ISNULL(s.pl_sl,0)) AS 计划数量,"
-                                + " SUM(ISNULL(s.sl,0)) AS 完成数量, MAX(s.asp_user1) AS 报工人,"
-                                + " CONVERT(varchar(16), MAX(s.asp_time1), 120) AS 报工时间,"
-                                + " CASE WHEN SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN ISNULL(s.sl,0) ELSE 0 END) > 0"
-                                + "      THEN N'已审核' ELSE N'草稿' END AS 单据状态"
-                                + " FROM dbo.scjl s WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y'" + repRowCond
-                                + " GROUP BY s.gxdm ORDER BY s.gxdm", doc, rowId, curRow.get("工单行号"), rowBatch)
-                : jdbc.queryForList(
-                        "SELECT ISNULL(s.gxdm, N'') AS 工序, MAX(ISNULL(s.pl_sl,0)) AS 计划数量,"
-                                + " SUM(ISNULL(s.sl,0)) AS 完成数量, MAX(s.asp_user1) AS 报工人,"
-                                + " CONVERT(varchar(16), MAX(s.asp_time1), 120) AS 报工时间,"
-                                + " CASE WHEN SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN ISNULL(s.sl,0) ELSE 0 END) > 0"
-                                + "      THEN N'已审核' ELSE N'草稿' END AS 单据状态"
-                                + " FROM dbo.scjl s WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
-                                + " GROUP BY s.gxdm ORDER BY s.gxdm", doc);
+                ? jdbc.queryForList(repAggSql, doc, rowId, curRow.get("工单行号"), rowBatch)
+                : jdbc.queryForList(repAggSql, doc);
+        // 计划数量 + 换算率(工序口径;唯一实现见方法注释)
+        fillDonePlanQty(done, doc, rowId, byRow);
         // 入库单据(产成品入库单挂 加工单号)
         // 行级收敛(2026-10-15 步5,结构变更已随 migrate-finish-in-wo-line-20261015.sql 落地):
         //   带 rowId 时按「本行」取 —— 优先 [工单行号]=本行 pl_xc,**老单没有行号**(该列 2026-10-15 才加)
@@ -1854,6 +1864,83 @@ public class ScheduleBoardService {
         segScope.put("家族清单", rowScope);
         out.put("分段口径", segScope);
         return out;
+    }
+
+    /**
+     * 追溯「完工数据」段的 **工序口径计划量 + 换算率** 回填(2026-11-15)。
+     *
+     * <p><b>为什么改</b>:原 SQL 取 {@code MAX(scjl.pl_sl)} —— 那是**报工单上的成品口径计划量**
+     * (成型换算率 0.5 的行也写 50),而同一行的「完成数量」是**工序口径**的报工量。
+     * 实测 GD-2026-11-0028-1 成型:计划显示 50 / 完成 25 ⇒ 看上去"只做了一半",
+     * 与上方工序进度(25/25 已完工)自相矛盾。用户口径(2026-11-15):
+     * 「工序的数据应该是换算后的数量,因为当前的工单工序存在换算机制」。
+     *
+     * <p><b>口径</b>(与工序进度 {@code ProcessTaskService#stepsSummary}、报工封顶
+     * {@code WoReportService} 同一个算式):
+     * <ol>
+     *   <li>该道工序计划量 = **本行排产数量 × 该道自己的换算率**(各道独立折算、❌ 不累乘;率空/≤0 按 1);</li>
+     *   <li>**整单口径**(不带工单行id)按**各行分别折算后累加**,❌ 不是「整单合计 × 一次换算率」——
+     *       同一工单可有多行(实测 GD-2026-09-0009 = 11 行),各行路线与换算率可以不同;每行用**自己的路线**取率;</li>
+     *   <li>路线里查不到该工序(路线改过/老单)→ 按率 1:与 {@code routeLines}「无明细=标准五道、率 1」
+     *       同一兜底,保证有报工的工序不会凭空显示 0 计划;</li>
+     *   <li>{@code 换算率} 列只为把换算过程摆在明面上(计划量 = 排产数量 × 该道换算率):
+     *       各行/各道率一致才回填,不一致留空(不拿其中一个充数)。</li>
+     * </ol>
+     *
+     * <p><b>为什么不用工序台账 {@code wo_process_line.计划数量}</b>(2026-11-15 决策,别再改回去):
+     * 台账是排产/切单时按同一算式算好的存量快照,健康数据与算式**逐行相等**;但存量里有
+     * **9 行**是历史脏值(如 GD-2026-09-0049 行1 排产 1100、成型台账 56000 = 旧 bug 串行),
+     * 若这里优先读台账,会出现「完工数据 计划 56000 / 同一弹窗工序进度 1100」的新自相矛盾。
+     * 看板 {@link #planQtyExpr(String)}(当前工序计划量)仍台账优先,那 9 行的台账订正属**另开的存量任务**。
+     *
+     * @param done  完工数据行(就地写入 {@code 计划数量} / {@code 换算率})
+     * @param doc   工单号
+     * @param rowId 工单行id(plang.id;null = 整单口径)
+     * @param byRow 是否按工单行口径
+     */
+    private void fillDonePlanQty(List<Map<String, Object>> done, String doc, Long rowId, boolean byRow) {
+        if (done == null || done.isEmpty()) return;
+        // ① 本行(或整单全部有效行)的排产数量 + 工艺路线(整单时要逐行折算,不能拿合计乘一次率)
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.[工艺路线],N'') AS 工艺路线"
+                        + " FROM dbo.plang p WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + (byRow ? " AND p.id=?" : "")
+                        + " ORDER BY p.pl_xc, p.id", byRow ? new Object[]{doc, rowId} : new Object[]{doc});
+        if (rows.isEmpty()) return;
+        // ② 路线换算率(路线 → 工序 → 率;同一路线同一道有多条时取最大,与 ProcessTaskService 一致)
+        Map<String, Map<String, Double>> rates = new HashMap<>();
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT r.工艺路线编码, r.工序名称, MAX(ISNULL(r.换算率,1)) AS 换算率"
+                        + " FROM dbo.bs_route r WHERE ISNULL(r.asp_cancel,'N')<>'Y'"
+                        + "   AND ISNULL(r.工序名称,N'')<>N''"
+                        + "   AND r.工艺路线编码 IN (SELECT DISTINCT ISNULL(p.[工艺路线],N'') FROM dbo.plang p"
+                        + "        WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y')"
+                        + " GROUP BY r.工艺路线编码, r.工序名称", doc)) {
+            rates.computeIfAbsent(String.valueOf(r.get("工艺路线编码")).trim(), k -> new HashMap<>())
+                    .put(String.valueOf(r.get("工序名称")).trim(), Num.of(r.get("换算率")));
+        }
+        for (Map<String, Object> d : done) {
+            String op = String.valueOf(d.get("工序") == null ? "" : d.get("工序")).trim();
+            if (op.isEmpty()) continue;
+            double total = 0;
+            LinkedHashSet<Double> usedRates = new LinkedHashSet<>();
+            for (Map<String, Object> row : rows) {
+                double rate = rateOf(rates, String.valueOf(row.get("工艺路线")), op);
+                usedRates.add(rate);                             // 换算率列:与"这一道到底折了多少"同源
+                total += Num.of(row.get("排产数量")) * rate;      // 工序计划量 = 本行排产数量 × 该道换算率
+            }
+            d.put("计划数量", r4(total));
+            // 换算率:各行一致才显示(空串=各行口径不一,不拿其中一个充数;前端显示 '-')
+            d.put("换算率", usedRates.size() == 1 ? r4(usedRates.iterator().next()) : "");
+        }
+    }
+
+    /** 路线里某道工序的换算率;路线为空 / 路线里没有该工序 ⇒ 1(不折算,见 {@link #fillDonePlanQty}) */
+    private static double rateOf(Map<String, Map<String, Double>> rates, String route, String op) {
+        Map<String, Double> m = rates.get(route == null ? "" : route.trim());
+        if (m == null) return 1;
+        Double r = m.get(op);
+        return r == null || r <= 0 ? 1 : r;
     }
 
     /**

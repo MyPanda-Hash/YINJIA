@@ -2875,6 +2875,8 @@ export default {
     '工单行号': 'Auftragsposition',
     '当前工序': 'Aktueller Vorgang',
     '待审': 'Prüfung ausstehend',
+    '待审数量': 'Ausstehende Menge',
+    '含草稿': 'Mit Entwurf',
     '数据时间': 'Datenstand',
     '产品规格': 'Produktspezifikation',
     '混料': 'Mischen',

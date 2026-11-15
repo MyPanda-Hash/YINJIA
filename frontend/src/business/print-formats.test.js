@@ -53,7 +53,7 @@ globalThis.requestAnimationFrame = (cb) => { cb(); return 1 }
 globalThis.alert = () => { throw new Error('不应触发打印失败告警') }
 
 const { printProductCards, productCardQrText, printPuOrder, printPuOrderNoAmount, printLocationCards, locationCardQrText,
-  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows, planSheetShop, planSheetTitle, planSheetDatesFromRows, planSheetWindow, ymdAddDays, MAX_SHEET_DAYS, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS, PLAN_SHEET_MAX_PRINT_DAYS, pickSlipHtml, printWoQr } = await import('./print-formats.js')
+  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows, planSheetShop, planSheetTitle, planSheetDatesFromRows, planSheetWindow, ymdAddDays, MAX_SHEET_DAYS, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS, PLAN_SHEET_MAX_PRINT_DAYS, pickSlipHtml, printWoQr, moldPlanQty } = await import('./print-formats.js')
 
 test('单据行(带可选键):订单编号/供应商/数量/批次/生产日期填充进卡面', async () => {
   const before = captured.printed
@@ -570,4 +570,47 @@ test('printWoQr:带明细的载荷走同一套版式(打印层收到的是新 HT
   assert.equal(captured.printed, before + 1, '走页面内打印(window.print 一次)')
   assert.ok(captured.html.includes('width:24mm'), '新二维码尺寸')
   assert.equal((captured.html.match(/GD-T-1#1/g) || []).length, 3, '空行不印单号')
+})
+
+// ── 2026-11-15:成型折算后数量 / 排单计划「生产计划数量」都走**工序口径** ──────────────────
+// 用户截图报障:GD-2026-11-0028(成型换算率 0.5、排产 50)
+//   ·「成型生产任务单」的「成型折算后数量」印的是 50(成品口径)⇒ 应为 25;
+//   ·「成型车间排单计划」的「生产计划数量」印的是 50 ⇒ 应为 25。
+// 两处统一收口到 moldPlanQty / PLAN_SHEET 的 工序计划量。
+
+test('moldPlanQty:排产 × 成型换算率(detail 的 成型计划量 ÷ 计划合计)', () => {
+  const row = { 排产数量: 50, 当前工序: '装箱', 当前工序计划量: 50 }
+  const detail = { 计划合计: 50, 工序步骤: [{ 工序: '成型', 计划量: 25 }, { 工序: '装箱', 计划量: 50 }] }
+  assert.equal(moldPlanQty(row, detail), 25, '成型 0.5 ⇒ 50 折算成 25')
+  // 3 倍率(切炭那种率 >1 的路线,成型仍是 1):成型计划量 = 排产
+  assert.equal(moldPlanQty({ 排产数量: 80 }, { 计划合计: 80, 工序步骤: [{ 工序: '成型', 计划量: 80 }] }), 80)
+  // 没有 detail:当前工序就是成型 ⇒ 用后端算好的 当前工序计划量
+  assert.equal(moldPlanQty({ 排产数量: 50, 当前工序: '成型', 当前工序计划量: 25 }, null), 25)
+  // 没有 detail 且当前工序不是成型 ⇒ 不折算,退回排产数量(与旧版一致)
+  assert.equal(moldPlanQty({ 排产数量: 50, 当前工序: '装箱', 当前工序计划量: 50 }, null), 50)
+  // detail 里没有成型这道(路线不含成型)⇒ 同样退回排产数量,不印 0
+  assert.equal(moldPlanQty({ 排产数量: 50 }, { 计划合计: 50, 工序步骤: [{ 工序: '切炭', 计划量: 50 }] }), 50)
+})
+
+test('schedPlanSheetHtml:生产计划数量印**工序计划量**(成型 0.5:排产 50 → 印 25)', async () => {
+  const rows = [{
+    客户等级: '', 客户: '内部', 加工单号: 'GD-2026-11-0028', 工单行号: 1, 公司代码: '0',
+    物料编码: 'T410', 规格型号: '63*40*193', 生产线: '4号车间',
+    未交量: 50, 需求数量: 50, 订单数量: 50,
+    排产数量: 50,        // 成品口径
+    工序计划量: 25,      // 工序口径(planSheet 接口合并进来的)
+    当前工序完工量: 0,
+    交期: '2026-11-15', 交期紧迫度: 7, '7天已排': 25, '15天已排': 25, '大于15天已排': 0,
+    日计划: { '2026-11-15': 25 },
+  }]
+  const html = await schedPlanSheetHtml(rows, ['2026-11-15'], { today: '2026-11-15', shop: '成型' })
+  // 按表头定位「生产计划数量」那一列,断言单元格是 25(工序计划量)而不是 50(排产数量)
+  const heads = [...html.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)]
+    .map((m) => m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ''))
+  const trMatch = /<tbody>([\s\S]*?)<\/tbody>/.exec(html)
+  const firstTr = trMatch ? (/<tr>([\s\S]*?)<\/tr>/.exec(trMatch[1]) || [])[1] || '' : ''
+  const cells = [...firstTr.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((m) => m[1].replace(/\s+/g, ''))
+  const iP = heads.findIndex((h) => h.includes('生产计划数量'))
+  assert.ok(iP >= 0, '纸面应有「生产计划数量」列')
+  assert.equal(cells[iP], '25', '生产计划数量 = 工序计划量 25(不是排产数量 50)')
 })

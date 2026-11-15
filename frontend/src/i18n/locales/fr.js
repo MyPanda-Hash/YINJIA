@@ -2875,6 +2875,8 @@ export default {
     '工单行号': 'Ligne du document',
     '当前工序': 'Opération en cours',
     '待审': 'En attente de validation',
+    '待审数量': 'Quantité en attente',
+    '含草稿': 'Avec brouillon',
     '数据时间': 'Données au',
     '产品规格': 'Spécification produit',
     '混料': 'Mélange',

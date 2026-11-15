@@ -109,7 +109,7 @@
       </div>
 
       <div class="wb-trace-block">
-        <div class="wb-block-title">{{ tt('排产数据') }}<span class="wb-scope-cap whole">{{ tt('整单') }}</span></div>
+        <div class="wb-block-title">{{ tt('排产数据') }}<span class="wb-scope-cap" :class="capsule('排产数据')">{{ tt(scopeOf('排产数据')) }}</span></div>
         <el-table :data="trace['排产数据']" size="small" border max-height="180">
           <el-table-column :label="tt('生产线')" prop="生产线" width="110" />
           <el-table-column :label="tt('排产数量')" prop="排产数量" width="90" align="right" />
@@ -125,15 +125,35 @@
       <div class="wb-trace-block">
         <div class="wb-block-title">{{ tt('完工数据') }}<span class="wb-scope-cap" :class="capsule('完工数据')">{{ tt(scopeOf('完工数据')) }}</span></div>
         <el-table :data="trace['完工数据']" size="small" border max-height="160" :empty-text="tt('暂无报工')">
-          <el-table-column :label="tt('工序')" prop="工序" min-width="120" />
+          <el-table-column :label="tt('工序')" min-width="120">
+            <!-- 工序名是字典值(混料/成型/…)⇒ 与上方步骤条同口径走 tt(),英文态不留中文 -->
+            <template #default="{ row }">{{ row['工序'] ? tt(row['工序']) : '-' }}</template>
+          </el-table-column>
+          <!-- 工序口径换算(2026-11-15 用户口径「工序的数据应该是换算后的数量,因为工单工序存在换算机制」):
+               「计划数量」= 该道自己的计划量 = 排产数量 × 该道换算率(与上方工序进度同一条算式),
+               把「换算率」摆出来才看得出为什么成型计划 25 而整单排产是 50。各行/各道率不一致时后端回空串 ⇒ 显示 '-' -->
+          <el-table-column :label="tt('换算率')" width="90" align="right">
+            <template #default="{ row }">{{ row['换算率'] === '' || row['换算率'] == null ? '-' : num(row['换算率']) }}</template>
+          </el-table-column>
           <el-table-column :label="tt('计划数量')" prop="计划数量" width="100" align="right" />
+          <!-- 完成数量只算**已审核**(2026-11-15,与工序进度「完工量」同源);草稿单列到「待审数量」,
+               不再把草稿混进完成数、也不再出现"完成 10 / 状态已审核"却与工序进度 0 打架 -->
           <el-table-column :label="tt('完成数量')" prop="完成数量" width="100" align="right" />
-          <!-- 单据状态(2026-10-16):报工记录含**草稿**未审行(与工序步骤的「待审」同源),
-               标出来才不会被误读成"已计入产量" -->
-          <el-table-column :label="tt('单据状态')" prop="单据状态" width="90" />
+          <el-table-column :label="tt('待审数量')" width="100" align="right">
+            <template #default="{ row }">{{ Number(row['待审数量'] || 0) ? num(row['待审数量']) : '-' }}</template>
+          </el-table-column>
+          <!-- 单据状态三态(含草稿/已审核/草稿),值走 tt():en/ja 等语言下与其它状态列一致 -->
+          <el-table-column :label="tt('单据状态')" prop="单据状态" width="90">
+            <template #default="{ row }">{{ row['单据状态'] ? tt(row['单据状态']) : '-' }}</template>
+          </el-table-column>
           <el-table-column :label="tt('报工人')" prop="报工人" width="120" />
           <el-table-column :label="tt('报工时间')" prop="报工时间" width="150" />
         </el-table>
+        <div class="wb-trace-sub">
+          {{ tt('计划数量') }} = {{ tt('排产数量') }} × {{ tt('换算率') }}
+          ｜ {{ tt('完成数量') }} = {{ tt('已审核') }}
+          ｜ {{ tt('待审数量') }} = {{ tt('草稿') }}
+        </div>
         <div class="wb-trace-sub">
           {{ tt('入库单据') }}（{{ (trace['入库单据'] || []).length }}）
           <span class="wb-scope-cap" :class="capsule('入库单据')">{{ tt(scopeOf('入库单据')) }}</span>

@@ -386,7 +386,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import DateRangeQuery from '@core/ui/DateRangeQuery.vue'
-import { printWorkTaskSheet } from '@/business/print-formats'
+import { printWorkTaskSheet, moldPlanQty } from '@/business/print-formats'
 // 逐道工序的悬停提示文本(2026-11-14:原「工序流转明细」展开区删除后,数字收到「当前工序」格)
 import { flowChainTip } from '@/business/woFlowChain'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
@@ -632,9 +632,14 @@ const MID_COLUMNS = [
   { prop: '计划开工日期', width: 112 },
   { prop: '计划完工日期', width: 112 },
   { prop: '交期紧迫度', width: 90, align: 'right' },
-  { prop: '7天需交付', width: 92, align: 'right' },
-  { prop: '15天需交付', width: 96, align: 'right' },
-  { prop: '大于15天需交付', width: 112, align: 'right' },
+  // 2026-11-15(用户口径「需交付原来也应该是工序计划量」):三桶已由后端改成**工序计划量**(排产×该道换算率),
+  //   与紧邻的「已排」三桶(日计划合计)同一把尺;口径写在表头 tooltip 里,别再来回猜。
+  { prop: '7天需交付', width: 92, align: 'right',
+    headerTip: '需交付 = 工序计划量(排产数量 × 该道换算率),按交期落桶;与「已排」三桶同一口径' },
+  { prop: '15天需交付', width: 96, align: 'right',
+    headerTip: '需交付 = 工序计划量(排产数量 × 该道换算率),按交期落桶;与「已排」三桶同一口径' },
+  { prop: '大于15天需交付', width: 112, align: 'right',
+    headerTip: '需交付 = 工序计划量(排产数量 × 该道换算率),按交期落桶;与「已排」三桶同一口径' },
   { prop: '7天已排', width: 88, align: 'right' },
   { prop: '15天已排', width: 92, align: 'right' },
   { prop: '大于15天已排', width: 108, align: 'right' },
@@ -1164,24 +1169,17 @@ async function doPrintTask(mode) {
   try {
     // 成型任务单的数量 = **按工艺路线换算后的成型工序量**(2026-10-05 用户口径:
     // 「成型打印的任务单就是需要根据换算进行的…不需要显示换算率,显示换算后的数量即可」)。
-    // 换算因子 = 该**工单行**成型工序的计划量 ÷ **该行**计划合计(即累计换算率),再按该行的排产数量摊算;
-    // 取不到(未绑路线/无换算)时退回排产数量,不影响既有打印。
-    // ⚠ 2026-10-15 改**按行**(用户口径「工单号+工单行号确定当前唯一工单,各个工单的进程、
-    //   流程追溯都这样实现,都需要这两个进行确定」):原来只传 工单号 ⇒ 后端返回**整单**计划合计,
-    //   而同一工单**不同行的工艺路线/排产数量可以不同**(实测 GD-2026-10-0002:行2/3/4 与行1/5/6/7/8
-    //   路线不同)⇒ 整单因子套到每一行,打印出的成型数量是错的。现逐行取该行自己的合计与成型量,
-    //   因子按 `工单号#行id` 存。
-    const fkey = (r) => `${r.工单号}#${r.行id}`
-    const factor = {}
+    // 2026-11-15 收口:换算算法抽到 `print-formats.moldPlanQty`(生产工单页/工单排产页共用同一份),
+    //   原来这里内联的"因子×排产"与工单排产页各写一套 —— 那边直接印排产数量(实测成型 0.5 的单印出 50)。
+    //   moldPlanQty:detail 有工序步骤 ⇒ 排产 × 成型计划量/计划合计;否则当前工序=成型用 当前工序计划量;再退排产。
+    // ⚠ 2026-10-15 按行取数(用户口径「工单号+工单行号确定当前唯一工单」):同一工单不同行的路线/排产可不同。
+    const moldQty = {}
     if (mode === '成型生产任务单') {
       await Promise.all(src.map(async (r) => {
         try {
           const d = (await request.post('/px/processTask/detail', { 工单号: r.工单号, 工单行id: r.行id })).data || {}
-          const total = Number(d['计划合计'] || 0)
-          const st = (d['工序步骤'] || []).find((x) => x['工序'] === '成型')
-          const q = Number(st?.['计划量'] || 0)
-          if (total > 0 && q > 0) factor[fkey(r)] = q / total
-        } catch { /* 取不到就退回排产数量 */ }
+          moldQty[r.行id] = moldPlanQty(r, d)
+        } catch { moldQty[r.行id] = moldPlanQty(r, null) }
       }))
     }
     const rowsToPrint = src.map((r) => ({
@@ -1192,8 +1190,8 @@ async function doPrintTask(mode) {
       商品名称: r.产品名称 || '',
       规格型号: r.规格型号 || '',
       订单数量: r.需求数量,
-      // 成型任务单:换算后的数量(出货口 = **该行**排产数量 × 该行累计换算率,如 3 倍 → 80 变 240)
-      成型折算后数量: factor[fkey(r)] ? Math.round(Number(r.排产数量 || 0) * factor[fkey(r)] * 10000) / 10000 : r.排产数量,
+      // 成型任务单:换算后的数量(该行排产数量 × 该行成型换算率;如 0.5 倍 → 50 变 25)
+      成型折算后数量: moldQty[r.行id] ?? moldPlanQty(r, null),
       计划完工日期: r.计划完工日期 || '',
       批号: r.批号 || '', 物料编码: r.物料编码 || '',
       排产数量: r.排产数量, 生产线: r.生产线 || lineFilter.value || '',

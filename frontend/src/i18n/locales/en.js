@@ -909,6 +909,8 @@ export default {
     // ---- 工序步骤状态着色(2026-10-16:四态 + 待审量)----
     '超产': 'Over-produced',
     '待审': 'Pending review',
+    '待审数量': 'Pending Qty',
+    '含草稿': 'With draft',
     '待审=草稿报工未审核,只算已开始(黑),不计入产出与转序': 'Pending = draft report not yet approved; it only marks the step as started (black) and does not count toward output or hand-over',
     '该工单还没有工序进度': 'This work order has no process progress yet',
     '血缘': 'Lineage',
@@ -2354,6 +2356,11 @@ export default {
     '7天已排': 'Planned ≤7 days',
     '15天已排': 'Planned ≤15 days',
     '大于15天已排': 'Planned >15 days',
+    // 2026-11-15:需交付三桶改「工序计划量」/未交量保持「成品口径」,表头 tooltip 的译名
+    '需交付 = 工序计划量(排产数量 × 该道换算率),按交期落桶;与「已排」三桶同一口径':
+      'Due = operation planned qty (scheduled qty × this operation\'s conversion rate), bucketed by due date; same basis as the "Planned" buckets',
+    '未交量 = 排产数量 − 入库数量(成品口径,整单剩余;不折工序)':
+      'Backlog = scheduled qty − received qty (finished-goods basis, whole order remaining; not converted per operation)',
     '当天已审核报工量': 'Approved reported qty of that day',
     // 日排产日期列语义(2026-10-31):格上=计划(可编辑,深色)、格下=报工(只读,前缀「实」);
     //   列头「今」= 今天那一列,过去列灰底 = 历史对照段

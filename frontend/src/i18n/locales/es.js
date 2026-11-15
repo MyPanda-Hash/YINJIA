@@ -2875,6 +2875,8 @@ export default {
     '工单行号': 'Línea de la orden',
     '当前工序': 'Operación actual',
     '待审': 'Pendiente de revisión',
+    '待审数量': 'Cantidad pendiente',
+    '含草稿': 'Con borrador',
     '数据时间': 'Datos a fecha de',
     '产品规格': 'Especificación del producto',
     '混料': 'Mezcla',

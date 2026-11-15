@@ -68,6 +68,8 @@ public class WorkOrderDayPlanService {
      * 7天/15天/大于15天已排、日计划、日报工、计划合计、完工合计、已报工、剩余量、人工指定、超分配、
      * 计划开工日期、计划完工日期;2026-11-13 增 <b>原计划</b>(日期 → 原计划量,全量均摊基线,含历史、
      * 不扣报工 —— 与「日计划」两本账,见 row 构造处注释)。
+     * <p>口径(2026-11-15 起):<b>需交付</b>三桶 = **工序计划量**(排产数量 × 该道换算率,按交期落桶),
+     * 与「已排」三桶(日计划合计,工序口径)同一把尺;需求数量/排产数量仍是成品口径,只作订单口径列展示。
      *
      * @param ids        生产工单页:当前表格里的行 id(空 = 走产线模式)
      * @param line       工单排产页:选中产线
@@ -134,15 +136,23 @@ public class WorkOrderDayPlanService {
             for (double v : doneAll.values()) doneTotal += v;
             double reported = reportedTotals.getOrDefault(key, 0d);
 
-            // 需交付三桶:按交期落桶(逾期归 7 天;无交期归 大于15天)
+            // 需交付三桶:按交期落桶(逾期归 7 天;无交期归 大于15天)。
+            // 🔴 2026-11-15(用户口径,带 4号车间 GD-2026-11-0028 截图):「这里原来也应该是工序计划量的」——
+            //   原来三桶取的是 **需求数量**(成品口径:该单 需求 50),而紧挨着的「已排」三桶是**日计划合计**
+            //   (工序口径:成型 25)⇒ 同一行左边 50、右边 25 两个单位在比,"需交付"永远大于"已排",
+            //   与看板其它工序口径列(本线排产数量/当前工序计划量/已排合计)也对不上。
+            //   现按 **工序计划量 = 排产数量 × 该道换算率**(= opCaps,与日计划总额/保存守卫/工序进度同一算式)
+            //   落桶,需交付与已排就成了同一把尺(该行这道工序一共要交多少 / 已排多少)。
+            //   ⚠ 需求数量/排产数量仍按成品口径原样下发(别改:它们是订单口径列,由前端单独显示)。
+            final double dueQty = opCaps.getOrDefault(key, 0d);
             double due7 = 0, due15 = 0, dueOver = 0;
             if (r.due == null) {
-                dueOver = r.demand;
+                dueOver = dueQty;
             } else {
                 long left = java.time.temporal.ChronoUnit.DAYS.between(today, r.due);
-                if (left <= 7) due7 = r.demand;
-                else if (left <= 15) due15 = r.demand;
-                else dueOver = r.demand;
+                if (left <= 7) due7 = dueQty;
+                else if (left <= 15) due15 = dueQty;
+                else dueOver = dueQty;
             }
             // 已排三桶:7天/15天为**累计**(≤7 / ≤15,与纸表「7天=15天」同口径),大于15天为 15 天之后的部分
             double plan7 = 0, plan15 = 0, planOver = 0;
