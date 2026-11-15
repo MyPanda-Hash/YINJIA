@@ -8708,7 +8708,61 @@ const sheetPdfDesc = computed(() => (isOqcSheetPanel.value
  *   兜底名单必须把**每种纸张的根类名**都列全 —— 2026-10-17 实测漏了 `.fi-sheet`,
  *   于是首件检验单点「导出 PDF」直接报「未找到可导出的单据」。
  */
-/** 截一张纸:离屏克隆(定宽) → domToPng;返回 { dataUrl, w0, h0 } */
+/**
+ * 检验单纸张(首件检验单 `.fi-sheet` / 巡线记录表 `.lp-sheet`)整页截图的预处理 —— 2026-11-15。
+ *
+ * 🔴 用户报障:「这个报表的打出预览会打印出滚动条无法查看到全部内容」。
+ *   这两张纸在屏上是「内层横向滚动容器(`.fi-grid-scroll` / `.lp-grid-scroll`)+ 表格 min-width」:
+ *     · 侧栏「打印」走 window.print(),有 `@media print` 把表格收回纸宽 ⇒ 正常;
+ *     · 「导出 PDF / 打印预览」走本文件的离屏克隆 + 截图,`@media print` **不生效** ⇒
+ *         ① 根元素 scrollWidth 量不到内层溢出宽度,右侧列被直接裁掉(用户截图裁在「挤压强度」);
+ *         ② 横向滚动条被一起截进 PDF(用户说的"打印出滚动条");
+ *         ③ 编辑控件(改列名输入框 / 分组下拉 / 行高拖动下标 / 操作列 / 标准行 textarea 滚动条)也上纸。
+ *   修法:截图前在**克隆体**上做三件事(不动线上 DOM、不改屏幕版式):
+ *     a) 摘掉编辑控件、把只读文字版列头显形(与 @media print 的隐藏/显形名单同口径),
+ *        并隐藏「请选择」占位词与下拉箭头(纸面不印控件提示);
+ *     b) 内层滚动容器**从深到浅**撑到内容宽 + overflow:visible ⇒ 整表宽可量、滚动条消失;
+ *     c) textarea/input 一律 overflow:hidden(值已写进文本节点,高度后面按内容撑开)。
+ *   随后 snapSheetPage 按实测整表宽放宽克隆体;出纸方向这两类纸用 **A4 横向**(见 buildSheetPdfBlob)。
+ */
+/** 截图用的一次性样式(只管克隆体里的纸面,克隆体一删即无宿主;不去删它也不影响线上 DOM) */
+const QC_SNAP_STYLE_ID = 'qc-sheet-snap-style'
+function ensureQcSnapStyle() {
+  if (document.getElementById(QC_SNAP_STYLE_ID)) return
+  const st = document.createElement('style')
+  st.id = QC_SNAP_STYLE_ID
+  st.textContent = `
+    .qc-sheet-snap input::placeholder, .qc-sheet-snap textarea::placeholder { color: transparent !important; }
+    .qc-sheet-snap .el-select__placeholder.is-transparent { visibility: hidden !important; }
+    .qc-sheet-snap .el-select__caret { display: none !important; }
+  `
+  document.head.appendChild(st)
+}
+function prepareQcSheetSnapshot(clone) {
+  clone.classList.add('qc-sheet-snap')
+  ensureQcSnapStyle()
+  // a) 编辑控件不上纸
+  clone.querySelectorAll('.fi-colname, .fi-colgroup, .fi-coldel, .fi-addcol, .fi-rowgrip, .col-op, .no-print')
+    .forEach((n) => n.remove())
+  // 列头文字版屏上是 display:none(打印媒体才显形),截图里要手动显形
+  clone.querySelectorAll('.fi-colhead-text').forEach((n) => { n.style.display = 'inline' })
+  // c) 文本域/输入框不要滚动条
+  clone.querySelectorAll('textarea, input').forEach((n) => { n.style.overflow = 'hidden' })
+  // b) 内层滚动容器撑到内容宽(从最深的一层开始,外层才量得到整表宽)
+  const scrollers = [...clone.querySelectorAll('*')]
+    .filter((n) => n.scrollWidth > n.clientWidth + 2)
+    .filter((n) => {
+      const cs = getComputedStyle(n)
+      return cs.overflowX !== 'visible' || cs.overflowY !== 'visible'
+    })
+    .reverse()
+  for (const n of scrollers) {
+    n.style.overflowX = 'visible'
+    n.style.overflowY = 'visible'
+    n.style.width = `${n.scrollWidth}px`
+  }
+}
+/** 截一张纸:离屏克隆(定宽) → domToPng;返回 { dataUrl, w0, h0, rowBreaks, qcSheet } */
 async function snapSheetPage(el, domToPng) {
   let holder = null
   try {
@@ -8742,7 +8796,14 @@ async function snapSheetPage(el, domToPng) {
      * 硬压只会裁掉右边几列。判据用纸面自己的结构类名，不写死面板码。
      */
     const isTableStyleSheet = !!(el.querySelector && el.querySelector('.sg-table'))
-    const reflow = !isTableStyleSheet && paperW > A4_CONTENT_PX
+    /**
+     * 检验单纸张(首件检验单 .fi-sheet / 巡线记录表 .lp-sheet,2026-11-15):
+     * **不压 A4 重排**,改为「按屏幕版式截全宽」—— 见函数 {@link prepareQcSheetSnapshot} 的注释。
+     * 这两类是内层横向滚动容器 + 表格 min-width 的宽表:压窄只会把右列裁掉,
+     * 而截图宽又量不到内层溢出内容 ⇒ 用户看到「打印预览只到挤压强度、还带着滚动条」。
+     */
+    const isQcSheet = !!(el.matches?.('.fi-sheet, .lp-sheet') || el.querySelector?.('.fi-sheet, .lp-sheet'))
+    const reflow = !isTableStyleSheet && !isQcSheet && paperW > A4_CONTENT_PX
     const w0 = reflow ? A4_CONTENT_PX : paperW
     holder = document.createElement('div')
     holder.style.cssText = `position:fixed;left:-10000px;top:0;width:${w0}px;background:#ffffff;`
@@ -8784,6 +8845,25 @@ async function snapSheetPage(el, domToPng) {
     document.body.appendChild(holder)
     // 双 raf:等克隆体按全宽完成重排再量高(窄窗换行多,原元素高度偏大;全宽布局高度才是纸高)
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+    /**
+     * 检验单纸张(首件/巡线,2026-11-15 用户报障「打印预览会打印出滚动条、看不到全部内容」):
+     * 把内层滚动容器撑开、按实测整表宽放宽克隆体 ⇒ 右侧列不再被裁、滚动条也不会上纸。
+     * ⚠ 必须在量 h0/realW 之前做,而且放宽后要重新等布局。
+     */
+    if (isQcSheet) {
+      prepareQcSheetSnapshot(clone)
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+      const fullW = Math.max(
+        clone.scrollWidth || 0,
+        Math.ceil(clone.getBoundingClientRect().width) || 0,
+        w0,
+      )
+      if (fullW > w0) {
+        clone.style.width = `${fullW}px`
+        holder.style.width = `${fullW}px`
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+      }
+    }
     /**
      * 🔴 textarea 的**高度要按克隆体的新宽度重算**（2026-11-13 实测踩到）。
      *
@@ -8868,7 +8948,7 @@ async function snapSheetPage(el, domToPng) {
       // 隐藏编辑态元素(字段编辑/标准库/终止横幅/拖动下标等),与打印口径一致
       filter: (node) => !(node instanceof HTMLElement && node.classList?.contains?.('no-print')),
     })
-    return { dataUrl, w0: realW, h0, rowBreaks }
+    return { dataUrl, w0: realW, h0, rowBreaks, qcSheet: isQcSheet }
   } finally {
     if (holder) holder.remove()
   }
@@ -8989,19 +9069,27 @@ async function buildSheetPdfBlob() {
    *   固定 A4 竖向后:① 每页方向尺寸完全一致;② 与单页面板走 window.print() 的观感一致
    *   (浏览器默认也是 A4 竖向、按纸宽缩放);③ 内容**等比**缩放居中,列宽比例不变(不拉伸)。
    */
-  const PAGE_W = SHEET_PAGE_W
-  const PAGE_H = SHEET_PAGE_H
+  /**
+   * 检验单纸张(首件检验单 / 巡线记录表,2026-11-15):**A4 横向**出纸。
+   *
+   * 这两张是 10 / 12 列的宽表(屏幕版式按列宽 120px/96px 设计);竖向 A4 只有 194mm 可用宽,
+   * 等比缩下来字会小到看不清。横向 A4 可用宽 281mm ⇒ 缩放后字号还保得住,一张纸也放得下。
+   * 判据:本次导出的**所有**截图都来自这两类纸才切横向(多页签文书等其它面板行为不变)。
+   */
+  const qcWide = shots.length > 0 && shots.every((s) => !!s.qcSheet)
+  const PAGE_W = qcWide ? SHEET_PAGE_H : SHEET_PAGE_W
+  const PAGE_H = qcWide ? SHEET_PAGE_W : SHEET_PAGE_H
   const MARGIN = SHEET_MARGIN
   const contentW = PAGE_W - MARGIN * 2
   const contentH = PAGE_H - MARGIN * 2
   const pdf = new jsPDF({
-    orientation: 'p',
+    orientation: qcWide ? 'l' : 'p',
     unit: 'mm',
     format: [PAGE_W, PAGE_H],
     compress: true,
   })
   shots.forEach((s, i) => {
-    if (i > 0) pdf.addPage([PAGE_W, PAGE_H], 'p')
+    if (i > 0) pdf.addPage([PAGE_W, PAGE_H], qcWide ? 'l' : 'p')
     // 截图原始尺寸(px) → mm
     const iw = s.w0 * MM
     const ih = s.h0 * MM
