@@ -234,6 +234,7 @@ import {
 } from '@/business/mixScan'
 import { printSlip } from '@/business/slipPrintFlow'
 import { scanOnce, hasNativeScan } from '@/business/nativeScan'
+import { focusScanNow } from '@/business/scanFocus'
 import request from '@core/request'
 
 const nativeScan = hasNativeScan()
@@ -367,6 +368,9 @@ async function onScanWorkOrder() {
     lines.value = []
   } finally {
     woLoading.value = false
+    // PDA 连扫(2026-11-16):扫工单成功后焦点去物料扫码框(useWorkOrderRow 里已经落一次),
+    //   失败/没找到则回到工单扫码框,好重扫
+    focusScanNow(() => (order.value ? matInput.value : woInput.value), { delay: 150 })
   }
 }
 
@@ -463,19 +467,24 @@ async function scanMatCamera() {
 async function onScanMaterial() {
   errText.value = ''
   okText.value = ''
-  const p = parseBarcode(matText.value)
-  if (!p.ok) {
-    errText.value = reasonText(p.reason)
-    return
+  try {
+    const p = parseBarcode(matText.value)
+    if (!p.ok) {
+      errText.value = reasonText(p.reason)
+      return
+    }
+    const hit = lines.value.findIndex((l) => String(l.code).trim() === p.code)
+    if (hit < 0) {
+      errText.value = reasonText('miss') + `：${p.code}`
+      return
+    }
+    activeIdx.value = hit
+    // 物料码是 `存货编码|批号`:批号随码带下去落库,纸面《成型配料记录》要印「物料批次」
+    await submitLine(lines.value[hit], p.batch)
+  } finally {
+    // PDA 连扫(2026-11-16):扫完(命中/没命中)光标都回物料扫码框,好接着扫下一个物料
+    focusScanNow(() => matInput.value, { delay: 150 })
   }
-  const hit = lines.value.findIndex((l) => String(l.code).trim() === p.code)
-  if (hit < 0) {
-    errText.value = reasonText('miss') + `：${p.code}`
-    return
-  }
-  activeIdx.value = hit
-  // 物料码是 `存货编码|批号`:批号随码带下去落库,纸面《成型配料记录》要印「物料批次」
-  await submitLine(lines.value[hit], p.batch)
 }
 
 async function submitActive() {
@@ -516,6 +525,8 @@ async function submitLine(line, batch) {
     errText.value = errMsg(e) || tt('提交本笔失败')
   } finally {
     savingOne.value = false
+    // 成功路径上面已经聚焦过;失败/取不到秤也要回来,别让光标掉在数量框上
+    focusScanNow(() => matInput.value, { delay: 180 })
   }
 }
 

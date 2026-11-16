@@ -289,6 +289,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { parseMaterialCode } from '@/business/scanCode'
+import { focusScanNow } from '@/business/scanFocus'
 import { makeBatchRows, allocateScannedFirst, allocateForQty, pickProgress, fmtQty, round4, isNonFifo } from '@/business/mobilePick'
 import { printWoQr } from '@/business/print-formats'
 import { printSlip } from '@/business/slipPrintFlow'
@@ -661,6 +662,9 @@ async function scanMaterial(scanBatch) {
     errText.value = errMsgOf(e) || tt('查询物料失败')
   } finally {
     matLoading.value = false
+    // PDA 连扫(2026-11-16):扫完(命中/报错都算)光标回到物料扫码框;
+    //   扫中后要填数量,「写入」成功后 saveQty / cancelLock 里各自再落一次
+    focusScanNow(() => matInput.value, { delay: 120 })
   }
 }
 

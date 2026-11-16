@@ -159,6 +159,7 @@ import { ElMessage } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { parseWorkOrderCode } from '@/business/scanCode'
+import { focusScanNow } from '@/business/scanFocus'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
@@ -294,6 +295,8 @@ async function loadWo(line) {
     errText.value = e?.response?.data?.message || e?.message || tt('查询工单失败')
   } finally {
     woLoading.value = false
+    // PDA 连扫(2026-11-16):扫完/查完把光标放回工单扫码框,好接着扫下一张
+    focusScanNow(() => woInput.value, { delay: 120 })
   }
 }
 
@@ -331,6 +334,8 @@ async function submit() {
     errText.value = e?.response?.data?.message || e?.message || tt('提交报工失败')
   } finally {
     saving.value = false
+    // 提交完光标回扫码框(下一张工单直接扫)
+    focusScanNow(() => woInput.value, { delay: 200 })
   }
 }
 </script>

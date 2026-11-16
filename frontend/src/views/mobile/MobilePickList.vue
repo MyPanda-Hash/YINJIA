@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   MobilePickList.vue — 手机扫码 · 生产领料(列表页 + 生单入口,2026-10-30 重写)
 
   【为什么是这一页】(用户 2026-10-30 口径原文)
@@ -59,6 +59,7 @@
       </div>
       <div class="mp-row mp-row-gap">
         <el-input
+          ref="scanInput"
           v-model="locateText"
           :placeholder="tt('扫工单号/领料单号,或直接输入后点打开')"
           size="large"
@@ -159,6 +160,7 @@ import { useRouter } from 'vue-router'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { parseWorkOrderCode } from '@/business/scanCode'
+import { focusScanNow } from '@/business/scanFocus'
 
 const router = useRouter()
 
@@ -166,6 +168,8 @@ const keyword = ref('')
 const listLoading = ref(false)
 const locateText = ref('')
 const locateLoading = ref(false)
+/** 扫码/定位框:PDA 连扫用(2026-11-16 用户口径,见 business/scanFocus.js) */
+const scanInput = ref(null)
 const errText = ref('')
 const okText = ref('')
 /** 点了「扫码」后是否还在等壳回调 —— 用来兜底提示"没收到扫码结果"(2026-11-01) */
@@ -255,6 +259,8 @@ async function refreshAll() {
 onMounted(() => {
   bindScan()
   loadList()
+  // PDA 连扫(2026-11-16):进页面光标就落在扫码/定位框
+  focusScanNow(() => scanInput.value, { delay: 350 })
 })
 
 /**
@@ -390,6 +396,8 @@ async function locate(line) {
     showErr(errMsgOf(e) || tt('查询失败'))
   } finally {
     locateLoading.value = false
+    // PDA 连扫(2026-11-16):定位/扫码结束光标回到扫码框(打开单据时页面会跳走,聚焦无副作用)
+    focusScanNow(() => scanInput.value, { delay: 150 })
   }
 }
 

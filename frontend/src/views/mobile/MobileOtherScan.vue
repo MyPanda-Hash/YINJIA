@@ -191,6 +191,7 @@ import {
   doneMessageKey,
 } from '@/business/scanOther'
 import { printSlip } from '@/business/slipPrintFlow'
+import { focusScanNow } from '@/business/scanFocus'
 import request from '@core/request'
 
 const props = defineProps({
@@ -371,6 +372,8 @@ async function onScan() {
     errText.value = errMsg(e) || tt('查询可用量失败')
   } finally {
     probing.value = false
+    // PDA 连扫(2026-11-16):扫完一条(命中/没命中都算)光标回到扫码框,好接着扫下一条
+    focusScanNow(() => scanInput.value, { delay: 120 })
   }
 }
 

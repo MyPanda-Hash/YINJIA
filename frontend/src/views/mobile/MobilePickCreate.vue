@@ -286,6 +286,7 @@ import { useRouter } from 'vue-router'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { parseWorkOrderCode } from '@/business/scanCode'
+import { focusScanNow } from '@/business/scanFocus'
 import { printWoQr } from '@/business/print-formats'
 import { queueToPrintStation, PRINT_TYPE_PICK_SLIP } from '@/business/printStation'
 
@@ -581,6 +582,8 @@ async function generateBatch() {
     errText.value = errMsgOf(e) || tt('生成失败')
   } finally {
     genLoading.value = false
+    // PDA 连扫(2026-11-16):生单完把光标放回工单扫码框
+    focusScanNow(() => woInput.value, { delay: 200 })
   }
 }
 

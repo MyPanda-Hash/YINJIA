@@ -1,4 +1,4 @@
-﻿<!--
+<!--
   MobileReturnList.vue — 手机扫码 · 生产退料(2026-11-18 独立成页)
 
   【用户口径(原话)】
@@ -81,6 +81,7 @@
 
       <div class="mr-row">
         <el-input
+          ref="scanInput"
           v-model="matText"
           :placeholder="tt('扫物料码或输入物料编码')"
           size="large"
@@ -144,11 +145,14 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import request from '@core/request'
 import { fmtQty, round4 } from '@/business/mobilePick'
+import { focusScanNow } from '@/business/scanFocus'
 
 const route = useRoute()
 
 const loading = ref(false)
 const scanning = ref(false)
+/** 物料扫码框:PDA 连扫用(2026-11-16 用户口径,见 business/scanFocus.js) */
+const scanInput = ref(null)
 const submitting = ref(false)
 const errText = ref('')
 const okText = ref('')
@@ -193,6 +197,8 @@ function select(d) {
   //   结果点行后作业区根本不出现(2026-11-18 实测)。
   cur.value = d
   resetWork(true)
+  // 选中单据后光标直接进物料扫码框(2026-11-16 PDA 连扫口径)
+  focusScanNow(() => scanInput.value, { delay: 150 })
 }
 
 /** 清空作业区(keepDoc=false 时连选中的单据一起清) */
@@ -222,6 +228,8 @@ async function scan() {
     errText.value = errMsgOf(e) || tt('查询可退数量失败')
   } finally {
     scanning.value = false
+    // PDA 连扫(2026-11-16):扫完光标回到扫码框
+    focusScanNow(() => scanInput.value, { delay: 120 })
   }
 }
 
@@ -242,6 +250,8 @@ function addLine() {
   matText.value = ''
   mat.value = null
   qty.value = 0
+  // 填完数量「加入」之后回扫码框(2026-11-16 用户口径)
+  focusScanNow(() => scanInput.value, { delay: 80 })
 }
 
 function removeLine(i) {
@@ -278,6 +288,8 @@ async function submit() {
     errText.value = errMsgOf(e) || tt('退料失败')
   } finally {
     submitting.value = false
+    // 提交完光标回扫码框(下一项/下一单直接扫)
+    focusScanNow(() => scanInput.value, { delay: 200 })
   }
 }
 
@@ -290,6 +302,8 @@ onMounted(async () => {
     const hit = list.value.find((d) => String(d.领料单号 || '').trim() === no)
     if (hit) select(hit)
   }
+  // PDA 连扫(2026-11-16):进页面就把光标放到物料扫码框
+  focusScanNow(() => scanInput.value, { delay: 350 })
 })
 </script>
 
