@@ -29,7 +29,9 @@ param(
     # 无条件重启一次(排障用:不信健康检查结果时)
     [switch]$Force,
     # 只报告状态,不做任何启动/结束动作
-    [switch]$Status
+    [switch]$Status,
+    # 由人手动触发(「补启动.bat」/ start-agent.ps1):不受"一小时最多动作 5 次"限制
+    [switch]$Manual
 )
 
 $ErrorActionPreference = 'Stop'
@@ -157,6 +159,8 @@ function Start-Agent {
 function Can-Act {
     # ⚠ 本函数里任何异常都不能把守护打死(否则"守护自己挂了,代理也没人拉"),
     #   所以整体 try/catch,出错就放行(fail-open):宁可多重启一次,也不要什么都不做。
+    # 人工点击(-Manual)不受限:人就在机器前面,不用替它省着。
+    if ($Manual) { return $true }
     try {
         $win = (Get-Date).AddHours(-1)
         $recent = @()
