@@ -8763,6 +8763,36 @@ function prepareQcSheetSnapshot(clone) {
   }
 }
 /**
+ * 出货检验单功能 / 出货检验表观(`.qr-sheet`)整页截图的预处理 —— 2026-11-16「打印不全」修版。
+ *
+ * 用户 2026-11-16 口径:「主要是修复打印不全的问题」「组件使用原来的吧」。
+ * 该纸面是**竖向受控表单(YJ-QR-154)**,但宽度是弹性的(width:100%)、内层 `.qr-grid-scroll`
+ * 又带横向滚动 ⇒ 「导出 PDF / 打印预览」的截图只有左半边:右侧列根本不在图里,还带着滚动条和
+ * 「暂无检验项…」「请选择」等编辑提示。打印(原生)那条路有 @media print 会把表格收回纸宽,截图拿不到。
+ * 这里在**克隆体**上按 @media print 的同一口径处理(不动线上 DOM、不改纸面组件):
+ *   a) 摘编辑控件(no-print)、清占位提示/下拉箭头;
+ *   b) `.qr-grid-scroll` 退回可见、`.qr-grid` 按纸宽重排(min-width:0 / width:100% / table-layout:fixed)。
+ * 克隆体本身宽已在 snapSheetPage 里固定为 A4 内容宽(733px),故重排后正好一页纸宽。
+ */
+function prepareQrSheetSnapshot(clone) {
+  clone.classList.add('qc-sheet-snap')
+  ensureQcSnapStyle()
+  clone.querySelectorAll('.no-print').forEach((n) => n.remove())
+  clone.querySelectorAll('input, textarea').forEach((n) => n.setAttribute('placeholder', ''))
+  clone.querySelectorAll('.el-input__suffix, .el-input__prefix').forEach((n) => n.remove())
+  clone.querySelectorAll('.qr-grid-scroll').forEach((n) => {
+    n.style.overflow = 'visible'
+    n.style.overflowX = 'visible'
+    n.style.overflowY = 'visible'
+  })
+  clone.querySelectorAll('.qr-grid').forEach((n) => {
+    n.style.minWidth = '0'
+    n.style.width = '100%'
+    n.style.tableLayout = 'fixed'
+  })
+  clone.querySelectorAll('textarea, input').forEach((n) => { n.style.overflow = 'hidden' })
+}
+/**
  * 检验委托单纸张(`.ic-sheet`)整页截图的预处理 —— 2026-11-16。
  *
  * 🔴 用户报障(两张截图):「打印的格式存在问题,字的格式会挤压」「按钮实现不应该被打印出来」。
@@ -8863,7 +8893,14 @@ async function snapSheetPage(el, domToPng) {
      * 而截图宽又量不到内层溢出内容 ⇒ 用户看到「打印预览只到挤压强度、还带着滚动条」。
      */
     const isQcSheet = !!(el.matches?.('.fi-sheet, .lp-sheet') || el.querySelector?.('.fi-sheet, .lp-sheet'))
-    const reflow = !isTableStyleSheet && !isQcSheet && paperW > A4_CONTENT_PX
+    /**
+     * 出货检验单功能 / 出货检验表观(`.qr-sheet`,2026-11-16 用户口径「主要是修复打印不全的问题」):
+     * 纸面宽度是**弹性的**(width:100%),窄窗/左栏展开时只有 300 多 px;内层 `.qr-grid-scroll`
+     * 又带横向滚动 ⇒ 截图只有左半边、右侧列被裁,还带着滚动条和「暂无检验项…」「请选择」提示。
+     * 修法:截图克隆**固定按 A4 内容宽(733px)重排**,并摘控件/清占位(见 prepareQrSheetSnapshot)。
+     */
+    const isQrSheet = !!(el.matches?.('.qr-sheet') || el.querySelector?.('.qr-sheet'))
+    const reflow = !isTableStyleSheet && !isQcSheet && (isQrSheet || paperW > A4_CONTENT_PX)
     const w0 = reflow ? A4_CONTENT_PX : paperW
     holder = document.createElement('div')
     holder.style.cssText = `position:fixed;left:-10000px;top:0;width:${w0}px;background:#ffffff;`
@@ -8891,6 +8928,8 @@ async function snapSheetPage(el, domToPng) {
     // ⚠ 光靠 CSS 不够:本函数走的是**截图**,CSS 的 @media print / body.approval-printing 都不生效
     //   (只有 filter 里认的 .no-print 才生效),而 .rsp-lib-pick 身上并没有 no-print。
     clone.querySelectorAll('.rsp-lib-pick, .rs-lib-btn').forEach((n) => n.remove())
+    // 出货检验单:按 A4 纸宽重排 + 摘控件/清占位(截图路径拿不到 @media print 的那套规则)
+    if (isQrSheet) prepareQrSheetSnapshot(clone)
     // ⚠ textarea 的值必须**写进克隆体的文本节点**(2026-11-11 用户报「配方表打印无数据」的根因):
     //   modern-screenshot 的 copyInputValue 只 setAttribute('value', ...),而 <textarea> 在
     //   foreignObject 里显示的是**子文本节点** ⇒ 整格是 textarea 的配方表会印成一片空白
@@ -9342,16 +9381,19 @@ async function previewSheetPdf() {
   //   通用面板走页内打印层(2026-10-31 打印通道统一:打印页 HTML + 原生打印预览,不再把 blob PDF 交给浏览器)
   if (isOqcSheetPanel.value) { await previewOqcReport(); return }
   /**
-   * 检验委托单(.ic-sheet,2026-11-16 用户报障「打印预览字被挤压、按钮也被打印出来」):
-   * 截图预览会把屏幕编辑态(选择检验项目按钮/日期控件/占位提示)一起拍进去,还是位图放大,
-   * 字发虚发挤 ⇒ **和侧栏「打印」走同一条原生打印通道**(window.print + @media print,矢量、A4 竖版)。
-   * 其余纸面(多页签文书/宽表)仍走截图打印层。
+   * 2026-11-16 用户口径:「主要是修复打印不全的问题」「组件使用原来的吧」。
+   * ≥ 单页纸面(首件检验单 / 出货检验单功能 / 出货检验表观 / 巡线检验 / 检验委托单):
+   * 打印预览**不再走「截图 → A4 纸」的位图通道**(那条路会把宽表裁掉/整体缩小/带上编辑控件),
+   * 直接复用侧栏「打印」的**原生打印通道**——用的就是组件原样渲染 + 各自 @media print 规则,
+   * 纸面方向由 printApprovalSheet 按纸种注入(首件/巡线横版、出货/委托单竖版)。
+   * 多页签文书/分组面板仍走截图打印层(它们必须逐页/逐组出纸)。
    */
   const sheetEl = approvalSheetRef.value?.$el
   const paperEl = sheetEl instanceof HTMLElement && sheetEl.offsetWidth > 0
     ? sheetEl
-    : document.querySelector('.approval-layout .ic-sheet')
-  if (paperEl && (paperEl.matches?.('.ic-sheet') || paperEl.querySelector?.('.ic-sheet'))) {
+    : document.querySelector('.approval-layout .ic-sheet, .approval-layout .fi-sheet, .approval-layout .lp-sheet, .approval-layout .qr-sheet')
+  if (paperEl && (paperEl.matches?.('.ic-sheet, .fi-sheet, .lp-sheet, .qr-sheet')
+    || paperEl.querySelector?.('.ic-sheet, .fi-sheet, .lp-sheet, .qr-sheet'))) {
     await printApprovalSheet()
     return
   }
@@ -9489,6 +9531,21 @@ async function printApprovalSheet() {
     sgPageStyle = document.createElement('style')
     sgPageStyle.id = 'sg-print-page'
     sgPageStyle.textContent = '@page { size: A4 landscape; margin: 8mm; }'
+    document.head.appendChild(sgPageStyle)
+  } else if (paperEl && (paperEl.classList.contains('fi-sheet') || paperEl.classList.contains('lp-sheet'))) {
+    // 首件检验单 / 巡线记录表(2026-11-16「打印不全」修版):这两张是**A4 横版**宽表纸样。
+    // 全局 @page 恰好是 landscape(见 QcLinePatrolSheet),但那条规则靠 CSS 顺序,换构建顺序就翻车;
+    // 这里显式注入,保证「打印 / 打印预览」两处方向一致、宽表不被竖版裁掉。
+    sgPageStyle = document.createElement('style')
+    sgPageStyle.id = 'qc-wide-print-page'
+    sgPageStyle.textContent = '@page { size: A4 landscape; margin: 8mm; }'
+    document.head.appendChild(sgPageStyle)
+  } else if (paperEl && paperEl.classList.contains('qr-sheet')) {
+    // 出货检验单功能 / 出货检验表观(2026-11-16「打印不全」修版):竖版受控表单(YJ-QR-154)。
+    // 之前自己没有注入 @page,被 QcLinePatrolSheet 的全局 landscape 规则带走 ⇒ 竖版表被铺到横版纸上。
+    sgPageStyle = document.createElement('style')
+    sgPageStyle.id = 'qr-print-page'
+    sgPageStyle.textContent = '@page { size: A4 portrait; margin: 8mm; }'
     document.head.appendChild(sgPageStyle)
   } else if (paperEl && paperEl.classList.contains('ic-sheet')) {
     // 检验委托单(INSP_COMMISSION,2026-11-15):委托检验合同是**A4 竖版**单页纸(照 .doc 原件)。
