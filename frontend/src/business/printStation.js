@@ -33,6 +33,19 @@ import * as QRCodeMod from 'qrcode'
 export const PRINT_TYPE_PICK_SLIP = 'PICK_SLIP'   // 生产领料单(工单二维码 + 领料明细)
 
 /**
+ * 2026-11-16 新增三种纸面报表 —— 版式与「生产领料单」**完全一致**,纸上只是标题不同
+ * (用户口径:「其他领料,其他退料和生产退料。都要可以打印报表……打印格式和生产领料一样,只是名称不同」)。
+ *
+ * <p>为什么要分成三个类型而不是复用 PICK_SLIP:类型是**派单键** ——
+ * 「自动打印」页按类型勾选,一台电脑打了生产领料单不代表它也要出其他退料的纸
+ * (2026-11-04 用户口径「加个勾选打印类型的」)。三个 code 必须与后端
+ * {@code PrintStationController.PRINT_TYPES} 的键逐字一致。
+ */
+export const PRINT_TYPE_OTHER_PICK_SLIP = 'OTHER_PICK_SLIP'   // 其他领料单(其他出库单)
+export const PRINT_TYPE_OTHER_RET_SLIP = 'OTHER_RET_SLIP'     // 其他退料单(生产退料单上的其他退料)
+export const PRINT_TYPE_MAT_RET_SLIP = 'MAT_RET_SLIP'         // 生产退料单(手机扫码生产退料)
+
+/**
  * 把二维码渲染成 dataURL(PNG,base64)。
  *
  * <p>为什么要前端生成再传给打印电脑(2026-11-01 用户口径「要有二维码显示,和工单同个二维码」):
@@ -45,7 +58,7 @@ export const PRINT_TYPE_PICK_SLIP = 'PICK_SLIP'   // 生产领料单(工单二�
  * @param {string} text 二维码内容
  * @returns {Promise<string>} 形如 data:image/png;base64,...
  */
-async function qrDataUrl(text) {
+export async function qrDataUrl(text) {
   const content = String(text || '').trim()
   if (!content) return ''
   try {

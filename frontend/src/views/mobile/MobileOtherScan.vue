@@ -117,6 +117,25 @@
         {{ tt('提交') }}
       </el-button>
     </div>
+
+    <!-- 补打印(2026-11-16):扫单据二维码,或手输单号 —— 纸质单丢了/没打出来时用 -->
+    <div class="mo-reprint">
+      <div class="mo-list-head">
+        <span>{{ tt('补打印') }}</span>
+        <span class="mo-reprint-hint">{{ tt('扫单据上的二维码，或直接输入单号') }}</span>
+      </div>
+      <div class="mo-reprint-row">
+        <el-input
+          v-model="printNo"
+          :placeholder="tt('扫码或输入单号（如 OO-2026-11-0005）')"
+          clearable
+          size="large"
+          @keyup.enter="reprint"
+        />
+        <el-button size="large" :loading="printing" @click="reprint">{{ tt('补打印') }}</el-button>
+      </div>
+      <el-alert v-if="printMsg" :title="printMsg" type="info" :closable="false" show-icon class="mo-print-msg" />
+    </div>
   </div>
 </template>
 
@@ -135,6 +154,8 @@ import {
   SIDE_RET, isRet, panelOfSide, titleOfSide, checkQty, mergeLine, buildForm,
   doneMessageKey,
 } from '@/business/scanOther'
+import { parseSlipQr } from '@/business/slipPrint'
+import { printSlip } from '@/business/slipPrintFlow'
 
 const props = defineProps({
   side: { type: String, default: 'pick' },
@@ -161,6 +182,12 @@ const qty = ref(1)
 const lines = ref([])
 const lastDoc = ref('')
 const lastMsg = ref('')
+
+// 打印(2026-11-16):提交即打印 + 补打印。kind 决定纸面标题与派单类型(见 business/slipPrint.js)
+const printing = ref(false)
+const printNo = ref('')
+const printMsg = ref('')
+const slipKind = computed(() => (isReturn.value ? 'OTHER_RET' : 'OTHER_PICK'))
 
 // 退料兜底:库存里没有该物料时,仓库要手选
 const warehouses = ref([])
@@ -212,6 +239,7 @@ const reasonText = (reason) => ({
   exceed: tt('数量超过了该批号的可用量'),
   'no-cand': tt('请先扫码选中一个物料'),
   'no-warehouse': tt('请选择退到哪个仓库'),
+  'no-docno': tt('请扫描单据二维码或输入单号'),
 }[reason] || '')
 
 /** 扫/回车:解析码 → 按存货编码查 STOCK_PICK(批号级可用量) */
@@ -220,6 +248,13 @@ async function onScan() {
   lastDoc.value = ''
   candidates.value = []
   candIndex.value = 0
+  // 先认**单据二维码**(YJSLIP:…):扫错地方了也要能用 —— 扫单据码就当补打印
+  if (parseSlipQr(scanText.value)) {
+    printNo.value = scanText.value
+    scanText.value = ''
+    await reprint()
+    return
+  }
   const parsed = parseBarcode(scanText.value)
   if (!parsed.ok) {
     errText.value = reasonText(parsed.reason)
@@ -334,6 +369,46 @@ function reset() {
   nextTick(() => scanInput.value?.focus?.())
 }
 
+/**
+ * 打一张单:优先发打印站点,没电脑在线就退回浏览器打印层。
+ *
+ * <p>打印**永远不该让业务回滚**(会话已经落库了),失败只提示、不抛。
+ *
+ * @param {string} kind OTHER_PICK|OTHER_RET(扫到别的种类的码时以码里的 kind 为准)
+ * @param {string} no 单号
+ * @param {string} source 来源标记(便于「自动打印」页看是谁发的)
+ */
+async function doPrint(kind, no, source) {
+  printing.value = true
+  printMsg.value = ''
+  try {
+    const r = await printSlip({ kind, docNo: no, source })
+    if (r.ok && r.mode === 'station') {
+      printMsg.value = `${tt('已发送到打印电脑')}${r.docNo ? '：' + r.docNo : ''}`
+    } else if (r.ok) {
+      printMsg.value = `${tt('已调用本机打印')}${r.docNo ? '：' + r.docNo : ''}`
+    } else {
+      printMsg.value = `${tt('打印失败')}${r.docNo ? '：' + r.docNo : ''}${r.message ? ' · ' + r.message : ''}`
+    }
+    return r
+  } finally {
+    printing.value = false
+  }
+}
+
+/** 补打印:扫码(优先按码里的种类)或手输单号(按当前页的种类) */
+async function reprint() {
+  const raw = String(printNo.value || '').trim()
+  if (!raw) {
+    errText.value = reasonText('no-docno')
+    return
+  }
+  const slip = parseSlipQr(raw)
+  const kind = slip?.kind || slipKind.value
+  const no = slip?.docNo || raw
+  await doPrint(kind, no, 'mobileOther.reprint')
+}
+
 /** 提交:保存(= 提交为待审核)一张单据;成功即清空,接着扫就是新单 */
 async function submit() {
   if (!lines.value.length) return
@@ -349,6 +424,8 @@ async function submit() {
     lastMsg.value = tt(doneMessageKey(props.side)) + (lastDoc.value ? '：' + lastDoc.value : '')
     ElMessage.success(lastMsg.value)
     reset()
+    // 🔴 提交即打印(2026-11-16 用户口径「这3个都是在提交的时候打印的」)
+    if (lastDoc.value) await doPrint(slipKind.value, lastDoc.value, 'mobileOther.submit')
   } catch (e) {
     errText.value = errMsg(e) || tt(isReturn.value ? '生成生产退料单失败' : '生成其他出库单失败')
   } finally {
@@ -389,6 +466,11 @@ async function submit() {
 .mo-line-qty { font-size: 14px; font-variant-numeric: tabular-nums; }
 .mo-foot { display: flex; gap: 10px; }
 .mo-foot :deep(.el-button) { flex: 1; }
+.mo-reprint { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--el-border-color-lighter); }
+.mo-reprint-hint { margin-left: auto; font-size: 12px; color: var(--el-text-color-secondary); }
+.mo-reprint-row { display: flex; gap: 10px; }
+.mo-reprint-row :deep(.el-input) { flex: 1; }
+.mo-print-msg { margin-top: 10px; }
 @media (max-width: 480px) {
   .mo-qty { flex-wrap: wrap; }
   .mo-qty :deep(.el-input-number) { width: 120px; }

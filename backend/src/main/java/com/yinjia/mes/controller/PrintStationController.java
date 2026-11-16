@@ -129,6 +129,13 @@ public class PrintStationController {
     private static final Map<String, String> PRINT_TYPES = new LinkedHashMap<>();
     static {
         PRINT_TYPES.put("PICK_SLIP", "生产领料单");
+        // 2026-11-16 用户口径:「其他领料,其他退料和生产退料。都要可以打印报表。(这3个都是在提交的时候打印的,
+        //   可以补打印)……打印格式和生产领料一样,只是名称不同」。
+        // 三种新报表**共用代理那套领料单版式**(纸上只是标题不同),故这里只登记类型,不改绘制分支:
+        //   类型是**派单键**(哪台电脑勾了哪种报表就打哪种),标题随任务的 `标题` 字段下发。
+        PRINT_TYPES.put("OTHER_PICK_SLIP", "其他领料单");
+        PRINT_TYPES.put("OTHER_RET_SLIP", "其他退料单");
+        PRINT_TYPES.put("MAT_RET_SLIP", "生产退料单");
     }
     /** 手机端没带 {@code 类型} 时的默认值(旧调用方兼容;现役只有领料单会入队) */
     private static final String DEFAULT_TYPE = "PICK_SLIP";

@@ -62,6 +62,15 @@
           {{ hasReturn ? doc.退料单号 : '—' }}
           <span v-if="hasReturn" class="mp-flag">{{ tt('含退料') }}</span>
         </b>
+        <!-- 补打印生产退料单(2026-11-16):退过料就能补打那张纸;打印格式与生产领料单一致 -->
+        <el-button
+          v-if="hasReturn"
+          text
+          size="small"
+          :loading="printingBack"
+          class="mp-back-print"
+          @click="reprintBackSlip"
+        >{{ tt('补打印') }}</el-button>
       </div>
       <div class="mp-kv">
         <span>{{ tt('领料进度') }}</span>
@@ -274,6 +283,7 @@ import { tt } from '@/i18n'
 import { parseMaterialCode } from '@/business/scanCode'
 import { makeBatchRows, allocateScannedFirst, allocateForQty, pickProgress, fmtQty, round4, isNonFifo } from '@/business/mobilePick'
 import { printWoQr } from '@/business/print-formats'
+import { printSlip } from '@/business/slipPrintFlow'
 import { queueToPrintStation, PRINT_TYPE_PICK_SLIP } from '@/business/printStation'
 
 const route = useRoute()
@@ -333,6 +343,8 @@ const batchRows = ref([])
 const saving = ref(false)
 const submitting = ref(false)
 const printing = ref(false)
+/** 生产退料单出纸中(与上面「打印二维码」那颗按钮分开,两个动作互不抢 loading) */
+const printingBack = ref(false)
 const errText = ref('')
 const okText = ref('')
 
@@ -757,6 +769,10 @@ async function submitReturn() {
     cur.value = null
     matText.value = ''
     await loadDoc()
+    // 🔴 提交即打印(2026-11-16 用户口径「生产退料也要打印报表,提交的时候打印」):
+    //   纸面 = 生产退料单,与「其他领料/其他退料」同一套版式,只是标题不同
+    const backNo = String(d.退料单号 || '').trim()
+    if (backNo) await printBackSlip(backNo)
   } catch (e) {
     errText.value = errMsgOf(e) || tt('退料失败')
   } finally {
@@ -764,9 +780,45 @@ async function submitReturn() {
   }
 }
 
+/**
+ * 打一张**生产退料单**纸面报表(2026-11-16)。
+ *
+ * <p>用户口径:「其他领料,其他退料和生产退料。都要可以打印报表……打印格式和生产领料一样,只是名称不同」。
+ * 生产退料与「其他退料」落同一张面板(MATERIAL_RET),区别只在标题与派单类型,
+ * 所以这里显式给 kind = MAT_RET(见 business/slipPrint.js 的三种 kind)。
+ *
+ * <p>打印是次要动作:失败只提示,绝不影响已经入库的退料。
+ */
+async function printBackSlip(no) {
+  const docNo = String(no || '').trim()
+  if (!docNo) return
+  printingBack.value = true
+  try {
+    const r = await printSlip({ kind: 'MAT_RET', docNo, source: 'mobilePick.return' })
+    if (r.ok && r.mode === 'station') okText.value = `${tt('已发送到打印电脑')}：${docNo}`
+    else if (r.ok) okText.value = `${tt('已调用本机打印')}：${docNo}`
+    else errText.value = `${tt('打印失败')}：${docNo}${r.message ? ' · ' + r.message : ''}`
+  } finally {
+    printingBack.value = false
+  }
+}
+
+/**
+ * 补打印:抬头「退料单号」旁边那颗按钮。
+ *
+ * <p>多次退料时台账里的退料单号是**逗号分隔的一串**(见 MobilePickController.appendReturnNo),
+ * 取最后一张 = 最近一次退料,与现场"刚退的那张要补打"的直觉一致。
+ */
+async function reprintBackSlip() {
+  const raw = String(doc.value?.退料单号 || '')
+  const no = raw.split(',').map((s) => s.trim()).filter(Boolean).pop() || ''
+  if (!no) { errText.value = tt('这张单还没有退料单号'); return }
+  clearMsg()
+  await printBackSlip(no)
+}
+
 /** 打印工单二维码:优先发打印站点,没在线站点就用本机打印层 */
-async function reprint() {
-  printing.value = true
+async function reprint() {  printing.value = true
   clearMsg()
   try {
     const res = await request.post('/px/mobilePick/reprint', { id: docId.value })
