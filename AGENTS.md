@@ -263,4 +263,9 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
 - **在册表台账**:**`tools/db-inuse-tables.txt`**(「确定下来的后台表」:206 张在册 + 3 张例外保留;不在册即脏数据;判定口径与逐表证据 `tools/archive/_table-audit/`、清理迁移 `tools/migrate-drop-unused-tables.sql`)
 - **代码规范与防臃肿**:**`docs/development/代码规范与防臃肿.md`**(A 分层边界/B 契约数据驱动/C 文件红线/D 反复制粘贴/E 清理与技术债台账/F 自动化防线);新代码必须满足该规范,违背即视为任务未完成
 - **工单排产看板数量口径**:**`docs/development/工单排产看板-本线任务量口径.md`**(左侧每线数字 = 顶部统计 = 右侧明细,三处同源;**改这三处数字/台账查询前必读**;台账唯一权威键 = 工单行id,存量订正迁移 `tools/migrate-wo-ledger-rowid-align-20261112.sql`)
+- **金蝶订单同步的行 id 契约**:**`docs/development/金蝶订单同步-行id稳定与下游占用.md`**
+  (订单明细行的 identity id 是 `form_flow_link.source_line_key` 与 `bl_pu_label.采购订单行id` 的唯一锚点 ⇒
+  **同步只许按「单据编号 + 行号」UPDATE 保 id,禁止整单删插**;2026-11-16 就是整单删插导致 422 条采购链占用 +
+  505 条销售链占用 + 24 条材料码失联、分批送料报文「送料行不存在或已失效」。回归脚本
+  `deploy/_test-lineupsert-20261116.mjs`;存量回填 `tools/migrate-erp-linekey-repair-20261116.sql`)
 - **踩坑台账**:`docs/development/开发与质量.md` §5.5(前端导出/探针专项:jsPDF px 单位、html2canvas、`$el` fragment 锚点、离屏克隆全宽截图、PS 命令通道 CJK 键、`char(2)` 尾空格等)**涉 PDF 生成/截图导出/CDP 探针/PS 工具脚本/定长列比较,先读该节再动手,违者即重复事故**
