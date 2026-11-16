@@ -77,6 +77,27 @@ test('④ 原生打印期间把单号写回打印标题(另存 PDF 文件名不�
   // 改走原生打印后没人设标题 ⇒ 单号丢。这里钉住:打印期间设标题、afterprint 恢复。
   const print = fnBlock(list, 'printApprovalSheet')
   assert.match(print, /document\.title = `\$\{panelName/, '打印期间要有「面板名-…」标题')
-  assert.match(print, /单据编号/, '标题里的单号取自「单据编号」')
+  // 单号取数只认 curDocNo(4800 行的 computed,「单据编号」→「编号」兜底在那里),
+  // 不许在打印里再写一份平行实现(2026-11-16 审查整改)。
+  assert.match(print, /const docNo = curDocNo\.value/, '标题里的单号取自既有 curDocNo')
+  assert.ok(!/cur\.value\?\.\['单据编号'\]/.test(print), '不许在 printApprovalSheet 里重写单号取数逻辑')
   assert.match(print, /document\.title = prevTitle/, '打印结束要恢复原标题(别污染标签页)')
+})
+
+test('⑤ 横版纸面(fi/lp)靠自身 @media print 适配纸宽,不读 --print-zoom', () => {
+  // 2026-11-16 审查更正:这两张纸的打印适配是 `.fi-sheet/.lp-sheet { width:100% }` +
+  //   `表格 { min-width:0; width:100% }`(组件自己的 @media print),**不消费 --print-zoom**
+  //   (该变量只被 .rsp-sheet / record-sheet 读) ⇒ printApprovalSheet 里算的 zoom 与
+  //   该分支的 A4_CONTENT_PX 对它们是空转。这里钉住"不要为横幅纸面去改这个常量"。
+  const fi = readFileSync(new URL('../qc/QcFirstInspSheet.vue', import.meta.url), 'utf8')
+  assert.match(fi, /body\.approval-printing \.fi-sheet \{[\s\S]{0,300}width: 100% !important/,
+    '首件检验单打印态靠 width:100% 适配纸宽')
+  assert.doesNotMatch(fi, /var\(--print-zoom/, '首件检验单不消费 --print-zoom(改常量对它无效)')
+  const print = fnBlock(list, 'printApprovalSheet')
+  const at = print.indexOf("classList.contains('fi-sheet')")
+  assert.ok(at >= 0, '要识别首件检验单纸面')
+  const branch = print.slice(at, at + 700)
+  assert.doesNotMatch(branch, /A4_CONTENT_PX = /,
+    '横版分支不要改 A4_CONTENT_PX —— 这两张纸不读 --print-zoom,改了是空转')
+  assert.match(branch, /size: A4 landscape/, '仍然注入横版 @page')
 })

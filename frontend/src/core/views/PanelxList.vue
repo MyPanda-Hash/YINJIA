@@ -9536,6 +9536,9 @@ async function printApprovalSheet() {
     // 首件检验单 / 巡线记录表(2026-11-16「打印不全」修版):这两张是**A4 横版**宽表纸样。
     // 全局 @page 恰好是 landscape(见 QcLinePatrolSheet),但那条规则靠 CSS 顺序,换构建顺序就翻车;
     // 这里显式注入,保证「打印 / 打印预览」两处方向一致、宽表不被竖版裁掉。
+    // ⚠ 不要顺手改上面的 A4_CONTENT_PX(2026-11-16 审查确认):这两张纸在 @media print 里是
+    //   `width:100% + 表格 min-width:0` 自适应纸宽,**不读 --print-zoom**(该变量只被 .rsp-sheet
+    //   与 record-sheet 消费),这里算出的 zoom 对它们不生效 —— 改常量是空转,别被"纸型"骗了。
     sgPageStyle = document.createElement('style')
     sgPageStyle.id = 'qc-wide-print-page'
     sgPageStyle.textContent = '@page { size: A4 landscape; margin: 8mm; }'
@@ -9571,7 +9574,7 @@ async function printApprovalSheet() {
    * 2026-11-16 改为复用原生打印通道后没人设标题 ⇒ 另存出来的 PDF 只剩页面标题、单号丢了。
    * 这里在打印期间设同样的标题,afterprint 恢复标签页原标题(与 printInPage 同一口径)。
    */
-  const docNo = String(cur.value?.['单据编号'] || cur.value?.['编号'] || '').trim()
+  const docNo = curDocNo.value.trim()   // 取数口径唯一真源见 4800 行 curDocNo(不要另写一份)
   const prevTitle = document.title
   document.title = `${panelName.value || panelCode.value}${docNo ? '-' + docNo : ''}`
   const restore = () => {
