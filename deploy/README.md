@@ -269,7 +269,9 @@ Unregister-ScheduledTask JdySalOrderSync -Confirm:$false   # 删除任务
 | delivery_date / inv_qty / comment | 预计交货日期 / 现存量 / 备注 |
 
 品牌/部门负责人/项目星辰无对应字段,置 NULL。写库统一 `asp_user1='jdy-sync'` 留痕;
-更新时行表按单据编号先删后插(与头表同一事务)。
+更新时**行表按(单据编号 + 行号)合并、保住行 id**(头表同一事务;2026-11-16 起,见
+`docs/development/金蝶订单同步-行id稳定与下游占用.md` —— 以前是"整单先删后插",每同步一次换一批
+行 id,MES 的行级占用 `form_flow_link.source_line_key` 与材料码 `bl_pu_label.采购订单行id` 就认不出原来那行)。
 
 | 星辰 material_entity | 本地 bl_pu_order |
 |---|---|
