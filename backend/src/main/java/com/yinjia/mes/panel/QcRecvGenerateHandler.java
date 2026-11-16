@@ -116,7 +116,10 @@ public class QcRecvGenerateHandler implements PanelActionHandler {
                 double qty = e.getValue() == null ? 0d : e.getValue();
                 if (qty <= EPS) continue;                       // 本次不送
                 Map<String, Object> r = byKey.get(e.getKey());
-                if (r == null) throw new IllegalStateException("送料行不存在或已失效:" + e.getKey());
+                // 行键 = `单号#行id`;弹窗是打开那一刻的快照,之后来源单在金蝶被改/行被重建就对不上。
+                // 提示里直接给出唯一可行的操作(根因修复见 deploy/sync-core.mjs 的 upsertLines)。
+                if (r == null) throw new IllegalStateException("送料行不存在或已失效:" + e.getKey()
+                        + "(打开弹窗后该单据有变动或明细行被重建,请关闭本窗口重新打开后再生单)");
                 double cap = numOf(r.get("可送上限"));
                 if (qty > cap + EPS) {
                     // 暂收单明细的「行号」实测可能为空(金蝶导入的行没有 seq),别把提示写成「第 null 行」

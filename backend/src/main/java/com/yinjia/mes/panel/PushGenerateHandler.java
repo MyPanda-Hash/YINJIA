@@ -619,7 +619,11 @@ public class PushGenerateHandler implements PanelActionHandler {
                 double qty = e.getValue() == null ? 0d : e.getValue();
                 if (qty <= 0.000001) continue;                       // 本次不送
                 Map<String, Object> r = byKey.get(lineKey);
-                if (r == null) throw new IllegalStateException("送料行不存在或已失效:" + lineKey);
+                // 2026-11-16:以前只说"不存在或已失效",现场只能猜。行键 = `单号#行id`,而弹窗是打开
+                // 那一刻的快照 —— 打开之后该单在金蝶被改/明细行被重建(同步),行 id 就对不上了。
+                // 所以把唯一可行的操作写进提示(根因修复见 deploy/sync-core.mjs 的 upsertLines)。
+                if (r == null) throw new IllegalStateException("送料行不存在或已失效:" + lineKey
+                        + "(打开弹窗后该订单在金蝶有变动或明细行被重建,请关闭本窗口重新打开后再送料)");
                 Map<String, Object> m = sourceItemOf(srcItems, orderKeyOf(lineKey));
                 if (m == null) throw new IllegalStateException("送料行对应的来源明细已不存在:" + lineKey);
                 boolean isolated = isIsolatedKey(lineKey);
@@ -1319,7 +1323,9 @@ public class PushGenerateHandler implements PanelActionHandler {
                 double qty = e.getValue() == null ? 0d : e.getValue();
                 if (qty <= 0.000001) continue;
                 Map<String, Object> r = byKey.get(lineKey);
-                if (r == null) throw new IllegalStateException("送料行不存在或已失效:" + lineKey);
+                // 同 generateBatch:行键对不上通常是"打开弹窗后金蝶又改了这张单",把处置办法写清楚
+                if (r == null) throw new IllegalStateException("送料行不存在或已失效:" + lineKey
+                        + "(打开弹窗后该订单在金蝶有变动或明细行被重建,请关闭本窗口重新打开后再送料)");
                 Map<String, Object> item = sourceItemOf(srcItems, orderKeyOf(lineKey));
                 if (item == null) throw new IllegalStateException("送料行对应的来源明细已不存在:" + lineKey);
                 double cap = isIsolatedKey(lineKey) ? numOf(r.get("剩余数量")) : numOf(r.get("可送上限"));

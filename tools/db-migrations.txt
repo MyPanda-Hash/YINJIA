@@ -4913,3 +4913,9 @@ migrate-sample-insp-module-20261116.sql
 #   现在按配置派单、落库,代理回来第一次 /pending 按 id 顺序补打;默认保留 3 天 = 72 小时(print.cache_hours,用户口径「补打印保留3天」)。
 #   含中文注明(表+15 列)、pk/ix 命名与末尾自检(关键列 5/5、索引 1/1、注明 ≥15)。两账套已执行
 migrate-print-task-cache-20261116.sql
+
+# 2026-11-16 「金蝶同步重建订单明细行 → 下游单据认不出原来那行」的存量回填(form_flow_link 占用 +
+#   bl_pu_label 材料码):根因在 deploy/sync-core.mjs upsertLines()(改按 单据编号+行号 合并、保住 identity id);
+#   本脚本把已经断掉的占用按「目标行采购订单行号 / 采购入库源单行号 / 同单物料唯一」逐级接回现行行 id,
+#   销售链按「同单存货唯一」回填;认不出来的留在原地并报数(不猜)。单事务,自检不过整体回滚。
+migrate-erp-linekey-repair-20261116.sql
