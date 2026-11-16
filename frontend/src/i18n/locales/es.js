@@ -2616,6 +2616,8 @@ export default {
     '生产领料明细表': 'Detalles de retirada de producción',
     '生产退料明细表': 'Detalles de devolución de producción',
     '生产退料单': 'Nota de devolución de producción',
+    '输入单号或关键字查询': 'Introduzca número o palabra clave',
+    '点单据进明细页，在那里打印或补打印': 'Toque un documento para abrir el detalle: imprima o reimprima allí',
     '扫单据二维码、输入单号或关键字': 'Escanee el QR o introduzca número de documento / palabra clave',
     '扫码 = 查询:扫纸上的二维码可直接定位那张单，再点「补打印」': 'Escanear = buscar: el QR del papel localiza ese documento; luego pulse «Reimprimir»',
     '没有单据': 'Sin documentos',

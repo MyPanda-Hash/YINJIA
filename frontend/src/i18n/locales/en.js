@@ -2714,6 +2714,8 @@ export default {
     '生产领料明细表': 'Production Picking Details',
     '生产退料明细表': 'Production Return Details',
     '生产退料单': 'Production Return Note',
+    '输入单号或关键字查询': 'Enter a document no. or keyword',
+    '点单据进明细页，在那里打印或补打印': 'Tap a document to open its details — print or reprint there',
     '扫单据二维码、输入单号或关键字': 'Scan the slip QR code, or enter a document no. / keyword',
     '扫码 = 查询:扫纸上的二维码可直接定位那张单，再点「补打印」': 'Scan = search: scanning the QR on the slip locates that document — then tap "Reprint"',
     '没有单据': 'No documents',

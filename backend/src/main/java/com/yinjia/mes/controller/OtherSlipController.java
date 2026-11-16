@@ -84,17 +84,35 @@ public class OtherSlipController {
         if (rows.isEmpty()) {
             throw new IllegalArgumentException("单据 " + no + " 没有明细行(单号写错或单据已删除)");
         }
+        // 明细页要显示的抬头信息:状态 / 创建人 / 数量合计(一次给全,页面只调这一个接口)
+        fillMeta(out, panel, no, rows);
         return ApiResult.ok(out);
+    }
+
+    /** 补齐明细页抬头:单据状态 / 创建人 / 创建时间 / 数量合计 */
+    private void fillMeta(Map<String, Object> out, String panel, String no, List<Map<String, Object>> rows) {
+        double sum = 0;
+        for (Map<String, Object> r : rows) {
+            Object q = r.get("实发数量");
+            if (q instanceof Number n) sum += n.doubleValue();
+        }
+        out.put("数量合计", sum);
+        List<Map<String, Object>> st = jdbc.queryForList(
+                "SELECT shr, pending, canceled FROM dbo.yj_doc_status WHERE panel_code = ? AND doc_no = ?", panel, no);
+        Map<String, Object> s = st.isEmpty() ? Map.of() : st.get(0);
+        out.put("单据状态", statusOf(s));
     }
 
     /** 其他出库单(其他领料):头 = bd_other_out,行 = bl_other_out */
     private void fillOtherOut(Map<String, Object> out, String no) {
         List<Map<String, Object>> head = jdbc.queryForList(
-                "SELECT TOP 1 单据日期, 部门, 经手人 FROM dbo.bd_other_out"
+                "SELECT TOP 1 单据日期, 部门, 经手人, asp_user1, asp_time1 FROM dbo.bd_other_out"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (head.isEmpty()) throw new IllegalArgumentException("没有找到其他出库单 " + no);
         Map<String, Object> h = head.get(0);
         out.put("单据日期", str(h.get("单据日期")));
+        out.put("创建人", str(h.get("asp_user1")));
+        out.put("创建时间", str(h.get("asp_time1")));
         // 纸面「领料部门」:部门优先,部门没填就退到经手人(现场至少看得出是谁领的)
         String dept = str(h.get("部门"));
         out.put("部门", dept.isEmpty() ? str(h.get("经手人")) : dept);
@@ -114,11 +132,13 @@ public class OtherSlipController {
     /** 生产退料单(其他退料 / 生产退料):头 = bd_material_ret,行 = bl_material_ret */
     private void fillMaterialRet(Map<String, Object> out, String no) {
         List<Map<String, Object>> head = jdbc.queryForList(
-                "SELECT TOP 1 单据日期, 领用人, 加工单号 FROM dbo.bd_material_ret"
+                "SELECT TOP 1 单据日期, 领用人, 加工单号, asp_user1, asp_time1 FROM dbo.bd_material_ret"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (head.isEmpty()) throw new IllegalArgumentException("没有找到生产退料单 " + no);
         Map<String, Object> h = head.get(0);
         out.put("单据日期", str(h.get("单据日期")));
+        out.put("创建人", str(h.get("asp_user1")));
+        out.put("创建时间", str(h.get("asp_time1")));
         out.put("部门", str(h.get("领用人")));
         // 生产退料单可能带工单号(手机扫码生产退料那条链路会写);有就带出去让纸面能对上工单
         out.put("工单号", str(h.get("加工单号")));
@@ -135,7 +155,10 @@ public class OtherSlipController {
         out.put("明细", rows);
     }
 
-    /** 一行 → 代理要的键(材料名称/规格/单位/请领数量/实发数量/备注) */
+    /**
+     * 一行 → 打印代理要的键(材料名称/规格/单位/请领数量/实发数量/备注),
+     * 另附**明细页**要的键(物料编码/批号/仓库) —— 代理只读它认识的那几个,多给的键不影响出纸。
+     */
     private static Map<String, Object> row(String name, String spec, String uom, Object qty,
                                            String lot, String wh, String code) {
         Map<String, Object> r = new LinkedHashMap<>();
@@ -149,6 +172,10 @@ public class OtherSlipController {
         String note = lot;
         if (!wh.isEmpty()) note = note.isEmpty() ? wh : note + " / " + wh;
         r.put("备注", note);
+        // 明细页用(分开显示,比挤在备注里好读)
+        r.put("物料编码", code);
+        r.put("批号", lot);
+        r.put("仓库", wh);
         return r;
     }
 
@@ -223,12 +250,25 @@ public class OtherSlipController {
      *
      * <p>为什么按这个顺序判定:作废是终态、压过一切;`shr`(审核人)有值即已审核;
      * `pending='Y'` 是「已提交、等审批」(手机端 callButton 保存 → 提交就是这一档)。
+     *
+     * <p>入参两种键名都认:列表查询里是中文别名(作废/审核人/待审),
+     * 明细页取的是原始列名(canceled/shr/pending)。
      */
     private static String statusOf(Map<String, Object> r) {
-        if ("Y".equalsIgnoreCase(str(r.get("作废")))) return "已作废";
-        if (!str(r.get("审核人")).isEmpty()) return "已审核";
-        if ("Y".equalsIgnoreCase(str(r.get("待审")))) return "待审核";
+        if ("Y".equalsIgnoreCase(pick(r, "作废", "canceled"))) return "已作废";
+        if (!pick(r, "审核人", "shr").isEmpty()) return "已审核";
+        if ("Y".equalsIgnoreCase(pick(r, "待审", "pending"))) return "待审核";
         return "草稿";
+    }
+
+    /** 按候选键名取第一个非空值(trim 成字符串) */
+    private static String pick(Map<String, Object> r, String... keys) {
+        if (r == null) return "";
+        for (String k : keys) {
+            String v = str(r.get(k));
+            if (!v.isEmpty()) return v;
+        }
+        return "";
     }
 
     /** 一次最多列多少条(手机屏幕翻不了太多;要更久的用关键字查) */

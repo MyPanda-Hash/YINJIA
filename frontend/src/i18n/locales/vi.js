@@ -2621,6 +2621,8 @@ export default {
     '生产领料明细表': 'Chi tiết xuất vật tư sản xuất',
     '生产退料明细表': 'Chi tiết trả vật tư sản xuất',
     '生产退料单': 'Phiếu trả vật tư sản xuất',
+    '输入单号或关键字查询': 'Nhập số phiếu hoặc từ khóa',
+    '点单据进明细页，在那里打印或补打印': 'Chạm vào phiếu để mở chi tiết — in hoặc in lại tại đó',
     '扫单据二维码、输入单号或关键字': 'Quét mã QR hoặc nhập số phiếu/từ khóa',
     '扫码 = 查询:扫纸上的二维码可直接定位那张单，再点「补打印」': 'Quét = tìm kiếm: quét QR trên phiếu để tới phiếu đó, rồi bấm "In lại"',
     '没有单据': 'Không có phiếu',

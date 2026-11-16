@@ -118,9 +118,9 @@
       </el-button>
     </div>
 
-    <!-- 历史单据 + 查询(2026-11-16 第二轮用户口径:「显示历史单据,扫码相当于查询,和生产领料一样」)
-         形态照「生产领料」列表页:上面一个查询框(可扫码),下面按单据状态分组、每组可折叠;
-         每条单据带「补打印」与「查看明细」—— 扫码只是**查询定位**,出纸点按钮,不会扫一下就乱吐纸。 -->
+    <!-- 历史单据 + 查询(2026-11-16 第二轮「显示历史单据,扫码相当于查询」;
+         第三轮用户口径:「点击进明细界面再打印……补打印就不要扫码了,就查询补打印就可以」)
+         ⇒ 列表只负责**查 + 点进去**;打印移到明细页(MobileOtherDoc),不再有行内按钮、也不再扫码补打。 -->
     <section class="mo-hist">
       <div class="mo-list-head">
         <span>{{ tt('查询单据') }}</span>
@@ -129,14 +129,14 @@
       <div class="mo-hist-row">
         <el-input
           v-model="keyword"
-          :placeholder="tt('扫单据二维码、输入单号或关键字')"
+          :placeholder="tt('输入单号或关键字查询')"
           clearable
           size="large"
           @keyup.enter="onQuery"
         />
         <el-button size="large" :loading="listLoading" @click="onQuery">{{ tt('查询') }}</el-button>
       </div>
-      <div class="mo-hist-hint">{{ tt('扫码 = 查询:扫纸上的二维码可直接定位那张单，再点「补打印」') }}</div>
+      <div class="mo-hist-hint">{{ tt('点单据进明细页，在那里打印或补打印') }}</div>
       <el-alert v-if="printMsg" :title="printMsg" type="info" :closable="false" show-icon class="mo-print-msg" />
 
       <div v-for="g in groups" :key="g.key" class="mo-grp">
@@ -152,10 +152,12 @@
             :key="d.单据编号"
             class="mo-doc"
             :class="{ hit: d.单据编号 === located }"
+            @click="openDoc(d.单据编号)"
           >
             <div class="mo-doc-l1">
               <span class="mo-doc-no mono">{{ d.单据编号 }}</span>
               <span class="mo-doc-state">{{ tt(d.单据状态) }}</span>
+              <span class="mo-doc-arrow">›</span>
             </div>
             <div class="mo-doc-l2">
               <span>{{ d.单据日期 || '—' }}</span>
@@ -164,21 +166,6 @@
             <div class="mo-doc-l3">
               <span>{{ d.部门 || '—' }}</span>
               <span>{{ d.创建人 || '' }} {{ d.创建时间 || '' }}</span>
-            </div>
-            <div class="mo-doc-ops">
-              <el-button text size="small" :loading="printingDoc === d.单据编号" @click="reprintDoc(d.单据编号)">
-                {{ tt('补打印') }}
-              </el-button>
-              <el-button text size="small" @click="toggleDetail(d.单据编号)">
-                {{ detailOf[d.单据编号] ? tt('收起明细') : tt('查看明细') }}
-              </el-button>
-            </div>
-            <div v-if="detailOf[d.单据编号]" class="mo-doc-detail">
-              <div v-for="(r, i) in detailOf[d.单据编号]" :key="i" class="mo-doc-line">
-                <span class="mo-doc-line-name">{{ r.材料名称 }}</span>
-                <span class="mo-doc-line-meta">{{ r.规格 || '—' }} · {{ r.单位 }}</span>
-                <span class="mo-doc-line-qty">{{ fmt(r.实发数量) }}</span>
-              </div>
             </div>
           </div>
         </template>
@@ -193,6 +180,7 @@
  * 由路由 props 注入(见 router/index.js 两条静态路由),不在这里猜。
  */
 import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { tt } from '@/i18n'
 import { useUserStore } from '@/stores/user'
@@ -202,8 +190,7 @@ import {
   SIDE_RET, isRet, panelOfSide, titleOfSide, checkQty, mergeLine, buildForm,
   doneMessageKey,
 } from '@/business/scanOther'
-import { parseSlipQr } from '@/business/slipPrint'
-import { printSlip, fetchSlipData } from '@/business/slipPrintFlow'
+import { printSlip } from '@/business/slipPrintFlow'
 import request from '@core/request'
 
 const props = defineProps({
@@ -232,19 +219,18 @@ const lines = ref([])
 const lastDoc = ref('')
 const lastMsg = ref('')
 
-// 打印(2026-11-16):提交即打印 + 补打印。kind 决定纸面标题与派单类型(见 business/slipPrint.js)
+// 打印(2026-11-16):提交即打印;补打印在**明细页**(MobileOtherDoc)里做。kind 决定纸面标题与派单类型
 const printing = ref(false)
 const printMsg = ref('')
-const printingDoc = ref('')
 const slipKind = computed(() => (isReturn.value ? 'OTHER_RET' : 'OTHER_PICK'))
 
-// 历史单据(2026-11-16 第二轮):查询框 + 按状态分组的列表;扫码 = 查询定位
+// 历史单据(2026-11-16 第二轮):查询框 + 按状态分组的列表;点一行进明细页
 const keyword = ref('')
 const listLoading = ref(false)
 const docs = ref([])
-const located = ref('')                 // 扫码定位到的那张单(高亮)
-const detailOf = ref({})                // 单号 → 明细行(按需取)
+const located = ref('')                 // 刚提交/刚查到的那张单(高亮)
 const openGroups = ref({ 待审核: true, 已审核: true, 已作废: false })
+const router = useRouter()
 
 /**
  * 列表分组:待审核(含草稿) / 已审核 / 已作废 —— 空组不显示(已作废除外,永远留一格)。
@@ -324,13 +310,7 @@ async function onScan() {
   lastDoc.value = ''
   candidates.value = []
   candIndex.value = 0
-  // 先认**单据二维码**(YJSLIP:…):扫单据码 = 查询那张单(不是直接出纸,见 onQuery 注释)
-  if (parseSlipQr(scanText.value)) {
-    keyword.value = scanText.value
-    scanText.value = ''
-    await onQuery()
-    return
-  }
+  // 本页的扫码框**只认物料码**(2026-11-16 第三轮:补打印改走查询,不再扫单据码)
   const parsed = parseBarcode(scanText.value)
   if (!parsed.ok) {
     errText.value = reasonText(parsed.reason)
@@ -497,59 +477,24 @@ async function loadList() {
 }
 
 /**
- * 查询(扫码=查询):扫到单据二维码就按单号精确定位并高亮,否则按关键字查。
+ * 查询:按单号/关键字查(2026-11-16 第三轮用户口径「补打印就不要扫码了,就查询补打印就可以」)。
  *
- * <p>⚠ 扫描**只定位不出纸** —— 出纸要点那一行的「补打印」。
- * 以前扫到码就直接打印,现场把纸放在桌上被扫到时白吐一张,还会把打印队列挤掉真正要打的那张。
+ * <p>⚠ 本页**不再解析单据二维码**:扫码补打印那条路撤掉了 —— 现场更常用的是直接敲单号,
+ * 纸上的 `YJSLIP` 码仍印(单据身份),但手机端不靠它。
  */
 async function onQuery() {
-  const raw = String(keyword.value || '').trim()
-  const slip = parseSlipQr(raw)
   located.value = ''
-  if (slip) {
-    // 码里带种类与单号:种类以码为准(可能是在另一个页面的单),单号拿去精确查
-    keyword.value = slip.docNo
-    located.value = slip.docNo
-  }
   await loadList()
-  const hit = docs.value.find((d) => d['单据编号'] === located.value)
-  if (hit) {
-    // 命中的那一组自动展开,不用再点一下
-    const k = hit['单据状态'] === '已作废' ? '已作废' : (hit['单据状态'] === '已审核' ? '已审核' : '待审核')
-    openGroups.value = { ...openGroups.value, [k]: true }
-  } else if (located.value) {
-    errText.value = `${tt('没有找到这张单据')}:${located.value}`
-  }
 }
 
 function toggleGroup(key) {
   openGroups.value = { ...openGroups.value, [key]: !openGroups.value[key] }
 }
 
-/** 补打印某一张(列表每行一个按钮) */
-async function reprintDoc(no) {
-  printingDoc.value = no
-  try {
-    await doPrint(slipKind.value, no, 'mobileOther.reprint')
-  } finally {
-    printingDoc.value = ''
-  }
-}
-
-/** 展开/收起某张单的明细(按需取,不在列表接口里带 —— 一条单几十行会把列表拖慢) */
-async function toggleDetail(no) {
-  if (detailOf.value[no]) {
-    const next = { ...detailOf.value }
-    delete next[no]
-    detailOf.value = next
-    return
-  }
-  try {
-    const data = await fetchSlipData({ kind: slipKind.value, docNo: no })
-    detailOf.value = { ...detailOf.value, [no]: Array.isArray(data['明细']) ? data['明细'] : [] }
-  } catch (e) {
-    errText.value = errMsg(e) || tt('取单据明细失败')
-  }
+/** 点一行 → 单据明细页(在那里看明细、点「打印」出纸) */
+function openDoc(no) {
+  const base = isReturn.value ? 'MOBILE_OTHER_RET' : 'MOBILE_OTHER_PICK'
+  router.push({ path: `/panelx/list/${base}/doc`, query: { no: String(no || '').trim() } })
 }
 
 /** 提交:保存(= 提交为待审核)一张单据;成功即清空,接着扫就是新单 */
@@ -625,19 +570,15 @@ async function submit() {
 .mo-grp-arrow { margin-left: auto; color: var(--el-text-color-secondary); transition: transform 0.15s; }
 .mo-grp-arrow.open { transform: rotate(90deg); }
 .mo-empty { padding: 14px 0; text-align: center; font-size: 13px; color: var(--el-text-color-secondary); }
-.mo-doc { padding: 10px 8px; border-bottom: 1px dashed var(--el-border-color-lighter); border-radius: 4px; }
+.mo-doc { padding: 10px 8px; border-bottom: 1px dashed var(--el-border-color-lighter); border-radius: 4px; cursor: pointer; }
+.mo-doc:hover { background: var(--el-fill-color-lighter); }
 .mo-doc.hit { background: var(--el-color-primary-light-9); }
 .mo-doc-l1 { display: flex; align-items: center; gap: 8px; }
 .mo-doc-no { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .mo-doc-state { margin-left: auto; font-size: 12px; padding: 0 6px; border-radius: 8px; background: var(--el-fill-color); color: var(--el-text-color-regular); }
+.mo-doc-arrow { color: var(--el-text-color-secondary); font-size: 15px; }
 .mo-doc-l2, .mo-doc-l3 { margin-top: 3px; display: flex; gap: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
 .mo-doc-l3 { word-break: break-all; }
-.mo-doc-ops { margin-top: 4px; display: flex; gap: 6px; }
-.mo-doc-detail { margin-top: 6px; padding: 6px 8px; background: var(--el-fill-color-lighter); border-radius: 4px; }
-.mo-doc-line { display: flex; gap: 10px; font-size: 12px; padding: 3px 0; }
-.mo-doc-line-name { flex: 1; min-width: 0; word-break: break-all; }
-.mo-doc-line-meta { color: var(--el-text-color-secondary); }
-.mo-doc-line-qty { font-variant-numeric: tabular-nums; }
 @media (max-width: 480px) {
   .mo-qty { flex-wrap: wrap; }
   .mo-qty :deep(.el-input-number) { width: 120px; }

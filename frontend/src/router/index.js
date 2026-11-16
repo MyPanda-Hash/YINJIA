@@ -178,6 +178,21 @@ const routes = [
         props: { side: 'ret' },
         meta: { title: '其他退料', code: 'mobileOtherRet', panelCode: 'MATERIAL_RET' },
       },
+      // 其他领料 / 其他退料的**单据明细页**(2026-11-16 第三轮用户口径:
+      //   「点击进明细界面再打印,前端设计可以和生产领料一致。只是功能不同,
+      //     补打印就不要扫码了,就查询补打印就可以。」)。
+      //   列表页点一行 → 带 ?no=单号 进来 → 核一眼明细 → 在这点「打印」出纸(补打印同此)。
+      //   必须排在 `panelx/list/:panelCode` 之前(与上面两条同理)。
+      {
+        path: 'panelx/list/MOBILE_OTHER_PICK/doc', component: () => import('@/views/mobile/MobileOtherDoc.vue'),
+        props: { side: 'pick' },
+        meta: { title: '其他领料单', code: 'mobileOtherPickDoc', panelCode: 'OTHER_OUT' },
+      },
+      {
+        path: 'panelx/list/MOBILE_OTHER_RET/doc', component: () => import('@/views/mobile/MobileOtherDoc.vue'),
+        props: { side: 'ret' },
+        meta: { title: '其他退料单', code: 'mobileOtherRetDoc', panelCode: 'MATERIAL_RET' },
+      },
       // 工序报工(2026-10-21 原样搬迁,页面逻辑一行不动):扫工单 → 选工序 → 填完工数量 → 提交。
       {
         path: 'panelx/list/MOBILE_REPORT', component: () => import('@/views/mobile/MobileReport.vue'),

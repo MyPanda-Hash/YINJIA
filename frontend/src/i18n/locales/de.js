@@ -2616,6 +2616,8 @@ export default {
     '生产领料明细表': 'Produktionsentnahme Details',
     '生产退料明细表': 'Produktionsrückgabe Details',
     '生产退料单': 'Produktionsrückgabe-Beleg',
+    '输入单号或关键字查询': 'Belegnummer oder Suchwort eingeben',
+    '点单据进明细页，在那里打印或补打印': 'Beleg antippen → Detailseite öffnen – dort drucken oder nachdrucken',
     '扫单据二维码、输入单号或关键字': 'QR-Code scannen oder Belegnummer/Suchwort eingeben',
     '扫码 = 查询:扫纸上的二维码可直接定位那张单，再点「补打印」': 'Scannen = Suchen: der QR-Code auf dem Beleg springt zu diesem Beleg – dann „Nachdruck" tippen',
     '没有单据': 'Keine Belege',
