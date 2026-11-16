@@ -6209,7 +6209,8 @@ export default {
     "测试周期": "Test Cycle",
     "收费": "Fee",
     "尚未从送样登记表带入检验项目": "No inspection items imported from the Sample Submission Register yet",
-    "合计收费：": "Total Fee:",
+    // 2026-11-16 用户口径:合计收费 → 总金额(含增值税 6%),金额 = 行表收费合计 × 1.06
+    "总金额（含增值税6%）RMB：": "Total Amount (incl. 6% VAT) RMB:",
     "样品处理方式": "Sample Disposal Method",
     "（任选其一）": "(choose one)",
     "备注：": "Remark:",

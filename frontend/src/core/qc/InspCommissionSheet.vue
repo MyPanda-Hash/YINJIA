@@ -226,7 +226,7 @@
             <div v-else class="ic-items-empty">{{ tt('尚未从送样登记表带入检验项目') }}</div>
 
             <div v-if="items.length" class="ic-items-total">
-              {{ tt('合计收费：') }}<span class="ic-items-total-val">{{ feeTotalText }}</span>
+              {{ tt('总金额（含增值税6%）RMB：') }}<span class="ic-items-total-val">{{ feeTotalText }}</span>
             </div>
           </td>
         </tr>
@@ -442,6 +442,7 @@
 import { computed, ref, watch } from 'vue'
 import { tt } from '@/i18n'
 import SampleCatalogPickDialog from './SampleCatalogPickDialog.vue'
+import { vatTotalText } from './inspCommissionVat'
 
 const props = defineProps({
   /** 当前单据(与首件/巡线/出厂检验同一口径:表头字段平铺 + detail.items 明细行) */
@@ -592,12 +593,22 @@ function feeTextOf(row) {
   return ''
 }
 
-/** 合计收费 = 行表「收费」求和(两位小数) */
+/** 行表收费合计(净额;含税换算在 inspCommissionVat.js,金额口径有单测) */
 const feeTotal = computed(() => {
   bump.value
   return items.value.reduce((sum, row) => sum + feeOf(row), 0)
 })
-const feeTotalText = computed(() => feeTotal.value.toFixed(2))
+
+/** 一行行表 → 含税总金额文本(2026-11-16 用户口径:原基础上 +6%) */
+function vatTotalTextOf(rows) {
+  return vatTotalText(rows.reduce((sum, row) => sum + feeOf(row), 0))
+}
+
+/** 纸面显示值 = 含税总金额(不是净额) */
+const feeTotalText = computed(() => {
+  bump.value
+  return vatTotalTextOf(items.value)
+})
 
 /** 取某一列去重后的非空值(保持行表顺序) */
 function uniqueOf(rows, key) {
@@ -621,14 +632,15 @@ function renumber() {
 
 /**
  * 整份行表重算三处汇总(契约 §4.2 第 2~4 条,带入与删行后都要重算):
- *   检验类别 = 检测元素去重后「、」拼接;检验依据 = 检测标准去重后「；」拼接;合计收费 = 收费求和。
+ *   检验类别 = 检测元素去重后「、」拼接;检验依据 = 检测标准去重后「；」拼接;
+ *   合计收费 = 行表「收费」求和 × (1+6%)(2026-11-16 用户口径:总金额含增值税 6%)。
  * 只写这三格,用户手填的其它表头字段一律不动。
  */
 function recomputeSummary() {
   const arr = ensureItems()
   props.head['检验类别'] = uniqueOf(arr, '检测元素').join('、')
   props.head['检验依据'] = uniqueOf(arr, '检测标准').join('；')
-  props.head['合计收费'] = arr.reduce((sum, row) => sum + feeOf(row), 0).toFixed(2)
+  props.head['合计收费'] = vatTotalTextOf(arr)
 }
 
 /** 删除一行(纸样小表可编辑时每行末「×」) */
@@ -646,7 +658,7 @@ function removeItem(index) {
 /**
  * 带入:送样登记表目录弹窗确认后的行 → 追加进本单行表(契约 §4.2)。
  *   1. 按「检测元素」去重追加(已存在的不重复),行号重排 1..n;
- *   2. 检验类别 / 检验依据 / 合计收费 按整份行表重算;
+ *   2. 检验类别 / 检验依据 / 合计收费(含 6% 增值税) 按整份行表重算;
  *   3. emit('dirty') + bump++(行对象可能 markRaw)。
  */
 function applyCarry(rows) {
@@ -797,6 +809,21 @@ watch(
   () => props.editable + '|' + docKeyOf(),
   () => {
     seedDefaultsOnce()
+  },
+  { immediate: true },
+)
+
+/**
+ * 含税总金额回写表头(2026-11-16 用户口径:合计收费 = 行表收费合计 × (1+6%))。
+ * 纸面显示本来就按行表实时算,但库里的「合计收费」可能是旧口径(净额)⇒ 打开单据时按现行口径
+ * 静默重算一次,保证后续保存/打印/审批取到的是**含税总金额**;只写这一格,不改其它字段、不标脏。
+ */
+watch(
+  () => docKeyOf() + '|' + items.value.length,
+  () => {
+    if (!props.head || !items.value.length) return
+    const next = vatTotalTextOf(items.value)
+    if (String(props.head['合计收费'] ?? '') !== next) props.head['合计收费'] = next
   },
   { immediate: true },
 )
