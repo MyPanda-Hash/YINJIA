@@ -152,6 +152,88 @@ public class OtherSlipController {
         return r;
     }
 
+    /**
+     * 历史单据(2026-11-16 第二轮用户口径:「显示历史单据,扫码相当于查询,和生产领料一样」)。
+     *
+     * <p>与「生产领料」列表页同一个形态:上面查询框(可扫码定位)、下面按状态分组列单据。
+     * 单据少而短(手机一单一单提交),故一次给最近 {@link #LIST_LIMIT} 条,不做分页。
+     *
+     * <p>🔴 **只列本页自己开的单**:其他出库单里还有 ERP 同步来的 QTCK-*、其他退料与生产退料
+     * 又落在同一张面板上,不筛的话现场翻半天找不到自己刚提交的那张。
+     * 筛法是**备注前缀**(建单时写死的「扫码其他领料(移动端)」/「扫码其他退料(移动端)」,
+     * 见 business/scanOther.js 的 buildForm) —— 不加标记列是因为这两张表是金蝶键集克隆的,
+    * 多一列就得跟着同步灌数,不值得。
+     *
+     * @param body {面板, 备注前缀?, 关键字?, 上限?}
+     * @return {list:[{单据编号,单据日期,部门,创建人,创建时间,行数,数量合计,单据状态}], 条数}
+     */
+    @PostMapping("/list")
+    public ApiResult<Map<String, Object>> list(@RequestBody Map<String, Object> body) {
+        String panel = str(body.get("面板"));
+        if (!PANELS.contains(panel)) throw new IllegalArgumentException("不支持的单据面板:" + panel);
+        perm.requirePanelView(panel);
+        String prefix = str(body.get("备注前缀"));
+        String kw = str(body.get("关键字"));
+        int limit = toInt(body.get("上限"));
+        if (limit <= 0 || limit > LIST_LIMIT) limit = LIST_LIMIT;
+
+        boolean otherOut = "OTHER_OUT".equals(panel);
+        String head = otherOut ? "dbo.bd_other_out" : "dbo.bd_material_ret";
+        String line = otherOut ? "dbo.bl_other_out" : "dbo.bl_material_ret";
+        String dept = otherOut ? "部门" : "领用人";
+
+        String sql = "SELECT TOP (" + limit + ") h.单据编号, h.单据日期, h." + dept + " AS 部门,"
+                + " h.asp_user1 AS 创建人, h.asp_time1 AS 创建时间,"
+                + " (SELECT COUNT(*) FROM " + line + " l WHERE l.单据编号 = h.单据编号"
+                + "    AND ISNULL(l.asp_cancel,'N') <> 'Y') AS 行数,"
+                + " (SELECT ISNULL(SUM(l.数量),0) FROM " + line + " l WHERE l.单据编号 = h.单据编号"
+                + "    AND ISNULL(l.asp_cancel,'N') <> 'Y') AS 数量合计,"
+                + " s.shr AS 审核人, s.pending AS 待审, s.canceled AS 作废"
+                + " FROM " + head + " h"
+                + " LEFT JOIN dbo.yj_doc_status s ON s.panel_code = ? AND s.doc_no = h.单据编号"
+                + " WHERE ISNULL(h.asp_cancel,'N') <> 'Y'"
+                + "   AND (? = N'' OR ISNULL(h.备注,N'') LIKE ? + N'%')"
+                + "   AND (? = N'' OR h.单据编号 LIKE N'%' + ? + N'%' OR ISNULL(h.备注,N'') LIKE N'%' + ? + N'%')"
+                + " ORDER BY h.id DESC";
+        List<Map<String, Object>> rows = jdbc.queryForList(sql, panel, prefix, prefix, kw, kw, kw);
+
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> r : rows) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("单据编号", str(r.get("单据编号")));
+            m.put("单据日期", str(r.get("单据日期")));
+            m.put("部门", str(r.get("部门")));
+            m.put("创建人", str(r.get("创建人")));
+            m.put("创建时间", str(r.get("创建时间")));
+            m.put("行数", toInt(r.get("行数")));
+            m.put("数量合计", r.get("数量合计"));
+            m.put("单据状态", statusOf(r));
+            out.add(m);
+        }
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("面板", panel);
+        res.put("条数", out.size());
+        res.put("list", out);
+        return ApiResult.ok(res);
+    }
+
+    /**
+     * 单据状态口径(与面板列表页显示一致):
+     * 已作废 → 已审核 → 待审核 → 草稿。
+     *
+     * <p>为什么按这个顺序判定:作废是终态、压过一切;`shr`(审核人)有值即已审核;
+     * `pending='Y'` 是「已提交、等审批」(手机端 callButton 保存 → 提交就是这一档)。
+     */
+    private static String statusOf(Map<String, Object> r) {
+        if ("Y".equalsIgnoreCase(str(r.get("作废")))) return "已作废";
+        if (!str(r.get("审核人")).isEmpty()) return "已审核";
+        if ("Y".equalsIgnoreCase(str(r.get("待审")))) return "待审核";
+        return "草稿";
+    }
+
+    /** 一次最多列多少条(手机屏幕翻不了太多;要更久的用关键字查) */
+    private static final int LIST_LIMIT = 200;
+
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> listOf(Object o) {
         return o instanceof List<?> l ? (List<Map<String, Object>>) l : List.of();
@@ -159,5 +241,14 @@ public class OtherSlipController {
 
     private static String str(Object o) {
         return o == null ? "" : String.valueOf(o).trim();
+    }
+
+    private static int toInt(Object o) {
+        if (o == null) return 0;
+        try {
+            return (int) Double.parseDouble(String.valueOf(o).trim());
+        } catch (RuntimeException e) {
+            return 0;
+        }
     }
 }

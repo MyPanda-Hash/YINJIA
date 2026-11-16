@@ -118,24 +118,72 @@
       </el-button>
     </div>
 
-    <!-- 补打印(2026-11-16):扫单据二维码,或手输单号 —— 纸质单丢了/没打出来时用 -->
-    <div class="mo-reprint">
+    <!-- 历史单据 + 查询(2026-11-16 第二轮用户口径:「显示历史单据,扫码相当于查询,和生产领料一样」)
+         形态照「生产领料」列表页:上面一个查询框(可扫码),下面按单据状态分组、每组可折叠;
+         每条单据带「补打印」与「查看明细」—— 扫码只是**查询定位**,出纸点按钮,不会扫一下就乱吐纸。 -->
+    <section class="mo-hist">
       <div class="mo-list-head">
-        <span>{{ tt('补打印') }}</span>
-        <span class="mo-reprint-hint">{{ tt('扫单据上的二维码，或直接输入单号') }}</span>
+        <span>{{ tt('查询单据') }}</span>
+        <el-button text size="small" :loading="listLoading" @click="loadList">{{ tt('刷新') }}</el-button>
       </div>
-      <div class="mo-reprint-row">
+      <div class="mo-hist-row">
         <el-input
-          v-model="printNo"
-          :placeholder="tt('扫码或输入单号（如 OO-2026-11-0005）')"
+          v-model="keyword"
+          :placeholder="tt('扫单据二维码、输入单号或关键字')"
           clearable
           size="large"
-          @keyup.enter="reprint"
+          @keyup.enter="onQuery"
         />
-        <el-button size="large" :loading="printing" @click="reprint">{{ tt('补打印') }}</el-button>
+        <el-button size="large" :loading="listLoading" @click="onQuery">{{ tt('查询') }}</el-button>
       </div>
+      <div class="mo-hist-hint">{{ tt('扫码 = 查询:扫纸上的二维码可直接定位那张单，再点「补打印」') }}</div>
       <el-alert v-if="printMsg" :title="printMsg" type="info" :closable="false" show-icon class="mo-print-msg" />
-    </div>
+
+      <div v-for="g in groups" :key="g.key" class="mo-grp">
+        <div class="mo-grp-head" @click="toggleGroup(g.key)">
+          <span class="mo-grp-title">{{ tt(g.title) }}</span>
+          <span class="mo-grp-num">{{ g.items.length }}</span>
+          <span class="mo-grp-arrow" :class="{ open: openGroups[g.key] }">›</span>
+        </div>
+        <template v-if="openGroups[g.key]">
+          <div v-if="!g.items.length" class="mo-empty">{{ tt('没有单据') }}</div>
+          <div
+            v-for="d in g.items"
+            :key="d.单据编号"
+            class="mo-doc"
+            :class="{ hit: d.单据编号 === located }"
+          >
+            <div class="mo-doc-l1">
+              <span class="mo-doc-no mono">{{ d.单据编号 }}</span>
+              <span class="mo-doc-state">{{ tt(d.单据状态) }}</span>
+            </div>
+            <div class="mo-doc-l2">
+              <span>{{ d.单据日期 || '—' }}</span>
+              <span>{{ tt('行数') }} {{ d.行数 || 0 }} · {{ tt('数量') }} {{ fmt(d.数量合计) }}</span>
+            </div>
+            <div class="mo-doc-l3">
+              <span>{{ d.部门 || '—' }}</span>
+              <span>{{ d.创建人 || '' }} {{ d.创建时间 || '' }}</span>
+            </div>
+            <div class="mo-doc-ops">
+              <el-button text size="small" :loading="printingDoc === d.单据编号" @click="reprintDoc(d.单据编号)">
+                {{ tt('补打印') }}
+              </el-button>
+              <el-button text size="small" @click="toggleDetail(d.单据编号)">
+                {{ detailOf[d.单据编号] ? tt('收起明细') : tt('查看明细') }}
+              </el-button>
+            </div>
+            <div v-if="detailOf[d.单据编号]" class="mo-doc-detail">
+              <div v-for="(r, i) in detailOf[d.单据编号]" :key="i" class="mo-doc-line">
+                <span class="mo-doc-line-name">{{ r.材料名称 }}</span>
+                <span class="mo-doc-line-meta">{{ r.规格 || '—' }} · {{ r.单位 }}</span>
+                <span class="mo-doc-line-qty">{{ fmt(r.实发数量) }}</span>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -155,7 +203,8 @@ import {
   doneMessageKey,
 } from '@/business/scanOther'
 import { parseSlipQr } from '@/business/slipPrint'
-import { printSlip } from '@/business/slipPrintFlow'
+import { printSlip, fetchSlipData } from '@/business/slipPrintFlow'
+import request from '@core/request'
 
 const props = defineProps({
   side: { type: String, default: 'pick' },
@@ -185,9 +234,32 @@ const lastMsg = ref('')
 
 // 打印(2026-11-16):提交即打印 + 补打印。kind 决定纸面标题与派单类型(见 business/slipPrint.js)
 const printing = ref(false)
-const printNo = ref('')
 const printMsg = ref('')
+const printingDoc = ref('')
 const slipKind = computed(() => (isReturn.value ? 'OTHER_RET' : 'OTHER_PICK'))
+
+// 历史单据(2026-11-16 第二轮):查询框 + 按状态分组的列表;扫码 = 查询定位
+const keyword = ref('')
+const listLoading = ref(false)
+const docs = ref([])
+const located = ref('')                 // 扫码定位到的那张单(高亮)
+const detailOf = ref({})                // 单号 → 明细行(按需取)
+const openGroups = ref({ 待审核: true, 已审核: true, 已作废: false })
+
+/**
+ * 列表分组:待审核(含草稿) / 已审核 / 已作废 —— 空组不显示(已作废除外,永远留一格)。
+ * 与「生产领料」的「未完成 / 已完成」同一形态(那边按业务阶段,这边按单据状态)。
+ */
+const groups = computed(() => {
+  const bucket = { 待审核: [], 已审核: [], 已作废: [] }
+  for (const d of docs.value) {
+    const k = d['单据状态'] === '已作废' ? '已作废' : (d['单据状态'] === '已审核' ? '已审核' : '待审核')
+    bucket[k].push(d)
+  }
+  return ['待审核', '已审核', '已作废']
+    .map((k) => ({ key: k, title: k, items: bucket[k] }))
+    .filter((g) => g.items.length || g.key === '已作废')
+})
 
 // 退料兜底:库存里没有该物料时,仓库要手选
 const warehouses = ref([])
@@ -201,7 +273,11 @@ const canAdd = computed(() => {
   return checkQty(props.side, qty.value, Number(current.value['现存量'])).ok
 })
 
-onMounted(() => nextTick(() => scanInput.value?.focus?.()))
+onMounted(() => {
+  nextTick(() => scanInput.value?.focus?.())
+  // 进页就把历史单据拉出来(生产领料同样是"上面查询、下面列单")
+  loadList()
+})
 
 const fmt = (n) => {
   const v = Number(n)
@@ -248,11 +324,11 @@ async function onScan() {
   lastDoc.value = ''
   candidates.value = []
   candIndex.value = 0
-  // 先认**单据二维码**(YJSLIP:…):扫错地方了也要能用 —— 扫单据码就当补打印
+  // 先认**单据二维码**(YJSLIP:…):扫单据码 = 查询那张单(不是直接出纸,见 onQuery 注释)
   if (parseSlipQr(scanText.value)) {
-    printNo.value = scanText.value
+    keyword.value = scanText.value
     scanText.value = ''
-    await reprint()
+    await onQuery()
     return
   }
   const parsed = parseBarcode(scanText.value)
@@ -396,17 +472,84 @@ async function doPrint(kind, no, source) {
   }
 }
 
-/** 补打印:扫码(优先按码里的种类)或手输单号(按当前页的种类) */
-async function reprint() {
-  const raw = String(printNo.value || '').trim()
-  if (!raw) {
-    errText.value = reasonText('no-docno')
+/**
+ * 历史单据(2026-11-16 第二轮):只列**本页自己开的单**。
+ *
+ * <p>为什么不列整张面板:其他出库单里还有 ERP 同步来的 `QTCK-*`,而其他退料与生产退料
+ * 又落在同一张 `MATERIAL_RET` 上 —— 不筛的话现场翻半天找不到自己刚提交的那张。
+ * 后端按**备注前缀**筛(建单时写死的「扫码其他领料(移动端)」/「扫码其他退料(移动端)」)。
+ */
+async function loadList() {
+  listLoading.value = true
+  try {
+    const res = await request.post('/px/slip/list', {
+      面板: panelOfSide(props.side),
+      备注前缀: isReturn.value ? '扫码其他退料' : '扫码其他领料',
+      关键字: String(keyword.value || '').trim(),
+    })
+    const d = res.data?.data || res.data || {}
+    docs.value = Array.isArray(d.list) ? d.list : []
+  } catch (e) {
+    errText.value = errMsg(e) || tt('查询单据失败')
+  } finally {
+    listLoading.value = false
+  }
+}
+
+/**
+ * 查询(扫码=查询):扫到单据二维码就按单号精确定位并高亮,否则按关键字查。
+ *
+ * <p>⚠ 扫描**只定位不出纸** —— 出纸要点那一行的「补打印」。
+ * 以前扫到码就直接打印,现场把纸放在桌上被扫到时白吐一张,还会把打印队列挤掉真正要打的那张。
+ */
+async function onQuery() {
+  const raw = String(keyword.value || '').trim()
+  const slip = parseSlipQr(raw)
+  located.value = ''
+  if (slip) {
+    // 码里带种类与单号:种类以码为准(可能是在另一个页面的单),单号拿去精确查
+    keyword.value = slip.docNo
+    located.value = slip.docNo
+  }
+  await loadList()
+  const hit = docs.value.find((d) => d['单据编号'] === located.value)
+  if (hit) {
+    // 命中的那一组自动展开,不用再点一下
+    const k = hit['单据状态'] === '已作废' ? '已作废' : (hit['单据状态'] === '已审核' ? '已审核' : '待审核')
+    openGroups.value = { ...openGroups.value, [k]: true }
+  } else if (located.value) {
+    errText.value = `${tt('没有找到这张单据')}:${located.value}`
+  }
+}
+
+function toggleGroup(key) {
+  openGroups.value = { ...openGroups.value, [key]: !openGroups.value[key] }
+}
+
+/** 补打印某一张(列表每行一个按钮) */
+async function reprintDoc(no) {
+  printingDoc.value = no
+  try {
+    await doPrint(slipKind.value, no, 'mobileOther.reprint')
+  } finally {
+    printingDoc.value = ''
+  }
+}
+
+/** 展开/收起某张单的明细(按需取,不在列表接口里带 —— 一条单几十行会把列表拖慢) */
+async function toggleDetail(no) {
+  if (detailOf.value[no]) {
+    const next = { ...detailOf.value }
+    delete next[no]
+    detailOf.value = next
     return
   }
-  const slip = parseSlipQr(raw)
-  const kind = slip?.kind || slipKind.value
-  const no = slip?.docNo || raw
-  await doPrint(kind, no, 'mobileOther.reprint')
+  try {
+    const data = await fetchSlipData({ kind: slipKind.value, docNo: no })
+    detailOf.value = { ...detailOf.value, [no]: Array.isArray(data['明细']) ? data['明细'] : [] }
+  } catch (e) {
+    errText.value = errMsg(e) || tt('取单据明细失败')
+  }
 }
 
 /** 提交:保存(= 提交为待审核)一张单据;成功即清空,接着扫就是新单 */
@@ -424,6 +567,10 @@ async function submit() {
     lastMsg.value = tt(doneMessageKey(props.side)) + (lastDoc.value ? '：' + lastDoc.value : '')
     ElMessage.success(lastMsg.value)
     reset()
+    // 刚提交的那张要立刻出现在下面的历史里(现场习惯:交完瞄一眼有没有进)
+    located.value = lastDoc.value
+    keyword.value = ''
+    await loadList()
     // 🔴 提交即打印(2026-11-16 用户口径「这3个都是在提交的时候打印的」)
     if (lastDoc.value) await doPrint(slipKind.value, lastDoc.value, 'mobileOther.submit')
   } catch (e) {
@@ -466,11 +613,31 @@ async function submit() {
 .mo-line-qty { font-size: 14px; font-variant-numeric: tabular-nums; }
 .mo-foot { display: flex; gap: 10px; }
 .mo-foot :deep(.el-button) { flex: 1; }
-.mo-reprint { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--el-border-color-lighter); }
-.mo-reprint-hint { margin-left: auto; font-size: 12px; color: var(--el-text-color-secondary); }
-.mo-reprint-row { display: flex; gap: 10px; }
-.mo-reprint-row :deep(.el-input) { flex: 1; }
+.mo-hist { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--el-border-color-lighter); }
+.mo-hist-row { display: flex; gap: 10px; }
+.mo-hist-row :deep(.el-input) { flex: 1; }
+.mo-hist-hint { margin-top: 6px; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.6; }
 .mo-print-msg { margin-top: 10px; }
+.mo-grp { margin-top: 14px; }
+.mo-grp-head { display: flex; align-items: center; gap: 8px; padding: 8px 0; cursor: pointer; border-bottom: 1px solid var(--el-border-color-lighter); }
+.mo-grp-title { font-size: 14px; font-weight: 600; }
+.mo-grp-num { display: inline-block; min-width: 20px; text-align: center; padding: 0 6px; border-radius: 10px; background: var(--el-color-primary-light-9); color: var(--el-color-primary); font-size: 12px; }
+.mo-grp-arrow { margin-left: auto; color: var(--el-text-color-secondary); transition: transform 0.15s; }
+.mo-grp-arrow.open { transform: rotate(90deg); }
+.mo-empty { padding: 14px 0; text-align: center; font-size: 13px; color: var(--el-text-color-secondary); }
+.mo-doc { padding: 10px 8px; border-bottom: 1px dashed var(--el-border-color-lighter); border-radius: 4px; }
+.mo-doc.hit { background: var(--el-color-primary-light-9); }
+.mo-doc-l1 { display: flex; align-items: center; gap: 8px; }
+.mo-doc-no { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mo-doc-state { margin-left: auto; font-size: 12px; padding: 0 6px; border-radius: 8px; background: var(--el-fill-color); color: var(--el-text-color-regular); }
+.mo-doc-l2, .mo-doc-l3 { margin-top: 3px; display: flex; gap: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
+.mo-doc-l3 { word-break: break-all; }
+.mo-doc-ops { margin-top: 4px; display: flex; gap: 6px; }
+.mo-doc-detail { margin-top: 6px; padding: 6px 8px; background: var(--el-fill-color-lighter); border-radius: 4px; }
+.mo-doc-line { display: flex; gap: 10px; font-size: 12px; padding: 3px 0; }
+.mo-doc-line-name { flex: 1; min-width: 0; word-break: break-all; }
+.mo-doc-line-meta { color: var(--el-text-color-secondary); }
+.mo-doc-line-qty { font-variant-numeric: tabular-nums; }
 @media (max-width: 480px) {
   .mo-qty { flex-wrap: wrap; }
   .mo-qty :deep(.el-input-number) { width: 120px; }
