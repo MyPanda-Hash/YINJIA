@@ -1,0 +1,3 @@
+﻿SET NOCOUNT ON;
+SELECT 'SRC|' + ISNULL(CAST(src AS VARCHAR(10)),'NULL') + '|cnt=' + CAST(COUNT(*) AS VARCHAR(10)) + '|types=' + ISNULL((SELECT TOP 3 STRING_AGG(x,',') FROM (SELECT DISTINCT [单据类型] AS x FROM outh o2 WHERE ISNULL(o2.src,'')=ISNULL(o.src,'') AND o2.[单据类型] IS NOT NULL) t),'')
+FROM outh o GROUP BY src ORDER BY src;

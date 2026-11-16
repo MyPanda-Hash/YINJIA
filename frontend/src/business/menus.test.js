@@ -491,21 +491,30 @@ test('WMS管理 = 与智能供应链同级的一级目录,含 库存核算/库�
   //   ⇒ 合并后挂点 37、唯一 36(重复的只有 WORK_ORDER_PICK,这是共用面板码的**预期**)。
   // 2026-11-13 新增两张退货类单据(销售退货单 SALE_IN / 生产退料单 MATERIAL_RET)+ 各自明细表/统计表,
   //   6 个新挂点全唯一 ⇒ 挂点 37+6=43、唯一 36+6=42。
-  assert.equal(invCodes.length, 43, `WMS管理应有 43 个面板码挂点,实际 ${invCodes.length}`)
-  assert.equal(new Set(invCodes).size, 42, 'WMS管理内唯一面板码应为 42(工单扫码领料与扫码领料记录共用 WORK_ORDER_PICK)')
+  // 2026-11-16 新增只读报表「生产退料明细表」PROD_RET_LIST(与生产领料明细表成对,数据源 = 生产退料单)
+  //   ⇒ 挂点 43+1=44、唯一 42+1=43。
+  assert.equal(invCodes.length, 44, `WMS管理应有 44 个面板码挂点,实际 ${invCodes.length}`)
+  assert.equal(new Set(invCodes).size, 43, 'WMS管理内唯一面板码应为 43(工单扫码领料与扫码领料记录共用 WORK_ORDER_PICK)')
   // 生产领料:入口在「库存核算 > 单据」里,紧跟材料出库单(可点进通用列表页)
   const invAcct = (inv.children || []).find((c) => c.code === 'invAcct')
   // ⚠ 子组 code 以远端改版为准:invAcctDoc(原 doc)
   const docGroup = (invAcct.children || []).find((c) => c.code === 'invAcctDoc')
   const pickLeaf = (docGroup.children || []).find((c) => c.panelCode === 'PROD_PICK_LIST')
-  assert.equal(pickLeaf?.title, '生产领料')
+  // 2026-11-16:显示名由「生产领料」改为「生产领料明细表」(面板码与路径都不动)
+  assert.equal(pickLeaf?.title, '生产领料明细表')
   assert.equal(pickLeaf?.path, '/panelx/list/PROD_PICK_LIST')
   const docCodes = (docGroup.children || []).map((c) => c.panelCode)
   // 2026-11-13:材料出库单后面紧跟「生产退料单」(MATERIAL_RET,领/退成对),再往后才是只读报表「生产领料」
   assert.equal(docCodes.indexOf('MATERIAL_RET'), docCodes.indexOf('MATERIAL_OUT') + 1,
     '生产退料单应紧跟材料出库单')
   assert.equal(docCodes.indexOf('PROD_PICK_LIST'), docCodes.indexOf('MATERIAL_RET') + 1,
-    '生产领料应紧跟生产退料单')
+    '生产领料明细表应紧跟生产退料单')
+  // 2026-11-16:生产退料明细表紧跟生产领料明细表(领/退两张明细表成对)
+  const retLeaf = (docGroup.children || []).find((c) => c.panelCode === 'PROD_RET_LIST')
+  assert.equal(retLeaf?.title, '生产退料明细表')
+  assert.equal(retLeaf?.path, '/panelx/list/PROD_RET_LIST')
+  assert.equal(docCodes.indexOf('PROD_RET_LIST'), docCodes.indexOf('PROD_PICK_LIST') + 1,
+    '生产退料明细表应紧跟生产领料明细表')
   // 销售退货单紧跟销售出库单(一出一进配成对)
   assert.equal(docCodes.indexOf('SALE_IN'), docCodes.indexOf('SALE_OUT') + 1,
     '销售退货单应紧跟销售出库单')

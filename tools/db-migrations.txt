@@ -4850,3 +4850,7 @@ migrate-return-docs-20261113.sql
 # 2026-11-13 销售退货单/生产退料单 字段布局定稿(排序 + 显示/隐藏):对照销售出库单/材料出库单 + 金蝶有数据的键
 #   (先全隐藏归位,再按清单放开;末尾自检 8 项全 PASS;两账套已执行)
 migrate-return-fields-layout-20261113.sql
+# 2026-11-16 生产领料改名「生产领料明细表」+ 新增「生产退料明细表」PROD_RET_LIST(视图 v_prod_ret_list)
+#   数据源 = 生产退料单(bd_material_ret/bl_material_ret),只列真实生成过的退料单(不是每张领料单都有退料单)
+#   带「工单号」列(手机扫码追溯键) · 只读报表(flat) · WMS管理/库存核算 · 授权按「生产退料单明细表」等价补授 · 两账套已执行
+migrate-prod-ret-list-20261116.sql

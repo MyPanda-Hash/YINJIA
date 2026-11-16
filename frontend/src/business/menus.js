@@ -249,7 +249,16 @@ export const menuTree = [
               //   (dbo.outh 里 src=6「材料出库」且未删除的行,即 SCLL-* 生产领料单)。
               //   入口钉在「材料出库单」之后:先建单、再看已过账的领料明细,找单据的人不会跑错组。
               //   面板/视图/译名/授权见 tools/migrate-prod-pick-outh-20261022.sql。
-              { code: 'prodPickList', title: '生产领料', path: '/panelx/list/PROD_PICK_LIST', icon: 'List', panelCode: 'PROD_PICK_LIST' },
+              // 2026-11-16 改名:显示名 →「生产领料明细表」(面板码 PROD_PICK_LIST / 路径 / 数据源都不动,
+              //   页签恢复按 path、权限按 panelCode 认,改的只是这一层的标题 —— 见 migrate-prod-ret-list-20261116.sql)。
+              { code: 'prodPickList', title: '生产领料明细表', path: '/panelx/list/PROD_PICK_LIST', icon: 'List', panelCode: 'PROD_PICK_LIST' },
+              // 生产退料明细表(2026-11-16 新增,与上面那张成对):数据源 = 包装视图 v_prod_ret_list,
+              //   即生产退料单(bd_material_ret 头 + bl_material_ret 行)逐行展开。
+              //   ⚠ 与领料那张的取数差别是**刻意的**:手机扫码从 2026-10-30 第三轮起不再预生成
+              //   「0 数量的退料草稿」,只有现场真的退料才生一张生产退料单 —— 所以这里天然只列
+              //   「生成过退料单」的单据,不必也不该去补「每张领料单都有一行」。
+              //   多带一列「工单号」:手机扫码是扫工单号起手的,2026-11-13 起退料单上也写了工单号/工单行号。
+              { code: 'prodRetList', title: '生产退料明细表', path: '/panelx/list/PROD_RET_LIST', icon: 'List', panelCode: 'PROD_RET_LIST' },
               // 2026-10-14 恢复:其他出库单(OTHER_OUT)—— 同其他入库单;委外发料单(OUTSOURCE_ISSUE)仍保持下架。
               { code: 'otherOut', title: '其他出库单', path: '/panelx/list/OTHER_OUT', icon: 'Upload', panelCode: 'OTHER_OUT', operationName: '新增' },
               // 2026-10-18 新增:调拨单 / 盘点单 —— 库存核算里两张**会改 kucun** 的单据
