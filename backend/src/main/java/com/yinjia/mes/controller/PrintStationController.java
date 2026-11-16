@@ -3,6 +3,7 @@ package com.yinjia.mes.controller;
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.PagePanelRegistry;
+import com.yinjia.mes.service.PrintCacheService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -97,12 +98,26 @@ public class PrintStationController {
     private static final String PANEL_SELF = PagePanelRegistry.PRINT_STATION;
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    /** 队列上限:只保留最近这么多条,超了挤掉最旧的(内存安全) */
-    private static final int MAX_TASKS = 200;
-    /** 心跳多久算"在线"(秒)。打印代理每 4 秒拉一次、面板页每 15 秒一次,留够容错 */
+    /**
+     * 心跳多久算"在线"(秒)。打印代理每 4 秒拉一次、面板页每 15 秒一次,留够容错
+     */
     private static final long ONLINE_SECONDS = 90;
-    /** 一条任务最多在队列里躺多久(秒)。过期单据打出来只会误事 */
-    private static final long TASK_TTL_SECONDS = 300;
+    /**
+     * 打印缓存:代理掉线期间的单子留在库里,回来按顺序补打(2026-11-16 用户口径)。
+     *
+     * <p>改造前:入队目标只算**在线**站点 + 队列在内存里(TTL 5 分钟)——
+     * 代理一掉线,这段时间手机点的打印**当场就丢**,服务端一重启更是整队清空。
+     * 现在:目标按**配置**(开关开 + 勾了该类型)算,任务落 `yj_print_task`(见 PrintCacheService),
+     * 代理回来第一次 {@code /pending} 就一条条领走。
+     *
+     * <p>{@code print.cache_enabled}=N 可整体关掉(回到旧口径:只发在线站点);
+     * {@code print.cache_hours} 是保留小时数 —— **用户口径 2026-11-16「补打印保留 3 天」**,
+     * 故默认 72 小时;过期标 EXPIRED 不再派单,但仍留在列表里给人看。
+     */
+    private static final String CFG_CACHE_ENABLED = "print.cache_enabled";
+    private static final String CFG_CACHE_HOURS = "print.cache_hours";
+    /** 默认保留 72 小时 = 3 天(用户口径「补打印保留3天」) */
+    private static final int CACHE_HOURS_DEFAULT = 72;
     /** 已出纸记录保留条数(概览显示"刚打印了什么") */
     private static final int MAX_DONE = 20;
     /** 站点配置在系统参数表里的键前缀/后缀 */
@@ -161,6 +176,8 @@ public class PrintStationController {
 
     private final JdbcTemplate jdbc;
     private final PanelPermissionService perm;
+    /** 打印任务缓存(落库;代理掉线也不丢,回来补打) */
+    private final PrintCacheService cache;
 
     /**
      * 在线站点表:key = 站点名称(打印代理的 {@code -Station} / 面板里配的名字)。
@@ -170,11 +187,9 @@ public class PrintStationController {
      */
     private static final Map<String, Station> STATIONS = new ConcurrentHashMap<>();
 
-    /** 打印任务队列(每条任务自带 targets,谁订阅了谁能取) */
-    private static final ConcurrentLinkedDeque<PrintTask> QUEUE = new ConcurrentLinkedDeque<>();
-    /** 已出纸记录 */
+    /** 打印任务缓存(落库,见 {@link PrintCacheService})。原内存队列 QUEUE 已下线 —— 那份东西一重启就没了 */
+    /** 已出纸记录(只用于面板"最近出纸",最多 {@link #MAX_DONE} 条,内存即可) */
     private static final Deque<PrintTask> DONE = new ArrayDeque<>();
-    private static final java.util.concurrent.atomic.AtomicLong SEQ = new java.util.concurrent.atomic.AtomicLong(1);
 
     /**
      * 一台打印电脑的在线视图。
@@ -249,9 +264,10 @@ public class PrintStationController {
         }
     }
 
-    public PrintStationController(JdbcTemplate jdbc, PanelPermissionService perm) {
+    public PrintStationController(JdbcTemplate jdbc, PanelPermissionService perm, PrintCacheService cache) {
         this.jdbc = jdbc;
         this.perm = perm;
+        this.cache = cache;
     }
 
     // ══════════════════════════ 手机端:发任务 ══════════════════════════
@@ -272,15 +288,21 @@ public class PrintStationController {
         sweep();
 
         String type = typeOf(body.get("类型"));
-        List<Station> subscribed = onlineStations().stream()
+        boolean cacheOn = cacheEnabled();
+        // 🔴 2026-11-16「打印缓存」口径:目标站点按**配置**算(开关开 + 勾了该类型),**不看在线**。
+        //   掉线那台电脑正是要把单子攒着、等它回来补打的那台;按老的"只算在线"口径,
+        //   代理一掉线这段时间手机点的打印当场就丢了(用户报障的原话就是"掉了后……补回来")。
+        //   缓存开关关掉(print.cache_enabled=N)时回到旧口径:只发给在线站点,掉线就退回手机自己打。
+        List<Station> subscribed = configuredStations().stream()
                 .filter((s) -> s.types().contains(type)).toList();
-        List<Station> targets = subscribed.stream().filter(Station::enabled).toList();
+        List<Station> targets = subscribed.stream()
+                .filter((s) -> s.enabled() && (cacheOn || isOnline(s))).toList();
 
         Map<String, Object> m = new LinkedHashMap<>();
         if (targets.isEmpty()) {
             m.put("online", false);
             m.put("queued", false);
-            // 原因分三种,现场按提示就能自己修(不让人猜"为什么没打")
+            // 原因分两种,现场按提示就能自己修(不让人猜"为什么没打")
             m.put("reason", subscribed.isEmpty() ? "no-subscriber" : "station-off");
             m.put("message", subscribed.isEmpty()
                     ? typeLabel(type) + "没有可用的打印电脑:请在打印电脑上打开「自动打印」页,"
@@ -317,26 +339,60 @@ public class PrintStationController {
         Set<String> targetNames = new LinkedHashSet<>();
         for (Station s : targets) targetNames.add(s.name());
 
-        PrintTask t = new PrintTask(SEQ.getAndIncrement(), type, str1(body.get("标题"), typeLabel(type)),
-                qr, woNo, line, str(body.get("产品名称")), str(body.get("规格型号")),
-                str1(body.get("来源"), "mobile"), currentUserName(), LocalDateTime.now().format(TS),
-                qrImg,
-                str(body.get("领料单号")), str(body.get("领料部门")), str(body.get("打印日期")),
-                body.get("明细") instanceof java.util.List<?> dl
-                        ? (java.util.List<java.util.Map<String, Object>>) dl : java.util.List.of(),
-                strList(body.get("表头")), str(body.get("部门标签")), strList(body.get("签名")),
-                targetNames, ConcurrentHashMap.newKeySet(), System.currentTimeMillis());
-        QUEUE.addLast(t);
-        // 上限保护:超了挤掉最旧的(内存安全;现场重打一次即可)
-        while (QUEUE.size() > MAX_TASKS) QUEUE.pollFirst();
+        // 载荷就是代理 /print 收到的那份(键全中文),整条 JSON 落库 —— 以后加打印字段不用改表。
+        // ⚠ 纸张不放这里:它按站点配置,派单那一刻由 pending() 塞进去。
+        String title = str1(body.get("标题"), typeLabel(type));
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("类型", type);
+        payload.put("标题", title);
+        payload.put("二维码内容", qr);
+        payload.put("二维码图", qrImg);
+        payload.put("领料单号", str(body.get("领料单号")));
+        payload.put("领料部门", str(body.get("领料部门")));
+        payload.put("打印日期", str(body.get("打印日期")));
+        payload.put("明细", body.get("明细") instanceof java.util.List<?> dl ? dl : java.util.List.of());
+        List<String> hdr = strList(body.get("表头"));
+        if (!hdr.isEmpty()) payload.put("表头", hdr);
+        String deptLabel = str(body.get("部门标签"));
+        if (!deptLabel.isEmpty()) payload.put("部门标签", deptLabel);
+        List<String> signs = strList(body.get("签名"));
+        if (!signs.isEmpty()) payload.put("签名", signs);
+        // 2026-11-18 第二轮:整张纸的抬头数据(混料单 →《成型配料记录》横板 A4 那套专用纸表)。
+        // 键值对原样透传,代理按固定版式取;没有这张表的老单据不带这个键,代理仍走领料单版式。
+        if (body.get("纸面") instanceof java.util.Map<?, ?> sheet && !sheet.isEmpty()) {
+            payload.put("纸面", sheet);
+        }
+        payload.put("工单号", woNo);
+        payload.put("工单行号", line);
+        payload.put("产品名称", str(body.get("产品名称")));
+        payload.put("规格型号", str(body.get("规格型号")));
+        payload.put("来源", str1(body.get("来源"), "mobile"));
+        payload.put("发起人", currentUserName());
+        payload.put("时间", LocalDateTime.now().format(TS));
 
-        m.put("online", true);
-        m.put("queued", true);
-        m.put("taskId", t.id());
+        // 单号:面板列表要一眼认出是哪张单(领料单号优先,没有就用工单号)
+        String slipNo = str(body.get("领料单号"));
+        long taskId = cache.enqueue(type, title, slipNo.isEmpty() ? woNo : slipNo, woNo,
+                payload, targetNames, currentUserName(), cacheHours());
+
+        List<Station> offTargets = targets.stream().filter((s) -> !isOnline(s)).toList();
+        m.put("online", offTargets.size() < targets.size());
+        m.put("queued", taskId > 0);
+        m.put("taskId", taskId);
         m.put("类型", type);
         m.put("station", names(targets));
         m.put("targets", targetNames);
-        m.put("message", "已发送到打印电脑「" + names(targets) + "」");
+        // 给手机端一句人话:全在线 = 已发送;有掉线的 = 已缓存,连上就补打
+        if (offTargets.isEmpty()) {
+            m.put("message", "已发送到打印电脑「" + names(targets) + "」");
+        } else if (offTargets.size() == targets.size()) {
+            m.put("message", "打印电脑「" + names(targets) + "」当前离线:单子已进打印缓存,"
+                    + "那台电脑一连上就自动补打");
+        } else {
+            m.put("message", "已发送到「" + names(targets.stream().filter(PrintStationController::isOnline).toList())
+                    + "」;「" + names(offTargets) + "」离线,已缓存等它回来补打");
+        }
+        m.put("cached", offTargets.size());
         return ApiResult.ok(m);
     }
 
@@ -364,15 +420,15 @@ public class PrintStationController {
         sweep();
 
         Station me = heartbeat(station, source, clientIp(req));
-        PrintTask t = me == null ? null : takeFor(me.name());
+        // 从**库里的缓存**取一条还没投给本站点的任务(代理掉线期间攒下的也在这里)
+        Map<String, Object> taskJson = (me == null || !me.enabled()) ? null : cache.takeFor(me.name());
 
         Map<String, Object> out = new LinkedHashMap<>();
         // 纸张(2026-11-05)是**按站点**的配置,不是任务属性(同一张单可能派给多台电脑、纸不一样),
         // 所以在派单这一刻把本站点的纸张塞进任务里,代理照它选纸型 —— 只换纸不缩放。
-        Map<String, Object> taskJson = t == null ? null : t.json();
-        if (taskJson != null && me != null) taskJson.put("纸张", me.paper());
+        if (taskJson != null) taskJson.put("纸张", me.paper());
         out.put("task", taskJson);
-        out.put("queueSize", QUEUE.size());
+        out.put("queueSize", cache.countPending());
         // 服务端总闸:固定开(用户口径「在服务器上开启是固定的」)—— 兼容旧前端字段
         out.put("autoEnabled", true);
         out.put("station", me == null ? "" : me.name());
@@ -397,6 +453,8 @@ public class PrintStationController {
         if (!ok) {
             log.warn("打印站点出纸失败 task={} printer={} error={}", id, printer, str(body.get("error")));
         }
+        // 库里那条缓存任务落回执(成功=DONE / 失败=FAILED + 原因,失败的行面板上能看见)
+        cache.ack(id, ok, str(body.get("error")));
         synchronized (DONE) {
             DONE.addFirst(new PrintTask(id, typeOf(body.get("类型")), str(body.get("标题")), "",
                     str(body.get("工单号")), toInt(body.get("工单行号")), "", "",
@@ -471,7 +529,7 @@ public class PrintStationController {
         Station me = heartbeat(body == null ? null : str(body.get("station")), "page", clientIp(req));
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("autoEnabled", true);
-        out.put("queueSize", QUEUE.size());
+        out.put("queueSize", cache.countPending());
         out.put("station", me == null ? "" : me.name());
         out.put("stations", stationList());
         return ApiResult.ok(out);
@@ -578,12 +636,9 @@ public class PrintStationController {
                     + "请先在那台电脑上停掉打印代理,等它变成离线再删");
         }
         STATIONS.remove(name);
-        // 队列里还有派给它的任务:把它的名字从 targets 里摘掉(否则这条任务会一直等一个不存在的站点)
-        for (PrintTask t : QUEUE) {
-            if (t.targets().remove(name)) {
-                if (t.targets().isEmpty()) QUEUE.remove(t);
-            }
-        }
+        // 缓存里还有派给它的任务:把它的名字从目标里摘掉(否则这条任务会一直等一个不存在的站点);
+        // 摘完没别的目标了就整行删掉 —— 交给 PrintCacheService.clear(站点点名版) 统一处理。
+        cache.clear(name);
         int n = deleteConfig(name);
         log.info("打印站点已删除:{}(清了 {} 行配置) by {}", name, n, currentUserName());
         Map<String, Object> out = new LinkedHashMap<>();
@@ -593,8 +648,87 @@ public class PrintStationController {
         return ApiResult.ok(out);
     }
 
-    /** 删站点参数行;返回删掉的行数 */
-    private int deleteConfig(String name) {
+    // ══════════════ 打印缓存(离线补打) · 2026-11-16 用户口径 ══════════════
+    //   「能在自动打印里面做个打印缓存吗，就是在打印代理掉了后，重新连接这个打印缓存，
+    //     会将这期间打印的补回来。」
+    //   补打本身**不需要人点**:代理一连上就自己按入队顺序领走;
+    //   这里三个按钮是给现场兜底的(重发一张、删掉作废单、清空积压)。
+
+    /**
+     * 打印缓存开关({@code print.cache_enabled})。
+     *
+     * @param body {enabled:true/false} —— 关掉只是"以后不再缓存",已经缓存的不会丢
+     */
+    @PostMapping("/cache/config")
+    public ApiResult<Map<String, Object>> saveCacheConfig(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView(PANEL_SELF);
+        perm.requireAnyPerm(PANEL_SELF, "配置打印机", "config");
+        boolean enabled = !Boolean.FALSE.equals(body.get("enabled"));
+        setSetting(CFG_CACHE_ENABLED, enabled ? "Y" : "N");
+        log.info("打印缓存开关:{} by {}", enabled ? "开" : "关", currentUserName());
+        return ApiResult.ok(stateOf(null));
+    }
+
+    /**
+     * 补打一条缓存任务:清掉"已送达"标记 ⇒ 代理下次轮询(≤4 秒)再打一次。
+     *
+     * @param body {id}
+     */
+    @PostMapping("/cache/retry")
+    public ApiResult<Map<String, Object>> retryCache(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView(PANEL_SELF);
+        perm.requireAnyPerm(PANEL_SELF, "配置打印机", "config");
+        long id = toLong(body.get("id"));
+        if (id <= 0) throw new IllegalArgumentException("缺少任务 id");
+        int n = cache.retry(id, cacheHours());
+        log.info("打印缓存补打 id={} 影响 {} 行 by {}", id, n, currentUserName());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", id);
+        out.put("影响行数", n);
+        out.put("cache", stateOf(null).get("cache"));
+        return ApiResult.ok(out);
+    }
+
+    /**
+     * 删掉一条缓存任务(作废单/打错单:不再补打)。
+     *
+     * @param body {id}
+     */
+    @PostMapping("/cache/delete")
+    public ApiResult<Map<String, Object>> deleteCache(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView(PANEL_SELF);
+        perm.requireAnyPerm(PANEL_SELF, "配置打印机", "config");
+        long id = toLong(body.get("id"));
+        if (id <= 0) throw new IllegalArgumentException("缺少任务 id");
+        int n = cache.delete(id);
+        log.info("打印缓存删除 id={} 影响 {} 行 by {}", id, n, currentUserName());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", id);
+        out.put("影响行数", n);
+        out.put("cache", stateOf(null).get("cache"));
+        return ApiResult.ok(out);
+    }
+
+    /**
+     * 清空待补打的缓存。{@code stationName} 为空 = 全部清掉;
+     * 给了站点名 = 只把这条任务对那台电脑摘掉(别的电脑仍会打)。
+     *
+     * @param body {stationName?}
+     */
+    @PostMapping("/cache/clear")
+    public ApiResult<Map<String, Object>> clearCache(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PANEL_SELF);
+        perm.requireAnyPerm(PANEL_SELF, "配置打印机", "config");
+        String station = body == null ? "" : str(body.get("stationName"));
+        int n = cache.clear(station);
+        log.info("打印缓存清空(站点={})影响 {} 行 by {}", station.isEmpty() ? "全部" : station, n, currentUserName());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("影响行数", n);
+        out.put("cache", stateOf(null).get("cache"));
+        return ApiResult.ok(out);
+    }
+
+    /** 删站点参数行;返回删掉的行数 */    private int deleteConfig(String name) {
         int n = 0;
         for (String suffix : new String[]{CFG_ENABLED, CFG_TYPES, CFG_PAPER}) {
             try {
@@ -607,38 +741,21 @@ public class PrintStationController {
     }
 
     /**
-     * 从队列里取一条**派给这个站点**的任务。
+     * 清掉过期任务(库里的,交给 {@link PrintCacheService#sweep()}) + 清掉太久没心跳的站点(内存)。
      *
-     * <ul>
-     *   <li>只取 {@code targets} 含本站点、且 {@code delivered} 里还没有本站点的(取到即去重);</li>
-     *   <li>{@code delivered} 覆盖了全部 targets ⇒ 这条任务已经发完,出队(不再占队列);</li>
-     *   <li>过期({@link #TASK_TTL_SECONDS})的任务在 {@link #sweep()} 里丢掉。</li>
-     * </ul>
+     * <p>2026-11-16:任务不再放内存 —— 原来这里"5 分钟没取就丢"的规则
+     * 正是"代理掉了这段时间的单子补不回来"的原因,现在过期的口径是
+     * {@code print.cache_hours}(默认 3 天 = 72 小时,过期标 EXPIRED 但仍留在库里给人看)。
      */
-    private PrintTask takeFor(String name) {
-        Station me = STATIONS.get(name);
-        if (me == null || !me.enabled() || me.types().isEmpty()) return null;
-        for (PrintTask t : QUEUE) {
-            if (!t.targets().contains(name)) continue;
-            if (!t.delivered().add(name)) continue;   // 本站点已经取过这条了
-            if (t.delivered().containsAll(t.targets())) QUEUE.remove(t);
-            return t;
-        }
-        return null;
-    }
-
-    /** 丢掉过期任务 + 清掉太久没心跳的站点(内存不留垃圾) */
     private void sweep() {
         long now = System.currentTimeMillis();
-        long ttl = TASK_TTL_SECONDS * 1000L;
-        for (PrintTask t : QUEUE) {
-            if (now - t.createdAt() > ttl) QUEUE.remove(t);
-        }
+        cache.sweep();
         // 站点条目保留 30 分钟:面板要把"刚才还在、现在离线"的电脑也列出来
         long keep = 30 * 60 * 1000L;
         STATIONS.entrySet().removeIf((e) -> now - e.getValue().seen() > keep);
     }
 
+    /** 在线站点(带心跳时间窗口)**只用于提示文案**;派单目标改按配置算,见 {@link #configuredStations()} */
     private List<Station> onlineStations() {
         long now = System.currentTimeMillis();
         long win = ONLINE_SECONDS * 1000L;
@@ -648,6 +765,42 @@ public class PrintStationController {
         }
         out.sort((a, b) -> a.name().compareTo(b.name()));
         return out;
+    }
+
+    /**
+     * 配置过的站点(内存里跑过的 ∪ 库里有配置的),**不看在线**。
+     *
+     * <p>2026-11-16 打印缓存的关键:目标站点按这份算 —— 掉线的那台也在里面,
+     * 单子才会攒进缓存、等它回来补打。与 {@link #stationList()} 同一口径,
+     * 只是这里返回 {@link Station} 对象(带开关/类型/纸张)。
+     */
+    private List<Station> configuredStations() {
+        Map<String, Station> all = new LinkedHashMap<>(STATIONS);
+        for (String name : configuredNames()) {
+            if (all.containsKey(name)) continue;
+            boolean[] en = {false};
+            String[] pp = {PAPER_DEFAULT};
+            Set<String> types = loadConfig(name, en, pp);
+            all.put(name, new Station(name, en[0], types, pp[0], 0L, "", ""));
+        }
+        List<Station> out = new ArrayList<>(all.values());
+        out.sort((a, b) -> a.name().compareTo(b.name()));
+        return out;
+    }
+
+    /** 打印缓存开关(默认开;print.cache_enabled=N 才关 —— 关掉就恢复"只发在线站点"的老口径) */
+    private boolean cacheEnabled() {
+        return !"N".equalsIgnoreCase(getSetting(CFG_CACHE_ENABLED));
+    }
+
+    /** 缓存保留小时数(默认 24;写坏了就按默认,不让一条脏参数把打印搞停) */
+    private int cacheHours() {
+        try {
+            int v = Integer.parseInt(getSetting(CFG_CACHE_HOURS).trim());
+            return v >= 1 && v <= 720 ? v : CACHE_HOURS_DEFAULT;
+        } catch (RuntimeException e) {
+            return CACHE_HOURS_DEFAULT;
+        }
     }
 
     /**
@@ -725,7 +878,14 @@ public class PrintStationController {
         out.put("stationOnline", me != null && isOnline(me));
         out.put("stations", stationList());
         out.put("types", typeList());
-        out.put("queueSize", QUEUE.size());
+        out.put("queueSize", cache.countPending());
+        // 打印缓存(离线补打,2026-11-16):开关 + 待补打清单,面板直接显示/补打/删除
+        Map<String, Object> c = new LinkedHashMap<>();
+        c.put("enabled", cacheEnabled());
+        c.put("hours", cacheHours());
+        c.put("count", cache.countPending());
+        c.put("items", cache.list());
+        out.put("cache", c);
         out.put("lastHeartbeat", getSetting("print.last_heartbeat"));
         List<Map<String, Object>> recent;
         synchronized (DONE) { recent = DONE.stream().map(PrintTask::json).toList(); }

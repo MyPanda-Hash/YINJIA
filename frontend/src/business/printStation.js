@@ -168,3 +168,38 @@ export async function deleteStationConfig(stationName) {
   const res = await request.post('/px/print/station/delete', { stationName: stationName || '' })
   return res.data?.data || res.data || {}
 }
+
+/**
+ * 打印缓存(离线补打)开关 —— 2026-11-16。
+ *
+ * <p>用户口径:「能在自动打印里面做个打印缓存吗，就是在打印代理掉了后，重新连接这个打印缓存，
+ * 会将这期间打印的补回来。」
+ *
+ * <p>关闭只是"以后不再缓存"(新任务回到旧口径:只发给在线站点);
+ * **已经缓存的任务不会因为关开关而丢**,仍会在代理回来后补打 —— 免得以为关一下就把积压清了。
+ */
+export async function saveCacheConfig({ enabled } = {}) {
+  const res = await request.post('/px/print/cache/config', { enabled: !!enabled })
+  return res.data?.data || res.data || {}
+}
+
+/**
+ * 重发一条缓存任务:清掉"已送达"标记、状态回 PENDING ⇒ 代理下次轮询(≤4 秒)再打一次。
+ * 用于打歪/补印;不重发的话任务由代理自己按入队顺序领走,不需要人点。
+ */
+export async function retryCacheTask(id) {
+  const res = await request.post('/px/print/cache/retry', { id })
+  return res.data?.data || res.data || {}
+}
+
+/** 删一条缓存任务(作废单/打错单:不再补打) */
+export async function deleteCacheTask(id) {
+  const res = await request.post('/px/print/cache/delete', { id })
+  return res.data?.data || res.data || {}
+}
+
+/** 清空待补打的缓存;{@code stationName} 为空 = 清全部 */
+export async function clearPrintCache({ stationName } = {}) {
+  const res = await request.post('/px/print/cache/clear', { stationName: stationName || '' })
+  return res.data?.data || res.data || {}
+}

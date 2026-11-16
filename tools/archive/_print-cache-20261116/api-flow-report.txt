@@ -1,0 +1,6 @@
+﻿YJ 清空缓存: 影响=1
+YJ 删除测试站点: CACHE-OFFLINE-TEST
+YJ 现存站点: 打印电脑-01(True) 缓存=0
+YJ_TEST 清空缓存: 影响=1
+YJ_TEST 删除测试站点: 缓存测试机
+YJ_TEST 现存站点: DESKTOP-JHUNFT6(True) 缓存=0
