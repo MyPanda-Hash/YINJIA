@@ -556,11 +556,9 @@ public class PuPrintService {
         String ph = str(phone);
         if (nm.isEmpty()) throw new IllegalArgumentException("请填写需方联系人姓名");
         List<Map<String, Object>> list = parseContacts(rawContacts());
-        boolean exists = false;
         for (Map<String, Object> c : list) {
-            if (nm.equals(str(c.get("姓名"))) && ph.equals(str(c.get("联系方式")))) { exists = true; break; }
+            if (nm.equals(str(c.get("姓名"))) && ph.equals(str(c.get("联系方式")))) return list;
         }
-        if (exists) return list;
         if (list.size() >= BUYER_CONTACTS_MAX) {
             throw new IllegalArgumentException("需方联系人最多保留 " + BUYER_CONTACTS_MAX + " 条,请先清理不用的再新增");
         }
@@ -568,6 +566,51 @@ public class PuPrintService {
         m.put("姓名", nm);
         m.put("联系方式", ph);
         list.add(m);
+        writeContacts(list, user);
+        return list;
+    }
+
+    /**
+     * 整份保存候选名单(2026-11-11 用户口径:「没有删除按钮吗,输错了怎么办」)。
+     *
+     * <p>只提供「加」而不提供「改/删」时,一旦把名字或电话打错进名单,下拉里就永久留着错的那条,
+     * 条数上限(12)满了还会彻底卡死 —— 用户明确要能删掉。所以改成**整份覆盖**:
+     * 前端把管理弹窗里的当前名单整份发上来,这里做清洗(去空行/去重/条数上限/长度上限)后落库。
+     *
+     * <p>顺序按前端给的保留(下拉里就是按这个顺序显示),姓名必填、联系方式可空。
+     * 传空数组 = 一条都不剩 ⇒ 拒绝:全清掉的话存量单据打印时就没有默认需方联系人,
+     * 与 {@link #BUYER_CONTACTS_DEFAULT} 的兜底语义冲突(要恢复默认请把那条重新加回来)。
+     */
+    @Transactional
+    public List<Map<String, Object>> saveBuyerContacts(List<Map<String, Object>> items, String user) {
+        List<Map<String, Object>> list = new ArrayList<>();
+        if (items != null) {
+            for (Map<String, Object> it : items) {
+                if (it == null) continue;
+                String nm = str(it.get("姓名"));
+                String ph = str(it.get("联系方式"));
+                if (nm.isEmpty()) continue;
+                boolean dup = false;
+                for (Map<String, Object> c : list) {
+                    if (nm.equals(str(c.get("姓名"))) && ph.equals(str(c.get("联系方式")))) { dup = true; break; }
+                }
+                if (dup) continue;
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("姓名", nm);
+                m.put("联系方式", ph);
+                list.add(m);
+            }
+        }
+        if (list.isEmpty()) throw new IllegalArgumentException("需方联系人至少要保留一条");
+        if (list.size() > BUYER_CONTACTS_MAX) {
+            throw new IllegalArgumentException("需方联系人最多保留 " + BUYER_CONTACTS_MAX + " 条");
+        }
+        writeContacts(list, user);
+        return list;
+    }
+
+    /** 名单 → 参数(`姓名|联系方式;…`)并落库(有则 UPDATE、无则 INSERT;两账套 yj_app_setting 结构不同源,只碰这两列) */
+    private void writeContacts(List<Map<String, Object>> list, String user) {
         StringBuilder sb = new StringBuilder();
         for (Map<String, Object> c : list) {
             if (sb.length() > 0) sb.append(';');
@@ -583,12 +626,11 @@ public class PuPrintService {
             jdbc.update("INSERT INTO yj_app_setting (setting_key, setting_value, remark, asp_user1, asp_time1)"
                             + " VALUES (?,?,?,?,SYSDATETIME())",
                     BUYER_CONTACTS_KEY, val,
-                    "采购订单「有金额」打印·需方联系人候选(姓名|联系方式,分号分隔;打印弹窗下拉选,可新增)", user);
+                    "采购订单「有金额」打印·需方联系人候选(姓名|联系方式,分号分隔;打印弹窗下拉选,可增可改可删)", user);
         } else {
             jdbc.update("UPDATE yj_app_setting SET setting_value = ?, asp_time2 = SYSDATETIME() WHERE setting_key = ?",
                     val, BUYER_CONTACTS_KEY);
         }
-        return list;
     }
 
     /** 参数原值(库里没有/为空 ⇒ 历史默认那一条) */

@@ -729,6 +729,14 @@ export async function puPrintBuyerContactAdd(payload) {
   return unwrapStrict(await request.post('/px/puPrint/buyerContacts', payload || {}))
 }
 
+/**
+ * 整份保存需方联系人名单(2026-11-11 用户口径「没有删除按钮吗,输错了怎么办」):
+ * 管理弹窗里改名 / 删掉 / 新增后一次提交,服务端清洗(去空/去重/上限 12 条)后覆盖系统参数,返回整份名单。
+ */
+export async function puPrintBuyerContactSave(contacts) {
+  return unwrapStrict(await request.put('/px/puPrint/buyerContacts', { contacts: contacts || [] }))
+}
+
 /** 保存「收料超送比例」(生单对话框改动即自动保存):落系统参数 receive_over_ratio,传 0~1 小数 */
 export async function batchFlowSaveOverRatio(overRatio) {
   return unwrap(await request.post('/px/batchFlow/overRatio', { overRatio }))

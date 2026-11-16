@@ -14,6 +14,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.LinkedHashMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -444,6 +445,29 @@ public class PxController {
         String name = body.get("姓名") == null ? "" : String.valueOf(body.get("姓名"));
         String phone = body.get("联系方式") == null ? "" : String.valueOf(body.get("联系方式"));
         return ApiResult.ok(puPrint.addBuyerContact(name, phone, currentUser()));
+    }
+
+    /**
+     * 整份保存需方联系人候选(2026-11-11 用户口径「没有删除按钮吗,输错了怎么办」):
+     * 管理弹窗里改名/删掉/新增后一次提交,服务端清洗(去空/去重/上限)后覆盖参数。
+     */
+    @PutMapping("/puPrint/buyerContacts")
+    @SuppressWarnings("unchecked")
+    public ApiResult<List<Map<String, Object>>> puPrintBuyerContactSave(@RequestBody Map<String, Object> body) {
+        // 与新增同一权限口径:改的是公司级名单,要「修改」权
+        perm.requireButton("PU_ORDER", "修改");
+        Object raw = body == null ? null : body.get("contacts");
+        List<Map<String, Object>> items = new java.util.ArrayList<>();
+        if (raw instanceof List<?> l) {
+            for (Object o : l) {
+                if (!(o instanceof Map<?, ?> m)) continue;
+                Map<String, Object> mm = new LinkedHashMap<>();
+                mm.put("姓名", m.get("姓名"));
+                mm.put("联系方式", m.get("联系方式"));
+                items.add(mm);
+            }
+        }
+        return ApiResult.ok(puPrint.saveBuyerContacts(items, currentUser()));
     }
 
     /**
