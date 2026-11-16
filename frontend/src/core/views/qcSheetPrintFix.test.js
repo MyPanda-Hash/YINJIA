@@ -70,3 +70,13 @@ test('③ 「导出 PDF」对出货检验单按 A4 纸宽重排(修打印不全)
   assert.match(prep, /tableLayout = 'fixed'/, '表格固定列宽按纸宽分配')
   assert.match(prep, /setAttribute\('placeholder', ''\)/, '清掉占位提示')
 })
+
+test('④ 原生打印期间把单号写回打印标题(另存 PDF 文件名不再丢单号)', () => {
+  // 2026-11-16 用户报障「原来打印的带有单号,现在打印的不带」:
+  // 原「打印预览」走 printInPage(title),title = 面板名-单号 ⇒ 另存 PDF 文件名带单号;
+  // 改走原生打印后没人设标题 ⇒ 单号丢。这里钉住:打印期间设标题、afterprint 恢复。
+  const print = fnBlock(list, 'printApprovalSheet')
+  assert.match(print, /document\.title = `\$\{panelName/, '打印期间要有「面板名-…」标题')
+  assert.match(print, /单据编号/, '标题里的单号取自「单据编号」')
+  assert.match(print, /document\.title = prevTitle/, '打印结束要恢复原标题(别污染标签页)')
+})

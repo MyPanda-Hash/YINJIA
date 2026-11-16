@@ -9563,9 +9563,21 @@ async function printApprovalSheet() {
     ? Math.max(0.32, Math.min(1, A4_CONTENT_PX / paperW))
     : 1
   document.documentElement.style.setProperty('--print-zoom', String(printZoom))
+  /**
+   * 打印标题 = 「面板名-单号」—— 2026-11-16 用户报障「原来打印的带有单号,现在打印的不带」。
+   *
+   * 原先「打印预览」走 openSheetPrint → printInPage(title) 会把 document.title 设成
+   * 「面板名-单号」(即导出文件名);浏览器「另存为 PDF」的默认文件名、以及打印页眉页脚都用它。
+   * 2026-11-16 改为复用原生打印通道后没人设标题 ⇒ 另存出来的 PDF 只剩页面标题、单号丢了。
+   * 这里在打印期间设同样的标题,afterprint 恢复标签页原标题(与 printInPage 同一口径)。
+   */
+  const docNo = String(cur.value?.['单据编号'] || cur.value?.['编号'] || '').trim()
+  const prevTitle = document.title
+  document.title = `${panelName.value || panelCode.value}${docNo ? '-' + docNo : ''}`
   const restore = () => {
     document.body.classList.remove('approval-printing')
     document.documentElement.style.removeProperty('--print-zoom')
+    document.title = prevTitle
     if (sgPageStyle) { sgPageStyle.remove(); sgPageStyle = null }
     window.removeEventListener('afterprint', restore)
   }
