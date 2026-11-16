@@ -114,6 +114,11 @@ const routes = [
       { path: 'prod/plan/workOrderBoard', component: () => import('@/views/modules/plan/WorkOrderBoard.vue'), meta: { title: '工单排产', code: 'workOrderBoard', panelCode: 'WORK_ORDER_BOARD' } },
       // 工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 报表式列表页)
       { path: 'prod/plan/workOrderList', component: () => import('@/views/modules/plan/WorkOrderList.vue'), meta: { title: '工单排产·列表', code: 'workOrderList', panelCode: 'WORK_ORDER_LIST' } },
+      // 新增生产工单·**整页编制**(2026-11-13 方案 A:替换原 WorkOrderCreateDialog 弹窗 + 保存草稿;
+      //   用户口径「是否用页面形式更好?」→ 整页)。?draftId=<草稿id> = 草稿箱「继续编辑」回填;
+      //   ?kind=临时 = 直接落在临时工单页签。页面级动作权限沿用 WORK_ORDER_LIST 的 create 词,
+      //   meta.panelCode 供上方守卫拦「直接敲 URL」(与生产工单列表同一面板可见口径)。
+      { path: 'prod/plan/workOrderCreate', component: () => import('@/views/modules/plan/WorkOrderCreatePage.vue'), meta: { title: '新增生产工单', code: 'workOrderCreate', panelCode: 'WORK_ORDER_LIST' } },
       // 生产工序进度看板(2026-11-08 用户口径「生产工单进度需要做一个看板,方便直观查看工单各工序进度」):
       //   一行=一张工单行(工单号+工单行号),大屏/列表双视图;工序进度口径复用「工单详情·追溯」;
       //   点行跳「生产工单」页并定位该工单(WorkOrderList 支持 ?keyword=&focus= 定位)。

@@ -51,9 +51,19 @@ public class WoInspGateGuard {
      * @param allowed 是否允许建单
      * @param code    不允许时的 HTTP 语义码(422 门禁拦截 / 400 缺原因 / 403 无强制权限)
      * @param error   不允许时的给前端话术
-     * @param status  判定明细(放行时调用方可能还要记账,如预警标记)
+     * @param status  判定明细(放行时调用方可能还要记账,如预警标记);通用判定(见 {@link #enforceVerdict})为 null
      */
     public record Decision(boolean allowed, int code, String error, WoInspGate.Status status) {}
+
+    /**
+     * 通用前置结论(2026-11-12):不同检验单的前置工序不同(首件/制程 = 成型已报工;
+     * 出货检验表观 = 已进入组装/装箱),但「拦截话术 + 预警留痕 + 管理员强制开单」这一套共用。
+     *
+     * @param allowed 是否放行
+     * @param warn    预警放行(放行但写留痕)
+     * @param reason  不放行时的话术
+     */
+    public record Verdict(boolean allowed, boolean warn, String reason) {}
 
     /**
      * **建单前统一过闸**。
@@ -67,25 +77,38 @@ public class WoInspGateGuard {
         if (!WoInspGate.gated(panelCode)) return new Decision(true, 0, "", WoInspGate.pass());
         WoInspGate.Status st = WoInspGate.check(jdbc, wo, xc);
         if (st.allowed() && !st.warn()) return new Decision(true, 0, "", st);
+        return decide(panelCode, st.warn(), st.reason(), docNo(wo, xc), body, ip, st);
+    }
 
-        String action = st.warn() ? ACTION_WARN : ACTION_FORCE;
+    /**
+     * **通用过闸**(2026-11-12 新增):判定由调用方给(如出货检验表观 = {@code AsmInspEntry}),
+     * 留痕 / 强制开单 / 权限校验这一套与 {@link #enforce} 完全同一份实现。
+     */
+    public Decision enforceVerdict(String panelCode, Verdict v, String docNo, Map<String, Object> body, String ip) {
+        if (v == null || v.allowed() && !v.warn()) return new Decision(true, 0, "", null);
+        return decide(panelCode, v.warn(), v.reason(), docNo, body, ip, null);
+    }
+
+    /** 拦截 / 预警放行 / 强制开单的**唯一**动作编排(两处调用共用) */
+    private Decision decide(String panelCode, boolean warn, String reason, String docNo,
+                            Map<String, Object> body, String ip, WoInspGate.Status st) {
         // ① 预警放行:能开单,但要留痕(现场"知道自己在绕过什么",事后可查)
-        if (st.warn()) {
+        if (warn) {
             usage.recordAction(currentUser(), usage.realNameOf(currentUser(), currentUser()),
-                    panelCode, ACTION_WARN, docNo(wo, xc), blankToNull(ip));
+                    panelCode, ACTION_WARN, docNo, blankToNull(ip));
             return new Decision(true, 0, "", st);
         }
         // ② 拦截:只有「填了原因 + 有强制权限」才允许越闸
         if (!truthy(body == null ? null : body.get("强制开单"))) {
-            return new Decision(false, 422, st.reason(), st);
+            return new Decision(false, 422, reason, st);
         }
-        String reason = str(body == null ? null : body.get("强制开单原因"));
-        if (reason.isEmpty()) return new Decision(false, 400, "强制开单必须填写原因", st);
+        String why = str(body == null ? null : body.get("强制开单原因"));
+        if (why.isEmpty()) return new Decision(false, 400, "强制开单必须填写原因", st);
         if (!perm.hasAnyPerm(panelCode, PERM_FORCE)) {
             return new Decision(false, 403, "仅具备「" + PERM_FORCE + "」权限的用户可强制开单", st);
         }
         usage.recordAction(currentUser(), usage.realNameOf(currentUser(), currentUser()),
-                panelCode, ACTION_FORCE + ":" + clip(reason, 40), docNo(wo, xc), blankToNull(ip));
+                panelCode, ACTION_FORCE + ":" + clip(why, 40), docNo, blankToNull(ip));
         return new Decision(true, 0, "", st);
     }
 
@@ -127,13 +150,20 @@ public class WoInspGateGuard {
 
     /** 账位/档位信息(前端顶部提示用):门禁档位 + 该用户能否强制开单 + 本面板是否受门禁 */
     public Map<String, Object> meta(String panelCode) {
+        return meta(panelCode, WoInspGate.gated(panelCode));
+    }
+
+    /**
+     * 同上,但「本面板受不受门禁」由调用方给(2026-11-12:出货检验表观用的是「进入组装/装箱」判定,
+     * 不是成型报工门禁 —— 它仍需要共用「可强制开单」这个能力位与留痕)。
+     */
+    public Map<String, Object> meta(String panelCode, boolean gated) {
         Map<String, Object> out = new LinkedHashMap<>();
-        boolean on = WoInspGate.gated(panelCode);
         WoInspGate.Policy pol = WoInspGate.policy(jdbc);
-        out.put("门禁生效", on);
-        out.put("门禁档位", on ? pol.mode().name() : "");
-        out.put("存量拦截", on && pol.legacyBlock());
-        out.put("可强制开单", on && perm.hasAnyPerm(panelCode, PERM_FORCE));
+        out.put("门禁生效", gated);
+        out.put("门禁档位", gated ? pol.mode().name() : "");
+        out.put("存量拦截", gated && pol.legacyBlock());
+        out.put("可强制开单", perm.hasAnyPerm(panelCode, PERM_FORCE));
         return out;
     }
 

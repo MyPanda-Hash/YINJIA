@@ -160,7 +160,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { applyLineDefaults, lineOptions } from '@/business/routeDefaults'
-import { cascadeDue, cascadeStart, invertedPlanRows, normalizePlanChain } from '@/business/planChain'
+import { cascadeDue, cascadeStart, normalizePlanChain } from '@/business/planChain'
+import { planFixMessages, planProblemMessages } from '@/business/planChainNotice'
 import {
   num, groupByChain, splitBatch, planChainOf, stepTotal, ratesOf,
   rateChainOf, rateDiffFromFirst, rowKeyOf, validateQty,
@@ -238,17 +239,16 @@ function syncSteps() {
   // 计划链规整(与单行排线弹窗同一份纯逻辑 business/planChain.js):第 2 道起开工=上一道完工、保留原时长
   normalizePlanChain(steps.value)
 }
-/** 计划完工日变化 → 本道开工不得晚于完工,下一道开工日跟着变,并沿链下传(与单行排线弹窗同一份 planChain 逻辑) */
+/** 计划完工日变化 → 本道不得早于上道完工、本道开工不得晚于本道完工,下一道开工日跟着变并沿链下传
+ *  (与单行排线弹窗同一份 planChain 逻辑;话术见 business/planChainNotice.js) */
 function onDueChange(index, v) {
-  const fixedStart = cascadeDue(steps.value, index, v)
-  // 2026-11-09 用户报障:原来改完工日早于开工日会留下「开工 11-09 / 完工 11-03」的倒挂 —— 现在自动调平并明说
-  // (整句按语言包翻译,`{d}` 换成本次被调平的日期 —— 拼接两段会让英文出现全角标点)
-  if (fixedStart) ElMessage.warning(tt('计划开工日期不能晚于计划完工日期，已把开工日期调为 {d}').replace('{d}', fixedStart))
+  const msgs = planFixMessages(cascadeDue(steps.value, index, v), 'due')
+  if (msgs.length) ElMessage.warning(msgs.join('; '))
 }
-/** 计划开工日晚于本道完工 ⇒ 完工拉到开工日,并继续沿链下传 */
+/** 计划开工日早于上道完工 ⇒ 夹到上道完工日;晚于本道完工 ⇒ 完工拉到开工日,并继续沿链下传 */
 function onStartChange(index, v) {
-  const pushedDue = cascadeStart(steps.value, index, v)
-  if (pushedDue) ElMessage.warning(tt('计划开工日期不能晚于计划完工日期，已把完工日期调为 {d}').replace('{d}', pushedDue))
+  const msgs = planFixMessages(cascadeStart(steps.value, index, v), 'start')
+  if (msgs.length) ElMessage.warning(msgs.join('; '))
 }
 watch(chosenChain, () => syncSteps())
 
@@ -301,15 +301,10 @@ async function submit() {
     ElMessage.warning(`${tt('还有工序未选生产线')}：${miss.map((s) => s['工序']).join('、')}`)
     return
   }
-  // 计划日期硬校验(2026-11-09 用户口径「开工日期不得大于完工日期」):
-  //   改日期时已自动调平,这里再兜一道 —— 任何路径(粘贴/程序改值)留下的倒挂都不许提交。
-  const badDates = invertedPlanRows(steps.value)
-  if (badDates.length) {
-    ElMessage.warning(`${tt('计划开工日期不能晚于计划完工日期')}: ${badDates
-      .map((b) => `${b.row['工序'] || ''} ${b.row['计划开工日期']} → ${b.row['计划完工日期']}`.trim())
-      .join('; ')}`)
-    return
-  }
+  // 计划日期硬校验(2026-11-09「开工不得晚于完工」+ 2026-11-11「下方的工序不能比上方的工序小」):
+  //   改日期时已自动调平,这里再兜一道 —— 任何路径(粘贴/程序改值)留下的问题都不许提交。
+  const badMsg = planProblemMessages(steps.value)
+  if (badMsg) { ElMessage.warning(badMsg); return }
   const bad = validateQty(included.value)
   if (bad.length) {
     const q = bad.filter((b) => b.reason === 'qty').map((b) => rowKeyOf(b.row))

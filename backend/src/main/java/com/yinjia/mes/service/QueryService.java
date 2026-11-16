@@ -5,9 +5,11 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 查询服务:把 HSDZ_MES 真实表数据映射为 light-mes 行契约。
@@ -132,6 +134,53 @@ public class QueryService {
      * 这里是服务端的第二道防线。
      */
     private static final List<String> WH_DOCK_PANELS = List.of("STOCK_DETAIL");
+    /**
+     * 左栏「单据状态页签」的取数控制键 —— **只有 {@link #STATUS_TAB_PANELS} 里的面板**认它。
+     *
+     * <p>用户口径(2026-11-10)：「出货功能检验中在左侧的列表中增加对应的页签实现已审核的完成单据和
+     * 未完成的分开显示,增加在当前列表处的部分,不要修改其他页面的这个组件」。
+     *
+     * <p>值:{@code all}(不传/空 等价)= 不过滤 / {@code done} = 已完成 / {@code todo} = 未完成。
+     * 前端只负责把当前页签原样放进 condition,过滤必须在**服务端**做 —— 左栏单据列表是后端分页
+     * (50 条/页、合计 400+ 单),前端手里只有当前页那一屏;在页面上再筛一遍只会把"排到第 2 页的
+     * 已完成单"全部漏掉,「共 N 条」也跟着变来变去。
+     */
+    public static final String STATUS_TAB_KEY = "_statusTab";
+
+    /**
+     * 认 {@link #STATUS_TAB_KEY} 的面板 —— 目前**只有出货检验单 QC_PROC_INSP**(用户明确要求
+     * 「不要修改其他页面的这个组件」)。
+     *
+     * <p>为什么要有这道闸门:前端切换面板时若没把页签清干净(或别的客户端乱传),别的面板收到残留的
+     * {@code _statusTab=done} 就会被静默筛掉一半数据,而界面上看不出任何提示 —— 与
+     * {@link #WH_DOCK_PANELS} 那次「库存明细的查询影响到库存状况表」(2026-10-15)是同一类跨面板串味,
+     * 这里是服务端的第二道防线。转发一个不认识的面板号不该把面板打死,所以闸门外一律**静默忽略**。
+     *
+     * <p>以后别的面板也要这个页签:把面板号加进这个集合即可(前端自己决定要不要画页签),
+     * SQL 一行都不用动。
+     */
+    private static final java.util.Set<String> STATUS_TAB_PANELS =
+            java.util.Set.of("QC_PROC_INSP", "QC_ASM_INSP", "QC_FIRST_INSP");
+
+    /**
+     * 需要后端派生只读字段「检测周期」的面板 —— 出货检验单 **QC_PROC_INSP** 与
+     * 出货检验表观 **QC_ASM_INSP**(2026-11-12 起表观单也按图2 纸面出,抬头第 1 行同款要这一格)。
+     *
+     * <p>用户口径(2026-11-11 图2《出货检验功能记录表》抬头第 1 行):「检测周期:首次填写表单时间-末次提交审核时间」;
+     * 设计契约见 {@code docs/design/出货检验功能记录表-表样改造.md} §二 字段清单 / §四 后端:
+     * 「虚拟字段,QueryService 下发,yj_field 不建」—— 所以只在这里算、**不落库**,任何面板元数据都不用动。
+     *
+     * <p>2026-11-12:QC_ASM_INSP(出货检验表观,原「组装成品检验单」)落成同款图2 矩阵纸面
+     * (明细同样一行 = 检验项目 × 内部批次),所以它也要「检测周期」⇒ 一并纳入本闸门。
+     * ⚠ 首次保存时间**不能写死表名**:见 {@link #loadFirstSaveTimes},表名取当前面板元数据的
+     *   {@code head_table}。写死 {@code qc_proc_insp_head} 会让表观单拿到**别的单**的首次保存时间
+     *   (两面板单号前缀不同,看似"查不到",实质是查错表)。
+     *
+     * <p>加闸门(而不是所有面板都算)的理由与 {@link #STATUS_TAB_PANELS} 同一类:这张单要多一次
+     * 「按单号分组取 MIN(asp_time1)」的批量查询,只给真要显示的面板付这份代价。
+     */
+    private static final java.util.Set<String> DOC_CYCLE_PANELS = java.util.Set.of("QC_PROC_INSP", "QC_ASM_INSP");
+
     /**
      * 供应商门户的数据范围控制键(2026-10-25 用户口径「供应商打印面版的前端要与采购订单一致。
      * 只是显示和权限不一样」)。
@@ -645,6 +694,12 @@ public class QueryService {
             fieldCond.remove("_archTo");
         }
         appendDocFilters(def, where, args, keyword, fieldCond, l2c, split, docCols, docTable, g);
+        // 左栏「全部/已完成/未完成」页签(2026-11-10,只对出货检验单 QC_PROC_INSP 生效,见
+        // appendStatusTabFilter)。**必须跟在其它条件之后、COUNT 之前**:列表是后端分页,
+        // totalSize 与分页 SQL 都要带上同一段 WHERE,否则「共 N 条」和页签内的实际行数对不上。
+        // 传原始 condition(fieldCond 只是剔掉了 _docNo/_archFrom/_archTo 的副本);
+        // _statusTab 以下划线开头,appendDocFilters 里因 l2c 查不到列名自然跳过,不会被当成字段名。
+        appendStatusTabFilter(def, condition, where, args, g);
         String noKw = qDocNo == null ? "" : String.valueOf(qDocNo).trim();
         if (!noKw.isEmpty()) {
             where.append(" AND (t.[").append(g).append("] LIKE ?");
@@ -776,6 +831,12 @@ public class QueryService {
 
         Map<String, Map<String, Object>> status = loadStatus(def.code(), docNos);
 
+        // 「检测周期」的左端(首次填写/保存时间):**一次批量查**全部单号(与 loadStatus 同款),
+        // 不要放进下面的单号循环里逐单查 —— 那会变成一页 50 次查询的 N+1。
+        Map<String, java.sql.Timestamp> firstSave = DOC_CYCLE_PANELS.contains(def.code())
+                ? loadFirstSaveTimes(def, docNos)
+                : Map.of();
+
         List<Map<String, Object>> docs = new ArrayList<>();
         for (String no : byDoc.keySet()) {
             List<Map<String, Object>> items = byDoc.get(no);
@@ -798,6 +859,21 @@ public class QueryService {
             // 2026-11-06 外部开发样品申请单接入两级审批后，前端靠这一格判断「我是不是本单的确认人」
             // （PanelxList.l2ApproverNow）：没有它，非管理员的确认人在「待二级审批」节点看不到按钮。
             doc.put("二级审核人", st == null ? null : st.get("l2_approver"));
+            // 「检测周期」派生只读字段(2026-11-11,出货检验单 QC_PROC_INSP /
+            //   2026-11-12 起同款表观单 QC_ASM_INSP 的图2 表头第 1 行):
+            //   首次填写表单时间(= 头表 asp_time1 的 MIN,即这套单第一次落库/保存的时刻)
+            //   ~ 末次提交/审核时间(= yj_doc_status.pending_at 提交时间 / shsj 审核时间中**有值的较晚者**)。
+            //   草稿只有首次保存时间 ⇒ 单端显示;两端都没有 ⇒ null(前端留空格子)。
+            //   两端按**时间先后**排版(B 案,原因见 docCycleText:存量单是批量导入,asp_time1 晚于历史审核时间,
+            //   照字面会排出倒置区间;新单 first<last,排版前后完全一致)。
+            //   口径来源:用户 2026-11-11 图2 表头注「检测周期:首次填写表单时间-末次提交审核时间」;
+            //   2026-11-13 用户修正「审批通过后才确定第二个日期」⇒ 右端只认审核时间 shsj,
+            //   提交审批后不再固定(弃审后自动退回单端)。契约见
+            //   docs/design/出货检验功能记录表-表样改造.md §二「(派生)检测周期 / 后端派生只读」。
+            //   ⚠ 只读派生、**不落库**:yj_field 里不建这一行(不是字段,是后端合成的行键,与「发起人」同类)。
+            if (DOC_CYCLE_PANELS.contains(def.code())) {
+                doc.put("检测周期", docCycleText(firstSave.get(no), st));
+            }
             doc.put("detail", Map.of("items", items));
             // 「发起人」= 提交审批的人(2026-10-29 用户口径「发起人应该是提交审批的人的账号名,
             // 以提交审批的为准,草稿的可以覆盖」)。
@@ -909,6 +985,111 @@ public class QueryService {
                     }, docNos.toArray());
         }
         return out;
+    }
+
+    /**
+     * 首次填写/保存时间 —— 「检测周期」的左端,**一次批量查**所有单号(按 group_col 取 {@code MIN(asp_time1)})。
+     *
+     * <p>为什么单独查:loadDocs 只 select yj_field 里登记过的列,{@code asp_time1} 是审计列、不一定在字段集合里;
+     * 它放在 {@link #loadStatus} 同一个位置(**进入单号循环之前**)= 一页 50 单只多 1 条 SQL,
+     * 与「发起人」取数同一条纪律(绝不逐单查 → N+1)。
+     *
+     * <p>头行式取头表(一单一行,MIN 与单值等价,写成 MIN 是为了与单表式面板同一句 SQL);
+     * 没有头表的形态用行表兜底。
+     *
+     * <p>🔴 <b>表名必须取当前面板的元数据({@code def.headTable()}),绝不写死任何一张表</b>
+     * (2026-11-12 本闸门纳入了第二个面板 QC_ASM_INSP 时再次确认):出货检验单 QC_PROC_INSP →
+     * {@code qc_proc_insp_head}、出货检验表观 QC_ASM_INSP → {@code qc_asm_insp_head},两面板单号
+     * 前缀/表都不同。若有人图省事写成 {@code FROM qc_proc_insp_head},表观单就查了**别人的表**:
+     * 单号对不上 ⇒ 全部落在 catch 里只留空格子,而列表接口不报错 —— 界面表现为「检测周期永远空」,
+     * 从 SQL 日志看不出是代码写死造成的。
+     *
+     * <p>取不到(表/列缺失、历史脏数据)只记日志、不阻断:派生字段缺失应当留空格子,
+     * 不能把整张列表打挂 —— 与 {@link #realNameOf} 的容错口径一致。
+     */
+    private Map<String, java.sql.Timestamp> loadFirstSaveTimes(PanelRegistry.PanelDef def, List<String> docNos) {
+        Map<String, java.sql.Timestamp> out = new HashMap<>();
+        // 表名只认面板元数据(见方法注释 🔴):头行式取 head_table,单表式退回 line_table。
+        // ⚠ 不要改成写死 qc_proc_insp_head / qc_asm_insp_head —— 这里同时服务两个出货检验面板。
+        String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
+        String g = def.groupCol();
+        if (table == null || table.isBlank() || g == null || g.isBlank()) return out;
+        String in = String.join(",", docNos.stream().map(n -> "?").toList());
+        try {
+            jdbc.query("SELECT t.[" + g + "] AS __no, MIN(t.asp_time1) AS __first FROM " + table
+                    + " t WHERE t.[" + g + "] IN (" + in + ") GROUP BY t.[" + g + "]", rs -> {
+                out.put(rs.getString("__no"), rs.getTimestamp("__first"));
+            }, docNos.toArray());
+        } catch (RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(QueryService.class)
+                    .warn("[检测周期] 面板 {} 取首次保存时间失败(该列留空): {}", def.code(), e.getMessage());
+        }
+        return out;
+    }
+
+    /**
+     * 「检测周期」文本 = 首次填写表单时间 ~ 末次提交/审核时间(格式 {@code yyyy-MM-dd HH:mm})。
+     *
+     * <p><b>用户口径</b>(2026-11-11 图2《出货检验功能记录表》抬头第 1 行):
+     * 「检测周期:首次填写表单时间-末次提交审核时间」;**2026-11-13 用户修正**:
+     * 「需要在审批通过后才确定下来这个检测周期的第二个日期,当前提交审批后日期就被固定下来了,
+     *   可能存在弃审的情况,所以要求审批通过后这个数据才保存下来」。取数:
+     * <ul>
+     *   <li>首次填写 = 首次保存(头表 {@code asp_time1} 的 MIN,见 {@link #loadFirstSaveTimes});</li>
+     *   <li>右端 = **审核通过时间 {@code shsj}**(审批通过那一刻写值),**不再吃 {@code pending_at}
+     *       (提交审批时间)** —— 提交后弃审会把 {@code shr/shsj} 清空(见 ButtonService.unaudit),
+     *       于是右端自动消失、只显示首次填写;再提交/再审通过时重新落最新的审核时间。
+     *       这样"周期"只表达**真正审过的区间**,不会因为提交过就被钉死;</li>
+     *   <li>只有一端就**单端显示**(草稿/审批中只有首次保存时间),两端都空 ⇒ {@code null}(前端留空格子)。</li>
+     * </ul>
+     *
+     * <p><b>为什么两端按时间先后排版,而不是硬把「首次」放左边</b>(2026-11-11 用户/Lead 拍板 B 案):
+     * 存量单是 2026-10 批量导入的 —— {@code asp_time1} 是**导入时刻**(实测统一 2026-10-18 08:02:03),
+     * 而 {@code shsj} 是纸面历史审核时刻(2026-10-14/15 08:30)。实测 445 张单里 417 张已审核单
+     * **全部**满足 shsj &lt; MIN(asp_time1)(0 张正常、28 张无审核时间)—— 照字面拼就是倒置区间
+     * 「2026-10-18 08:02 ~ 2026-10-14 08:30」,打在纸面上像个 bug。
+     * ⇒ 两端取**较早者在前、较晚者在后**:新单本来 first &lt; last,输出**一个字都不变**;
+     *   存量单只是把两个真实时间换成可读顺序,不发明时间、也不丢时间。
+     *   (没有改成「只显示左端」:那样会把审核时间藏掉,反而少给了信息。)
+     *
+     * @param firstSave 头表 MIN(asp_time1)({@code java.sql.Timestamp}/LocalDateTime/Date 都能吃)
+     * @param st        {@link #loadStatus} 那一行(yj_doc_status),可为 null
+     */
+    static String docCycleText(Object firstSave, Map<String, Object> st) {
+        java.time.LocalDateTime first = wallClock(firstSave);
+        // 右端**只认审批通过时间**(2026-11-13 用户口径):提交审批(pending_at)不锁定周期;
+        // 弃审清空 shr/shsj ⇒ 这里自然回到单端显示(不留下"已经被固定"的假周期)。
+        java.time.LocalDateTime last = st == null ? null : wallClock(st.get("shsj"));
+        if (last == null && st != null) last = null;   // 明确:不使用 pending_at
+        if (first == null && last == null) return null;
+        if (last == null) return first.format(CYCLE_FMT);
+        if (first == null) return last.format(CYCLE_FMT);
+        // 见方法注释 B 案:存量单(批量导入的 asp_time1)会晚于历史审核时刻 ⇒ 按先后排版,避免倒置区间
+        java.time.LocalDateTime start = first.isBefore(last) ? first : last;
+        java.time.LocalDateTime end = first.isBefore(last) ? last : first;
+        return start.format(CYCLE_FMT) + " ~ " + end.format(CYCLE_FMT);
+    }
+
+    /** 两个时间点取较晚者(任一为空就返回另一个);「检测周期」右端用 */
+    private static java.time.LocalDateTime laterOf(java.time.LocalDateTime a, java.time.LocalDateTime b) {
+        if (a == null) return b;
+        if (b == null) return a;
+        return b.isAfter(a) ? b : a;
+    }
+
+    /** 库里的时间值 → 本地墙钟 LocalDateTime(口径同 {@link #auditTimeText}:不做时区换算、按字面显示) */
+    private static java.time.LocalDateTime wallClock(Object v) {
+        if (v == null) return null;
+        try {
+            if (v instanceof java.sql.Timestamp ts) return ts.toLocalDateTime();
+            if (v instanceof java.sql.Date d) return d.toLocalDate().atStartOfDay();
+            if (v instanceof java.time.LocalDateTime d) return d;
+            if (v instanceof java.time.LocalDate d) return d.atStartOfDay();
+            if (v instanceof java.util.Date d) return new java.sql.Timestamp(d.getTime()).toLocalDateTime();
+        } catch (RuntimeException e) {
+            return null;
+        }
+        return null;
     }
 
     /** 状态推导:已作废 > 已中止 > 删除申请中 > 已终止/终止审批中(项目实施计划) > 修改申请中 > 待二级审批/审批中 > 修改中 > 已生效 > 已归档 > 已完成(金蝶自动关单) > 已审核 > 草稿
@@ -1132,12 +1313,40 @@ public class QueryService {
             java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final java.time.format.DateTimeFormatter T_FMT =
             java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss");
+    /**
+     * 「检测周期」两端的时间格式 = {@code yyyy-MM-dd HH:mm}。
+     *
+     * <p>用户 2026-11-11 口径(图2 表头「检测周期」格,同设计契约 §二):写到**分钟**即可 ——
+     * 这一格是给纸面看的「从什么时候开始检、到什么时候交/审完」,秒没有意义且会把格子撑宽;
+     * 与列表/表单里其它虚拟时间字段({@link #DT_FMT} 到秒)刻意不同,别手滑复用。
+     */
+    private static final java.time.format.DateTimeFormatter CYCLE_FMT =
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     /** 直接列过滤(档案模式) */
     private void appendDirectFilters(PanelRegistry.PanelDef def, String table, StringBuilder where,
                                      List<Object> args, String keyword, Map<String, Object> condition,
                                      Map<String, String> l2c, String alias) {
         if (condition != null) {
+            // 查询区参照字段「输入即查」的模糊名单(2026-11-13)——
+            // 用户口径:「报工记录中上方的查询不能只是选择查询的,而是可以输入后就查询的形式」。
+            // 前端在**用户自由输入、没从候选里精确选中**时带控制键 `_fuzzy` = 逗号分隔的**字段 label**
+            // (例:`产品编码,客户编码`,中文数据键口径不变);命中名单的参照字段走 `RTRIM(列) LIKE '%值%'`,
+            // 不在名单里(含完全没带该键)仍走等值 `= ?`。
+            // ⚠ 口径红线:**精确选择仍等值,只有自由输入才 LIKE** —— 从放大镜/下拉里选中的是一个实体,
+            //   子串匹配会串档(仓库「成品仓」命中「半成品仓」的事故见下方 2026-10-20 注释);
+            //   只有用户手打的片段才允许模糊,并且仅限该面板显式开了 queryInputRef 的那几个参照字段。
+            // `_fuzzy` 以 `_` 开头 ⇒ 属控制键:不进下面的通用循环(循环开头已 skip `_` 前缀),也不参与 l2c 映射。
+            // 二期(同日):参照字段的值若是**数组**(前端按名称片段解析出的编码集合),走 IN(...) ——
+            //   与 `_fuzzy` 无关,也不再要求本键(见通用循环里的 refCodesOf 与参照分支)。
+            Set<String> fuzzyLabels = new HashSet<>();
+            Object fuzzyRaw = condition.get("_fuzzy");
+            if (fuzzyRaw != null && !String.valueOf(fuzzyRaw).isBlank()) {
+                for (String s : String.valueOf(fuzzyRaw).split(",")) {
+                    String t = s.trim();
+                    if (!t.isEmpty()) fuzzyLabels.add(t);
+                }
+            }
             // 仓库下拉(库存状况):按仓库编码(ckdm)精确过滤(_ckdm);绑定编码,仓库字典改名不影响
             Object ck = condition.get("_ckdm");
             if (ck != null && !String.valueOf(ck).isBlank()) {
@@ -1237,7 +1446,12 @@ public class QueryService {
                 if (key != null && key.startsWith("_")) continue; // 控制键(_whCode/_itemCode/_whCodes/_ckdm/_docNo…)
                 String col = l2c.get(key);
                 Object v = e.getValue();
-                if (col == null || v == null || String.valueOf(v).isBlank()) continue;
+                if (col == null || v == null) continue;
+                // 参照字段的「编码集合」形态(2026-11-13 输入即查二期):值为数组时**不能**落到下面的
+                // String.valueOf/args(List 会被拼成 "[CJ001, CJ002]" 塞进 SQL)。先解析成 List<String>
+                // (非集合值返回 null),参照分支据此拼 IN(...);非参照字段收到数组则按调用方异常忽略。
+                List<String> codes = refCodesOf(v);
+                if (codes == null && String.valueOf(v).isBlank()) continue;
                 if ("开始日期".equals(key) || "结束日期".equals(key)) continue; // 已按期次区间处理
                 // 仓库/存货已由 appendWhItemFilter 按「编码优先、退化名称」处理完毕(前端仍回显名称,不重复叠加)
                 if ("仓库".equals(key) && byWh) continue;
@@ -1246,10 +1460,31 @@ public class QueryService {
                 // LIKE 子串会串仓:仓库「成品仓」会同时命中「半成品仓」、「不良品仓」命中「原料不良品仓」
                 // (库存台账实测:查 成品仓 返回 93 行 = 成品仓 34 + 半成品仓 59,台账按仓分户的口径直接失真)。
                 // 文本字段保持模糊;RTRIM 防 nchar/手工导入尾随空格(与台账联动选项同款口径)。
+                // 例外(2026-11-13 输入即查):本字段 label 出现在 `_fuzzy` 名单里 = 用户是**手打片段**而非
+                // 精确选中 ⇒ 按 LIKE '%片段%' 模糊匹配(与同面板文本字段同口径,RTRIM 同上);
+                // 其余情况(精确选择/没带 `_fuzzy`)一律维持等值 —— 见方法开头的 `_fuzzy` 解析注释。
+                // 二期(2026-11-13,同日):值为**编码数组**时走 IN(...) —— 见上方 `codes` 的说明。
                 PanelRegistry.FieldDef fd = def.byLabel(key);
                 if (fd != null && "参照".equals(fd.dataType())) {
-                    where.append(" AND RTRIM(").append(alias).append(".[").append(col).append("]) = ?");
-                    args.add(String.valueOf(v).trim());
+                    // ① 编码集合(前端自由输入「名称片段」时,先按关键字解析出匹配档案的编码再传过来)⇒ IN (...)。
+                    //    数组本身语义就是「这些编码之一」,故**不看也不要求** `_fuzzy`;两种并存时以数组优先。
+                    //    全部为空(前端一个编码都没解析到)⇒ **不加条件**,别把查询静默变成 0 行。
+                    if (codes != null) {
+                        if (codes.isEmpty()) continue;
+                        where.append(" AND RTRIM(").append(alias).append(".[").append(col).append("]) IN (")
+                                .append(String.join(",", java.util.Collections.nCopies(codes.size(), "?"))).append(")");
+                        args.addAll(codes);
+                    } else if (fuzzyLabels.contains(key)) {
+                        where.append(" AND RTRIM(").append(alias).append(".[").append(col).append("]) LIKE ?");
+                        args.add("%" + String.valueOf(v).trim() + "%");
+                    } else {
+                        where.append(" AND RTRIM(").append(alias).append(".[").append(col).append("]) = ?");
+                        args.add(String.valueOf(v).trim());
+                    }
+                } else if (codes != null) {
+                    // 防御:数组值只对参照字段有意义(编码集合)。文本/日期等字段收到数组属调用方 bug,
+                    // 宁可不加条件,也不能把 "[CJ001, CJ002]" 经 String.valueOf 拼进 LIKE。
+                    continue;
                 } else {
                     where.append(" AND ").append(alias).append(".[").append(col).append("] LIKE ?");
                     args.add("%" + v + "%");
@@ -1268,6 +1503,52 @@ public class QueryService {
                 args.addAll(kargs);
             }
         }
+    }
+
+    /** 参照字段「编码集合」上限(2026-11-13 输入即查二期):前端约定最多传 200 个,超出截断 ——
+     *  防 IN 参数膨胀(SQL Server 上限 2100)与慢查询;与前端侧同一上限口径。 */
+    private static final int REF_IN_CODES_MAX = 200;
+
+    /**
+     * 参照字段的值若是**集合**({@link java.util.Collection};前端 JSON 数组经 Jackson 反序列化即 ArrayList)
+     * 或 Java 数组,解析成**去重后的编码列表**;非集合值返回 {@code null}(调用方据此走原有的 LIKE/等值分支)。
+     *
+     * <p>用户口径(2026-11-13,输入即查二期):用户直接回车打的是「名称片段」(如「钢管」)时,单靠
+     * {@code LIKE %片段%} 匹配编码列(wzdm)—— 名称与编码不同源 —— 查不到;改由前端先按关键字解析出
+     * 匹配档案的**编码集合**传过来,后端落成 {@code IN (...)}。
+     *
+     * <p>防呆口径(契约):
+     * <ul>
+     *   <li>trim + 丢弃 null/空白项;</li>
+     *   <li>去重(保序,LinkedHashSet);</li>
+     *   <li>最多 {@value #REF_IN_CODES_MAX} 个,超出**截断**(不报错);</li>
+     *   <li>全部为空 ⇒ 返回**空列表**(不是 null)⇒ 调用方**不加条件**,
+     *       绝不能静默变成「0 行」把用户吓一跳。</li>
+     * </ul>
+     *
+     * <p>⚠ 这里存在的意义:List 一旦落到 {@code String.valueOf(v)} 就会拼出 {@code "[CJ001, CJ002]"}
+     * 进 SQL/args,所以数组必须在通用循环里被本方法提前接住,转成 IN 的参数列表。
+     */
+    private static List<String> refCodesOf(Object v) {
+        if (v == null) return null;
+        List<Object> raw = new ArrayList<>();
+        if (v instanceof java.util.Collection<?> c) {
+            raw.addAll(c);
+        } else if (v.getClass().isArray()) {
+            int n = java.lang.reflect.Array.getLength(v);
+            for (int i = 0; i < n; i++) raw.add(java.lang.reflect.Array.get(v, i));
+        } else {
+            return null;   // 普通标量值 ⇒ 非集合形态,走原分支
+        }
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        for (Object o : raw) {
+            if (o == null) continue;
+            String t = String.valueOf(o).trim();
+            if (t.isEmpty()) continue;
+            out.add(t);
+            if (out.size() >= REF_IN_CODES_MAX) break;   // 超出截断
+        }
+        return new ArrayList<>(out);
     }
 
     /**
@@ -1543,5 +1824,64 @@ public class QueryService {
             }
             where.append(")");
         }
+    }
+
+    /**
+     * 左栏「全部 / 已完成 / 未完成」页签的服务端过滤(2026-11-10,出货检验单 QC_PROC_INSP)。
+     *
+     * <p>用户原话:「出货功能检验中在左侧的列表中增加对应的页签实现已审核的完成单据和未完成的分开显示,
+     * 增加在当前列表处的部分,不要修改其他页面的这个组件我先确认查看」。所以只有
+     * {@link #STATUS_TAB_PANELS} 里登记的面板认这个键,其余面板的左栏一律照旧。
+     *
+     * <p>为什么必须在服务端过滤:左栏单据列表是**后端分页**(50 条/页,合计 400+ 单),前端手里只有
+     * 当前页那一屏。在页面上再 filter 一遍,得出的只是「当前页里的已完成」——换页就变数,
+     * 「共 N 条」和点进去能看到的单据对不上。所以只认 condition 里的页签名,在这里翻成 WHERE 片段,
+     * 与其它条件一起进 COUNT 和分页 SQL(前端只负责传当前页签)。
+     *
+     * <p><b>done 的判据必须与 {@link #docStatus(Map)} 逐条对齐</b>(列表行上显示的「单据状态」就是它算的),
+     * 否则会出现「页签说已完成、行上却显示草稿」。映射:
+     * <ul>
+     *   <li>已作废({@code canceled='Y'})/ 已中止({@code stopped='Y'} 或 {@code erp_close_state='H'})/
+     *       删除申请中({@code deleting='Y'})⇒ **都不算完成**(先排除);这类异常终态落在「未完成」,
+     *       因为业务上确实没做完 —— 已作废的单据本来也已被 queryDocs 开头那条 canceled 过滤排除,
+     *       这里再排除一次是为了与 docStatus 的优先级保持同一口径,不依赖外层。</li>
+     *   <li>已审核({@code shr} 非空,含下级状态) / 已归档({@code archived='Y'}) /
+     *       已生效({@code effective='Y'}) / 已完成({@code erp_close_state='S'},金蝶自动关单)
+     *       ⇒ 算完成(docStatus 里这几种都排在「已审核」之上或等于,即都过了审核)。</li>
+     * </ul>
+     *
+     * <p>todo = {@code NOT done}(补集):这样 done + todo 恒等于「全部」,任何单据都不会在两个页签里
+     * 凭空消失或重复 —— 包括 yj_doc_status 里**没有状态行**的老单据(列表上显示「草稿」)。
+     * 将来 docStatus 多出新的"未完成"状态,兜底也自动落进 todo,不必回来改两处。
+     *
+     * <p>闸门(静默 return,不抛错):condition 为空 / 面板不在 {@link #STATUS_TAB_PANELS} /
+     * 值为空或 {@code all} / 值不是 {@code done|todo}。认不出的值一律当「全部」,不猜。
+     *
+     * <p>⚠ 与 {@link #docStatus(Map)} **必须同改**(同 ButtonService.docStatusOf 那条规矩):
+     * docStatus 增删状态或调整优先级,这里跟着改,否则页签与行上的状态文字会对不上。
+     */
+    private void appendStatusTabFilter(PanelRegistry.PanelDef def, Map<String, Object> condition,
+                                       StringBuilder where, List<Object> args, String g) {
+        if (condition == null || def == null) return;
+        // 第二道防线:没有登记页签的面板收到残留键也不能被静默过滤(见 STATUS_TAB_PANELS 注释)
+        if (!STATUS_TAB_PANELS.contains(def.code())) return;
+        Object raw = condition.get(STATUS_TAB_KEY);
+        String tab = raw == null ? "" : String.valueOf(raw).trim().toLowerCase(java.util.Locale.ROOT);
+        if (tab.isEmpty() || "all".equals(tab)) return;            // 全部 = 不加任何条件
+        if (!"done".equals(tab) && !"todo".equals(tab)) return;    // 认不出的值当「全部」,不猜
+        // 与 docStatus() 同口径:异常终态(作废/中止/删除申请中)先排除,再认"过了审核/归档/生效/金蝶关单"。
+        // CAST 统一为 nvarchar:组列类型与 doc_no 比较时不会隐式转换失败(同上面 canceled 过滤的写法)。
+        String done = "EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ?"
+                + " AND s.doc_no = CAST(t.[" + g + "] AS nvarchar(100))"
+                + " AND ISNULL(s.canceled,'N') <> 'Y'"
+                + " AND ISNULL(s.stopped,'N') <> 'Y'"
+                + " AND ISNULL(s.erp_close_state,'') <> 'H'"
+                + " AND ISNULL(s.deleting,'N') <> 'Y'"
+                + " AND (s.shr IS NOT NULL OR ISNULL(s.archived,'N') = 'Y'"
+                + " OR ISNULL(s.effective,'N') = 'Y' OR ISNULL(s.erp_close_state,'') = 'S'))";
+        where.append("done".equals(tab) ? " AND " : " AND NOT ").append(done);
+        // 副本面板(供应商采购打印之类)的状态行记在源面板名下,与 loadStatus / 归档区间过滤同一折算,
+        // 见 PanelAliases —— 不折算的话副本面板的页签会恒为空。
+        args.add(com.yinjia.mes.panel.PanelAliases.statusSource(def.code()));
     }
 }

@@ -91,10 +91,12 @@ python run_migrations.py ../tools/migrate-xxx.sql               # 两个账套�
 
 它会：base64 分块上传 → `sqlcmd -f 65001 -b -i` 逐库执行 → **自动补登 `yj_schema_log`**。
 
-> 三个坑（脚本里已处理，改代码时别看漏）：
+> 四个坑（脚本里已处理，改代码时别看漏）：
 > ① WinRM 单命令 **8000 字符就报 `command line is too long`** ⇒ 分块必须 ≤ **1500**；
 > ② 迁移脚本是 UTF-8 含中文，sqlcmd 默认按 ANSI 读会报语法错 ⇒ 必须 **`-f 65001`**；
-> ③ 不加 **`-b`** 时 SQL 报错 sqlcmd 仍返回 0，会误判成功。
+> ③ 不加 **`-b`** 时 SQL 报错 sqlcmd 仍返回 0，会误判成功；
+> ④ 不加 **`-I`** 时 `QUOTED_IDENTIFIER` 默认 OFF，凡 `CREATE INDEX` / 计算列 / 筛选索引的脚本
+>    直接报 **消息 1934「'QUOTED_IDENTIFIER' 的设置不正确」**（2026-11-15 实测 `migrate-wo-bom-20261113`）。
 
 ### 第 3 步：部署 jar
 
@@ -180,7 +182,7 @@ schtasks /run /tn "YINJIA-MES"
 |---|---|
 | `InvalidCredentialsError` | 用 `YJ_WINRM_TRANSPORT=basic`；或口令错（`%` `@` 等特殊字符要加引号） |
 | 连不上 5985 / 超时 | 安全组没放通开发机出口 IP；`telnet <host> 5985` 自测 |
-| 代理环境下"连上了但收不到数据" | 代理的 `200 Connection established` 只代表代理自己应答，不代表到得了服务器；**以"能否拿到协议响应"为准** |
+| 代理环境下"连上了但收不到数据" | 代理的 `200 Connection established` 只代表代理自己应答，不代表到得了服务器；**以"能否拿到协议响应"为准**。Windows 开发机若注册表开着系统代理（`Internet Settings\ProxyServer`），pywinrm 会被它截胡报 `Code 502` ⇒ 运行前 `set NO_PROXY=36.140.66.163`（2026-11-15 实测） |
 | 上传后远端文件 0 字节 | WinRM 单命令超长（把分块降到 1500） |
 | sqlcmd 报语法错、中文变 `??` | 缺 `-f 65001` |
 | 构建失败 | 看 `deploy_src.py` 打印的日志尾部；多为 `mvn` 下载失败或依赖缺失 |

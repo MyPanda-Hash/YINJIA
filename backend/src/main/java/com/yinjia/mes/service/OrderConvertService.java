@@ -285,6 +285,12 @@ public class OrderConvertService {
      * (2026-09-26 数据源单轨:不再写 bd/bl_manu_order,不再跳转生产加工单表单页)。
      * 行内若修改了 交货日期 → 先回写订单行(applyDateEdit),工单 计划完工日期 取修正后交期。
      *
+     * <p>🔴 2026-11-11 工单号口径(用户拍板,**修订当天第一版**):**同一个销售订单始终一张工单号** ——
+     * 不同订单行无论分几次点「转工单」,都往该订单已有工单里追加(行号 = 订单行号);只有**同一订单行
+     * 重复转单**(该工单里已经有这一行了,如数量分批/备品追加)或该订单已完全结案时,才另取新工单号。
+     * 解析逻辑收口在 {@link QuickScheduleService#resolveOrderWorkOrderNo}(单点实现,别在页面/控制器里再写一套)。
+     * 用户原话:「当前明明是同一个销售订单的订单结转,生成的生产工单号还是不同,要求同一个销售订单的工单号相同。」
+     *
      * <p>⚠ 不加 @Transactional(2026-09-26 修复):行级独立提交——此前外层事务+内层事务方法
      * 的组合,某行守卫失败会把共享事务标 rollback-only,提交即抛
      * "Transaction rolled back because it has been marked as rollback-only"(用户实测报障)。
@@ -292,8 +298,9 @@ public class OrderConvertService {
      */
     public Map<String, Object> toManu(List<Map<String, Object>> rows, String user) {
         if (rows == null || rows.isEmpty()) throw new IllegalArgumentException("请先勾选要转工单的订单行");
-        List<String> created = new ArrayList<>();
+        List<String> created = new ArrayList<>();      // 工单号(去重,按首次生成顺序)
         List<String> failed = new ArrayList<>();
+        int lineCount = 0;
         for (Map<String, Object> r : rows) {
             String soNo = str(r.get("订单号"));
             String lineId = str(r.get("行id"));
@@ -310,14 +317,18 @@ public class OrderConvertService {
                     failed.add(soNo + "#" + lineId + ":未选择工艺路线,不能转工单");
                     continue;
                 }
-                created.add(quickSchedule.createFromOrderLine(soNo, lineId, qty, user, route));
-            } catch (RuntimeException e) {
-                failed.add(soNo + "#" + lineId + ":" + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
+                // 工单号传 null:由服务按「销售订单」解析(已有工单就并入;同一订单行重复转单才取新号)
+                String plNo = quickSchedule.createFromOrderLine(soNo, lineId, qty, user, route, null);
+                if (!created.contains(plNo)) created.add(plNo);
+                lineCount++;
+            } catch (RuntimeException ex) {
+                failed.add(soNo + "#" + lineId + ":" + (ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage()));
             }
         }
         if (created.isEmpty()) throw new IllegalStateException("无行可转:" + String.join("; ", failed));
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("生成张数", created.size());
+        out.put("生成张数", created.size());         // 落到的工单张数(同一销售订单通常 1 张)
+        out.put("生成行数", lineCount);              // 实际落库的工单行数(成功转出的订单行)
         out.put("编号清单", created);
         out.put("失败行", failed);
         return out;

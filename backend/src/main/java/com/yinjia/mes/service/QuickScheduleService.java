@@ -17,12 +17,18 @@ import java.util.Map;
  * 一并删除 —— 排产单一入口是「快速排产 / 生产工单」页(Plang 单轨,见 ScheduleBoardService.assign)。
  * 本类不再承担排产回写。
  *
- * <p>🔴 2026-10-31 转单口径(用户拍板,替代「同一销售订单共用一张工单」):
- * <b>一次转单 = 一张新工单号</b>(GD-YYYY-MM-NNNN,取号走 {@link FormNoService});
- * 工单上写 订单号 + **订单行号**({@code od_no}/{@code od_xc}),工单行号 {@code pl_xc} 也取订单行号
- * ⇒ 同一订单行分多次转单时,每张工单各自一行、行号稳定(不再出现 MAX(pl_xc)+1 的漂移),
- * 靠 od_no/od_xc 回溯销售订单行。每张工单的 需求数量/转单数量 都等于**本次转单数量**
- * (旧实现写整条订单行数量 ⇒ 同一订单行转两次就各带一份整单需求,需求被重复计)。
+ * <p>🔴 2026-11-11 转单口径(用户拍板,**取代** 2026-10-31 的「一次转单一张新工单」,并修正当天第一版的
+ * 「按转单批次发号」):<b>同一个销售订单始终用同一张工单号</b>,不同订单行陆续转进来就一行一行并进这张工单
+ * (工单行号 {@code pl_xc} 各取自己的订单行号);只有**同一订单行重复转单**(该工单里已经有这一行了)
+ * 或该订单已完全结案时才另取新工单号。
+ * 用户原话:「同一个销售订单都应该为同一个工单号只是工单行号不同」「当前明明是同一个销售订单的订单结转,
+ * 生成的生产工单号还是不同,要求同一个销售订单的工单号相同」。
+ * 追溯仍靠 {@code od_no}(订单号)+ {@code od_xc}(订单行 id)+ {@code pl_xc}(=订单行号)。
+ * 每行 需求数量/转单数量 都等于**该行本次转单数量**(不写整条订单行数量,避免需求重复计 —— 2026-10-30 报障)。
+ *
+ * <p>历史沿革(别再改回去):2026-09-27「同一销售订单共用工单(行号取 MAX+1)」→ 2026-10-31「一行一张
+ * 工单号」→ 2026-11-11「按转单批次发号」→ 2026-11-11 修订「同一销售订单共用工单、行号=订单行号、
+ * 重复行才开新单」。前两版都被用户报障推翻,判据见 {@link #resolveOrderWorkOrderNo}。
  *
  * <p>🔴 2026-11-08 用户口径(备品):订单结转页的「本次转单数量」**允许超过销售订单数量**
  * (备品场景);该数量由 UI 明确给出(qtyOverride>0)时按原值落工单,不再截断到剩余可转量,
@@ -57,13 +63,17 @@ public class QuickScheduleService {
     // ────────────────────────── ① 销售订单 → 生产工单(一单可多次生成多张) ──────────────────────────
 
     /**
-     * 整单按行生成工单草稿(**每行一张新工单号**,增量:剩余为 0 的行跳过),返回新单号清单;
-     * 支持同一行反复点击多次生成。
+     * 整单按行生成工单草稿(**整单共用一张工单号**,增量:剩余为 0 的行跳过),
+     * 返回新单号清单(去重,通常 1 个);支持同一行反复点击多次生成(该行已有工单行 ⇒ 另起一张新工单)。
+     *
+     * <p>2026-11-11 修订:工单号由 {@link #resolveOrderWorkOrderNo} 按**销售订单**解析 ——
+     * 该订单已有未结案工单就把各行并进去(不再一行一张单号)。
      *
      * <p>2026-10-31:用户口径「销售订单 → 生产工单、生产工单 → 产成品入库单这两个保持原来的不变」
      * ⇒ 本链路**不进统一生单对话框**(不勾行、不填量),这里保持原实现不动。
      * 注:它经 {@code createFromOrderLine(...)} 的 4 参重载调用,而该重载传 route=null,
-     * 会被 2026-10-16 加的「工艺路线须已审核」闸门拒绝 —— 这是既有行为,本次按用户要求未改。
+     * 会被 2026-10-16 加的「工艺路线须已审核」闸门拒绝 —— 这是既有行为,本次按用户要求未改
+     * (转单以「订单结转」页为准,那里按行选路线)。
      */
     @Transactional
     @SuppressWarnings("unchecked")
@@ -82,25 +92,28 @@ public class QuickScheduleService {
             String lineId = str(line.get("id"));
             if (lineId == null) continue;
             if (residual(sourceNo, lineId, line) <= 0.0001) continue;   // 剩余为 0:已生成的行跳过
-            created.add(createFromOrderLine(sourceNo, lineId, null, user));
+            // 工单号由服务内部按「销售订单」解析(2026-11-11 修订):该订单的工单会被复用
+            String plNo = createFromOrderLine(sourceNo, lineId, null, user, null, null);
+            if (!created.contains(plNo)) created.add(plNo);            // 去重:同一单号只报一次
         }
         if (created.isEmpty()) throw new IllegalStateException("该订单明细行均已生成生产工单,无需重复生成(如需调整请先删除对应工单草稿)");
         return created;
     }
 
     /**
-     * 单行 → **一张新工单**(2026-10-31 用户拍板,取代 2026-09-27 的「同一销售订单共用一张工单」):
+     * 订单行 → 工单行(**一张工单可含同一销售订单的多个订单行** —— 2026-11-11 修订口径,详见类注释):
      * <ul>
-     *   <li><b>每次转单取新工单号</b>(GD-YYYY-MM-NNNN,{@link FormNoService});同一订单行转几次就是几张工单,
-     *       各自可独立排产/报工/打印/结案;</li>
-     *   <li><b>工单行号 pl_xc = 订单行号</b>({@code bl_so_order.行号});每张新工单只有这一行,
-     *       所以同一订单行多次转单时行号稳定(旧实现复用单号时取 MAX(pl_xc)+1 ⇒ 第二次转单行号变 2);</li>
+     *   <li><b>工单号</b>:默认由 {@link #resolveOrderWorkOrderNo} 按**销售订单**解析 —— 该订单已有工单且
+     *       里面还没有这一订单行 ⇒ 并进去(返回那张单号);该订单还没工单、或这一订单行已经在里面
+     *       (= 同一行重复转单/备品追加)⇒ 取新号(GD-YYYY-MM-NNNN,{@link FormNoService});</li>
+     *   <li><b>工单行号 pl_xc = 订单行号</b>({@code bl_so_order.行号});并入已有工单时若该行号已被占用
+     *       (只可能来自订单行号为空/重复的历史脏数据),改用 MAX(pl_xc)+1 并告警 —— 键是 工单号#行号,
+     *       撞号会把占用链/工序台账混成一条;</li>
      *   <li><b>订单追溯</b>:{@code od_no = 销售订单号},{@code od_xc = 订单行 id}(沿用历史口径,
      *       工单列表/追溯按它 join 出「订单行号」);{@code pl_xc} 本身即订单行号 ⇒ 工单自带订单号+订单行号;</li>
-     *   <li><b>数量</b>:{@code xq_sl(需求) = pl_sl(转单) = 本次转单数量},{@code yl(余量)=0}
-     *       —— 旧实现把 xq_sl 写成整条订单行数量,同一订单行分两次转 ⇒ 两张工单各带 200 需求、
-     *       订单需求被重复计(2026-10-30 用户报障);</li>
-     *   <li>占用链仍是行级 form_flow_link(SO 订单行 → 本工单行,数量 = 本次转单数量),
+     *   <li><b>数量</b>:{@code xq_sl(需求) = pl_sl(转单) = 本行本次转单数量},{@code yl(余量)=0}
+     *       —— 不写整条订单行数量,同一订单行分多次转不会重复计需求(2026-10-30 用户报障);</li>
+     *   <li>占用链仍是行级 form_flow_link(SO 订单行 → 本工单行,键 pl_no#pl_xc,数量 = 本行本次转单数量),
      *       订单结转页「已排产/剩余数量」口径不变。</li>
      * </ul>
      * 严格「已审核」闸门;剩余=行数量−各通道占用。
@@ -123,6 +136,17 @@ public class QuickScheduleService {
      *              空 = 回退产品档案绑定(bs_inv.工艺路线)→ 否则默认 GY-CB-STD
      */
     public String createFromOrderLine(String sourceNo, String lineId, Double qtyOverride, String user, String route) {
+        return createFromOrderLine(sourceNo, lineId, qtyOverride, user, route, null);
+    }
+
+    /**
+     * @param plNo 目标工单号:**空 = 交给 {@link #resolveOrderWorkOrderNo} 按销售订单解析**
+     *             (该订单已有工单就并进去,同一订单行重复转单才取新号 —— 2026-11-11 修订口径);
+     *             非空 = 强制追加进该工单(目前仅生成器/运维工具显式指定时使用)
+     * @return 本行实际落库的工单号
+     */
+    public String createFromOrderLine(String sourceNo, String lineId, Double qtyOverride, String user,
+                                      String route, String plNo) {
         requireAudited(sourceNo);
         // 🔴 工艺路线必须审核完成后才能被使用(2026-10-16 用户口径「当前能工艺路线需要被
         //   审核完成后才能被使用」)。拦住的是**生成工单这一步**：订单结转/快速排产选定的路线
@@ -176,16 +200,18 @@ public class QuickScheduleService {
             qty = residual;
         }
         if (qty <= 0) throw new IllegalStateException("生单数量必须大于 0");
-        // ── 工单号 / 行号 / 数量(2026-10-31 新口径,口径说明见方法 javadoc)──────────────────────
-        // 每次转单**直接取新工单号**:不再按 od_no 复用「该订单已有工单号」。
-        // 旧实现(2026-09-27~2026-10-30)一张订单共用一张工单,复用时的行号只能取 MAX(pl_xc)+1 ⇒
-        //   同一订单行第二次转单就变成同单里的 #2(与订单行号无关),用户报障「第二次转工单的行号被改了」。
+        // ── 工单号 / 行号 / 数量(2026-11-11 修订口径,口径说明见类注释与方法 javadoc)──────────
+        // 工单号按**销售订单**发(不再按转单批次发):
+        //   · 该订单已有工单、且里面**还没有这一订单行** ⇒ 并入该工单(不同订单行无论分几次转都是同一个号);
+        //   · 该订单还没有工单,或候选工单里都已有这一订单行(= 同一行重复转单/备品追加) ⇒ 取新工单号。
         // 生产工单前缀 MO → GD(2026-10-05 用户口径「修改生产工单」):只影响新单号,历史单号不变;
         // 取号流水在 s_allno(按 前缀+年月 独立序列),不与旧前缀混号。
-        String plNo = formNo.next("GD", user);
-        // 工单行号 = 订单行号(bl_so_order.行号,金蝶分录 seq);每张新工单只有这一行,不会撞号。
+        boolean append = plNo != null && !plNo.isBlank();
+        String targetNo = append ? plNo.trim() : resolveOrderWorkOrderNo(sourceNo, Integer.parseInt(lineId), user);
+        // 工单行号 = 订单行号(bl_so_order.行号,金蝶分录 seq);并入已有工单时防撞号(见 reserveLineNo)
         Integer lineNo = line.get("行号") instanceof Number n ? n.intValue() : 1;
         if (lineNo == null || lineNo <= 0) lineNo = 1;
+        if (append) lineNo = reserveLineNo(targetNo, lineNo);
         String batch = null; // 生产批次在工单行首次生产完工时生成
         String due = str(line.get("交货日期"));
         // 需求数量 = 本次转单数量(本工单行自己的需求),余量 0。
@@ -198,7 +224,7 @@ public class QuickScheduleService {
                         + " VALUES (N'0', ?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, ?, ?,"
                         + " CASE WHEN ? IS NULL OR ? = N'' THEN NULL ELSE CONVERT(datetime, ?, 120) END,"
                         + " ?, ?, CONVERT(float, ?), 'N', 'N', ?, GETDATE(), ?, ?)",
-                plNo, lineNo, str(line.get("客户编码")), str(line.get("存货编码")), str(line.get("存货名称")),
+                targetNo, lineNo, str(line.get("客户编码")), str(line.get("存货编码")), str(line.get("存货名称")),
                 str(line.get("规格型号")), str(line.get("销售单位")), qty, qty, remain, due, due, due,
                 // od_no=销售订单号;od_xc 沿用历史口径存**订单行 id**(bl_so_order.id,精确关联,
                 // 工单列表/追溯按它 join 出「订单行号」显示)。
@@ -209,18 +235,85 @@ public class QuickScheduleService {
         // 工序台账(2026-10-21 用户口径:「工艺路线是在工单结转的时候选择的,选择完后工单跟着走」):
         //   转单后立刻按**结转时选的路线**建 wo_process_line,否则「结转过但没预排产」的工单在
         //   工序报工页面看不到任何工序、现场报不了工。计划生产线留空,后续预排产再派线。
-        //   幂等:该行已有有效台账(已预排产)则跳过;失败不阻断转单(台账可事后补)。
+        //   幂等:**按工单行**判有没有台账(已预排产的行跳过)⇒ 同一张工单后续追加的行照样建自己的台账,
+        //   已存在的行不会重复建;失败不阻断转单(台账可事后补)。
         try {
-            int n = processTask.ensureLedgerForWorkOrder(plNo, route, user);
-            if (n > 0) log.info("[订单结转] 工单 {} 按路线 {} 建工序台账 {} 道", plNo, route, n);
+            int n = processTask.ensureLedgerForWorkOrder(targetNo, route, user);
+            if (n > 0) log.info("[订单结转] 工单 {} 按路线 {} 建工序台账 {} 道", targetNo, route, n);
         } catch (Exception e) {
-            log.warn("[订单结转] 工单 {} 建工序台账失败(不阻断转单): {}", plNo, e.getMessage());
+            log.warn("[订单结转] 工单 {} 建工序台账失败(不阻断转单): {}", targetNo, e.getMessage());
         }
         // 行级占用链落**实际转单量** qty(2026-11-08 备品口径复核:超出订单数量时也按实际数计入,
         // 不截断 ⇒ 备品转完后本行剩余为负,订单结转页按「剩余>0」过滤自然消失,无需额外改)。
+        // 键 = 工单号#工单行号 ⇒ 同一张工单的多行各挂各的占用链,互不干扰。
         voucherFlow.linkLine("SO_ORDER", sourceNo, sourceNo + "#" + lineId, str(line.get("存货编码")), qty,
-                "PLANG", plNo, plNo + "#" + lineNo, "");
-        return plNo;
+                "PLANG", targetNo, targetNo + "#" + lineNo, "");
+        return targetNo;
+    }
+
+    /**
+     * 解析本行该落进哪张工单(2026-11-11 **修订**口径:同一个销售订单始终一张工单号)。
+     *
+     * <p>用户口径(2026-11-11 第二次报障,截图 `GD-2026-11-0013`(#2)/`GD-2026-11-0014`(#4) 都属
+     * `LZW-20261019-02`,分两次点转工单却拿到两个号):
+     * 「当前明明是同一个销售订单的订单结转,生成的生产工单号还是不同,要求同一个销售订单的工单号相同。」
+     *
+     * <p>规则(按顺序):
+     * <ol>
+     *   <li>该销售订单下**已有的工单**(未作废、不是切单子单、且还有未结案的行),按创建先后找第一张
+     *       **里面还没有这一订单行**的 ⇒ 把本行并进去(不同订单行,无论隔几次转单、隔多久,都是同一个号);</li>
+     *   <li>找不到(该订单还没工单;或候选工单里都已经含这一订单行)⇒ **取新工单号**:
+     *       后者就是「同一订单行重复转单(数量分批/备品追加)」——同一张工单里一个订单行只能有一行
+     *       (行键 = 工单号#工单行号,重复会把占用链/工序台账混成一条);</li>
+     *   <li>已完全结案的工单不再接收新行(生产做完了又出现新订单行,应当另开一张,不要往历史单里塞)。</li>
+     * </ol>
+     *
+     * <p>判重口径 = {@code bl_so_order.id}(plang.od_xc,精确到行,不受「行号」历史重复值影响);
+     * 并入时仍可能撞 `pl_xc`(=订单行号)的历史脏数据,由 {@link #reserveLineNo} 让位。
+     *
+     * @param sourceNo 销售订单号
+     * @param lineId   销售订单行 id({@code bl_so_order.id})
+     * @param user     取号留痕人
+     * @return 目标工单号(已有工单号或新号)
+     */
+    private String resolveOrderWorkOrderNo(String sourceNo, int lineId, String user) {
+        if (sourceNo != null && !sourceNo.isBlank() && lineId > 0) {
+            List<String> candidates = jdbc.queryForList(
+                    "SELECT p.pl_no FROM dbo.plang p"
+                            + " WHERE p.od_no = ? AND ISNULL(p.asp_cancel,'N') <> 'Y'"
+                            // 切单子单是独立工单(GD-xxx-1),不算该订单的主工单
+                            + "   AND ISNULL(p.[是否切单],'N') <> 'Y'"
+                            // 还至少有一行没结案(全结案的工单不再接新行)
+                            + "   AND EXISTS (SELECT 1 FROM dbo.plang y WHERE y.pl_no = p.pl_no"
+                            + "        AND ISNULL(y.asp_cancel,'N') <> 'Y' AND ISNULL(y.ja,'N') <> 'Y')"
+                            // 这张工单里还没有这一订单行(按订单行 id 判,精确)
+                            + "   AND NOT EXISTS (SELECT 1 FROM dbo.plang x WHERE x.pl_no = p.pl_no"
+                            + "        AND ISNULL(x.asp_cancel,'N') <> 'Y'"
+                            + "        AND CONVERT(bigint, ISNULL(x.od_xc, 0)) = ?)"
+                            // 按最早创建的工单优先:主工单持续累积该订单的各行
+                            + " GROUP BY p.pl_no ORDER BY MIN(p.id)", String.class, sourceNo, lineId);
+            if (!candidates.isEmpty()) return candidates.get(0);
+        }
+        return formNo.next("GD", user);
+    }
+
+    /**
+     * 追加行时确定本行行号(2026-11-11):优先用订单行号;该行号在本工单里已被占用时改用 MAX(pl_xc)+1。
+     *
+     * <p>为什么需要:行键是「工单号#工单行号」(占用链 target_line_key、工序台账按 工单行id、领料/报工
+     * 都按 工单号+行号 定位),同一张工单里撞行号会把两行的链路混成一条。正常一笔转单里每行订单行号
+     * 唯一,撞号只可能来自「订单行 行号 为空/重复」的历史脏数据 —— 宁可让出一个行号并留日志,
+     * 也不能静默混账。
+     */
+    private int reserveLineNo(String plNo, int want) {
+        List<Integer> used = jdbc.queryForList(
+                "SELECT DISTINCT pl_xc FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                        + " AND pl_xc IS NOT NULL", Integer.class, plNo);
+        if (want > 0 && !used.contains(want)) return want;
+        int next = used.stream().mapToInt(Integer::intValue).max().orElse(0) + 1;
+        log.warn("[订单结转] 工单 {} 里订单行号 {} 已被占用(订单行号为空或重复),本行改用行号 {}",
+                plNo, want, next);
+        return next;
     }
 
     /**
@@ -265,8 +358,12 @@ public class QuickScheduleService {
      * <p>为什么走 yj_doc_status 而不是读 {@code bs_route.审核状态} 列：那一列是**显示投影**，
      * 依赖触发器是否触发;状态表才是状态机的唯一凭据(与 {@code docStatusOf} 同源)。
      * 取不到状态行 ⇒ 该路线从未走过审核流 ⇒ 视为未审核。</p>
+     *
+     * <p>2026-11-13:由 {@code private} 提升为 {@code public} —— 新增的「生产工单 → 新增生产工单」
+     * ({@link WorkOrderCreateService})与订单结转走**同一道**路线审核闸门,不另写一套判据
+     * (两套判据必然分叉;本仓库 2026-10-16 的教训即此)。</p>
      */
-    private void requireRouteAudited(String route) {
+    public void requireRouteAudited(String route) {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT shr FROM yj_doc_status WHERE panel_code = 'ROUTE' AND doc_no = ?", route);
         if (rows.isEmpty()) {

@@ -540,11 +540,18 @@ async function convert(api, label) {
     })
     const d = res.data || {}
     const failed = d['失败行'] || []
+    // 2026-11-11 口径:同一销售订单在同一次转单里的多行 = 一张工单号(行号不同) ⇒ 提示同时给「张数/行数」,
+    // 让现场一眼看出"勾了 3 行、只生成了 1 张单"是正常的,不是漏转。
+    const woCount = d['生成张数'] ?? 0
+    const rowCount = d['生成行数'] ?? 0
+    const countText = rowCount > woCount
+      ? `${woCount} ${tt('张')}（${rowCount} ${tt('行')}）`
+      : `${woCount} ${tt('张')}`
     // 2026-10-11 用户拍板:结转只弹首道「确认转工单」框,结果不再弹窗——轻提示带出即可;
     // 新工单即落 plang 入快速排产待排产池(该池已改新单置顶),本页刷新后转满行自动消失
     ElMessage({
       type: 'success',
-      message: `${tt('已生成')} ${d['生成张数']} ${tt('张')}：${(d['编号清单'] || []).join('、')}`
+      message: `${tt('已生成')} ${countText}：${(d['编号清单'] || []).join('、')}`
         + (failed.length ? `（${tt('跳过')} ${failed.length}：${failed[0]}）` : ''),
       duration: 5000,
       showClose: true,

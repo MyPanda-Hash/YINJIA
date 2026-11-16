@@ -10,12 +10,16 @@
  * 2026-11-09 增补(用户报障「计划开工日期可以大于计划完工日期」):
  *   · 改完工日若早于**本道**开工日 ⇒ 本道开工一起降到完工日(否则留下 11-09~11-03 的倒挂);
  *   · isPlanDateInverted / invertedPlanRows:供弹窗提交前硬校验。
+ *
+ * 2026-11-11 增补(用户口径「下方的工序页不能比上方的工序小」):
+ *   · 后道开工/完工不得早于**上道完工**:改日期时先夹到上道完工日,再管本道开工≤完工;
+ *   · planDateProblems 同时报「本道倒挂」和「下道早于上道」两类,供提交前一次拦全。
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   addDays, daysBetween, cascadeDue, cascadeStart, normalizePlanChain,
-  isPlanDateInverted, invertedPlanRows,
+  isPlanDateInverted, invertedPlanRows, planDateProblems,
 } from './planChain.js'
 
 const row = (op, start, due) => ({ 工序: op, 计划开工日期: start, 计划完工日期: due })
@@ -57,7 +61,8 @@ test('cascadeDue:改完工日 ⇒ 下一道开工=本道完工,后续按各自�
     row('切炭', '2026-11-02', '2026-11-05'),   // 时长 3 天
     row('组装', '2026-11-05', '2026-11-06'),   // 时长 1 天
   ]
-  cascadeDue(rows, 0, '2026-11-03')
+  const fixed = cascadeDue(rows, 0, '2026-11-03')
+  assert.deepEqual(fixed, { start: null, due: null })     // 首道没有上道 ⇒ 完工不被夹;本道也没倒挂 ⇒ 不提示
   assert.deepEqual(pair(rows), [
     ['2026-11-01', '2026-11-02'],   // 本道日期没倒挂(11-01 ≤ 11-03)⇒ 本道原样不动、只由调用方 v-model 写入完工值
     ['2026-11-03', '2026-11-06'],
@@ -74,8 +79,8 @@ test('cascadeDue:改完工日早于本道开工 ⇒ 本道开工降到完工日(
   ]
   // @change 触发前 v-model 已把完工写成 11-03(真实组件的顺序),此时本道开工还留着 11-09
   rows[0]['计划完工日期'] = '2026-11-03'
-  const fixedStart = cascadeDue(rows, 0, '2026-11-03')
-  assert.equal(fixedStart, '2026-11-03')                 // 返回被调平的开工日,调用方据此提示
+  const fixed = cascadeDue(rows, 0, '2026-11-03')
+  assert.deepEqual(fixed, { start: '2026-11-03', due: null })   // 返回被调平的开工日,调用方据此提示
   assert.deepEqual(pair(rows), [
     ['2026-11-03', '2026-11-03'],
     ['2026-11-03', '2026-11-03'],
@@ -90,14 +95,74 @@ test('cascadeStart:开工晚于本道完工 ⇒ 完工拉到开工并向后续�
     row('切炭', '2026-11-02', '2026-11-04'),
     row('组装', '2026-11-04', '2026-11-04'),
   ]
-  assert.equal(cascadeStart(rows, 1, '2026-11-06'), '2026-11-06')
+  assert.deepEqual(cascadeStart(rows, 1, '2026-11-06'), { start: null, due: '2026-11-06' })
   assert.equal(rows[1]['计划完工日期'], '2026-11-06')
   assert.equal(rows[2]['计划开工日期'], '2026-11-06')
   assert.equal(rows[2]['计划完工日期'], '2026-11-06')   // 原时长 0
   // 开工没晚于完工 ⇒ 什么都不动(也不返回提示值)
   const before = JSON.stringify(rows)
-  assert.equal(cascadeStart(rows, 0, '2026-11-01'), null)
+  assert.deepEqual(cascadeStart(rows, 0, '2026-11-01'), { start: null, due: null })
   assert.equal(JSON.stringify(rows), before)
+})
+
+test('cascadeStart:下方工序开工早于上方完工 ⇒ 夹到上方完工日(2026-11-11 报障截图:成型 11-11~11-13、切炭 11-01)', () => {
+  // 截图形态:第 1 道 11-11~11-13,后两道却都是 11-01~11-01(手工把下道开工改早了)
+  const rows = [
+    row('成型', '2026-11-11', '2026-11-13'),
+    row('切炭', '2026-11-11', '2026-11-11'),
+    row('组装', '2026-11-11', '2026-11-11'),
+  ]
+  rows[1]['计划开工日期'] = '2026-11-01'
+  const fixed = cascadeStart(rows, 1, '2026-11-01')
+  assert.deepEqual(fixed, { start: '2026-11-13', due: '2026-11-13' })  // 开工被上道完工夹到 11-13;完工随之顺延
+  assert.deepEqual(pair(rows), [
+    ['2026-11-11', '2026-11-13'],
+    ['2026-11-13', '2026-11-13'],
+    ['2026-11-13', '2026-11-13'],
+  ])
+  assert.deepEqual(planDateProblems(rows), [])
+})
+
+test('cascadeDue:下方工序完工早于上方完工 ⇒ 夹到上方完工日,再顺延下游', () => {
+  const rows = [
+    row('成型', '2026-11-11', '2026-11-13'),
+    row('切炭', '2026-11-13', '2026-11-15'),
+    row('组装', '2026-11-15', '2026-11-16'),
+  ]
+  rows[1]['计划完工日期'] = '2026-11-01'
+  const fixed = cascadeDue(rows, 1, '2026-11-01')
+  assert.deepEqual(fixed, { start: null, due: '2026-11-13' })
+  assert.equal(rows[1]['计划完工日期'], '2026-11-13')   // 夹到上道完工日(开工 11-13 未超完工 ⇒ 不动)
+  assert.equal(rows[2]['计划开工日期'], '2026-11-13')   // 下游跟着上道完工
+  assert.deepEqual(planDateProblems(rows), [])
+})
+
+test('planDateProblems:两类问题一次列全(本道倒挂 + 下道早于上道)', () => {
+  assert.deepEqual(planDateProblems([]), [])
+  // 截图形态:本道没倒挂,但下道早于上道
+  const shot = [
+    row('成型', '2026-11-11', '2026-11-13'),
+    row('切炭', '2026-11-01', '2026-11-01'),
+    row('组装', '2026-11-01', '2026-11-01'),
+  ]
+  const probs = planDateProblems(shot)
+  assert.deepEqual(probs.map((p) => [p.index, p.kind, p.prevDue]), [
+    [1, 'order', '2026-11-13'],   // 切炭 11-01 < 成型完工 11-13;组装 11-01 与切炭完工相等 ⇒ 不算早,不报
+  ])
+  assert.equal(probs[0].row['工序'], '切炭')
+  assert.equal(probs[0].prevRow['工序'], '成型')
+  // 本道倒挂也一起报(两道都不合规)
+  const mixed = [
+    row('成型', '2026-11-13', '2026-11-11'),   // 本道倒挂
+    row('切炭', '2026-11-01', '2026-11-02'),   // 早于上道完工 11-11
+  ]
+  assert.deepEqual(planDateProblems(mixed).map((p) => p.kind), ['inverted', 'order'])
+  // 合法链(相邻相等/留空)不误报
+  assert.deepEqual(planDateProblems([
+    row('成型', '2026-11-11', '2026-11-13'),
+    row('切炭', '2026-11-13', '2026-11-13'),
+    row('组装', '2026-11-14', '2026-11-15'),
+  ]), [])
 })
 
 test('isPlanDateInverted / invertedPlanRows:开工>完工 才算倒挂;空值/相等/带时间都不误报', () => {

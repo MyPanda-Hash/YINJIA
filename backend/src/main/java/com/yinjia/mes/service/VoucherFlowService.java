@@ -168,6 +168,29 @@ public class VoucherFlowService {
         batchService.releaseByTarget(targetPanel, targetFormNo);
     }
 
+    /**
+     * **按目标行**释放占用(2026-11-13 生产工单删除用)。
+     *
+     * <p>与 {@link #release} 的区别:{@link #release} 按「目标单号」释放该单**全部行**的占用;
+     * 生产工单的「一张工单」可有多行(不同订单行并进同一工单号),删除其中一行时只能释放
+     * 该行自己的 SO→PLANG 占用(target_line_key = 工单号#工单行号),不能把同工单其它行也放掉
+     * (那会让别人的订单行凭空"可再转单"、出现重复转单)。
+     *
+     * <p>不回收批次台账(与 {@link #release} 同一口径:批次号一经生成不再回收,避免重号)。
+     *
+     * @return 实际释放的行数(0 = 本来没有有效占用,如手工新增工单)
+     */
+    public int releaseLine(String targetPanel, String targetFormNo, String targetLineKey) {
+        try {
+            return jdbc.update("UPDATE form_flow_link SET link_status='RELEASED', release_time=SYSDATETIME()"
+                            + " WHERE target_panel_code = ? AND target_form_no = ? AND target_line_key = ?"
+                            + "   AND link_status = 'ACTIVE'",
+                    targetPanel, targetFormNo, targetLineKey);
+        } catch (Exception ignore) {
+            return 0;   /* 表未建/列缺失等场景不阻断删除主流程 */
+        }
+    }
+
     // ============ 内部 ============
 
     private Map<String, Object> loadDoc(String panelCode, String docNo) {

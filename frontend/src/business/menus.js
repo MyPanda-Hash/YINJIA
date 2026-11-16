@@ -658,13 +658,21 @@ export const menuTree = [
           // 检验类别字段区分「首件检验(第2步)」与「制程检验(第3步)」。
           { code: 'qcProcInsp', title: '出货检验单功能', path: '/panelx/list/QC_PROC_INSP', icon: 'Checked', panelCode: 'QC_PROC_INSP', operationName: '新增流程' },
           // 组装成品检验单(9.29 批次④,2026-10-05):**组装**报工审核自动出单;含合格转库存/不合格待处理
-          { code: 'qcAsmInsp', title: '组装成品检验单', path: '/panelx/list/QC_ASM_INSP', icon: 'Finished', panelCode: 'QC_ASM_INSP', operationName: '新增流程' },
+          // 2026-11-11 用户口径「将当前的组装成品检验修改为出货检验表观」:菜单/页签只改**显示名**,
+          //   面板代号 QC_ASM_INSP、物理表 qc_asm_insp_*、单号前缀 ZJ、菜单 code/route、历史数据与
+          //   审批状态**全部不动**(改名=显示层,代号是数据键,动它等于全链路迁移+历史数据对不上)。
+          { code: 'qcAsmInsp', title: '出货检验表观', path: '/panelx/list/QC_ASM_INSP', icon: 'Finished', panelCode: 'QC_ASM_INSP', operationName: '新增流程' },
           // 出厂检验报告(2026-10-30 新增,面板 QC_OQC_REPORT,前缀 OQC):用户口径「出厂检验报告的内容
           // 就是首件/制程/成品三张单检验数据共同数据之上生成;在销售出库勾选货物时跳转到这个页面,
           // 然后走正常的审批形式」。一份报告=一个产品(勾选多行→多张单);行清单来自《出货检验计划表》
           // 的只读视图 v_oqc_std(不改该表任何一列),实测值按 qc_oqc_item_map 的优先级从三张单并集取。
           // 设计定稿 docs/design/出厂检验报告-从三张检验单并集生成.md。
           { code: 'qcOqcReport', title: '出厂检验报告', path: '/panelx/list/QC_OQC_REPORT', icon: 'Stamp', panelCode: 'QC_OQC_REPORT', operationName: '新增流程' },
+          // 巡线检验(2026-11-14 用户口径「新增成型车间巡线记录表,巡线检验入口,设定在品质模块下面」+
+          // 追问后「品质管理 → 制程品质(放在出厂检验报告下面)」):面板 QC_LINE_PATROL,
+          // 纸面照用户给的第二张图(脱模检验记录表)样式,先可填即可。
+          // 契约唯一真源 docs/design/成型车间巡线记录表-首版.md。
+          { code: 'qcLinePatrol', title: '巡线检验', path: '/panelx/list/QC_LINE_PATROL', icon: 'Document', panelCode: 'QC_LINE_PATROL', operationName: '新增流程' },
         ],
       },
       // 2026-10-09 下架:「不良处理」整组(不良品处理单 QC_DISPOSAL / 炭棒不良退货登记 ROD_RETURN)、
@@ -693,6 +701,26 @@ export const menuTree = [
           { code: 'qcScy', title: '生产异常分析报告', path: '/panelx/list/QC_SCY', icon: 'TrendCharts', panelCode: 'QC_SCY', operationName: '新增流程' },
         ],
       },
+    ],
+  },
+  // 样品检验(2026-11-16 用户口径:「样品检验需要单独放在外面的位置,相当于单独一个模块实现了」)
+  // ⇒ 从「品质管理」的二级分组**提升为一级模块**,位置紧跟品质管理
+  //   (侧栏顺序:… 生产过程 → 品质管理 → 样品检验 → 数据建模 …;一级二级同一套导航层级)。
+  // 两张单只互相引用、不与其他单据发生关系:
+  //   · 送样登记表 SAMPLE_REG = 档案模式(内部检测目录),一行=一个可检验项目,
+  //     是检验委托单「检验类别」的引用源(纸面点「选择检验项目」从这里带入);
+  //   · 检验委托单 INSP_COMMISSION = 主要实际单据(头行式 + 纸面 + 基础单级审批),
+  //     纸面照《水家电综合检测中心 检验委托单(委托检验合同)》YJ-QP-701-1-01 (00) 一比一。
+  // 契约唯一真源 docs/design/检验委托单-首版.md;迁移 tools/migrate-sample-insp-20261115.sql
+  // + tools/migrate-sample-insp-module-20261116.sql(yj_panel.module_group/权限矩阵分组 → 样品检验)。
+  // 面板码 / 路由 / 权限行 / 表结构一个字节没动,只换导航层级。
+  {
+    code: 'qcSample',
+    title: '样品检验',
+    icon: 'Notebook',
+    children: [
+      { code: 'qcSampleReg', title: '送样登记表', path: '/panelx/list/SAMPLE_REG', icon: 'Notebook', panelCode: 'SAMPLE_REG' },
+      { code: 'qcInspCommission', title: '检验委托单', path: '/panelx/list/INSP_COMMISSION', icon: 'Document', panelCode: 'INSP_COMMISSION', operationName: '新增流程' },
     ],
   },
   // 2026-10-18 用户口径:「写一个数据建模目录」——其下依次放 字段管理 / 数据字典。

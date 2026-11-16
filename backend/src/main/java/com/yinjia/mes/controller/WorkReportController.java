@@ -2,6 +2,8 @@ package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.ButtonService;
+import com.yinjia.mes.service.ProcessFlow;
+import com.yinjia.mes.service.WorkOrderBomService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -40,10 +42,13 @@ public class WorkReportController {
 
     private final JdbcTemplate jdbc;
     private final ButtonService buttons;
+    /** BOM 取数(2026-11-13 收口):临时工单用料 wo_bom 优先 → 产品标准组装 BOM 兜底 */
+    private final WorkOrderBomService bomService;
 
-    public WorkReportController(JdbcTemplate jdbc, ButtonService buttons) {
+    public WorkReportController(JdbcTemplate jdbc, ButtonService buttons, WorkOrderBomService bomService) {
         this.jdbc = jdbc;
         this.buttons = buttons;
+        this.bomService = bomService;
     }
 
     /**
@@ -83,6 +88,14 @@ public class WorkReportController {
 
         // 工序台账(wo_process_line):工序序 / 计划数量 / 状态 / 计划生产线
         String batch = String.valueOf(head.getOrDefault("批号", "") == null ? "" : head.get("批号")).trim();
+        // 🔴 2026-11-11 按量流转:本行各道的**可加工量 / 在制量 / 剩余可报**由 {@link ProcessFlow} 派生
+        //   (唯一口径,与报工闸门、转序、完工判定同源)。前端据此把数量默认成"还能报多少",
+        //   而不是"计划量 − 已报工"(那会让后道把前道还没流下来的量报掉)。
+        java.util.Map<String, ProcessFlow.Step> flowOf = new LinkedHashMap<>();
+        for (ProcessFlow.Step s : ProcessFlow.steps(jdbc, no, rowId,
+                num(head.get("排产数量")), str(head.get("工艺路线")))) {
+            flowOf.put(s.op(), s);
+        }
         List<Map<String, Object>> ledger = new ArrayList<>();
         for (Map<String, Object> r : jdbc.queryForList(
                 "SELECT ISNULL(工序,N'') AS 工序, ISNULL(工序序,0) AS 工序序,"
@@ -110,6 +123,15 @@ public class WorkReportController {
                     Double.class, no, op, rowId, batch);
             m.put("已报工", done == null ? 0 : done);
             m.put("待审核", pending == null ? 0 : pending);
+            // 按量流转(2026-11-11):可加工量 = 上一道已审报工折成品 × 本道换算率(首道 = 排产数量×本道换算率);
+            //   剩余可报 = 可加工量 − 已报工(不足 0 记 0)⇒ 工序1 只报 200/500 时,工序2 这里就是 200。
+            ProcessFlow.Step step = flowOf.get(op);
+            double avail = step == null ? 0 : step.avail();
+            double approved = done == null ? 0 : done;
+            m.put("可加工量", round4(avail));
+            m.put("在制量", round4(Math.max(avail - approved, 0)));
+            m.put("剩余可报", round4(Math.max(avail - approved, 0)));
+            m.put("上道已完", round4(step == null ? 0 : step.availBase()));
             ledger.add(m);
         }
 
@@ -131,59 +153,21 @@ public class WorkReportController {
         out.put("可报工行", rows);      // 同工单其它行(扫错行时可切换)
         // 组装物料清单(2026-11-01 用户口径:「只有组装工序有 BOM;工序报工这里选到『组装』时,
         //   要能看到当前工单对应的组装 BOM,其它工序的 BOM 和这个无关」)。
-        // 取数 = bs_asm_bom(组装物料清单,一行=一个子件,按 BOM编码 分组);前端只在选中「组装」时展示。
-        out.put("组装物料", asmBomOf(str(head.get("物料编码"))));
+        // 2026-11-13:取数收口到 {@link WorkOrderBomService} —— **临时工单用料(wo_bom)优先**,
+        //   否则按产品编码取标准组装 BOM;与手机扫码领料端同一口径(不再各写一套 SQL)。
+        WorkOrderBomService.Bom bom = bomService.ofRow(rowId, str(head.get("物料编码")));
+        Map<String, Object> asmBom = new LinkedHashMap<>();
+        // 临时工单没有独立 BOM 单号 ⇒ 用「临时工单」占位显示;标准 BOM 沿用原「单据编号」语义
+        asmBom.put("BOM编号", bom.temporary() ? "临时工单" : bom.docNo());
+        asmBom.put("版本号", bom.version());
+        asmBom.put("来源", bom.temporary() ? "临时工单" : bom.origin());
+        asmBom.put("行", bom.lines());
+        out.put("组装物料", asmBom);
         return ApiResult.ok(out);
     }
 
-    /**
-     * 工单行产品的**组装物料清单**(2026-11-01 用户口径:只有「组装」工序有 BOM,
-     * 工序报工页面选到「组装」时显示当前工单的组装物料;其它工序的 BOM 与此无关)。
-     *
-     * <p>只读:按 产品编码 + 工序=N'组装' + 状态≠停用 取一张 BOM 单 ——
-     * 「默认BOM=是」优先,其次版本号最大(当前库每个产品只有 1 个版本,无歧义);
-     * 再按 行序 取该单的全部子件行。查不到时返回空行集合,由前端提示"该产品还没有维护组装BOM"。
-     *
-     * @param productCode 工单行的产品编码(plang.dm)
-     * @return { BOM编号, 版本号, 来源, 行:[{行序,子件编码,子件名称,子件规格,计量单位,标准用量,损耗量,备注}] }
-     */
-    private Map<String, Object> asmBomOf(String productCode) {
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("BOM编号", "");
-        out.put("版本号", "");
-        out.put("来源", "");
-        out.put("行", List.of());
-        String code = productCode == null ? "" : productCode.trim();
-        if (code.isEmpty()) return out;
-        List<Map<String, Object>> docs = jdbc.queryForList(
-                "SELECT TOP 1 单据编号, 版本号, ISNULL(默认BOM,N'') AS 默认BOM, ISNULL(来源,N'') AS 来源"
-                        + " FROM dbo.bs_asm_bom"
-                        + " WHERE 产品编码=? AND 工序=N'组装' AND ISNULL(asp_cancel,'N')<>'Y'"
-                        + "   AND ISNULL(状态,N'启用')<>N'停用'"
-                        + " GROUP BY 单据编号, 版本号, 默认BOM, 来源"
-                        // 2026-11-04 与 MobilePickController.latestAsmBom 对齐为**同一套三段排序**:
-                        //   默认BOM='是' 优先 → 版本号 DESC → 单据编号 DESC(tie-break)。
-                        //   补最后一段的理由:bs_asm_bom 没有「单据日期」列 ⇒ nextVersionNo 对同日新建的多张 BOM
-                        //   恒产出 V<当天>-01,同产品两版**版本号可能相同**;此时只按 版本号 DESC 两端会拿到不同
-                        //   的一张(报工端/领料端不一致)。单号 DESC 兜底让两端结果确定且一致。
-                        + " ORDER BY CASE WHEN ISNULL(默认BOM,N'')=N'是' THEN 0 ELSE 1 END,"
-                        + " 版本号 DESC, 单据编号 DESC",
-                code);
-        if (docs.isEmpty()) return out;
-        Map<String, Object> doc = docs.get(0);
-        String bomNo = str(doc.get("单据编号"));
-        out.put("BOM编号", bomNo);
-        out.put("版本号", str(doc.get("版本号")));
-        out.put("来源", str(doc.get("来源")));
-        out.put("行", jdbc.queryForList(
-                "SELECT ISNULL(行序,0) AS 行序, ISNULL(子件编码,N'') AS 子件编码,"
-                        + " ISNULL(子件名称,N'') AS 子件名称, ISNULL(子件规格,N'') AS 子件规格,"
-                        + " ISNULL(计量单位,N'') AS 计量单位, ISNULL(标准用量,0) AS 标准用量,"
-                        + " ISNULL(损耗量,0) AS 损耗量, ISNULL(行备注,N'') AS 备注"
-                        + " FROM dbo.bs_asm_bom WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'"
-                        + " ORDER BY ISNULL(行序,999), id", bomNo));
-        return out;
-    }
+    // ⚠ 2026-11-13:原 private asmBomOf(...) 已删除 —— BOM 取数收口到 {@link WorkOrderBomService}
+    //   (临时工单用料 wo_bom 优先 → 产品标准组装 BOM 兜底),与手机扫码领料端同一口径。
 
     /**
      * 提交报工:建 {@code WO_REPORT} 报工单并**立即审核** —— 只有审核才会触发
@@ -243,9 +227,10 @@ public class WorkReportController {
         } catch (Exception e) {
             // callButton 是 @Transactional ⇒ 同一事务里抛异常会把"保存"一起回滚,
             // 所以这里可以放心说"没有保存",不会留下孤儿草稿单。
-            throw new IllegalStateException("报工没有提交成功:"
-                    + (admin ? "审核" : "提交审批") + "失败(" + e.getMessage() + ")。请稍后重试,"
-                    + "或直接到「工序报工单」手工建单。");
+            // 2026-11-13 用户口径「报工提示文案要简洁明了」:原来这里又包了一层"请稍后重试,或直接到…手工建单",
+            //   叠加后端原文后手机上是一大段。现只保留「报工提交失败: <真正原因>」,
+            //   前端弹窗再按情况给一句统一建议(见 MobileReport.vue 的超量/失败弹窗)。
+            throw new IllegalStateException("报工提交失败:" + e.getMessage());
         }
 
         Map<String, Object> out = new LinkedHashMap<>();
@@ -287,5 +272,10 @@ public class WorkReportController {
     private static double num(Object v) {
         if (v == null) return 0;
         try { return Double.parseDouble(String.valueOf(v).trim()); } catch (Exception e) { return 0; }
+    }
+
+    /** 数量保留 4 位小数(抹掉浮点尾差;可加工量/在制量展示用) */
+    private static double round4(double v) {
+        return Math.round(v * 10000d) / 10000d;
     }
 }

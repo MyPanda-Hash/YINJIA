@@ -43,9 +43,9 @@ from __future__ import annotations
 
 import argparse
 import base64
+import hashlib
 import os
 import sys
-import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -127,7 +127,7 @@ def main() -> int:
             rp = REMOTE_DIR + "\\" + f.name
             out_file = REMOTE_DIR + "\\_last.txt"
             rc, out, err = s.ps(
-                f"& sqlcmd -S localhost -E -d {db} -b -f 65001 -i '{rp}' -o '{out_file}' 2>&1 | Out-Null; "
+                f"& sqlcmd -S localhost -E -d {db} -b -I -f 65001 -i '{rp}' -o '{out_file}' 2>&1 | Out-Null; "
                 f"Write-Output ('RC=' + $LASTEXITCODE)"
             )
             ok = "RC=0" in (out or "")
@@ -145,14 +145,19 @@ def main() -> int:
                 return 1
 
     if not args.no_register:
-        print("[3] 补登 yj_schema_log（手工执行不会自动进台账）")
-        stamp = time.strftime("%Y%m%d")
+        print("[3] 补登 yj_schema_log（写脚本字节的 SHA-256，与 DbSync 同口径）")
         for db in dbs:
             for f in files:
+                # 2026-11-15:原来写的是 MANUAL-<日期>-run_migrations 占位值,导致后续
+                # 「清单 − 账本」比对既看不出内容变更、也分不清是真执行还是补登;
+                # 现按 DbSync.sha256() 同口径写真实哈希(脚本字节的 SHA-256,小写 hex)。
+                sha = hashlib.sha256(f.read_bytes()).hexdigest()
                 q = (
-                    f"IF NOT EXISTS (SELECT 1 FROM yj_schema_log WHERE script_name = N'{f.name}') "
-                    f"INSERT INTO yj_schema_log (script_name, content_hash, applied_at) "
-                    f"VALUES (N'{f.name}', N'MANUAL-{stamp}-run_migrations', GETDATE());"
+                    f"IF EXISTS (SELECT 1 FROM yj_schema_log WHERE script_name = N'{f.name}') "
+                    f"UPDATE yj_schema_log SET content_hash = N'{sha}', applied_at = GETDATE() "
+                    f"WHERE script_name = N'{f.name}'; "
+                    f"ELSE INSERT INTO yj_schema_log (script_name, content_hash, applied_at) "
+                    f"VALUES (N'{f.name}', N'{sha}', GETDATE());"
                 )
                 rc, out, err = s.ps(
                     f"& sqlcmd -S localhost -E -d {db} -b -Q \"{q}\" 2>&1 | Out-Null; "

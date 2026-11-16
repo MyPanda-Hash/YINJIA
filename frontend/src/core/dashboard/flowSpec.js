@@ -159,8 +159,10 @@ export const CHAINS = [
             warn: ['nodes.QC_PROC_INSP.ngQty'],
             note: '成型达计划量自动出草稿(也可人工开单)',
           },
+          // 2026-11-11 用户口径:显示名「组装成品检验单」→「出货检验表观」;只改显示串,
+          //   code QC_ASM_INSP / key asminsp 不动(仪表盘/流程看板的名称均走 tt(node.name))
           {
-            key: 'asminsp', name: '组装成品检验单', code: 'QC_ASM_INSP', route: '/panelx/list/QC_ASM_INSP',
+            key: 'asminsp', name: '出货检验表观', code: 'QC_ASM_INSP', route: '/panelx/list/QC_ASM_INSP',
             main: { label: '单据数', ref: 'nodes.QC_ASM_INSP.docs' },
             subs: [
               { label: '合格数量', ref: 'nodes.QC_ASM_INSP.okQty' },

@@ -1,0 +1,44 @@
+# A2 首件检验单「黄格真落库」——SQL 与终端输出实录
+# 执行人: verifier   执行时间: 2026-11-14 23:02~23:04   目标库: HSDZ_MES(正式库)
+# 单号: SJ-2026-11-0011(点「选生产工单」生成草稿;黄格填 3#外径=12.3、5#跌落=50cm、7#挤压=31 后点「保存」)
+# 清理: 验证完成后已删除（见 _cleanup-evidence.txt, 删前 3 单/91 明细行, 删后 0）
+#
+# ── SQL（tools/archive/_verify-20261114/_a2-verify.sql）────────────────────────
+# SELECT TOP 6 id, 单据编号, 工单号, 单据日期, 单据状态, asp_user1, asp_time1 FROM qc_first_insp_head ORDER BY id DESC;
+# SELECT 单据编号, COUNT(*) FROM qc_first_insp_detail WHERE 单据编号 IN ('SJ-2026-11-0009','SJ-2026-11-0010','SJ-2026-11-0011') GROUP BY 单据编号;
+# SELECT d.检验列, d.样品序号, d.实测数值, d.标准, d.行类型 FROM qc_first_insp_detail d
+#   WHERE d.单据编号='SJ-2026-11-0011' AND d.实测数值 IS NOT NULL AND LTRIM(RTRIM(d.实测数值)) <> '' ORDER BY d.检验列, d.样品序号;
+#
+# ── 输出实录（终端原样粘贴）──────────────────────────────────────────────────
+id | 单据编号 | 工单号 | 单据日期 | 单据状态 | asp_user1 | asp_time1
+10499 | SJ-2026-11-0011 | GD-2026-11-0028 | 2026-11-14 | null | admin | 2026-11-14 23:01:37.2630259
+10498 | SJ-2026-11-0010 | null | 2026-11-14 | null | admin | 2026-11-14 23:00:18.0123080
+10497 | SJ-2026-11-0009 | null | 2026-11-14 | null | admin | 2026-11-14 22:57:40.6877768
+10496 | SJ-2026-11-0008 | GD-2026-11-0023-1 | 2026-11-13 | null | admin | 2026-11-13 16:28:48.3066071
+
+单据编号 | n
+SJ-2026-11-0011 | 90
+
+检验列 | 样品序号 | 实测数值 | 标准 | 行类型
+compress | 7# | 31 | null | 样品
+drop | 5# | 50cm | null | 样品
+outer | 3# | 12.3 | null | 样品
+
+# outer 逐行（其余格必须无新值）：
+outer | 1# | null
+outer | 2# | null
+outer | 3# | 12.3      ← 黄格 3# 外径
+outer | 4# | null
+outer | 5# | null
+outer | 6# | null
+outer | 7# | null
+outer | 8# | null
+outer | 标准 | null
+# drop 逐行：仅 5# = 50cm；compress 逐行：仅 7# = 31（其余全 null）
+#
+# ── 结论 ────────────────────────────────────────────────────────────────────
+# PASS：90 行明细里「实测数值非空」恰好 3 格，且正是 (outer,3#)=12.3 / (drop,5#)=50cm / (compress,7#)=31；
+#       不可填格未被写入；保存请求 POST /api/px/callButton → 200（见 a2-save-wire3.json），
+#       UI 提示「「保存」成功」；消息记录里另有「已撤回新增：SJ-2026-11-0010」（点新增产生的空草稿被正常撤回）。
+# 刷新重开（第 10 轮 ego）：SJ-2026-11-0011 页面 3# 外径=12.3、5# 跌落=50cm、7# 挤压=31 仍在；
+# 8090 打包版重新查库渲染同一单也显示这三值（round-17 DOM8090 输出：values.outer3=12.3 / drop5=50cm / press7=31）。

@@ -505,6 +505,12 @@ public class PanelConfigService {
         metadata.put("panelCategory", def.category());
         // 报表查询弹窗入口(T+ 同款):进入面板先弹查询条件(日期段必填),关闭弹窗即退出页面;前端 PanelxList 消费
         if (List.of("STOCK_SUMMARY", "STOCK_LEDGER").contains(def.code())) metadata.put("reportQueryDialog", true);
+        // 查询区参照字段「输入即查」开关(yj_panel.config 的 queryInputRef,2026-11-13):
+        // 用户口径「报工记录中上方的查询不能只是选择查询的,而是可以输入后就查询的形式」⇒ 前端据此把
+        // 查询区里只读+放大镜的参照字段改成可输入联想;自由输入时带控制键 `_fuzzy`,后端 appendDirectFilters
+        // 对这些字段做 RTRIM(列) LIKE '%值%'(精确选择仍等值)。真源 = yj_panel.config,不加代码。
+        // 只下发 true、不下发 false:缺省键 ⇒ 前端按现行为(只可精确选择),所有面板 metadata 形状不变。
+        if (def.queryInputRef()) metadata.put("queryInputRef", true);
         metadata.put("singleDoc", panelSingleDoc(def.code()));   // 见 yj_panel.config 的 singleDoc
         metadata.put("autoCodeField", doc ? autoCodeLabel(def) : null);
         // 保存即归档文书面板(真源 ButtonService.DOC_ARCHIVE_PANELS):前端据此放出
@@ -598,7 +604,9 @@ public class PanelConfigService {
                     // 当前的生产工单」)—— 排在「取出货检验计划」之前:先按工单行建单,再带检验项目。
                     // 通用「选单」不可用(见 QcProcInspController 类注释:来源须已审核 + 须带量明细行 +
                     // 头行映射只认来源表头),故走专用入口。
-                    if ("QC_PROC_INSP".equals(def.code()) && !merged.contains("选生产工单")) {
+                    // 2026-11-12:出货检验表观(QC_ASM_INSP)同口径接入(用户口径「同时增加当前出货表观可选
+                    //   生产工单,实现方式和出货功能检验的选择工单一致」),入口=/qc/asmInsp,准入=已进入组装/装箱。
+                    if (WO_PICK_PANELS.contains(def.code()) && !merged.contains("选生产工单")) {
                         int at = merged.indexOf("取出货检验计划");
                         merged.add(at < 0 ? anchor + 1 : at, "选生产工单");
                     }
@@ -2370,6 +2378,15 @@ public class PanelConfigService {
     private static final java.util.Set<String> SHIP_PLAN_PANELS =
             java.util.Set.of("QC_ASM_INSP", "QC_PROC_INSP");
 
+    /**
+     * 「选生产工单」入口下发的面板集(2026-11-12 从「仅 QC_PROC_INSP」扩到表观单):
+     * 制程检验单 QC_PROC_INSP(2026-10-15)+ 出货检验表观 QC_ASM_INSP(2026-11-12 用户口径
+     * 「同时增加当前出货表观可选生产工单,实现方式和出货功能检验的选择工单一致」)。
+     * 首件检验单 QC_FIRST_INSP 不在此集 —— 它有自己的注入条件(见上面 FIRST_INSP_PANEL 那段)。
+     */
+    private static final java.util.Set<String> WO_PICK_PANELS =
+            java.util.Set.of("QC_PROC_INSP", "QC_ASM_INSP");
+
     /** 首件检验单(2026-10-15):工具栏注入「取成型工艺清单」入口 */
     private static final String FIRST_INSP_PANEL = "QC_FIRST_INSP";
     /** 检验项标准库编码(检验数据记录 QC_INSP_REC 的「检验项」字段 dict_sql 就是它) */
@@ -2759,6 +2776,124 @@ public class PanelConfigService {
         } catch (Exception e) {
             org.slf4j.LoggerFactory.getLogger(PanelConfigService.class)
                     .warn("[EXT_FIELD] 绑定审计写入失败({} {} {}): {}", action, label, col, e.getMessage());
+        }
+    }
+
+    /**
+     * 下拉字段「选项库」自动增项(2026-11-11 用户口径:处理意见「选择库可自动增加处理意见」)。
+     *
+     * <p>用途:纸面上把「处理意见」做成 el-select(allow-create)后,用户手输一个新意见时,前端调本方法把
+     * 新值追加进该字段的选项库({@code yj_field.dict_sql}),以后所有人在下拉里都能直接选 ——
+     * 只靠 allow-create 的话新值只存在于当前浏览器会话,下次打开又没了(不满足「选择库」语义)。
+     *
+     * <p>实现边界(只做加法,绝不改结构):
+     * <ul>
+     *   <li>只认「下拉框」字段,且 dict_sql 必须是 {@code SELECT v FROM (VALUES (N'a'),(N'b')) AS t(v)}
+     *       这种字面量列表形态 —— 其它形态(查字典表/JOIN)一律不动并返回 false;</li>
+     *   <li>已存在(去首尾空格比较)直接返回 false,不重复插;</li>
+     *   <li>值长度 ≤ 200、不含换行等控制字符;单引号按 T-SQL 规则转义,避免注入;</li>
+     *   <li>UPDATE 带 panel_code + label 精确条件,受影响行数 != 1 视为失败。</li>
+     * </ul>
+     *
+     * @return true = 已追加;false = 不需要/不允许追加(前端静默,不阻断保存)
+     */
+    public boolean appendDropdownOption(String panelCode, String label, String option) {
+        String code = panelCode == null ? "" : panelCode.trim();
+        String lab = label == null ? "" : label.trim();
+        String val = option == null ? "" : option.trim();
+        if (code.isEmpty() || lab.isEmpty() || val.isEmpty() || val.length() > 200) return false;
+        if (val.indexOf('\n') >= 0 || val.indexOf('\r') >= 0) return false;
+        try {
+            java.util.List<java.util.Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT data_type, dict_sql FROM yj_field WHERE panel_code = ? AND label = ?", code, lab);
+            if (rows.isEmpty()) return false;
+            Object type = rows.get(0).get("data_type");
+            Object sqlObj = rows.get(0).get("dict_sql");
+            if (!"下拉框".equals(type == null ? "" : String.valueOf(type).trim())) return false;
+            String sql = sqlObj == null ? "" : String.valueOf(sqlObj).trim();
+            // 只认 VALUES 字面量列表:SELECT v FROM (VALUES (N'a'),(N'b')) AS t(v)
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("(?is)^SELECT\\s+v\\s+FROM\\s*\\(\\s*VALUES\\s*(.*?)\\)\\s*(?:AS\\s+)?t\\(v\\)$")
+                    .matcher(sql);
+            if (!m.matches()) return false;
+            String values = m.group(1);
+            // 已有值:抽出所有 N'xxx' 字面量(去首尾空格比较)
+            java.util.regex.Matcher lit = java.util.regex.Pattern.compile("N?'((?:[^']|'')*)'").matcher(values);
+            java.util.List<String> existing = new java.util.ArrayList<>();
+            while (lit.find()) existing.add(lit.group(1).replace("''", "'").trim());
+            if (existing.contains(val)) return false;
+            String escaped = val.replace("'", "''");
+            String newValues = values.trim() + ", (N'" + escaped + "')";
+            String newSql = "SELECT v FROM (VALUES " + newValues + ") AS t(v)";
+            int n = jdbc.update("UPDATE yj_field SET dict_sql = ? WHERE panel_code = ? AND label = ?",
+                    newSql, code, lab);
+            return n == 1;
+        } catch (RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(PanelConfigService.class)
+                    .warn("[OPTION_LIB] 追加下拉选项失败({} {} {}): {}", code, lab, val, e.getMessage());
+            return false;
+        }
+    }
+
+    /** VALUES 字面量选项 SQL 的正则(两个方法共用一份口径:appendDropdownOption / saveDropdownOptions) */
+    private static final java.util.regex.Pattern VALUES_OPTIONS_RX = java.util.regex.Pattern
+            .compile("(?is)^SELECT\\s+v\\s+FROM\\s*\\(\\s*VALUES\\s*(.*?)\\)\\s*(?:AS\\s+)?t\\(v\\)$");
+    /** 单个选项里的 N'xxx' 字面量 */
+    private static final java.util.regex.Pattern VALUES_LITERAL_RX = java.util.regex.Pattern
+            .compile("N?'((?:[^']|'')*)'");
+
+    /**
+     * 下拉字段「选项库」**整体维护**(2026-11-11 用户口径:「能不能增加按钮或者弹窗?我觉得当前实现可行但是
+     * 弹窗形式更好维护」)—— 供纸面上的「⚙ 维护选项」弹窗调用:一次提交整份选项清单(可增、可删、可改名/排序)。
+     *
+     * <p>与 {@link #appendDropdownOption} 同一套边界:只认「下拉框」字段 + VALUES 字面量 dict_sql,
+     * 其它形态一律拒绝(返回 false,不动库)。额外约束:
+     * <ul>
+     *   <li>清单去首尾空格、去空项、去重(保序);</li>
+     *   <li>至少保留 1 项(否则下拉就空了,没法用);</li>
+     *   <li>每项 ≤ 200 字、不含换行;单引号转义;</li>
+     *   <li>写库仍是 {@code SELECT v FROM (VALUES (N'a'),(N'b')) AS t(v)} 形态(与手工维护一致)。</li>
+     * </ul>
+     *
+     * <p>⚠ 删除一个选项**不会**改动历史单据里的值:纸面对"不在选项里的历史值"有临时兜底项,
+     * 老单据照常显示原值(见 QcProcInspSheet.withCurrentOption)。
+     *
+     * @return true = 已保存;false = 拒绝(字段不是下拉框 / dict_sql 非 VALUES 形态 / 清单不合法)
+     */
+    public boolean saveDropdownOptions(String panelCode, String label, java.util.List<String> options) {
+        String code = panelCode == null ? "" : panelCode.trim();
+        String lab = label == null ? "" : label.trim();
+        if (code.isEmpty() || lab.isEmpty() || options == null) return false;
+        java.util.LinkedHashSet<String> cleaned = new java.util.LinkedHashSet<>();
+        for (String raw : options) {
+            String v = raw == null ? "" : raw.trim();
+            if (v.isEmpty()) continue;
+            if (v.length() > 200 || v.indexOf('\n') >= 0 || v.indexOf('\r') >= 0) return false;
+            cleaned.add(v);
+        }
+        if (cleaned.isEmpty()) return false;
+        try {
+            java.util.List<java.util.Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT data_type, dict_sql FROM yj_field WHERE panel_code = ? AND label = ?", code, lab);
+            if (rows.isEmpty()) return false;
+            Object type = rows.get(0).get("data_type");
+            Object sqlObj = rows.get(0).get("dict_sql");
+            if (!"下拉框".equals(type == null ? "" : String.valueOf(type).trim())) return false;
+            String sql = sqlObj == null ? "" : String.valueOf(sqlObj).trim();
+            if (!VALUES_OPTIONS_RX.matcher(sql).matches()) return false;   // 非字面量列表形态:不碰
+            StringBuilder values = new StringBuilder();
+            for (String v : cleaned) {
+                if (values.length() > 0) values.append(",");
+                values.append("(N'").append(v.replace("'", "''")).append("')");
+            }
+            String newSql = "SELECT v FROM (VALUES " + values + ") AS t(v)";
+            int n = jdbc.update("UPDATE yj_field SET dict_sql = ? WHERE panel_code = ? AND label = ?",
+                    newSql, code, lab);
+            return n == 1;
+        } catch (RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(PanelConfigService.class)
+                    .warn("[OPTION_LIB] 保存下拉选项失败({} {}): {}", code, lab, e.getMessage());
+            return false;
         }
     }
 }

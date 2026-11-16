@@ -39,14 +39,42 @@ import java.util.Set;
 @Service
 public class WorkOrderInspectionService {
 
-    /** 一张工序检验单的取数口径(三张表同构,列名差异在此登记) */
-    private record InspPanel(String panelCode, String label, String headTable, String detailTable, String ngColumn) { }
+    /**
+     * 一张工序检验单的取数口径(三张表同构,列名差异在此登记)。
+     *
+     * @param panelCode 面板代号(下发/归属/元数据锚点,**永远不改**)
+     * @param type      **类型键**:「检验类型」的语义值,参与 {@link #OP_TYPES} 的工序归属与排序 ——
+     *                  改它会让看板认不出「组装」这道工序(检验工序变空 ⇒ 检验单挂不到工序步骤上)
+     * @param display   下发给界面的「检验类型」**显示名**(仅显示层;2026-11-11 起 QC_ASM_INSP = 出货检验表观)
+     * @param headTable 头表
+     * @param detailTable 明细表
+     * @param ngColumn  明细里的不合格数量列名(首件/组装成品=不合格数量、制程=不良数量,不得写死)
+     */
+    private record InspPanel(String panelCode, String type, String display, String headTable, String detailTable,
+                             String ngColumn) { }
+
+    /**
+     * 类型键 → 界面显示名(2026-11-11 用户口径「将当前的组装成品检验修改为出货检验表观」)。
+     *
+     * <p>只改**显示串**:面板代号 {@code QC_ASM_INSP}、表名 {@code qc_asm_insp_*}、单号前缀 ZJ、
+     * 历史数据、审批状态全部不动(设计契约 docs/design/出货检验功能记录表-表样改造.md §五 改名清单)。
+     * 类型键「组装成品检验」继续作为 {@link #OP_TYPES} 的工序归属键 —— 它是内部逻辑值,不是给人看的。
+     *
+     * <p>⚠ 显示名走前端的 {@code tt()},新中文串要在 locales/*.js 补词条(至少 en:
+     * Outgoing Inspection Sheet (Appearance)),否则英文界面回落中文 —— 词条由多语言那一路统一补。
+     */
+    private static final Map<String, String> TYPE_DISPLAY = Map.of("组装成品检验", "出货检验表观");
+
+    /** 类型键 → 显示名;不在表里就原样返回(首件检验/制程检验) */
+    private static String displayOfType(String type) {
+        return type == null ? null : TYPE_DISPLAY.getOrDefault(type, type);
+    }
 
     /** 顺序 = 展示顺序(成型:首件→制程;组装:组装成品) */
     private static final List<InspPanel> PANELS = List.of(
-            new InspPanel("QC_FIRST_INSP", "首件检验", "qc_first_insp_head", "qc_first_insp_detail", "不合格数量"),
-            new InspPanel("QC_PROC_INSP", "制程检验", "qc_proc_insp_head", "qc_proc_insp_detail", "不良数量"),
-            new InspPanel("QC_ASM_INSP", "组装成品检验", "qc_asm_insp_head", "qc_asm_insp_detail", "不合格数量"));
+            new InspPanel("QC_FIRST_INSP", "首件检验", "首件检验", "qc_first_insp_head", "qc_first_insp_detail", "不合格数量"),
+            new InspPanel("QC_PROC_INSP", "制程检验", "制程检验", "qc_proc_insp_head", "qc_proc_insp_detail", "不良数量"),
+            new InspPanel("QC_ASM_INSP", "组装成品检验", "出货检验表观", "qc_asm_insp_head", "qc_asm_insp_detail", "不合格数量"));
 
     /** 应检工序 → 该工序的检验类型(与 {@link QcInspAutoService} 的 OP_PANELS 同源;改口径只改这里) */
     private static final Map<String, List<String>> OP_TYPES = new LinkedHashMap<>();
@@ -108,8 +136,10 @@ public class WorkOrderInspectionService {
         for (InspPanel p : PANELS) {
             for (Map<String, Object> d0 : rawDocs(p, noArgs)) {
                 Map<String, Object> d = new LinkedHashMap<>(d0);
-                d.put("检验类型", p.label());
-                d.put("检验工序", opOfType(p.label()));
+                // 检验类型 = **显示名**(2026-11-11 起 QC_ASM_INSP 叫「出货检验表观」);
+                // 检验工序 = 用**类型键**归属(OP_TYPES 的 成型/组装 映射,与显示名无关)。
+                d.put("检验类型", p.display());
+                d.put("检验工序", opOfType(p.type()));
                 List<Long> targets = targetsOf(d, byNo, byId, rowReports);
                 for (Long rowId : targets) {
                     List<Map<String, Object>> list = out.computeIfAbsent(rowId, k -> new ArrayList<>());
@@ -118,8 +148,10 @@ public class WorkOrderInspectionService {
             }
         }
         // 每行排序:有效单在前(按状态、再按类型顺序)
+        // ⚠ 排序键是**下发的显示名**(上面 d.put("检验类型", p.display())),所以顺序表也按显示名铺;
+        //   继续从 OP_TYPES 出发是为了「类型键 → 显示名」只认 TYPE_DISPLAY 这一处映射。
         List<String> typeOrder = new ArrayList<>();
-        for (List<String> ts : OP_TYPES.values()) typeOrder.addAll(ts);
+        for (List<String> ts : OP_TYPES.values()) for (String t : ts) typeOrder.add(displayOfType(t));
         for (List<Map<String, Object>> list : out.values()) {
             list.sort((a, b) -> {
                 int ia = typeOrder.indexOf(String.valueOf(a.get("检验类型")));
@@ -181,7 +213,8 @@ public class WorkOrderInspectionService {
 
             Map<String, Object> insp = new LinkedHashMap<>();
             insp.put("应检", true);
-            insp.put("类型", types);
+            // 「应检类型」也下发显示名,与单据上的「检验类型」同一套词(2026-11-11 组装成品检验 → 出货检验表观)
+            insp.put("类型", types.stream().map(WorkOrderInspectionService::displayOfType).toList());
             insp.put("状态", st);
             // 品质提示:该工序已有产出、但检验还没完成(缺单/草稿/审批中)⇒ 提示品质去检验
             boolean prompt = ("待检验".equals(st) || "待审核".equals(st)) && done > 0;

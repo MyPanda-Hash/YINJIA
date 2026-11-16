@@ -1,0 +1,182 @@
+{
+ "hash": "#/panelx/list/QC_FIRST_INSP",
+ "colHeads": [
+  "炭棒表观状态",
+  "炭棒脱粉情况",
+  "炭棒外径(mm)",
+  "炭棒内径(mm)",
+  "炭棒长度(mm)",
+  "炭棒重量(g)",
+  "跌落",
+  "挤压强度(kgf)",
+  "浊度NTU",
+  "压降kPa"
+ ],
+ "sampleRowCount": 8,
+ "sampleTdTotal": 88,
+ "gzYCount": 20,
+ "gzYColors": [
+  "rgb(255, 243, 202)"
+ ],
+ "slashCells": 60,
+ "fillableRows": [
+  {
+   "col": "炭棒表观状态",
+   "rows": [
+    1,
+    2
+   ],
+   "slashText": 6
+  },
+  {
+   "col": "炭棒脱粉情况",
+   "rows": [
+    1,
+    2
+   ],
+   "slashText": 6
+  },
+  {
+   "col": "炭棒外径(mm)",
+   "rows": [
+    3,
+    4
+   ],
+   "slashText": 6
+  },
+  {
+   "col": "炭棒内径(mm)",
+   "rows": [
+    3,
+    4
+   ],
+   "slashText": 6
+  },
+  {
+   "col": "炭棒长度(mm)",
+   "rows": [
+    3,
+    4
+   ],
+   "slashText": 6
+  },
+  {
+   "col": "炭棒重量(g)",
+   "rows": [
+    3,
+    4
+   ],
+   "slashText": 6
+  },
+  {
+   "col": "跌落",
+   "rows": [
+    5,
+    6
+   ],
+   "slashText": 6
+  },
+  {
+   "col": "挤压强度(kgf)",
+   "rows": [
+    7,
+    8
+   ],
+   "slashText": 6
+  },
+  {
+   "col": "浊度NTU",
+   "rows": [
+    7,
+    8
+   ],
+   "slashText": 6
+  },
+  {
+   "col": "压降kPa",
+   "rows": [
+    7,
+    8
+   ],
+   "slashText": 6
+  }
+ ],
+ "fillableTotal": 20,
+ "stdCheckCount": 2,
+ "stdCheckColors": [
+  "rgb(217, 217, 217)"
+ ],
+ "stdCheckHasCtrl": 0,
+ "spot": {
+  "3#外径(可填)": {
+   "bg": "rgb(255, 243, 202)",
+   "hasInput": true,
+   "boxes": 0,
+   "text": "",
+   "title": "按相关要求：内外径、长度及重量保留小数点后1位"
+  },
+  "3#表观(不可填)": {
+   "bg": "rgba(0, 0, 0, 0)",
+   "hasInput": false,
+   "boxes": 0,
+   "text": "/",
+   "title": "按相关要求：本组测试只记录 2 支样品（1#、2#）"
+  },
+  "5#跌落(可填)": {
+   "bg": "rgb(255, 243, 202)",
+   "hasInput": true,
+   "boxes": 0,
+   "text": "",
+   "title": ""
+  },
+  "5#外径(不可填)": {
+   "bg": "rgba(0, 0, 0, 0)",
+   "hasInput": false,
+   "boxes": 0,
+   "text": "/",
+   "title": "按相关要求：本组测试只记录 2 支样品（3#、4#）"
+  },
+  "7#挤压(可填)": {
+   "bg": "rgb(255, 243, 202)",
+   "hasInput": true,
+   "boxes": 0,
+   "text": "",
+   "title": "按表显数据记录（不取整）"
+  },
+  "7#浊度(可填)": {
+   "bg": "rgb(255, 243, 202)",
+   "hasInput": true,
+   "boxes": 0,
+   "text": "",
+   "title": ""
+  },
+  "7#压降(可填)": {
+   "bg": "rgb(255, 243, 202)",
+   "hasInput": true,
+   "boxes": 0,
+   "text": "",
+   "title": "按表显数据记录（不取整）"
+  },
+  "1#表观(可填)": {
+   "bg": "rgb(255, 243, 202)",
+   "hasInput": false,
+   "boxes": 3,
+   "text": "□无粘模（均匀）□轻微粘模（粗糙）□严重粘模（脱皮）",
+   "title": ""
+  },
+  "1#跌落(不可填)": {
+   "bg": "rgba(0, 0, 0, 0)",
+   "hasInput": false,
+   "boxes": 0,
+   "text": "/",
+   "title": "按相关要求：本组测试只记录 2 支样品（5#、6#）"
+  },
+  "8#表观(不可填)": {
+   "bg": "rgba(0, 0, 0, 0)",
+   "hasInput": false,
+   "boxes": 0,
+   "text": "/",
+   "title": "按相关要求：本组测试只记录 2 支样品（1#、2#）"
+  }
+ }
+}

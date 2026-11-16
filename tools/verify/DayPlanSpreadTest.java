@@ -88,6 +88,37 @@ public class DayPlanSpreadTest {
                 eq(r9.values().stream().mapToDouble(Double::doubleValue).sum(), 6000)
                         && r9.keySet().stream().noneMatch(d -> d.isBefore(today)), r9.toString());
 
+        // ── 2026-11-13:「原计划」基线(merge)与「日计划」(mergeReported)两本账 ──────────────
+        // 用户口径(附截图)「报工后显示在当前位置 原计划量/实际报工量」「当天结束后未完成会进行提示」
+        // ⇒ 原计划 = 全量均摊基线(含历史、不扣报工);日计划 = 扣报工后的剩余(不含历史)。
+
+        // 10) 基线:开工日=今天-3、交期=今天+4(共 8 天)⇒ 历史与未来都有值,合计 = 工序计划量 104。
+        //     注意 merge **不接收报工参数** —— 它本来就不会因报工减少,这正是"原计划"该有的样子。
+        Map<LocalDate, Double> base10 = DayPlanSpread.merge(104, today.minusDays(3), today.plusDays(4), today, Map.of());
+        check("原计划基线:含历史(今天-3)与未来(今天+4)",
+                base10.containsKey(today.minusDays(3)) && base10.containsKey(today.plusDays(4)), base10.toString());
+        check("原计划基线:合计 = 工序计划量 104(8 天×13,不因报工减少)",
+                eq(base10.values().stream().mapToDouble(Double::doubleValue).sum(), 104)
+                        && eq(base10.get(today.minusDays(3)), 13d), base10.toString());
+
+        // 11) 人工指定优先:明天人工 20 ⇒ 那天=20,剩余 84 摊到其余 7 天,合计仍 = 104(守恒)
+        Map<LocalDate, Double> manualBase = new LinkedHashMap<>();
+        manualBase.put(today.plusDays(1), 20d);
+        Map<LocalDate, Double> base11 = DayPlanSpread.merge(104, today.minusDays(3), today.plusDays(4), today, manualBase);
+        check("原计划基线:人工指定优先(明天=20)、合计守恒 104",
+                eq(base11.get(today.plusDays(1)), 20d)
+                        && eq(base11.values().stream().mapToDouble(Double::doubleValue).sum(), 104), base11.toString());
+
+        // 12) 两本账口径钉死(同一 total=104、已报 30、同一区间):
+        //     原计划含历史、合计 = 104;日计划不含历史、合计 = 74(= 104 − 30)。两者不可相加。
+        Map<LocalDate, Double> cmpOriginal = DayPlanSpread.merge(104, startPast, today.plusDays(4), today, Map.of());
+        Map<LocalDate, Double> cmpPlan = DayPlanSpread.mergeReported(104, 30, startPast, today.plusDays(4), today, Map.of());
+        check("两本账对比:原计划含历史且合计 104;日计划不含历史且合计 74",
+                cmpOriginal.keySet().stream().anyMatch(d -> d.isBefore(today))
+                        && eq(cmpOriginal.values().stream().mapToDouble(Double::doubleValue).sum(), 104)
+                        && cmpPlan.keySet().stream().noneMatch(d -> d.isBefore(today))
+                        && eq(sumFrom(cmpPlan, today), 74), cmpOriginal + " vs " + cmpPlan);
+
         System.out.println("RESULT: " + (fail == 0 ? "PASS" : "FAIL") + " (pass=" + pass + ", fail=" + fail + ")");
         if (fail > 0) System.exit(1);
     }

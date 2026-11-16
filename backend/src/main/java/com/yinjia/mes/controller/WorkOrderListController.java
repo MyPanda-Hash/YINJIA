@@ -3,6 +3,10 @@ package com.yinjia.mes.controller;
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
+import com.yinjia.mes.service.WorkOrderBomService;
+import com.yinjia.mes.service.WorkOrderCreateService;
+import com.yinjia.mes.service.WorkOrderDeleteService;
+import com.yinjia.mes.service.WorkOrderDraftService;
 import com.yinjia.mes.service.WorkOrderPickingService;
 import com.yinjia.mes.service.WorkOrderRecipeService;
 import com.yinjia.mes.service.WorkOrderSplitService;
@@ -63,16 +67,30 @@ public class WorkOrderListController {
     private final WorkOrderRecipeService recipeService;
     /** 结案守卫:反查/回正「外部程序误写成已结案」的行(判据与 ProcessTaskService.syncCloseState 同源) */
     private final com.yinjia.mes.service.WorkOrderCloseGuard closeGuard;
+    /** 新增生产工单(2026-11-13 用户口径:生产工单页要能新建,含临时工单) */
+    private final WorkOrderCreateService createService;
+    /** 工单 BOM 取数(临时工单用料优先 → 产品标准组装 BOM 兜底) */
+    private final WorkOrderBomService bomService;
+    /** 生产工单编制草稿(2026-11-13 方案 A:保存草稿/草稿箱/提交生成正式工单) */
+    private final WorkOrderDraftService draftService;
+    /** 工单删除(2026-11-13 用户口径第二条:可删除;订单结转来的释放占用回订单结转;已排产/有报工不能删) */
+    private final WorkOrderDeleteService deleteService;
 
     public WorkOrderListController(JdbcTemplate jdbc, PanelPermissionService perm, WorkOrderSplitService splitService,
                                    WorkOrderPickingService pickingService, WorkOrderRecipeService recipeService,
-                                   com.yinjia.mes.service.WorkOrderCloseGuard closeGuard) {
+                                   com.yinjia.mes.service.WorkOrderCloseGuard closeGuard,
+                                   WorkOrderCreateService createService, WorkOrderBomService bomService,
+                                   WorkOrderDraftService draftService, WorkOrderDeleteService deleteService) {
         this.jdbc = jdbc;
         this.perm = perm;
         this.splitService = splitService;
         this.pickingService = pickingService;
         this.recipeService = recipeService;
         this.closeGuard = closeGuard;
+        this.createService = createService;
+        this.bomService = bomService;
+        this.draftService = draftService;
+        this.deleteService = deleteService;
     }
 
     /** 工单行键:公司代码+工单号+工单行号+批次号(plang 行键;批次号=转单日期 yyyyMMdd,同日同批累加) */
@@ -144,7 +162,11 @@ public class WorkOrderListController {
                         + " ISNULL(p.[批次号], N'') AS 批次号,"
                         + " p.pl_no AS 加工单号, p.id AS 行id, p.pl_xc AS 行号,"
                         + " CONVERT(varchar(10), p.pl_date, 120) AS 单据日期,"
-                        + " CONVERT(varchar(16), p.asp_time1, 120) AS 转单时间,"
+                        // 转单时间(2026-11-13 用户报障「15:07 的单显示成 07:07」):
+                        //   asp_time1 由 SYSDATETIME()/GETDATE() 写入,而本机 SQL Server 跑在 Docker 里
+                        //   **TZ=UTC** ⇒ 库里存的是 UTC 墙钟;列表要按北京时间显示 ⇒ +8 小时
+                        //   (中国无夏令时,固定偏移安全)。⚠ 只改**显示**,不改库里的值、不影响排序。
+                        + " CONVERT(varchar(16), DATEADD(hour, 8, p.asp_time1), 120) AS 转单时间,"
                         + " ISNULL(dk.mc, p.khdm) AS 客户, ISNULL(p.khdm, N'') AS 客户代码,"
                         // 订单追溯(2026-10-31 用户口径「工单里要有订单ID或订单号,订单行号,能够保持订单的追溯」):
                         //   · 订单号 = plang.od_no(转单时从销售订单带入);
@@ -189,10 +211,13 @@ public class WorkOrderListController {
                         //   那是**按单号聚合**的整单派生值 ⇒ 同工单所有行显示同一个工序(实测行2 路线是
                         //   GY-2026-10-0003 首道应为混料,却因视图显示成整单的成型)。
                         //   现改为回落 **p.当前工序**(本行自己的状态列,由 ProcessTaskService 按行维护)。
+                        // 当前工序 = 预排台账里**最前一道「已落实」**。2026-11-11 按量流转后可能多道同时在制
+                        //   (成型在做、切炭也在做已流入的那批)⇒ 取最前面还没做完的那道(工序序 ASC),
+                        //   与 ProcessFlow.currentOp 同口径;已完工道由状态过滤自动跳过。
                         + " ISNULL(NULLIF((SELECT TOP 1 w.工序 FROM dbo.wo_process_line w"
                         + "   WHERE w.工单号 = p.pl_no AND ISNULL(w.asp_cancel,'N')<>'Y'"
                         + "     AND (w.工单行id = p.id OR w.工单行id IS NULL) AND ISNULL(w.状态,N'')=N'已落实'"
-                        + "   ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(p.[当前工序], N'')) AS 当前工序,"
+                        + "   ORDER BY ISNULL(w.工序序,999) ASC, w.id ASC), N''), ISNULL(p.[当前工序], N'')) AS 当前工序,"
                         // 当前工序完工量 = **该工单行**该道的已审报工量(2026-10-07:视图按单号聚合=整单口径,
                         //   与单行计划量配对会出现作用域错配「整单 56000 / 单行 75」⇒ 按行锚定)
                         + " ISNULL((SELECT SUM(ISNULL(s.sl,0)) FROM dbo.scjl s"
@@ -207,12 +232,22 @@ public class WorkOrderListController {
                         + "     AND ISNULL(r.asp_cancel,'N')<>'Y'), 0) AS 当前工序计划量,"
                         // 余量(2026-10-30 改行级,见 {@link #ROW_YL}):本工单行需求 − 本工单行占用,不足 0 记 0
                         + " " + ROW_YL + " AS 余量,"
+                        // 按量流转展示(2026-11-12 方案A,只读):enrichRowFlow 需要本行路线编码
+                        + " ISNULL(p.[工艺路线], N'') AS 工艺路线,"
                         + " ISNULL(p.ll_no2, N'') AS 领料单号, ISNULL(p.lot_no, N'') AS 批号,"
                         + " ISNULL(p.[成型配方单号],N'') AS 成型配方单号, ISNULL(p.[成型配方版本],N'') AS 成型配方版本,"
                         + " CONVERT(varchar(10), p.st_date, 120) AS 计划开工日期,"
                         + " CONVERT(varchar(10), p.cp_date, 120) AS 计划完工日期,"
-                        + " CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注"
+                        + " CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注,"
+                        // 工单类型(2026-11-13,用户口径「新增生产工单→临时工单」):有按本工单定制的
+                        //   临时用料(wo_bom)即为「临时」,否则「常规」。常规工单只填主物料、用料走
+                        //   产品标准组装物料清单 bs_asm_bom(见 WorkOrderBomService 的口径说明)。
+                        + " CASE WHEN ISNULL(wb.n, 0) > 0 THEN N'临时' ELSE N'常规' END AS 工单类型,"
+                        + " ISNULL(wb.n, 0) AS 临时物料项数"
                         + " FROM dbo.plang p"
+                        // 临时用料行数(一次分组聚合,不逐行子查询 —— 本页一次返回 400+ 行)
+                        + " LEFT JOIN (SELECT b.工单行id, COUNT(*) AS n FROM dbo.wo_bom b"
+                        + "            WHERE ISNULL(b.asp_cancel,'N') <> 'Y' GROUP BY b.工单行id) wb ON wb.工单行id = p.id"
                         + " LEFT JOIN dbo.dm_kh dk ON dk.dm = p.khdm"
                         // 订单追溯(2026-10-31):od_xc 存销售订单行 id ⇒ 反查行号(见 SELECT 段注释)。
                         + com.yinjia.mes.service.PlangOrderLine.join("p")
@@ -223,12 +258,18 @@ public class WorkOrderListController {
                         //   才是唯一工单」的口径冲突;且它是**一对多**风险源(视图按单号一行,join 尚安全,
                         //   但语义已是整单)。本查询已全部改用行级来源:当前工序取台账→本行 p.[当前工序]、
                         //   当前工序完工量按 p.id 锚定、当前工序计划量按本行路线换算 ⇒ 不再需要该视图。
-                        // 当前工序 = 预排台账最后一道「已落实」(该行现在该做的工序),缺台账回落**本行** p.当前工序
+                        // 当前工序 = 预排台账**最前一道「已落实」**(按量流转后可能多道在制),缺台账回落**本行** p.当前工序
                         + " CROSS APPLY (SELECT ISNULL(NULLIF((SELECT TOP 1 w.工序 FROM dbo.wo_process_line w"
                         + "   WHERE w.工单号 = p.pl_no AND ISNULL(w.asp_cancel,'N')<>'Y'"
                         + "     AND (w.工单行id = p.id OR w.工单行id IS NULL) AND ISNULL(w.状态,N'')=N'已落实'"
-                        + "   ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(p.[当前工序], N'')) AS 当前工序) cop"
-                        + w + " ORDER BY p.pl_date DESC, p.pl_no, p.pl_xc",
+                        + "   ORDER BY ISNULL(w.工序序,999) ASC, w.id ASC), N''), ISNULL(p.[当前工序], N'')) AS 当前工序) cop"
+                        // 默认排序(2026-11-13 用户口径「新工单应排在旧工单上方」):
+                        //   ① 先按**工单日期**倒序(业务口径不变:日期越近越靠前);
+                        //   ② 同一天内按 **id DESC**(自增主键 = 建单先后)⇒ 后建的单排最上面。
+                        //   此前是 `pl_date DESC, pl_no, pl_xc`:同一天按工单号**升序**,号越大(越新)
+                        //   反而越靠下 —— 用户看到「刚建的两张单沉在今天这组末尾」正是这个原因。
+                        //   ⚠ pl_no 是 nvarchar,不要用 pl_no 做时间先后判据(跨月/跨年前缀会翻车)。
+                        + w + " ORDER BY p.pl_date DESC, p.id DESC, p.pl_xc",
                 args.toArray());
         // 生产状态(2026-10-15 用户口径拆分「完工」与「结案」):
         //   · 已结案 = **plang.ja**(唯一结案标志;由「组装成品检验已审核 + 入库≥排产」重算,或手工结案);
@@ -242,8 +283,15 @@ public class WorkOrderListController {
         for (Map<String, Object> r : rows) {
             Map<String, Object> m = new LinkedHashMap<>(r);
             m.put("生产状态", com.yinjia.mes.service.PlangStatus.of(m));
+            // 工单类型(2026-11-13):SQL 已按 wo_bom 有无给出;老数据/空值兜底「常规」,前端列/图标不出空白
+            Object wbType = m.get("工单类型");
+            if (wbType == null || String.valueOf(wbType).isBlank()) m.put("工单类型", WorkOrderCreateService.KIND_NORMAL);
             out.add(m);
         }
+        // 按量流转展示(2026-11-12 用户口径「方案A = 只做显示」):
+        //   补 上道完工(折成品) / 本工序可加工量 / 待报量 / 待流入量 —— **只读**,不写库、不影响报工校验。
+        //   取数是 3 条批量查询(与行数无关),别改成逐行子查询(本页一次返回 400+ 行)。
+        com.yinjia.mes.service.ProcessFlow.enrichRowFlow(jdbc, out);
         return ApiResult.ok(out);
     }
 
@@ -430,6 +478,163 @@ public class WorkOrderListController {
         perm.requireButton(PagePanelRegistry.WORK_ORDER_LIST, "获取混料配方");
         return ApiResult.ok(recipeService.bind(str(body.get("工单号")), longOf(body.get("行id")),
                 doubleOf(body.get("混料数量")), currentUser()));
+    }
+
+    // ══════════ 新增生产工单(2026-11-13 用户口径)══════════
+    // 用户原话:「让当前的生产工单可以新建生产工单」+「在当前新建生产工单中增加一个页签按钮,
+    //   为增加临时工单,临时工单需要实现上方为主物料下方为所需的物料」。
+    // 两种形态共用一个弹窗:常规工单(只填主物料,用料按产品标准组装 BOM 查)/
+    //   临时工单(主物料 + 本工单定制的子件明细,落 wo_bom;取料优先用它,见 WorkOrderBomService)。
+    // 权限:查看权 + 页面动作词 create(「新增」;PagePanelRegistry.WORK_ORDER_LIST_ACTIONS)。
+    // 业务规则全部在 WorkOrderCreateService(Controller 零业务,规范 A2)。
+
+    /** 弹窗选项:客户列表 + 默认工艺路线 */
+    @PostMapping("/workOrderList/options")
+    public ApiResult<Map<String, Object>> createOptions() {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        return ApiResult.ok(createService.options());
+    }
+
+    /** 选中产品编码 → 回填名称/规格/单位/档案绑定路线 */
+    @PostMapping("/workOrderList/productInfo")
+    public ApiResult<Map<String, Object>> productInfo(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        Map<String, Object> b = body == null ? Map.of() : body;
+        return ApiResult.ok(createService.productInfo(strOf(b.get("存货编码"))));
+    }
+
+    /** 标准组装物料清单(stdBom 带出用):来源=标准BOM;产品没维护时 行=[] */
+    @PostMapping("/workOrderList/stdBom")
+    public ApiResult<Map<String, Object>> stdBom(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        Map<String, Object> b = body == null ? Map.of() : body;
+        return ApiResult.ok(bomService.viewOf(bomService.standardOf(strOf(b.get("产品编码")))));
+    }
+
+    /**
+     * 工单行 BOM(生产工单页「物料清单」按钮):临时工单用料优先,否则产品标准组装 BOM。
+     *
+     * <p>用户提问「只填写主物料、没写子物料会不会导致当前 bom 没法被查询到?」——
+     * 本端点就是答案的取证入口:常规工单返回 来源=标准BOM(按产品编码查 bs_asm_bom),
+     * 临时工单返回 来源=临时工单(按工单行查 wo_bom);两者都没有时 行=[] 且页面提示去维护。
+     */
+    @PostMapping("/workOrderList/bom")
+    public ApiResult<Map<String, Object>> bom(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        Map<String, Object> b = body == null ? Map.of() : body;
+        Long rowId = longOf(b.get("行id"));
+        String productCode = strOf(b.get("物料编码"));
+        if (productCode.isEmpty() && rowId != null) {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT ISNULL(dm,N'') AS 物料编码 FROM dbo.plang WHERE id = ?", rowId);
+            if (!rows.isEmpty()) productCode = strOf(rows.get(0).get("物料编码"));
+        }
+        return ApiResult.ok(bomService.viewOf(bomService.ofRow(rowId, productCode)));
+    }
+
+    /** 新建生产工单(常规/临时两页签共用;临时工单必须带物料清单) */
+    @PostMapping("/workOrderList/create")
+    public ApiResult<Map<String, Object>> create(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireAnyPerm(PagePanelRegistry.WORK_ORDER_LIST, "新增", "create");
+        String user = currentUser();
+        Map<String, Object> out = createService.create(body == null ? Map.of() : body, user);
+        logUsage(user, "新增生产工单", String.valueOf(out.get("工单号")), null);
+        return ApiResult.ok(out);
+    }
+
+    // ══════════ 生产工单编制草稿(2026-11-13 方案 A:保存草稿 + 整页编制 + 草稿箱)══════════
+    // 用户口径:「新建的生产工单如何实现保存草稿的情况呢?是否当前不能使用弹窗形式而是使用页面形式会更好呢?」
+    // ⇒ 草稿存 wo_draft_head/_line(**不写 plang**,避免草稿进入待排产/报工/领料),提交时复用
+    //   WorkOrderCreateService.create 生成正式工单。业务规则全部在 WorkOrderDraftService(Controller 零业务)。
+    // 权限:查看权 + 页面动作词 create(「新增」)—— 草稿保存/删除/提交与建单同词,不新增权限词。
+
+    /** 保存草稿(草稿id=0/空=新建;否则覆盖) */
+    @PostMapping("/workOrderList/draft/save")
+    public ApiResult<Map<String, Object>> draftSave(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireAnyPerm(PagePanelRegistry.WORK_ORDER_LIST, "新增", "create");
+        return ApiResult.ok(draftService.save(body == null ? Map.of() : body, currentUser()));
+    }
+
+    /** 草稿箱列表(只列草稿态;keyword 模糊 草稿号/产品编码/产品名称) */
+    @PostMapping("/workOrderList/draft/list")
+    public ApiResult<List<Map<String, Object>>> draftList(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        Map<String, Object> b = body == null ? Map.of() : body;
+        return ApiResult.ok(draftService.list(strOf(b.get("keyword"))));
+    }
+
+    /** 草稿详情(继续编辑/提交前读取:表头 + 物料清单) */
+    @PostMapping("/workOrderList/draft/get")
+    public ApiResult<Map<String, Object>> draftGet(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        Map<String, Object> b = body == null ? Map.of() : body;
+        return ApiResult.ok(draftService.get(requireDraftId(b)));
+    }
+
+    /** 删除草稿(软删;只允许草稿态) */
+    @PostMapping("/workOrderList/draft/delete")
+    public ApiResult<Map<String, Object>> draftDelete(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireAnyPerm(PagePanelRegistry.WORK_ORDER_LIST, "新增", "create");
+        Map<String, Object> b = body == null ? Map.of() : body;
+        return ApiResult.ok(draftService.delete(requireDraftId(b), currentUser()));
+    }
+
+    /** 提交草稿 → 生成正式生产工单(成功才把草稿置「已提交」并回填正式工单号) */
+    @PostMapping("/workOrderList/draft/submit")
+    public ApiResult<Map<String, Object>> draftSubmit(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireAnyPerm(PagePanelRegistry.WORK_ORDER_LIST, "新增", "create");
+        Map<String, Object> b = body == null ? Map.of() : body;
+        String user = currentUser();
+        Map<String, Object> out = draftService.submit(requireDraftId(b), user);
+        logUsage(user, "提交工单草稿", String.valueOf(out.get("工单号")), null);
+        return ApiResult.ok(out);
+    }
+
+    /** 草稿箱角标数量(生产工单页工具栏) */
+    @PostMapping("/workOrderList/draft/count")
+    public ApiResult<Map<String, Object>> draftCount() {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("数量", draftService.count());
+        return ApiResult.ok(out);
+    }
+
+    // ══════════ 删除工单(2026-11-13 用户口径第二条)══════════
+    // 用户原话:「当前工单应该可以删除,从订单结转处转来的工单删除应该回到订单结转中,
+    //   而已经排产的不能删除。其他存在报工的自然也不能删除了。」
+    // 规则见 WorkOrderDeleteService:软删 plang;订单结转来源的释放 SO→PLANG 占用链(订单行回订单结转);
+    //   已排产/有报工/已入库/已领料/已结案/切单子单/已有下游单据一律拒绝并点名原因。
+    // 权限:查看权 + 页面动作词 del(「删除」;PagePanelRegistry.WORK_ORDER_LIST_ACTIONS)。
+
+    /** 删除工单行(单行) */
+    @PostMapping("/workOrderList/delete")
+    public ApiResult<Map<String, Object>> delete(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireAnyPerm(PagePanelRegistry.WORK_ORDER_LIST, "删除工单", "del");
+        Map<String, Object> b = body == null ? Map.of() : body;
+        Long rowId = longOf(b.get("行id"));
+        if (rowId == null || rowId <= 0) throw new IllegalArgumentException("缺少工单行id");
+        String user = currentUser();
+        Map<String, Object> out = deleteService.delete(rowId, user);
+        logUsage(user, "删除工单", String.valueOf(out.get("工单号")),
+                out.get("工单行号") instanceof Number n ? n.intValue() : null);
+        return ApiResult.ok(out);
+    }
+
+    /** body.草稿id → long;缺/非数字直接给业务错误(前端能原样提示) */
+    private static long requireDraftId(Map<String, Object> body) {
+        Long id = longOf(body.get("草稿id"));
+        if (id == null || id <= 0) throw new IllegalArgumentException("缺少草稿id");
+        return id;
+    }
+
+    /** 取字符串并 trim;空 → 空串(不返回 null,前端少判一种情况) */
+    private static String strOf(Object o) {
+        return o == null ? "" : String.valueOf(o).trim();
     }
 
     private static Long longOf(Object o) {

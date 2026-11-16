@@ -1,0 +1,18 @@
+{
+ "st0": {
+  "factory": "YINJIA-MES·测试库",
+  "hash": "#/panelx/list/QC_FIRST_INSP"
+ },
+ "before": {
+  "sheet": true,
+  "boxes": 12,
+  "firstText": "□",
+  "checkCells": 16,
+  "editable": true
+ },
+ "clicked": true,
+ "after": {
+  "firstText": "☑",
+  "onCount": 1
+ }
+}

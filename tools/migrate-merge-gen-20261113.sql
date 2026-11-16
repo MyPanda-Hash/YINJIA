@@ -55,7 +55,13 @@ END ELSE PRINT '[merge-gen] qc_return_detail.采购单号 exists, skip';
 IF COL_LENGTH('bl_purchase_in', '采购单号') IS NOT NULL
 BEGIN
     DECLARE @hasVal INT = 0;
-    SELECT @hasVal = COUNT(*) FROM bl_purchase_in WHERE ISNULL(LTRIM(RTRIM([采购单号])), N'') <> N'';
+    /* 2026-11-15 修:原来这里直接写 `SELECT @hasVal = COUNT(*) FROM bl_purchase_in WHERE …[采购单号]…`。
+       SQL Server 是**整批编译**:即使 IF 守卫为假、该列不存在,批内对缺失列的引用照样报
+       「消息 207 列名 '采购单号' 无效」⇒ 本脚本在「bl_purchase_in 没有该列」的库上(生产/测试两账套都如此)
+       根本跑不起来,更谈不上幂等。改成动态 SQL 后,只有守卫为真才编译这段。 */
+    EXEC sp_executesql
+         N'SELECT @hv = COUNT(*) FROM bl_purchase_in WHERE DATALENGTH(LTRIM(RTRIM([采购单号]))) > 0',
+         N'@hv INT OUTPUT', @hv = @hasVal OUTPUT;
     DELETE FROM yj_field WHERE panel_code = N'PURCHASE_IN' AND (label = N'采购单号' OR col_name = N'采购单号');
     IF EXISTS (SELECT 1 FROM sys.extended_properties
                WHERE major_id = OBJECT_ID('bl_purchase_in')

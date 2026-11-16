@@ -1,0 +1,17 @@
+{
+ "dlg0": "未保存提示当前单据有未保存的修改，是否保存？取消不保存保存",
+ "open": true,
+ "dlg1": null,
+ "st": {
+  "activeRow": "XJ-2026-11-00012026-11-14已审核",
+  "editing": false,
+  "inputs": 0,
+  "statusTag": "已审核",
+  "cellText": "09:15",
+  "v1": "编号：CR-T01",
+  "vLen": "实测：112.05",
+  "vPerson": "测试员",
+  "rowspan4": 24,
+  "headers": 12
+ }
+}

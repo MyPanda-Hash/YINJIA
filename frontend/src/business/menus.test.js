@@ -441,7 +441,30 @@ const PAGE_LEAF_GROUPS = new Set(['dc'])
 // 2026-11-09 用户口径「手机扫码下面原来的四个面版对加一个父目录叫生产扫码登记。和实验室手机登记在同一级」
 //   ⇒ 手机扫码改为**带面板的二级分组**(生产扫码登记 / 实验室记录手机登记),走下面通用分支;
 //   分组内的叶子仍是带面板码的页面(断言在「手机扫码:二级 = …」那条用例里)。
-const PANEL_LEAF_GROUPS = new Set(['plan', 'prodProcess'])
+// 2026-11-16:样品检验(qcSample)由「品质管理」的二级分组提升为**一级模块**(用户口径
+//   「样品检验需要单独放在外面的位置,相当于单独一个模块实现了」) ⇒ 它的一级子项是两个带
+//   面板码的**面板叶子**(送样登记表 SAMPLE_REG / 检验委托单 INSP_COMMISSION),不是再套一层分组,
+//   与「手机扫码」改版前同款,故登记进 PANEL_LEAF_GROUPS(下面的层级同构断言会逐项校验)。
+const PANEL_LEAF_GROUPS = new Set(['plan', 'prodProcess', 'qcSample'])
+test('样品检验为独立一级模块,紧跟品质管理(送样登记表 / 检验委托单)', () => {
+  const topCodes = menuTree.map((n) => n.code)
+  const qcAt = topCodes.indexOf('qc')
+  const sampleAt = topCodes.indexOf('qcSample')
+  const dmAt = topCodes.indexOf('dm')
+  assert.ok(qcAt >= 0, '应有品质管理一级目录')
+  assert.equal(sampleAt, qcAt + 1, '样品检验应紧随品质管理之后(一级模块)')
+  assert.ok(sampleAt < dmAt, '样品检验应在数据建模之前')
+  const node = menuTree[sampleAt]
+  assert.equal(node.title, '样品检验')
+  assert.deepEqual((node.children || []).map((c) => c.panelCode), ['SAMPLE_REG', 'INSP_COMMISSION'])
+  assert.deepEqual((node.children || []).map((c) => c.title), ['送样登记表', '检验委托单'])
+  // 迁移而非复制:品质管理下不得残留旧分组/旧面板入口
+  const qcJson = JSON.stringify(menuTree.find((n) => n.code === 'qc'))
+  assert.ok(!qcJson.includes('qcSample'), '品质管理下不应再有 qcSample 分组')
+  assert.ok(!qcJson.includes('SAMPLE_REG') && !qcJson.includes('INSP_COMMISSION'),
+    '品质管理下不应再挂样品检验的两张面板')
+})
+
 test('导航层级同构:一级模块的二级目录一律是"带面板的分组",不出现裸叶子/空壳层', () => {
   for (const g of menuTree) {
     if (!g.children || !g.children.length) continue // 我的桌面 等暂无二级
@@ -733,12 +756,13 @@ test('成型检验单 / 切炭检验单 / 成品检验规范 已下架:菜单树
   for (const t of ['成型检验单', '切炭检验单', '成品检验规范']) {
     assert.ok(!all.includes(t), `菜单树里不应再有「${t}」标题`)
   }
-  // 制程品质组现役 = 首件 / 制程 / 组装成品 / 出厂检验报告 四张(2026-10-30 增 QC_OQC_REPORT);质量单据组现役 = 7 张
+  // 制程品质组现役 = 首件 / 制程 / 组装成品 / 出厂检验报告 / 巡线检验 五张(2026-10-30 增 QC_OQC_REPORT;
+  // 2026-11-14 增 QC_LINE_PATROL「巡线检验」——用户口径「设定在品质模块下面,放在出厂检验报告后面」);质量单据组现役 = 7 张
   // (2026-10-23:该组 code 由 'process' 改为 'qcProcess' —— 与「工序 OP」叶子重名,菜单覆盖表要求 code 全树唯一)
   const qc = menuTree.find((n) => n.code === 'qc')
   const group = (code) => (qc.children || []).find((c) => c.code === code)
   assert.deepEqual((group('qcProcess').children || []).map((c) => c.panelCode),
-    ['QC_FIRST_INSP', 'QC_PROC_INSP', 'QC_ASM_INSP', 'QC_OQC_REPORT'])
+    ['QC_FIRST_INSP', 'QC_PROC_INSP', 'QC_ASM_INSP', 'QC_OQC_REPORT', 'QC_LINE_PATROL'])
   assert.equal((group('qcDoc').children || []).length, 7)
 })
 

@@ -20,41 +20,94 @@ export const GROUP_ORDER = ['表观及脱粉', '尺寸及重量', '强度', '浊
 
 /**
  * 「表观及脱粉」那两列(勾选式)的识别口径 —— **按列名认**(自定义列不误判),key 只作兜底。
- * 组件(渲染勾选式 / 画底色)、可填判据、Excel 导出**共用这一个函数**,别在别处再写一份正则。
+ * 列名变体照契约文档写:表观状态 / 脱粉情况 / **炭粉情况**(纸面同一列的另一种叫法)。
+ * 组件(渲染勾选式 / 画底色 / 标准行只读)、可填判据、Excel 导出**共用这一个函数**,别在别处再写一份正则。
  */
 export const CHECK_COL_KEYS = ['appearance', 'depowder']
 
-/** 这一列是不是「表观及脱粉」那种勾选式列(炭棒表观状态 / 炭棒脱粉情况,即纸面前两列) */
+/** 这一列是不是「表观及脱粉」那种勾选式列(炭棒表观状态 / 炭棒脱粉情况(炭粉情况),即纸面前两列) */
 export function isCheckColumn(col) {
   const label = String(col?.label ?? '')
   const key = String(col?.key ?? '')
-  return /表观状态|表观|粘模/.test(label) || /脱粉/.test(label) || CHECK_COL_KEYS.includes(key)
+  return /表观状态|表观|粘模|脱粉|炭粉情况/.test(label) || CHECK_COL_KEYS.includes(key)
 }
 
 /**
- * 勾选式那两列(前两列)的样品范围:**仍是 1#/2#**。
+ * 纸面「可填样品行」矩阵(**第十一轮 2026-11-15 现行口径**,唯一真源见
+ * `docs/design/首件检验单-可填范围.md`;初版逐格量色自用户给的原图)。
  *
- * 用户口径(2026-10-17):「让当前各个表格都能填写即可,**前两列保持原样**即可」,
- *                       追问后补充「**以及后面新增的列也一样**」——
- * 即:除前两列外的所有测试项目列(图纸上的 8 列 + 以后用表头「＋」新增的列),
- * **1#..8# 八行全部可填**;前两列维持勾选式、只记 1#/2#,与改前完全一致。
+ * 用户口径:「**没有黄色的格子就打上斜杠、不可填写**,对应的表格改成黄色」——
+ * 纸面上黄格(#FFF3CA)才是要填的格,白格一律打 `/`。四对样品行按**列名**认:
  *
- * ⚠ 更早(同日上午)曾按图纸把四个分组各绑一对样品行(表观→1#/2#、尺寸→3#/4#、强度→5#/6#、
- *   浊度→7#/8#),那一版已被本口径取代 —— 现在**只剩"前两列只填 1#/2#"这一条限制**。
+ *   表观状态 / 脱粉情况(勾选式)   → 1#、2#
+ *   外径 / 内径 / 长度 / 重量        → 3#、4#
+ *   跌落 / 挤压强度(抗压强度)       → 5#、6#
+ *   压降 / 浊度NTU                  → 7#、8#
+ *   认不出列名的新增列               → 按**分组**兜底(见 {@link GROUP_SAMPLE_PAIRS})
+ *
+ * ⚠ 与第十轮(2026-11-14、照原图)的差别 = **挤压强度从 7#/8# 上移到 5#/6#**:
+ *   用户 2026-11-15 口径「把挤压强度的格子提上去」(追问后选「和跌落强度同一对样品行」)
+ *   ⇒ 强度组两项(跌落、挤压)同记 5#/6# 两支样品;压降/浊度仍在 7#/8#。
+ * ⚠ 第九轮「只限前两列、其余列八行全开」的口径已被第十轮推翻,别再照抄。
  */
-export const CHECK_SAMPLE_ROWS = [1, 2]
+export const PAPER_SAMPLE_PAIRS = Object.freeze({
+  check: Object.freeze([1, 2]),   // 表观及脱粉(勾选式两列)
+  size: Object.freeze([3, 4]),    // 尺寸及重量(外径/内径/长度/重量)
+  drop: Object.freeze([5, 6]),    // 跌落 / 挤压强度(强度组同一对)
+  last: Object.freeze([7, 8]),    // 压降 / 浊度 / 认不出列名时的兜底
+})
 
 /**
- * 这一格(样品行 × 列)能不能填。
- * 组件渲染、提示话术、底色标记、Excel 导出**共用**这一个判据(别再各写一份样品范围)。
+ * 认不出列名的新增列按**分组**兜底(纸面四组各一对;未知分组落最后一对 ——
+ * 与纸面「浊度及压降」同侧,不让人凭空多填)。
+ */
+export const GROUP_SAMPLE_PAIRS = Object.freeze({
+  表观及脱粉: PAPER_SAMPLE_PAIRS.check,
+  尺寸及重量: PAPER_SAMPLE_PAIRS.size,
+  强度: PAPER_SAMPLE_PAIRS.drop,
+  浊度及压降: PAPER_SAMPLE_PAIRS.last,
+})
+
+/**
+ * 本列可填哪两个样品行(组件渲染、提示话术、底色、Excel 导出**共用**这一个判据,
+ * 别再在别处写一份样品范围)。
+ *
+ * 认列顺序(先列名、后分组 —— 契约 §一 的口径):
+ *   ① 勾选式那两列 ⇒ {@link isCheckColumn}(按列名认、key 兜底);
+ *   ② 尺寸四项 / 跌落 / 挤压强度 / 压降 / 浊度 ⇒ 各自那一对;
+ *   ③ 认不出列名 ⇒ 按**分组**兜底({@link GROUP_SAMPLE_PAIRS}),未知分组 7#/8#。
+ * @param {{label?:string,key?:string,group?:string}} col 测试项目列
+ * @returns {number[]} 可填的两个样品序号(1..8;返回的是冻结常量,**别就地改**)
+ */
+export function sampleRowsOf(col) {
+  if (isCheckColumn(col)) return PAPER_SAMPLE_PAIRS.check
+  const label = String(col?.label ?? '')
+  if (/外径|内径|长度|重量/.test(label)) return PAPER_SAMPLE_PAIRS.size
+  if (/跌落/.test(label)) return PAPER_SAMPLE_PAIRS.drop
+  // 挤压强度 / 抗压强度:2026-11-15 起与「跌落」同一对(强度组两支样品)
+  if (/挤压|抗压/.test(label)) return PAPER_SAMPLE_PAIRS.drop
+  if (/压降|压缩/.test(label)) return PAPER_SAMPLE_PAIRS.last
+  if (/浊度/.test(label)) return PAPER_SAMPLE_PAIRS.last
+  return GROUP_SAMPLE_PAIRS[String(col?.group ?? '')] || PAPER_SAMPLE_PAIRS.last
+}
+
+/**
+ * 这一格(样品行 × 列)能不能填 —— 「可填 = 本列那两行」(纸面黄格)。
+ * 组件(渲染/底色/提示)、Excel 导出**共用**这一个判据。
  * @param {number|string} sample 样品序号(1..8)
- * @param {{label?:string,key?:string}} col 测试项目列
+ * @param {{label?:string,key?:string,group?:string}} col 测试项目列
  */
 export function isFillableCell(sample, col) {
   const n = Number(sample)
   if (!Number.isFinite(n) || n < 1 || n > SAMPLE_COUNT) return false
-  return isCheckColumn(col) ? CHECK_SAMPLE_ROWS.includes(n) : true
+  return sampleRowsOf(col).includes(n)
 }
+
+/**
+ * 契约文档(`docs/design/首件检验单-可填范围.md` §二)里的名字 ——
+ * 与 {@link isFillableCell} **同一个函数**,只是方便照文档找代码的人。
+ */
+export const isFillableSample = isFillableCell
 
 /** 明细行类型:标准行 / 样品行 */
 export const ROW_STANDARD = '标准'

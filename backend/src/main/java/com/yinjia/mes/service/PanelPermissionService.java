@@ -180,6 +180,11 @@ public class PanelPermissionService {
         m.put(PagePanelRegistry.WORK_ORDER_BOARD + "|日排产", new String[]{"dayplan"});
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|日排产", new String[]{"dayplan"});
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|打印", new String[]{"print"});
+        // 新增生产工单(2026-11-13):顶部「新增」按钮 + POST /px/workOrderList/create 共用 create 词。
+        //   按钮名取页面实际文案「新增」(与页面按钮文字一致,便于对照矩阵)。
+        m.put(PagePanelRegistry.WORK_ORDER_LIST + "|新增", new String[]{"create"});
+        // 删除工单(2026-11-13 第二轮):顶部「删除工单」按钮 + POST /px/workOrderList/delete 共用 del 词。
+        m.put(PagePanelRegistry.WORK_ORDER_LIST + "|删除工单", new String[]{"del"});
         // 生产工单列表:「结案/取消结案」是同一个按钮的两种取向,同挂 close 词;
         // 工单排产看板上的「取消结案」是**另一个**动作(只撤结案不改结案)⇒ 挂 unclose 词。
         // 两者共用一个端点(/px/workOrderList/close),故该端点按 requireButtonAny 取「任一命中」。

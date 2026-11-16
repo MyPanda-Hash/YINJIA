@@ -544,6 +544,23 @@ export async function deleteForms({ panelCode, rowCodes }) {
   return unwrap(await request.post('/px/deleteForms', { panelCode, rowCodes }))
 }
 
+/**
+ * 下拉字段「选项库」自动增项(2026-11-11 用户口径:处理意见「选择库可自动增加处理意见」)。
+ * 纸面 el-select(allow-create)里手输的新值通过它落进 yj_field.dict_sql,以后所有人下拉都能选到。
+ * 后端只做加法、只认 VALUES 字面量形态;返回 false = 不需要/不允许追加(前端静默)。
+ */
+export async function appendFieldOption({ panelCode, label, option }) {
+  return unwrap(await request.post('/px/appendFieldOption', { panelCode, label, option }))
+}
+
+/**
+ * 下拉字段「选项库」**整体维护**(2026-11-11 用户口径:处理意见「能不能增加按钮或者弹窗?弹窗形式更好维护」)。
+ * 提交整份选项清单(可增/删/改名/排序),写回 `yj_field.dict_sql`;需要该面板的「自定义字段」权。
+ */
+export async function saveFieldOptions({ panelCode, label, options }) {
+  return unwrap(await request.post('/px/saveFieldOptions', { panelCode, label, options }))
+}
+
 /** 表格列自定义:保存排序/栏名/显隐 */
 export async function saveColumnPrefs({ panelCode, columns }) {
   return unwrap(await request.post('/px/saveColumnPrefs', { panelCode, columns }))

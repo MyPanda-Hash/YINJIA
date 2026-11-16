@@ -255,3 +255,8 @@ deploy/print-agent/print-out/
 
 # 增量部署包产物(make-incremental-package.ps1 生成,含 app.jar,不入库;zip 由 deploy/*.zip 覆盖)
 deploy/package-*/
+
+# Python 字节码:本地跑 py_compile / 部署脚本会生成 __pycache__
+# (2026-11-15 曾在部署取证目录误提交 4 个 .pyc,事后清理)
+__pycache__/
+*.pyc

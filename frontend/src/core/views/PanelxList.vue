@@ -90,6 +90,38 @@
             <el-option v-for="o in (refSelectData[qr.dataName]?.options || [])" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </div>
+        <!-- 查询区参照字段「输入即查」(2026-11-13 用户口径「报工记录中上方的查询不能只是选择查询的,
+             而是可以输入后就查询的形式」):只在后端下发 metadata.queryInputRef === true 时启用
+             (真源 = yj_panel.config,目前仅报工记录 WO_REPORT_LIST);标志不下发 ⇒ 走下面原来的只读分支,
+             行为与改造前逐字一致。
+             交互口径(与后端 QueryService.appendDirectFilters 的 `_fuzzy` / 数组契约配套):
+               · 边打边联想(debounce 300ms;空关键字一个请求都不发),下拉显示「编码 — 名称」;
+               · 选中候选 ⇒ 条件写**编码**、摘掉模糊标记(后端等值);
+               · 未选候选直接回车(名称片段「钢管」也必须查得到)⇒ 先拿片段去参照档案里解析命中档案的
+                 **编码集合**,条件写编码数组(后端 IN)、摘标记;一条都解析不到才退化写输入文本 + `_fuzzy`
+                 标记(后端对编码列 RTRIM LIKE 片段);
+               · 清空 ⇒ 删条件 + 摘标记;放大镜保留,精确选择仍走原 RefPickDialog,确认后回显编码。 -->
+        <div v-else-if="qType(qr) === 'ref' && queryInputRef" class="query-ref query-ref-input">
+          <el-autocomplete
+            :model-value="queryInputTextOf(qr.dataName)"
+            value-key="value"
+            :debounce="300"
+            :trigger-on-focus="false"
+            select-when-unmatched
+            clearable
+            :fetch-suggestions="(kw, cb) => fetchQueryInputSuggestions(qr, kw, cb)"
+            :placeholder="qr.placeholder || tt('编码/名称，回车查询')"
+            :title="tt('输入编码或名称，回车即查；也可从下拉选中精确档案')"
+            @update:model-value="(v) => setQueryInputText(qr.dataName, v)"
+            @select="(item) => onQueryInputCommit(qr, item)"
+            @clear="onQueryInputClear(qr)"
+          >
+            <template #default="{ item }">
+              <span class="query-input-opt">{{ item.text }}</span>
+            </template>
+          </el-autocomplete>
+          <el-button :icon="Search" :title="tt('打开参照')" @click="openQueryRef(qr, 'page')" />
+        </div>
         <div v-else-if="qType(qr) === 'ref'" class="query-ref">
           <el-input
             :model-value="condition[qr.dataName] || ''"
@@ -138,6 +170,7 @@
           @search="onRailSearch"
           @check="onRailCheck"
           @check-all="onRailCheckAll"
+          @tab="onRailTab"
         />
         <!-- 项目进度查询(RD_PROGRESS)= 汇总查看面板:数据由「项目实施计划归档 / 立项申请」自动导入,
              人工不再往里写 ⇒ **单元格恒只读**(:editable 硬编码 false,2026-10-09 用户口径「去掉自己写入功能」)。
@@ -169,11 +202,22 @@
              纸张式可填写报表 —— 表区横向分组(外观|尺寸|出货重量 并排,组名横跨本组列)。
              写法与 QcInspRecSheet 同款:props=head/fields/editable,行取 head.detail,
              单元格 v-model 直绑 + @input=emit('dirty') 走引擎脏标记(markRaw 行不可直写)。 -->
+        <!-- 出货检验两张单共用同一份纸面组件(2026-11-12):
+             功能单 QC_PROC_INSP(出货检验功能记录表)/ 表观单 QC_ASM_INSP(出货检验表观,原组装成品检验单)。
+             版式与字段完全同一套(图2),差异只通过 props 注入:
+               · title            纸面标题(表观单=「出货检验表观」,用户口径「还是叫出货检验表观」)
+               · formCode         右上表单编号(用户口径「沿用原来的表单编号」⇒ 两张都用 YJ-QR-154)
+               · panelCode        选项库维护接口按面板落库(处理意见选项各自独立)
+               · resultTextField  「录入对应结果」落哪列:功能单=实测数值、表观单=检验结果(各自历史数据所在列) -->
         <QcProcInspSheet
-          v-else-if="panelCode === 'QC_PROC_INSP'"
+          v-else-if="PROC_INSP_SHEET_PANELS.includes(String(panelCode))"
           ref="approvalSheetRef"
           :head="cur" :fields="headerFields" :detail-fields="sheetDetailFields"
           :editable="draftEditable && !annOn"
+          :panel-code="String(panelCode)"
+          :title="procInspSheetTitle"
+          form-code="YJ-QR-154"
+          :result-text-field="procInspResultTextField"
           @dirty="markInlineDirty"
           @open-items="qcInspPlanVisible = true"
         />
@@ -190,6 +234,30 @@
              服务端 Jasper 版式(reports/qc_oqc.jrxml)仍保留,只给导出报表的 PDF/Excel 用。 -->
         <QcOqcSheet
           v-else-if="panelCode === 'QC_OQC_REPORT'"
+          ref="approvalSheetRef"
+          :head="cur" :fields="headerFields" :editable="draftEditable && !annOn"
+          @dirty="markInlineDirty"
+        />
+        <!-- 巡线检验·成型车间巡线记录表(QC_LINE_PATROL,2026-11-14 用户口径「新增成型车间巡线记录表,
+             巡线检验入口,设定在品质模块下面。先可填即可」):
+             纸面版式照用户给的第二张纸样(脱模检验记录表 1843×1109);
+             与首件检验单/出厂检验报告同一形态 —— 整页纸居中 + 左单据选择栏 + 右侧按钮竖栏,
+             纸上是 12 列 × 每块 4 子行(块级列 rowspan=4),可增删块。
+             契约唯一真源 docs/design/成型车间巡线记录表-首版.md(§一 版式 / §二 库表)。 -->
+        <QcLinePatrolSheet
+          v-else-if="panelCode === 'QC_LINE_PATROL'"
+          ref="approvalSheetRef"
+          :head="cur" :fields="headerFields" :editable="draftEditable && !annOn"
+          @dirty="markInlineDirty"
+        />
+        <!-- 检验委托单(INSP_COMMISSION,2026-11-15 用户口径「检验委托单为主要实际单据,需要这个单据完成形式
+             实现为图片中的,可以在检验类别这里带入到送样登记表的内容,需要完成基础的审批流程」):
+             纸面照《水家电综合检测中心 检验委托单(委托检验合同)》YJ-QP-701-1-01 (00) 一比一,
+             「检验类别」格给「选择检验项目」按钮 → 从送样登记表 SAMPLE_REG(内部检测目录)勾选带入,
+             带入内容 = 行表(head.detail.items)+ 检验类别/检验依据/合计收费。
+             契约唯一真源 docs/design/检验委托单-首版.md(§四 纸面组件契约)。 -->
+        <InspCommissionSheet
+          v-else-if="panelCode === 'INSP_COMMISSION'"
           ref="approvalSheetRef"
           :head="cur" :fields="headerFields" :editable="draftEditable && !annOn"
           @dirty="markInlineDirty"
@@ -997,6 +1065,7 @@
           @search="onRailSearch"
           @check="onRailCheck"
           @check-all="onRailCheckAll"
+          @tab="onRailTab"
         />
         <div class="doc-rail-main">
           <div class="fields header-fields udl-fields" :class="{ 'is-draft': draftEditable }">
@@ -2719,6 +2788,7 @@ import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
 import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaults'
+import { parseSamplingQty } from '@core/insp/samplingQty'
 import { applyInspectorDefault } from '@core/qc/qcInspector'
 import { applyCalcRules } from '@core/panel/calcRules'
 import { sumKeepScale } from '@core/panel/sumTotals'
@@ -2738,6 +2808,11 @@ import QcProcInspSheet from '@core/qc/QcProcInspSheet.vue'
 import QcFirstInspSheet from '@core/qc/QcFirstInspSheet.vue'
 // 出厂检验报告(2026-11-01):与首件检验单同款纸张式受控记录表(c-95-12 / YJ-QR-05/A1)
 import QcOqcSheet from '@core/qc/QcOqcSheet.vue'
+// 巡线检验·成型车间巡线记录表(2026-11-14):纸面 12 列 × 每块 4 子行(契约见 docs/design/成型车间巡线记录表-首版.md)
+import QcLinePatrolSheet from '@core/qc/QcLinePatrolSheet.vue'
+// 检验委托单(2026-11-15):纸面照《检验委托单(委托检验合同)》YJ-QP-701-1-01 (00);
+// 「检验类别」从送样登记表 SAMPLE_REG 的检测目录勾选带入(契约 docs/design/检验委托单-首版.md)
+import InspCommissionSheet from '@core/qc/InspCommissionSheet.vue'
 // 首件检验单的列模型(「取成型工艺清单」按列合并时用:已有列只刷标准、保留已填数据)
 import { mergeFetchedColumns } from '@core/qc/firstInspCols.js'
 import QcProcInspWoPicker from '@core/qc/QcProcInspWoPicker.vue'
@@ -2754,6 +2829,8 @@ import {
   validateReportQuery,
 } from '@core/report/reportQuery'
 import { ALL_FIELDS, buildFuzzyQuery } from '@core/search/fuzzyQuery'
+// 查询区参照字段「输入即查」(2026-11-13):条件写入/摘 `_fuzzy` 标记的纯函数(单测见 queryInput.test.js)
+import { applyCodes, applyFuzzy, applyPicked, clearField, normalizeCodeList } from '@core/search/queryInput'
 // 产品文件列表的矩阵行筛选(单一口径,与 ProdDocListSheet 共用;纯函数 + 单测)
 import { PROD_DOC_FIELD_OPTIONS, buildProdDocFilter, filterProdDocRows } from '@core/prod/prodDocSearch'
 import { nextSortState, sortRows } from '@core/sort/rowSort'
@@ -2833,14 +2910,33 @@ const operationName = computed(() => route.meta.operationName || route.query.ope
 const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'undefined')
 
 // 立项申请表/项目实施计划/项目进度查询/数据记录表(功能性滤效+其余7张)+实验室使用记录表4张:文件类文书式特例面板
+/** 使用「出货检验纸面」(QcProcInspSheet / 图2 表样)的面板(2026-11-12 起两张单共用):
+ *  出货检验单功能 QC_PROC_INSP + 出货检验表观 QC_ASM_INSP(原组装成品检验单)。
+ *  纸面标题:功能单印「出货检验功能记录表」、表观单印「出货检验表观」(用户口径「还是叫出货检验表观」);
+ *  表单编号:两张都印 YJ-QR-154(用户口径「沿用原来的表单编号即可」)。
+ *  「录入对应结果」落库列:功能单=实测数值;表观单=检验结果(原组装成品检验的历史数据都在这列,
+ *  不切换的话老单在新纸面上会看起来"全空")。 */
+const PROC_INSP_SHEET_PANELS = ['QC_PROC_INSP', 'QC_ASM_INSP']
+const procInspSheetTitle = computed(() => (String(panelCode.value) === 'QC_ASM_INSP' ? '出货检验表观' : '出货检验功能记录表'))
+const procInspResultTextField = computed(() => (String(panelCode.value) === 'QC_ASM_INSP' ? '检验结果' : '实测数值'))
 const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
 const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_PROD_DOCLIST', 'RD_FILTER_EFF', 'QC_CATALOG', 'QC_INSP_REC',
   // 制程检验单(2026-10-12):用户口径「参考检验数据记录的做法」—— 作为文书式面板,
   // 整页纸张居中 + 功能按钮右侧竖排,由 QcProcInspSheet 以报表形态接管
   'QC_PROC_INSP', 'QC_FIRST_INSP',
+  // 出货检验表观(原组装成品检验单 QC_ASM_INSP,2026-11-12 用户口径「将出货检验表观的格式也修改为这种格式」):
+  // 与出货检验单功能共用 QcProcInspSheet 同一套纸面(图2);数据侧只多两列
+  // (qc_asm_insp_detail.内部批次 / head 内部批次清单·表单审核人,见 migrate-qc-asm-insp-batch-table-20261112.sql)。
+  'QC_ASM_INSP',
   // 出厂检验报告(2026-11-01 用户口径):「和首件检验单相同的形式」——
   // 改为纸张式受控表单(QcOqcSheet,c-95-12 / YJ-QR-05/A1),不再是表头+17 列明细的数据页。
   'QC_OQC_REPORT',
+  // 巡线检验·成型车间巡线记录表(QC_LINE_PATROL,2026-11-14 用户口径「照第二张图纸面样式,先可填即可」):
+  // 纸张式记录表(QcLinePatrolSheet:标题/日期/审核人 + 12 列表头 + 每块 4 子行),
+  // 不列进来会退回「表头字段平铺 + 明细表格」的数据页,与用户给的纸样不符。
+  // 本期**不做审批流**(契约 §一):故不进 hasApprovalBtns / L2_DOC_PANELS,侧栏只有新增/保存/打印。
+  // 契约唯一真源 docs/design/成型车间巡线记录表-首版.md。
+  'QC_LINE_PATROL',
   // 样品二级目录两张单（2026-11-06）：各自有 DocSheet 版式（sampleExt/IntSheetCfg），
   // 不列进来会退回「表头字段平铺」的数据页，与《新系统-样品流程和相关表格式.xlsx》的表格版式不符。
   // ⚠ 2026-11-06 第二轮：内部单**恢复纸面版式**（用户纠正「格式还是要和 Excel 一样的，只是行操作
@@ -2848,6 +2944,11 @@ const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', '
   //   内部单的行源改成明细（见 docSheetConfigs.sampleIntSheetCfg 与
   //   tools/migrate-sample-int-paper-rows-20261106.sql）。上一版 archive 数据面板做法已撤销。
   'RD_SAMPLE_EXT', 'RD_SAMPLE_INT',
+  // 检验委托单(INSP_COMMISSION,2026-11-15 用户口径「检验委托单为主要实际单据,需要这个单据完成形式
+  // 实现为图片中的」):纸面由 InspCommissionSheet 接管(委托检验合同 YJ-QP-701-1-01 (00)),
+  // 「检验类别」从送样登记表的检测目录勾选带入。不列进来会退回「表头字段平铺 + 明细表格」的数据页。
+  // 契约唯一真源 docs/design/检验委托单-首版.md。
+  'INSP_COMMISSION',
   ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
 /**
@@ -3733,6 +3834,133 @@ async function loadRefSelectOptions(field, fieldKey, keyword) {
 
 function isRefSelect(field) {
   return isReferenceField(field) && refModeMap[headerFieldKey(field)] === 'select'
+}
+
+// ---- 查询区参照字段「输入即查」(2026-11-13 用户口径,仅报工记录 WO_REPORT_LIST)----
+// 真源 = 后端 metadata.queryInputRef(来自 yj_panel.config);不下发 ⇒ 走原来的「只读+放大镜」分支。
+// 只影响**内联查询区**里「弹窗模式」的参照字段(refModeMap==='dialog' 或尚未判定):
+// ≤20 条的下拉模式仍走 el-select(那一支本来就支持 remote 搜索),弹窗/表头/明细单元格一概不动。
+const queryInputRef = computed(() => cfgCache.value?.metadata?.queryInputRef === true)
+/** 输入框显示文本(字段 label → 文本):**与 condition 分开维护**。
+ *  用户正在打的片段未必已经生效(回车/选中候选才写进 condition),所以文本是本地的;
+ *  键不存在 = 没在编辑 ⇒ 回显 condition 里的值(面板切回/查询方案应用/弹窗选完都能对上)。
+ *  ⚠ condition 的值可能是**编码数组**(名称片段展开成「这些档案之一」),数组没有对应的文本表示
+ *  ⇒ 返回空串,绝不 String(array)(否则框里会出现 "A,B" 甚至 [object Object])。 */
+const queryInputText = reactive({})
+/** 最近一次联想候选(字段 label → [{value(编码), label(名称), row, picked, text}])。
+ *  回车时先在这里找「输入文本 == 某候选编码」的精确命中(用户打的本来就是编码/刚点过候选)。 */
+const queryInputOptions = reactive({})
+/** 每字段操作序号:回车后的"按片段解析编码集合"是**异步**的(档案搜索可能要一两秒),
+ *  解析回来时若用户已经清空/改了别的输入,就只认最后一次操作的结果(否则清掉的框会自己填回去)。 */
+const queryInputSeq = reactive({})
+function nextQueryInputSeq(key) {
+  queryInputSeq[key] = (queryInputSeq[key] || 0) + 1
+  return queryInputSeq[key]
+}
+function queryInputTextOf(key) {
+  if (queryInputText[key] !== undefined) return queryInputText[key]
+  const cond = condition[key]
+  return Array.isArray(cond) ? '' : String(cond ?? '')
+}
+function setQueryInputText(key, value) {
+  queryInputText[key] = String(value ?? '')
+}
+/** 清掉输入框草稿文本与候选缓存:切面板 / reset() / 应用查询方案后重新按 condition 回显(优先 condition)。
+ *  候选缓存必须一起清:上一个面板/上一轮条件的候选不能拿来判定"这个输入是不是编码"。 */
+function syncQueryInputText() {
+  Object.keys(queryInputText).forEach((k) => delete queryInputText[k])
+  Object.keys(queryInputOptions).forEach((k) => delete queryInputOptions[k])
+  Object.keys(queryInputSeq).forEach((k) => delete queryInputSeq[k])
+}
+/** 联想候选:engine.refSelectOptions 返回 [{label(名称), value(编码), row}]。
+ *  **空关键字一个请求都不发**:服务端 keyword 是"本面板所有字段 LIKE %kw%",空关键字等于不过滤,
+ *  而档案分支不吃 pageSize(几千行 × 上百列),白拉一次就要好几秒(同 RecordSheetPanels 的口径)。
+ *  下拉项显示「编码 — 名称」两段(只报名称时重名分不清),写进条件的仍是编码。 */
+async function fetchQueryInputSuggestions(field, keyword, cb) {
+  const key = field.dataName
+  const kw = String(keyword ?? '').trim()
+  if (!kw) { cb([]); return }
+  let options = []
+  try {
+    options = await engine.refSelectOptions(field, kw)
+  } catch (e) {
+    options = [] // 参照取数失败:退化成"手打片段直接回车模糊查",不弹错
+  }
+  const mapped = options.map((o) => {
+    const code = String(o.value ?? '')
+    const name = String(o.label ?? '')
+    return { value: code, label: name, row: o.row, picked: true, text: name && name !== code ? `${code} — ${name}` : code }
+  })
+  queryInputOptions[key] = mapped // 回车时的"输入==编码"精确命中就查这份
+  cb(mapped)
+}
+/** 按片段在参照档案里找编码集合(名称片段也能查到):
+ *  engine.refSelectOptions(field, 片段) 返回最多 100 条匹配档案(服务端 keyword 模糊搜参照面板),
+ *  取出各自的编码 → 去重/trim/上限 200。取不到(或接口报错)返回 [](调用方退化成 `_fuzzy` LIKE)。 */
+async function resolveQueryInputCodes(field, keyword) {
+  const kw = String(keyword ?? '').trim()
+  if (!kw) return []
+  try {
+    const options = await engine.refSelectOptions(field, kw)
+    return normalizeCodeList(options.map((o) => o.value))
+  } catch (e) {
+    return []
+  }
+}
+/** 候选选中 / 未选候选回车 的统一入口(el-autocomplete 的 select 事件;
+ *  select-when-unmatched 让"没有高亮候选时按回车"也走这里,那种 item 只有 value、没有 row):
+ *   · 精确选中候选 ⇒ condition[字段] = 编码、摘 `_fuzzy`(后端等值);
+ *   · 自由输入回车(2026-11-13 第二轮补强:名称片段也必须查得到)——
+ *       ① 已加载候选里有 value 与输入完全相同的 ⇒ 按精确编码处理(同选中候选);
+ *       ② 否则拿片段去参照档案里解析编码集合:非空 ⇒ condition[字段] = 编码数组(后端 IN)、摘 `_fuzzy`;
+ *       ③ 一条都没解析到 ⇒ 退化:condition[字段] = 输入文本 + `_fuzzy`(后端对编码列 LIKE)。
+ *  三种情形都把用户输入原样留在输入框里(queryInputText);数组形态没有文本表示,尤其不能覆盖显示。 */
+async function onQueryInputCommit(field, item) {
+  const key = field.dataName
+  const text = String(item?.value ?? '').trim()
+  if (item && item.picked) {
+    applyPicked(condition, key, item.value)
+    setQueryInputText(key, item.value)
+    search()
+    return
+  }
+  if (!text) { // 空输入回车 = 清空这一格
+    clearField(condition, key)
+    setQueryInputText(key, '')
+    search()
+    return
+  }
+  // ① 候选里"输入就是编码"的精确命中
+  const exact = (queryInputOptions[key] || []).find((o) => String(o.value) === text)
+  if (exact) {
+    applyPicked(condition, key, exact.value)
+    setQueryInputText(key, text)
+    search()
+    return
+  }
+  // ② 名称/编码片段 → 参照档案编码集合(数组 ⇒ 后端 IN)
+  const seq = nextQueryInputSeq(key)
+  const codes = await resolveQueryInputCodes(field, text)
+  if (queryInputSeq[key] !== seq) return // 期间被清空/改过别的输入:丢弃这次迟到的解析结果
+  if (codes.length) {
+    applyCodes(condition, key, codes)
+    setQueryInputText(key, text)
+    search()
+    return
+  }
+  // ③ 退化:按输入的编码片段 LIKE
+  applyFuzzy(condition, key, text)
+  setQueryInputText(key, text)
+  search()
+}
+/** 清空(输入框 clearable 图标):删条件 + 摘 `_fuzzy` 标记 + 清掉候选缓存 + 重查 */
+function onQueryInputClear(field) {
+  const key = field.dataName
+  nextQueryInputSeq(key) // 让还在飞的"按片段解析编码集合"作废(否则清掉的框会被迟到结果填回去)
+  clearField(condition, key)
+  delete queryInputText[key]
+  delete queryInputOptions[key]
+  search()
 }
 
 /** 草稿表头下拉选中带回:与表头参照弹窗同口径,按 refMap 把选中项源数据行的其他字段整串回填。
@@ -4872,12 +5100,21 @@ const hasApprovalBtns = computed(() => isStandardFlowSheet.value
   || String(panelCode.value) === 'QC_OQC_REPORT'
   || String(panelCode.value) === 'QC_PROC_INSP'
   || String(panelCode.value) === 'QC_FIRST_INSP'
+  // 出货检验表观(2026-11-13 用户口径「为当前的出货检验表观增加审批流程」):
+  //   与出货检验功能同形(单级审批:提交审批 → 审批通过 = 已审核 → 弃审回草稿),后端
+  //   ButtonService.SINGLE_LEVEL_INSP_PANELS 同批登记;这里只管显示,能否点由 isDisabled + 后端裁决。
+  || String(panelCode.value) === 'QC_ASM_INSP'
   || String(panelCode.value) === 'RD_DOM_TEST'
   // 开发样品申请单（2026-11-06 用户口径「里面的对应流程已经给出了，把这个流程也跑通」）：
   //   外部单 提交 → 审核(一级,选确认人) → 确认(二级) → 已审核。
   // 只放开**显示**：能不能点仍由 isDisabled(状态×身份) + 后端 ButtonService 裁决。
   // ⚠ 内部单 2026-11-06 起改成共享表（无审批），不在这里 —— 见 migrate-sample-int-flat-20261106.sql。
-  || String(panelCode.value) === 'RD_SAMPLE_EXT')
+  || String(panelCode.value) === 'RD_SAMPLE_EXT'
+  // 检验委托单(INSP_COMMISSION,2026-11-15 用户口径「需要完成基础的审批流程」):
+  //   走**通用单级审批**(草稿 → 提交审批 → 审批中 → 审批通过 → 已审核 → 弃审 → 草稿),
+  //   不进 ADMIN_L2_PANELS(两级)/ 不进 SINGLE_LEVEL_INSP_PANELS(那两张的编制格是「检验员」),
+  //   后端零改动;审批权 = yj_role_panel.can_approve(迁移里照 QC_INSP 授权,4 个质量角色可审批)。
+  || String(panelCode.value) === 'INSP_COMMISSION')
 /**
  * 侧栏是否放出**直接「审核 / 弃审」**按钮(2026-10-17 用户口径「为当前制程检验单增加审核」)。
  *
@@ -6258,6 +6495,74 @@ const DOC_RAIL_PANELS = {
   //   一个工单行 = 一个生产批次 ⇒ 左栏给工单号,业务能一眼对上生产批次;
   //   客户名称改由纸面抬头显示(报告按工单行/产品定位,不再以客户为索引)。
   QC_OQC_REPORT: ['工单号', '产品名称'],
+  // 巡线检验(成型车间巡线记录表 QC_LINE_PATROL,2026-11-14):
+  //   一张记录表 = 一个班次/一条线的巡线记录,现场会按天开多张 ⇒ 与首件/出厂检验报告同款左栏
+  //   (单号 | 日期 | 中间列 | 审核状态),点行即切单。
+  //   ⚠ 中间列只留空数组:左栏的列取的是**列表行(=表头字段)**的值,而本面板表头只有
+  //     单据编号/单据日期/审核人/审核时间/单据状态 —— 「车间 / 巡线人员」是**明细块级列**,
+  //     列表行上根本没有这两个键(实测配上去就是两列空白)。故左栏只给 单号|日期|审核状态,
+  //     车间/巡线人员进纸面里看。
+  QC_LINE_PATROL: [],
+  // 检验委托单(INSP_COMMISSION,2026-11-15):一张委托单 = 一次委托检验,会按客户/样品开多张
+  // ⇒ 与来料检验单/首件/出厂检验报告同款左栏(单号 | 日期 | 中间列 | 审核状态),点行即切单。
+  //   中间列取表头里真实有值的三个业务键(全部是 yj_field 的 header 字段,随列表行下发):
+  //   · 委托单位 —— 委托方(与「来料检验单」左栏的供应商同义,一眼看出是谁的委托);
+  //   · 样品名称 —— 送检的是哪个样品;
+  //   · 检验类别 —— 本单从送样登记表带入的检验项目摘要(纸面/列表同源),
+  //     左栏能看到"这单测了哪些项",不用逐张点开。
+  INSP_COMMISSION: ['委托单位', '样品名称', '检验类别'],
+}
+/**
+ * 左栏「单据状态」页签(2026-11-10,出货检验单 = 制程检验单 QC_PROC_INSP)。
+ * 【用户原话】「出货功能检验中在左侧的列表中增加对应的页签实现已审核的完成单据和未完成的分开显示,
+ *   增加在当前列表处的部分,不要修改其他页面的这个组件我先确认查看」
+ * 【范围】2026-11-12 用户口径「这个页签也为当前的出货检验表观增加」⇒ 出货检验表观(QC_ASM_INSP,
+ *   原组装成品检验单)也登记一份;2026-11-13 用户口径「为当前的首件检验单也增加这三个页签」⇒
+ *   首件检验单(QC_FIRST_INSP)再登记一份。三张工序检验单同一套左栏/状态口径,都按 未完成/已完成 分堆。
+ * 【为什么按面板登记】用户明说「不要修改其他页面的这个组件」⇒ 页签是**按面板登记**的能力:
+ *   只有出现在这张表里的面板,左栏才会出现页签条;没登记的(其余 20+ 个带左栏的面板)左栏
+ *   与改动前**完全一致**(DocSelectRail 收到 tabs=[] 就不渲染页签条)。用户先看这一张,
+ *   确认样式/交互 OK 后再逐个登记到下面即可,不需要再改组件。
+ * 【键值语义】三键固定 todo/done/all:
+ *   · todo = done 的补集(未完成:草稿/审批中/未审核),两者相加恰好等于全部 ——
+ *            没有第三态、不会漏单;
+ *   · done = 已审核的完成单据 = 正常终态 —— 口径与后端 QueryService 的 docStatus()/
+ *            STATUS_TAB_KEY 逐条对齐:未作废、未中止、未删除申请,且(审核人 shr 非空
+ *            或 archived='Y' 或 effective='Y' 或 erp_close_state='S');即「已审核/已归档/
+ *            已完成/已关闭」这类**可以往下走流程**的单据;
+ *   · all  = 全部(不加任何过滤,与改动前同一条 SQL)。
+ * 【顺序与默认页签】2026-11-11 用户口径:「把未完成放在最左侧作为打开页面的默认选项」
+ *   ⇒ **数组顺序即渲染顺序,且第一项就是默认页签**(railStatusTabDefault 取首项,见下):
+ *   ① 未完成在左、进页面默认停在未完成(用户主要在这张页签上干活,不必每次先点一下);
+ *   ② 其余两项保持「已完成 → 全部」的顺序:状态两组挨着,「全部」作为总览放最右。
+ *   要把默认改成别的键:调换数组顺序即可(不是改 ref 初值 —— 初值只是 SSR 首帧的占位)。
+ * 【谁来过滤】过滤在**后端**:左栏是后端分页(50 条/页,全库 500+ 张),前端只过滤当前页
+ *   等于骗人(切「已完成」时第 2 页可能又冒出未完成的)。前端只负责把当前页签键塞进
+ *   condition 控制键 `_statusTab`(见 load() 里的派生),后端 QueryService 只对登记在
+ *   STATUS_TAB_PANELS 的面板认这个键(其余面板收到就忽略,防串味)。
+ * 【以后怎么给别的面板开】往下面加一行 `<面板编码>: [{key:'todo',label:'未完成'}, …]` 即可;
+ *   label 用中文原文(渲染时走 tt(),10 个语种的词条都已存在,不用新增词条)。
+ */
+const RAIL_STATUS_TABS = {
+  // 出货检验单功能(2026-11-10 首开)+ 出货检验表观(2026-11-12 用户口径「这个页签也为当前的出货检验表观增加」):
+  // 两张单同一套纸面/同一个左栏,页签键值与顺序一致(顺序即渲染顺序、首项=默认页签)。
+  QC_PROC_INSP: [
+    { key: 'todo', label: '未完成' },
+    { key: 'done', label: '已完成' },
+    { key: 'all', label: '全部' },
+  ],
+  QC_ASM_INSP: [
+    { key: 'todo', label: '未完成' },
+    { key: 'done', label: '已完成' },
+    { key: 'all', label: '全部' },
+  ],
+  // 首件检验单(2026-11-13 用户口径「为当前的首件检验单也增加这三个页签」):
+  // 三张工序检验单(制程/表观/首件)同一套左侧栏、同一套状态口径,页签键值与顺序保持一致。
+  QC_FIRST_INSP: [
+    { key: 'todo', label: '未完成' },
+    { key: 'done', label: '已完成' },
+    { key: 'all', label: '全部' },
+  ],
 }
 
 /**
@@ -6295,6 +6600,14 @@ const docRailCfg = computed(() => {
   ]
   return { title: railTitle(panelName.value), columns }
 })
+/** 左栏状态页签(2026-11-10):只有登记在 RAIL_STATUS_TABS 的面板才有,其余面板恒为 [](零影响) */
+const railStatusTabs = computed(() => RAIL_STATUS_TABS[panelCode.value] || [])
+/** 页签默认键 = 登记表的**第一项**(QC_PROC_INSP = todo 未完成,2026-11-11 用户口径
+ *  「把未完成放在最左侧作为打开页面的默认选项」);未登记页签的面板恒 'all'(不过滤)。
+ *  ⚠ 默认值由**数组顺序**决定,别在别处硬写 'todo':以后谁调了顺序或加了面板都以登记表为准。 */
+const railStatusTabDefault = computed(() => (railStatusTabs.value.length ? railStatusTabs.value[0].key : 'all'))
+/** 当前生效的状态页签键;初值只是首帧占位,进面板/切面板时由 load() 置成 railStatusTabDefault */
+const railStatusTab = ref('all')
 const railCollapsed = ref(false)
 const railCurNo = computed(() => {
   const c = cur.value || {}
@@ -6318,6 +6631,10 @@ const railBind = computed(() => ({
   // 批量生单(2026-10-31):勾选列 + 已勾单号(按单号保管,翻页不丢)
   selectable: railSelectable.value,
   checked: railChecked.value,
+  // 状态页签(2026-11-10):只有 QC_PROC_INSP 这类登记了 RAIL_STATUS_TABS 的面板才有值,
+  // 其余面板 tabs=[] ⇒ DocSelectRail 不渲染页签条,左栏与改动前完全一致
+  tabs: railStatusTabs.value,
+  activeTab: railStatusTab.value,
 }))
 /**
  * 预览态专用的 rail 绑定：与 railBind 同一套字段，但
@@ -6369,6 +6686,16 @@ function onRailSearch(kw) {
   const k = String(kw || '').trim()
   if (k === (query.keyword || '')) return
   guardPageAction(async () => { query.keyword = k; query.pageNo = 1; await load(); curIdx.value = 0 })
+}
+
+/** 左栏「单据状态」页签(2026-11-10,仅 QC_PROC_INSP):点页签 = 换一套服务端过滤再取数。
+ *  - 走 guardPageAction(与翻页/切单/模糊搜索同一个未保存草稿守卫),不能绕过草稿丢失提示;
+ *  - 页号归 1、当前单据落回本页首张 —— 换了过滤后旧页号/旧下标已无意义(否则会翻出空页);
+ *  - 实际过滤键不在这里拼:railStatusTab 只是真源,load() 里派生 params.condition._statusTab。 */
+function onRailTab(key) {
+  const k = String(key || 'all')
+  if (k === railStatusTab.value) return
+  guardPageAction(async () => { railStatusTab.value = k; query.pageNo = 1; await load(); curIdx.value = 0 })
 }
 
 async function page(delta) {
@@ -8381,12 +8708,156 @@ const sheetPdfDesc = computed(() => (isOqcSheetPanel.value
  *   兜底名单必须把**每种纸张的根类名**都列全 —— 2026-10-17 实测漏了 `.fi-sheet`,
  *   于是首件检验单点「导出 PDF」直接报「未找到可导出的单据」。
  */
-/** 截一张纸:离屏克隆(定宽) → domToPng;返回 { dataUrl, w0, h0 } */
+/**
+ * 检验单纸张(首件检验单 `.fi-sheet` / 巡线记录表 `.lp-sheet`)整页截图的预处理 —— 2026-11-15。
+ *
+ * 🔴 用户报障:「这个报表的打出预览会打印出滚动条无法查看到全部内容」。
+ *   这两张纸在屏上是「内层横向滚动容器(`.fi-grid-scroll` / `.lp-grid-scroll`)+ 表格 min-width」:
+ *     · 侧栏「打印」走 window.print(),有 `@media print` 把表格收回纸宽 ⇒ 正常;
+ *     · 「导出 PDF / 打印预览」走本文件的离屏克隆 + 截图,`@media print` **不生效** ⇒
+ *         ① 根元素 scrollWidth 量不到内层溢出宽度,右侧列被直接裁掉(用户截图裁在「挤压强度」);
+ *         ② 横向滚动条被一起截进 PDF(用户说的"打印出滚动条");
+ *         ③ 编辑控件(改列名输入框 / 分组下拉 / 行高拖动下标 / 操作列 / 标准行 textarea 滚动条)也上纸。
+ *   修法:截图前在**克隆体**上做三件事(不动线上 DOM、不改屏幕版式):
+ *     a) 摘掉编辑控件、把只读文字版列头显形(与 @media print 的隐藏/显形名单同口径),
+ *        并隐藏「请选择」占位词与下拉箭头(纸面不印控件提示);
+ *     b) 内层滚动容器**从深到浅**撑到内容宽 + overflow:visible ⇒ 整表宽可量、滚动条消失;
+ *     c) textarea/input 一律 overflow:hidden(值已写进文本节点,高度后面按内容撑开)。
+ *   随后 snapSheetPage 按实测整表宽放宽克隆体;出纸方向这两类纸用 **A4 横向**(见 buildSheetPdfBlob)。
+ */
+/** 截图用的一次性样式(只管克隆体里的纸面,克隆体一删即无宿主;不去删它也不影响线上 DOM) */
+const QC_SNAP_STYLE_ID = 'qc-sheet-snap-style'
+function ensureQcSnapStyle() {
+  if (document.getElementById(QC_SNAP_STYLE_ID)) return
+  const st = document.createElement('style')
+  st.id = QC_SNAP_STYLE_ID
+  st.textContent = `
+    .qc-sheet-snap input::placeholder, .qc-sheet-snap textarea::placeholder { color: transparent !important; }
+    .qc-sheet-snap .el-select__placeholder.is-transparent { visibility: hidden !important; }
+    .qc-sheet-snap .el-select__caret { display: none !important; }
+  `
+  document.head.appendChild(st)
+}
+function prepareQcSheetSnapshot(clone) {
+  clone.classList.add('qc-sheet-snap')
+  ensureQcSnapStyle()
+  // a) 编辑控件不上纸
+  clone.querySelectorAll('.fi-colname, .fi-colgroup, .fi-coldel, .fi-addcol, .fi-rowgrip, .col-op, .no-print')
+    .forEach((n) => n.remove())
+  // 列头文字版屏上是 display:none(打印媒体才显形),截图里要手动显形
+  clone.querySelectorAll('.fi-colhead-text').forEach((n) => { n.style.display = 'inline' })
+  // c) 文本域/输入框不要滚动条
+  clone.querySelectorAll('textarea, input').forEach((n) => { n.style.overflow = 'hidden' })
+  // b) 内层滚动容器撑到内容宽(从最深的一层开始,外层才量得到整表宽)
+  const scrollers = [...clone.querySelectorAll('*')]
+    .filter((n) => n.scrollWidth > n.clientWidth + 2)
+    .filter((n) => {
+      const cs = getComputedStyle(n)
+      return cs.overflowX !== 'visible' || cs.overflowY !== 'visible'
+    })
+    .reverse()
+  for (const n of scrollers) {
+    n.style.overflowX = 'visible'
+    n.style.overflowY = 'visible'
+    n.style.width = `${n.scrollWidth}px`
+  }
+}
+/**
+ * 出货检验单功能 / 出货检验表观(`.qr-sheet`)整页截图的预处理 —— 2026-11-16「打印不全」修版。
+ *
+ * 用户 2026-11-16 口径:「主要是修复打印不全的问题」「组件使用原来的吧」。
+ * 该纸面是**竖向受控表单(YJ-QR-154)**,但宽度是弹性的(width:100%)、内层 `.qr-grid-scroll`
+ * 又带横向滚动 ⇒ 「导出 PDF / 打印预览」的截图只有左半边:右侧列根本不在图里,还带着滚动条和
+ * 「暂无检验项…」「请选择」等编辑提示。打印(原生)那条路有 @media print 会把表格收回纸宽,截图拿不到。
+ * 这里在**克隆体**上按 @media print 的同一口径处理(不动线上 DOM、不改纸面组件):
+ *   a) 摘编辑控件(no-print)、清占位提示/下拉箭头;
+ *   b) `.qr-grid-scroll` 退回可见、`.qr-grid` 按纸宽重排(min-width:0 / width:100% / table-layout:fixed)。
+ * 克隆体本身宽已在 snapSheetPage 里固定为 A4 内容宽(733px),故重排后正好一页纸宽。
+ */
+function prepareQrSheetSnapshot(clone) {
+  clone.classList.add('qc-sheet-snap')
+  ensureQcSnapStyle()
+  clone.querySelectorAll('.no-print').forEach((n) => n.remove())
+  clone.querySelectorAll('input, textarea').forEach((n) => n.setAttribute('placeholder', ''))
+  clone.querySelectorAll('.el-input__suffix, .el-input__prefix').forEach((n) => n.remove())
+  clone.querySelectorAll('.qr-grid-scroll').forEach((n) => {
+    n.style.overflow = 'visible'
+    n.style.overflowX = 'visible'
+    n.style.overflowY = 'visible'
+  })
+  clone.querySelectorAll('.qr-grid').forEach((n) => {
+    n.style.minWidth = '0'
+    n.style.width = '100%'
+    n.style.tableLayout = 'fixed'
+  })
+  clone.querySelectorAll('textarea, input').forEach((n) => { n.style.overflow = 'hidden' })
+}
+/**
+ * 检验委托单纸张(`.ic-sheet`)整页截图的预处理 —— 2026-11-16。
+ *
+ * 🔴 用户报障(两张截图):「打印的格式存在问题,字的格式会挤压」「按钮实现不应该被打印出来」。
+ *   根因:「导出 → 打印预览 / 导出 PDF」走的是**离屏克隆 + 截图**(`@media print` 对截图不生效),
+ *   而 `ic-sheet` 的打印态清理(隐藏「选择检验项目」按钮 / 日期控件 / 占位提示)全写在
+ *   `@media print` 里 ⇒ 截图上原样带着这些编辑控件;同时克隆体被压到 A4 宽(733px)重排,
+ *   纸面上的 880px 版式被挤窄 ⇒ 打出来文字挤在一起。屏幕「打印」按钮走 window.print() 那条路是对的。
+ *
+ * 修法(只动克隆体,不碰线上 DOM):按 papar 打印口径把控件/占位摘掉,并让日期回到「年 月 日」文字态。
+ * 与 `@media print` 的隐藏名单保持同一口径(见 InspCommissionSheet.vue 的 @media print 块)。
+ */
+function prepareInspSheetSnapshot(clone) {
+  // a) 编辑控件不上纸:选择检验项目按钮 / 明细行「×」/ 字段管理或其它 no-print 装饰
+  clone.querySelectorAll('.ic-pick-btn, .ic-items-op, .no-print').forEach((n) => n.remove())
+  // b) 日期控件换成纸面「年 月 日」文字(只读态本来就是文字;编辑态被 .is-edit-hide 藏起来了)
+  clone.querySelectorAll('.ic-date-pick').forEach((n) => n.remove())
+  clone.querySelectorAll('.ic-date-text').forEach((n) => {
+    n.classList.remove('is-edit-hide')
+    n.style.display = 'inline'
+  })
+  // c) 输入框占位提示、日历/清除图标不是纸面内容(输入值本身照常留在 value 里)
+  clone.querySelectorAll('input, textarea').forEach((n) => n.setAttribute('placeholder', ''))
+  clone.querySelectorAll('.el-input__suffix, .el-input__prefix').forEach((n) => n.remove())
+  // d) 克隆体里输入框按纸面观感去掉控件边框阴影(屏幕态已是无边框,这里兜底)
+  clone.querySelectorAll('.el-input__wrapper, .el-textarea__inner').forEach((n) => {
+    n.style.boxShadow = 'none'
+    n.style.background = 'transparent'
+  })
+}
+/**
+ * 检验委托单(.ic-sheet)整页截图 —— **单独走 html2canvas**(2026-11-16)。
+ *
+ * 为什么不用 modern-screenshot:它用 SVG `<foreignObject>` 光栅化,对中文衬线字体(纸面是宋体
+ * `font-family: SimSun`)会以默认 sans 度量渲染 ⇒ 排版按宋体、出图按黑体,行宽不一致,
+ * 文字换行错位、行与行叠在一起(用户报障的「字的格式会挤压」;实测 SimSun/NSimSun/serif 都重叠,
+ * 仿宋/雅黑才正常,但换字体会改变受控表单的字体)。html2canvas 直接在页面上按实测文本排版绘制,
+ * 字体度量与屏幕一致 ⇒ 宋体也能完整出字(实测填值/空表都正常)。
+ *
+ * 截图前用 {@link prepareInspSheetSnapshot} 在**克隆件**上摘掉编辑控件(按钮/日期控件/占位提示),
+ * 与 `@media print` 的隐藏名单同一口径;不动线上 DOM、不改屏幕版式。
+ */
+async function snapInspSheetPage(el, w0) {
+  const h0 = Math.max(el.scrollHeight, el.offsetHeight)
+  const mod = await import('html2canvas')
+  const html2canvas = mod.default || mod
+  const canvas = await html2canvas(el, {
+    backgroundColor: '#ffffff',
+    scale: 2,
+    logging: false,
+    width: w0,
+    height: h0,
+    windowWidth: Math.max(w0, 1600),
+    onclone: (doc, clonedEl) => prepareInspSheetSnapshot(clonedEl),
+  })
+  return { dataUrl: canvas.toDataURL('image/png'), w0, h0, rowBreaks: [], qcSheet: false }
+}
+/** 截一张纸:离屏克隆(定宽) → domToPng;返回 { dataUrl, w0, h0, rowBreaks, qcSheet } */
 async function snapSheetPage(el, domToPng) {
   let holder = null
   try {
     // 纸宽=scrollWidth(max-width:100% 压缩 offsetWidth 时,内容横向溢出,scrollWidth 才是整张纸)
     const paperW = Math.max(el.scrollWidth, el.offsetWidth)
+    // 检验委托单:中文衬线字体在 modern-screenshot 的 foreignObject 里会重叠 ⇒ 改走 html2canvas
+    const isInspSheet = !!(el.matches?.('.ic-sheet') || el.querySelector?.('.ic-sheet'))
+    if (isInspSheet) return await snapInspSheetPage(el, paperW)
     /**
      * A4 内容宽(px)：194mm @96dpi ≈ 733px。
      *
@@ -8415,7 +8886,21 @@ async function snapSheetPage(el, domToPng) {
      * 硬压只会裁掉右边几列。判据用纸面自己的结构类名，不写死面板码。
      */
     const isTableStyleSheet = !!(el.querySelector && el.querySelector('.sg-table'))
-    const reflow = !isTableStyleSheet && paperW > A4_CONTENT_PX
+    /**
+     * 检验单纸张(首件检验单 .fi-sheet / 巡线记录表 .lp-sheet,2026-11-15):
+     * **不压 A4 重排**,改为「按屏幕版式截全宽」—— 见函数 {@link prepareQcSheetSnapshot} 的注释。
+     * 这两类是内层横向滚动容器 + 表格 min-width 的宽表:压窄只会把右列裁掉,
+     * 而截图宽又量不到内层溢出内容 ⇒ 用户看到「打印预览只到挤压强度、还带着滚动条」。
+     */
+    const isQcSheet = !!(el.matches?.('.fi-sheet, .lp-sheet') || el.querySelector?.('.fi-sheet, .lp-sheet'))
+    /**
+     * 出货检验单功能 / 出货检验表观(`.qr-sheet`,2026-11-16 用户口径「主要是修复打印不全的问题」):
+     * 纸面宽度是**弹性的**(width:100%),窄窗/左栏展开时只有 300 多 px;内层 `.qr-grid-scroll`
+     * 又带横向滚动 ⇒ 截图只有左半边、右侧列被裁,还带着滚动条和「暂无检验项…」「请选择」提示。
+     * 修法:截图克隆**固定按 A4 内容宽(733px)重排**,并摘控件/清占位(见 prepareQrSheetSnapshot)。
+     */
+    const isQrSheet = !!(el.matches?.('.qr-sheet') || el.querySelector?.('.qr-sheet'))
+    const reflow = !isTableStyleSheet && !isQcSheet && (isQrSheet || paperW > A4_CONTENT_PX)
     const w0 = reflow ? A4_CONTENT_PX : paperW
     holder = document.createElement('div')
     holder.style.cssText = `position:fixed;left:-10000px;top:0;width:${w0}px;background:#ffffff;`
@@ -8443,6 +8928,8 @@ async function snapSheetPage(el, domToPng) {
     // ⚠ 光靠 CSS 不够:本函数走的是**截图**,CSS 的 @media print / body.approval-printing 都不生效
     //   (只有 filter 里认的 .no-print 才生效),而 .rsp-lib-pick 身上并没有 no-print。
     clone.querySelectorAll('.rsp-lib-pick, .rs-lib-btn').forEach((n) => n.remove())
+    // 出货检验单:按 A4 纸宽重排 + 摘控件/清占位(截图路径拿不到 @media print 的那套规则)
+    if (isQrSheet) prepareQrSheetSnapshot(clone)
     // ⚠ textarea 的值必须**写进克隆体的文本节点**(2026-11-11 用户报「配方表打印无数据」的根因):
     //   modern-screenshot 的 copyInputValue 只 setAttribute('value', ...),而 <textarea> 在
     //   foreignObject 里显示的是**子文本节点** ⇒ 整格是 textarea 的配方表会印成一片空白
@@ -8457,6 +8944,25 @@ async function snapSheetPage(el, domToPng) {
     document.body.appendChild(holder)
     // 双 raf:等克隆体按全宽完成重排再量高(窄窗换行多,原元素高度偏大;全宽布局高度才是纸高)
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+    /**
+     * 检验单纸张(首件/巡线,2026-11-15 用户报障「打印预览会打印出滚动条、看不到全部内容」):
+     * 把内层滚动容器撑开、按实测整表宽放宽克隆体 ⇒ 右侧列不再被裁、滚动条也不会上纸。
+     * ⚠ 必须在量 h0/realW 之前做,而且放宽后要重新等布局。
+     */
+    if (isQcSheet) {
+      prepareQcSheetSnapshot(clone)
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+      const fullW = Math.max(
+        clone.scrollWidth || 0,
+        Math.ceil(clone.getBoundingClientRect().width) || 0,
+        w0,
+      )
+      if (fullW > w0) {
+        clone.style.width = `${fullW}px`
+        holder.style.width = `${fullW}px`
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+      }
+    }
     /**
      * 🔴 textarea 的**高度要按克隆体的新宽度重算**（2026-11-13 实测踩到）。
      *
@@ -8541,7 +9047,7 @@ async function snapSheetPage(el, domToPng) {
       // 隐藏编辑态元素(字段编辑/标准库/终止横幅/拖动下标等),与打印口径一致
       filter: (node) => !(node instanceof HTMLElement && node.classList?.contains?.('no-print')),
     })
-    return { dataUrl, w0: realW, h0, rowBreaks }
+    return { dataUrl, w0: realW, h0, rowBreaks, qcSheet: isQcSheet }
   } finally {
     if (holder) holder.remove()
   }
@@ -8593,7 +9099,7 @@ async function collectSheetShots() {
   const el = el0 instanceof HTMLElement && el0.offsetWidth > 0 ? el0 : document.querySelector(
     '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, '
     + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
-    + '.approval-layout .oqc-sheet, .approval-layout .qr-sheet')
+    + '.approval-layout .oqc-sheet, .approval-layout .qr-sheet, .approval-layout .lp-sheet, .approval-layout .ic-sheet')
   if (!el || !(el instanceof HTMLElement)) return null
   const [{ domToPng }] = await Promise.all([import('modern-screenshot')])
   await nextTick()
@@ -8662,19 +9168,27 @@ async function buildSheetPdfBlob() {
    *   固定 A4 竖向后:① 每页方向尺寸完全一致;② 与单页面板走 window.print() 的观感一致
    *   (浏览器默认也是 A4 竖向、按纸宽缩放);③ 内容**等比**缩放居中,列宽比例不变(不拉伸)。
    */
-  const PAGE_W = SHEET_PAGE_W
-  const PAGE_H = SHEET_PAGE_H
+  /**
+   * 检验单纸张(首件检验单 / 巡线记录表,2026-11-15):**A4 横向**出纸。
+   *
+   * 这两张是 10 / 12 列的宽表(屏幕版式按列宽 120px/96px 设计);竖向 A4 只有 194mm 可用宽,
+   * 等比缩下来字会小到看不清。横向 A4 可用宽 281mm ⇒ 缩放后字号还保得住,一张纸也放得下。
+   * 判据:本次导出的**所有**截图都来自这两类纸才切横向(多页签文书等其它面板行为不变)。
+   */
+  const qcWide = shots.length > 0 && shots.every((s) => !!s.qcSheet)
+  const PAGE_W = qcWide ? SHEET_PAGE_H : SHEET_PAGE_W
+  const PAGE_H = qcWide ? SHEET_PAGE_W : SHEET_PAGE_H
   const MARGIN = SHEET_MARGIN
   const contentW = PAGE_W - MARGIN * 2
   const contentH = PAGE_H - MARGIN * 2
   const pdf = new jsPDF({
-    orientation: 'p',
+    orientation: qcWide ? 'l' : 'p',
     unit: 'mm',
     format: [PAGE_W, PAGE_H],
     compress: true,
   })
   shots.forEach((s, i) => {
-    if (i > 0) pdf.addPage([PAGE_W, PAGE_H], 'p')
+    if (i > 0) pdf.addPage([PAGE_W, PAGE_H], qcWide ? 'l' : 'p')
     // 截图原始尺寸(px) → mm
     const iw = s.w0 * MM
     const ih = s.h0 * MM
@@ -8866,6 +9380,23 @@ async function previewSheetPdf() {
   // 出厂检验报告:预览服务端受控表单 PDF(与「导出报表 → 打印预览」同一份)
   //   通用面板走页内打印层(2026-10-31 打印通道统一:打印页 HTML + 原生打印预览,不再把 blob PDF 交给浏览器)
   if (isOqcSheetPanel.value) { await previewOqcReport(); return }
+  /**
+   * 2026-11-16 用户口径:「主要是修复打印不全的问题」「组件使用原来的吧」。
+   * ≥ 单页纸面(首件检验单 / 出货检验单功能 / 出货检验表观 / 巡线检验 / 检验委托单):
+   * 打印预览**不再走「截图 → A4 纸」的位图通道**(那条路会把宽表裁掉/整体缩小/带上编辑控件),
+   * 直接复用侧栏「打印」的**原生打印通道**——用的就是组件原样渲染 + 各自 @media print 规则,
+   * 纸面方向由 printApprovalSheet 按纸种注入(首件/巡线横版、出货/委托单竖版)。
+   * 多页签文书/分组面板仍走截图打印层(它们必须逐页/逐组出纸)。
+   */
+  const sheetEl = approvalSheetRef.value?.$el
+  const paperEl = sheetEl instanceof HTMLElement && sheetEl.offsetWidth > 0
+    ? sheetEl
+    : document.querySelector('.approval-layout .ic-sheet, .approval-layout .fi-sheet, .approval-layout .lp-sheet, .approval-layout .qr-sheet')
+  if (paperEl && (paperEl.matches?.('.ic-sheet, .fi-sheet, .lp-sheet, .qr-sheet')
+    || paperEl.querySelector?.('.ic-sheet, .fi-sheet, .lp-sheet, .qr-sheet'))) {
+    await printApprovalSheet()
+    return
+  }
   await openSheetPrint('正在生成打印预览…')
 }
 /** 导出 Excel(.xlsx):当前单据 头字段键值 + 各明细页签(全字段全数据,不受纸张限制);控制列表走专属导出 */
@@ -8879,6 +9410,7 @@ async function exportSheetExcel() {
     RD_PROGRESS: 'exportProgressExcel',
     QC_CATALOG: 'exportCatalogExcel',
     QC_PROC_INSP: 'exportProcInspExcel',
+    QC_ASM_INSP: 'exportProcInspExcel',
     QC_FIRST_INSP: 'exportFirstInspExcel',
     // 配方表专属导出（2026-11-11）：通用导出把配方表按原文本倒出来（设计添加量无单位、
     // 无合计、空白行全在），用户报的「炭棒配方管控清单-设计添加量导出错误」就是它。
@@ -8993,12 +9525,40 @@ async function printApprovalSheet() {
   const paperEl = document.querySelector(
     '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, '
     + '.approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet, .approval-layout .fi-sheet, '
-    + '.approval-layout .oqc-sheet, .approval-layout .qr-sheet, .record-sheet')
+    + '.approval-layout .oqc-sheet, .approval-layout .qr-sheet, .approval-layout .lp-sheet, .approval-layout .ic-sheet, .record-sheet')
   if (paperEl && paperEl.querySelector('.sg-table')) {
     A4_CONTENT_PX = Math.round((297 - 16) / 25.4 * 96)    // 281mm @96dpi ≈ 1062px
     sgPageStyle = document.createElement('style')
     sgPageStyle.id = 'sg-print-page'
     sgPageStyle.textContent = '@page { size: A4 landscape; margin: 8mm; }'
+    document.head.appendChild(sgPageStyle)
+  } else if (paperEl && (paperEl.classList.contains('fi-sheet') || paperEl.classList.contains('lp-sheet'))) {
+    // 首件检验单 / 巡线记录表(2026-11-16「打印不全」修版):这两张是**A4 横版**宽表纸样。
+    // 全局 @page 恰好是 landscape(见 QcLinePatrolSheet),但那条规则靠 CSS 顺序,换构建顺序就翻车;
+    // 这里显式注入,保证「打印 / 打印预览」两处方向一致、宽表不被竖版裁掉。
+    // ⚠ 不要顺手改上面的 A4_CONTENT_PX(2026-11-16 审查确认):这两张纸在 @media print 里是
+    //   `width:100% + 表格 min-width:0` 自适应纸宽,**不读 --print-zoom**(该变量只被 .rsp-sheet
+    //   与 record-sheet 消费),这里算出的 zoom 对它们不生效 —— 改常量是空转,别被"纸型"骗了。
+    sgPageStyle = document.createElement('style')
+    sgPageStyle.id = 'qc-wide-print-page'
+    sgPageStyle.textContent = '@page { size: A4 landscape; margin: 8mm; }'
+    document.head.appendChild(sgPageStyle)
+  } else if (paperEl && paperEl.classList.contains('qr-sheet')) {
+    // 出货检验单功能 / 出货检验表观(2026-11-16「打印不全」修版):竖版受控表单(YJ-QR-154)。
+    // 之前自己没有注入 @page,被 QcLinePatrolSheet 的全局 landscape 规则带走 ⇒ 竖版表被铺到横版纸上。
+    sgPageStyle = document.createElement('style')
+    sgPageStyle.id = 'qr-print-page'
+    sgPageStyle.textContent = '@page { size: A4 portrait; margin: 8mm; }'
+    document.head.appendChild(sgPageStyle)
+  } else if (paperEl && paperEl.classList.contains('ic-sheet')) {
+    // 检验委托单(INSP_COMMISSION,2026-11-15):委托检验合同是**A4 竖版**单页纸(照 .doc 原件)。
+    // 必须动态注入 @page —— QcLinePatrolSheet 在全局声明了 `@page { size: A4 landscape }`,
+    // @page 又不认类选择器、无法按面板条件化;不注入就会被铺到横版纸上(实测裁半张 + 空白第 2 页)。
+    // 注入的 style 在组件样式之后 ⇒ 覆盖全局 landscape;afterprint 时连同 body 样式一起移除,
+    // 不影响之后再打别的纸(与上面 sg-table 分支同一套收尾)。
+    sgPageStyle = document.createElement('style')
+    sgPageStyle.id = 'ic-print-page'
+    sgPageStyle.textContent = '@page { size: A4 portrait; margin: 8mm; }'
     document.head.appendChild(sgPageStyle)
   }
   const paperW = paperEl ? Math.max(paperEl.scrollWidth, paperEl.offsetWidth) : 0
@@ -9006,9 +9566,21 @@ async function printApprovalSheet() {
     ? Math.max(0.32, Math.min(1, A4_CONTENT_PX / paperW))
     : 1
   document.documentElement.style.setProperty('--print-zoom', String(printZoom))
+  /**
+   * 打印标题 = 「面板名-单号」—— 2026-11-16 用户报障「原来打印的带有单号,现在打印的不带」。
+   *
+   * 原先「打印预览」走 openSheetPrint → printInPage(title) 会把 document.title 设成
+   * 「面板名-单号」(即导出文件名);浏览器「另存为 PDF」的默认文件名、以及打印页眉页脚都用它。
+   * 2026-11-16 改为复用原生打印通道后没人设标题 ⇒ 另存出来的 PDF 只剩页面标题、单号丢了。
+   * 这里在打印期间设同样的标题,afterprint 恢复标签页原标题(与 printInPage 同一口径)。
+   */
+  const docNo = curDocNo.value.trim()   // 取数口径唯一真源见 4800 行 curDocNo(不要另写一份)
+  const prevTitle = document.title
+  document.title = `${panelName.value || panelCode.value}${docNo ? '-' + docNo : ''}`
   const restore = () => {
     document.body.classList.remove('approval-printing')
     document.documentElement.style.removeProperty('--print-zoom')
+    document.title = prevTitle
     if (sgPageStyle) { sgPageStyle.remove(); sgPageStyle = null }
     window.removeEventListener('afterprint', restore)
   }
@@ -9335,7 +9907,12 @@ async function downloadReport(fmt) {
  *     元素截成 PDF),所见即所得;服务端报表仍保留给「导出报表 → 导出 PDF / Excel」,
  *     以及其它面板(销售订单/送料暂收单/出厂检验报告)。
  */
-const SHEET_PREVIEW_PANELS = ['QC_PROC_INSP', 'QC_FIRST_INSP']
+const SHEET_PREVIEW_PANELS = ['QC_PROC_INSP', 'QC_FIRST_INSP',
+  // 巡线检验(成型车间巡线记录表 QC_LINE_PATROL,2026-11-14):没有服务端 .jrxml 模板
+  // ⇒ 若不加进来,「导出报表 → 打印预览」会去 fetchReportBlob('pdf') 拿**通用字段流水报表**,
+  // 打出来不是这张纸(与首件/制程当初踩的坑同源)。加进来 = 预览与「打印」同一个渲染源
+  // (buildSheetPdfBlob 把当前纸张元素截成 PDF),所见即所得。
+  'QC_LINE_PATROL']
 /** 「导出报表 → 打印预览」在本面板是否走纸张(= 与「打印」同一份渲染);弹窗文案据此换话术 */
 const sheetPreviewUsesPaper = computed(() => SHEET_PREVIEW_PANELS.includes(String(panelCode.value)))
 async function previewServerReport() {
@@ -9843,22 +10420,29 @@ function applyProductRows(items) {
 }
 
 /**
- * 「选生产工单」弹窗的回执 → 提示并跳到新单(2026-10-15 制程检验单 / 2026-10-16 首件检验单)。
+ * 「选生产工单」弹窗的回执 → 提示并跳到新单(2026-10-15 制程检验单 / 2026-10-16 首件检验单 /
+ * 2026-11-12 出货检验表观)。
  *
- * 草稿已由服务端建好(表头带 工单号/工单行号/产品/批次/产线;制程明细留空、首件按工艺清单预铺),
- * 这里只做两件事:说清结果 + 让用户看到那张单。幂等命中时服务端回 `已存在=true` 并给**原来那张**单号,
- * 故提示用「已有」而不是「已生成」,避免用户以为又建了一张。
+ * 草稿已由服务端建好(表头带 工单号/工单行号/产品/批次/产线;制程明细留空、首件按工艺清单预铺、
+ * 表观按出货检验计划预铺),这里只做两件事:说清结果 + 让用户看到那张单。幂等命中时服务端回
+ * `已存在=true` 并给**原来那张**单号,故提示用「已有」而不是「已生成」,避免用户以为又建了一张。
  * 目标面板与本面板相同时(本入口就是同面板自建)不关页签,直接刷新列表即可,免得关了又开。
  */
 async function openPickedProcInsp(res) {
   const no = String(res?.['编号'] || '')
   const target = String(res?.['gotoPanel'] || 'QC_PROC_INSP')
-  const isFirst = target === 'QC_FIRST_INSP'                 // 首件检验单(同一套回执,话术分面板)
-  if (!no) return ElMessage.warning(isFirst ? tt('未生成首件检验单') : tt('未生成出货检验单功能'))
+  // 三张单共用同一个弹窗与回执:话术按目标面板分(首件/表观/制程)
+  const kind = target === 'QC_FIRST_INSP' ? 'first' : (target === 'QC_ASM_INSP' ? 'asm' : 'proc')
+  if (!no) {
+    return ElMessage.warning(kind === 'first' ? tt('未生成首件检验单')
+      : (kind === 'asm' ? tt('未生成出货检验表观') : tt('未生成出货检验单功能')))
+  }
   const existed = res?.['已存在'] === true
-  ElMessage.success(existed
-    ? `${isFirst ? tt('该工单行已有首件检验单') : tt('该工单行已有出货检验单功能')}：${no}`
-    : `${isFirst ? tt('已生成首件检验单') : tt('已生成出货检验单功能')}：${no}`)
+  const existedText = kind === 'first' ? tt('该工单行今天已有首件检验单')
+    : (kind === 'asm' ? tt('该工单行已有出货检验表观') : tt('该工单行已有出货检验单功能'))
+  const createdText = kind === 'first' ? tt('已生成首件检验单')
+    : (kind === 'asm' ? tt('已生成出货检验表观') : tt('已生成出货检验单功能'))
+  ElMessage.success(`${existed ? existedText : createdText}：${no}`)
   if (target === panelCode.value) {
     // 🔴 2026-10-18 审查补:切单前必须过「未保存修改」守卫 —— openDocByNo 会直接 load() 换掉当前单,
     //   不守卫就会把用户正在填的明细静默冲掉(与翻页/点行走 guardPageAction 同一口径)。
@@ -10047,7 +10631,13 @@ function applyInspItems(items) {
     // 但这里一直漏写 ⇒ 制程检验单从弹窗「出货检验计划」来源带入时这一格是空的(走「取出货检验计划」
     // 按钮那条路 applyShipPlanItems 有写)。组装成品检验单没有这一列 ⇒ 按 has() 自动跳过。
     if (it['不合格应对措施'] && has('不合格应对措施')) row['不合格应对措施'] = it['不合格应对措施']
-    if (it['取样要求'] && has('抽检量')) row['抽检量'] = it['取样要求']
+    // 取样要求是标准库里的**自由文本**(「称取100g」「每批5件」「全检」),而抽检量是 **decimal 数值列**:
+    // 原文直写会让保存 500(2026-11-13 用户报 `error code [8114]; Error converting data type nvarchar to numeric`)。
+    // ⇒ 只写能明确解析成数量的写法(纯数字 / nPCS / n件…),其余留空;解析口径见 core/insp/samplingQty.js。
+    if (it['取样要求'] && has('抽检量')) {
+      const qty = parseSamplingQty(it['取样要求'])
+      if (qty != null) row['抽检量'] = qty
+    }
     if (it['计量单位'] && has('单位')) row['单位'] = it['计量单位']
     // 检验数量 → 横表格数 + 上限(只对制程检验单这张横表;其它检验单是纵向明细,没有格的概念)
     if (isProcSheet) {
@@ -10652,7 +11242,13 @@ function clearQueryRef(qr, context = 'page') {
     if (isCascadePanel.value && key === '存货') delete queryDraft['_itemCode']
     return
   }
-  delete condition[key]
+  // 「输入即查」现场(2026-11-13):清空 = 删条件 + 摘 `_fuzzy` 标记 + 同步清掉输入框草稿文本
+  if (queryInputRef.value) {
+    clearField(condition, key)
+    delete queryInputText[key]
+  } else {
+    delete condition[key]
+  }
   search()
 }
 
@@ -10663,7 +11259,15 @@ function onQueryRefConfirm(rows) {
   const ref = field.ref && typeof field.ref === 'object' ? field.ref : field
   const valueField = ref.field || ref.refField || ref.display || ref.displayField || headerFieldKey(field)
   const target = queryRefContext.value === 'dialog' ? queryDraft : condition
-  target[headerFieldKey(field)] = row[valueField] ?? ''
+  const fieldKey = headerFieldKey(field)
+  const pickedValue = row[valueField] ?? ''
+  target[fieldKey] = pickedValue
+  // 「输入即查」现场(2026-11-13):放大镜里精确选中 = 选的是一个实体 ⇒ 写编码、摘掉该字段的 `_fuzzy`
+  // (后端回到等值匹配),并把编码回显到输入框(输入框文本与 condition 分开维护)。
+  if (queryRefContext.value === 'page' && queryInputRef.value) {
+    applyPicked(condition, fieldKey, pickedValue)
+    setQueryInputText(fieldKey, pickedValue)
+  }
   // 台账/状况表:参照行携带编码,选中即绑码(_whCode/_itemCode)——查询条件按编码过滤,名称仅回显
   if (queryRefContext.value === 'dialog' && isCascadePanel.value) {
     const key = headerFieldKey(field)
@@ -10712,6 +11316,8 @@ function applyHeaderQuery() {
   // 控制键(`_whCode`/`_itemCode`/`_whCodes`…)必须原样带上:它们是台账按**编码**精确过滤的唯一来源,
   // 而 cleanCondition 只负责去空值(不再顺手丢掉 `_` 开头 —— 否则台账查出来永远是"期初+期末两行")。
   for (const [key, value] of Object.entries(cleanReportCondition(queryDraft))) condition[key] = value
+  // 「输入即查」现场(2026-11-13):条件被整套替换(应用查询方案/弹窗查询)⇒ 输入框按新条件重新回显
+  syncQueryInputText()
   // 高级筛选定格为「生效中」:报表/单据面板随本次查询 POST 给后端全表过滤(分页/导出口径一致;
   // 单据面板 2026-09-24 起同样服务端化);档案面板仍是前端过滤。
   // 日期范围(起/止)在此并入(ge/le 两条),不占可见条件行。
@@ -10825,6 +11431,7 @@ function planSummary(plan) {
 function resetHeaderQuery() {
   Object.keys(queryDraft).forEach((key) => delete queryDraft[key])
   Object.keys(condition).forEach((key) => delete condition[key])
+  syncQueryInputText() // 「输入即查」输入框草稿一并清空(condition 已空 ⇒ 回显为空)
   rqdRange.value = [] // 弹窗面板:单据日期区间一并重置
   advFilters.value = []
   dateFrom.value = ''
@@ -11920,12 +12527,15 @@ async function onButton(action) {
     qcInspPlanVisible.value = true
     return
   }
-  // 选生产工单(2026-10-15 制程检验单 / 2026-10-16 首件检验单):用户口径「选择生产工单加工单行号
-  // 唯一确定当前的生产工单」+「让当前的首件检验单也可以选择到生产工单,参照制程检验单的实现方式」。
-  // 弹窗列生产工单行(plang),选中一行 → 服务端按面板各自生成草稿(幂等:同一工单行已有存活单则
-  // 返回那张)→ 这里按既有 gotoPanel 惯例跳过去。生成是**新建一张单**,故与当前单据无关,不需要先打开单据。
+  // 选生产工单(2026-10-15 制程检验单 / 2026-10-16 首件检验单 / 2026-11-12 出货检验表观):
+  // 用户口径「选择生产工单加工单行号唯一确定当前的生产工单」+「让当前的首件检验单也可以选择到
+  // 生产工单,参照制程检验单的实现方式」+「同时增加当前出货表观可选生产工单,实现方式和出货功能
+  // 检验的选择工单一致」。弹窗列生产工单行(plang),选中一行 → 服务端按面板各自生成草稿
+  // (幂等:同一工单行已有存活单则返回那张)→ 这里按既有 gotoPanel 惯例跳过去。
+  // 生成是**新建一张单**,故与当前单据无关,不需要先打开单据。
   if (action === '选生产工单') {
-    woPickerMode.value = panelCode.value === 'QC_FIRST_INSP' ? 'first' : 'proc'
+    woPickerMode.value = panelCode.value === 'QC_FIRST_INSP' ? 'first'
+      : (panelCode.value === 'QC_ASM_INSP' ? 'asm' : 'proc')
     woPickerVisible.value = true
     return
   }
@@ -12581,6 +13191,9 @@ async function load(clamping = false) {
   if (railPanelCode !== String(panelCode.value)) {
     railPanelCode = String(panelCode.value)
     railChecked.value = []
+    // 状态页签随面板复位:默认键见 RAIL_STATUS_TABS 的**第一项**(QC_PROC_INSP = 未完成,
+    // 2026-11-11 用户口径「打开页面的默认选项」);别把上一张单的页签带到下一张单。
+    railStatusTab.value = railStatusTabDefault.value
   }
   if (invalidPanel.value) {
     ElMessage.error('面板编号无效，请从菜单重新进入')
@@ -12614,6 +13227,11 @@ async function load(clamping = false) {
     //   用户 2026-10-15(第七轮):**不勾选 = 显示全部**(勾一次仓只是为了收窄,别让人每次都得先勾),
     //   所以这里只在真选了仓库时才加条件;勾选即查询、单选由左栏控制。
     if (isStockDetail.value && whDockSelected.value) params.condition._whCodes = whDockSelected.value
+    // 左栏「单据状态」页签(2026-11-10,仅 QC_PROC_INSP):与上面 _whCodes 同款「请求时派生」控制键 ——
+    //   不写进共用 condition(切面板会被 reset 清掉、还会串到别的面板);
+    //   控制键以 _ 开头,后端只对登记在 STATUS_TAB_PANELS 的面板认这个键(其余面板收到即忽略);
+    //   'all' 不传键 = 与改动前同一条 SQL(零影响),done/todo 由后端按 docStatus() 同一口径拼 WHERE。
+    if (railStatusTabs.value.length && railStatusTab.value !== 'all') params.condition._statusTab = railStatusTab.value
     // 模糊搜索生效中:叠加字段条件(后端 AND)与「全部字段」关键字
     if (fuzzyApplied.value?.valid) {
       Object.assign(params.condition, fuzzyApplied.value.condition || {})
@@ -12644,9 +13262,19 @@ async function load(clamping = false) {
     }
     if (curIdx.value >= list.value.length) curIdx.value = 0
     // 2026-08-25：?focus=单号 定位（选单/生单从表单页跳转过来时直接显示目标单据）
+    // 2026-11-11：默认页签改成「未完成」后，深链要定位的单据可能**不在当前页签里**
+    //   （典型：「查看单据」打开一张已审核的检验单，URL 带 ?focus=ZC-…，但它落在「已完成」页签）。
+    //   此时退回「全部」再取一次，deep link 优先于页签 —— 否则点「查看单据」只会停在第一张，
+    //   用户以为单子丢了。只回退一次（第二趟 railStatusTab 已是 all，不会来回跳）。
     const focus = route.query.focus
     if (focus) {
       const fi = list.value.findIndex((r) => (r['编号'] || r['单据编号'] || r['锭号']) === String(focus))
+      if (fi < 0 && railStatusTabs.value.length && railStatusTab.value !== 'all') {
+        railStatusTab.value = 'all'
+        query.pageNo = 1
+        await load(true) // clamping=true:与上面「页码越界自愈」同一套防递归口径
+        return
+      }
       if (fi >= 0) curIdx.value = fi
       router.replace({ path: route.path, query: { ...route.query, focus: undefined } })
     }
@@ -12676,6 +13304,7 @@ function search() {
 
 function reset() {
   Object.keys(condition).forEach((k) => delete condition[k])
+  syncQueryInputText() // 「输入即查」输入框随条件一起清空(否则框里还留着上一轮的片段)
   query.keyword = ''
   if (isStockStatus.value) stockWh.value = ''
   search()
@@ -12832,6 +13461,7 @@ watch(
     qOptCache.clear()
     Object.keys(condition).forEach((key) => delete condition[key])
     Object.keys(queryDraft).forEach((key) => delete queryDraft[key])
+    syncQueryInputText() // 「输入即查」输入框草稿属于上一个面板(同名字段也不能把片段带过去)
     query.keyword = ''
     queryFields.value = []
     gridTabs.value = []
@@ -13856,6 +14486,24 @@ onUnmounted(() => {
   width: 28px;
   min-height: 26px;
   padding: 0;
+}
+/* 查询区「输入即查」参照(el-autocomplete):与 .query-ref 同宽,输入框占满按钮以外的空间 */
+.query-ref-input :deep(.el-autocomplete) {
+  flex: 1;
+  width: 160px;
+}
+/* placeholder 必须**完整显示**(2026-11-13 用户口径:提示文字被截成「输入编码或名称,回…」不行):
+   160px 输入框减内边距约 152px 可用,13px 字号放不下 12 个中文字 ⇒ 提示语已缩短为
+   「编码/名称，回车查询」并把 placeholder 字号收到 12px(英文译名同样按此宽度选词)。
+   完整说明仍挂在 title(悬停可见),不影响点击后下拉的候选显示。 */
+.query-ref-input :deep(.el-input__inner::placeholder) {
+  font-size: 12px;
+}
+.query-input-opt {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .dict-pick-search {
   margin-bottom: 8px;

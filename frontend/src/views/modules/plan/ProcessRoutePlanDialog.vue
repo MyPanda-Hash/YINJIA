@@ -101,6 +101,8 @@
         {{ tt('计划数量 = 本工单行排产数量 × 该工序自己的换算率(各道分开算,不累乘)') }}。
         {{ tt('上一道的计划完工日期 = 下一道的计划开工日期') }}。
         {{ tt('日排产请到「生产工单 / 工单排产」的日期列里逐格填写后保存') }}。
+        <!-- 2026-11-13 第五轮用户口径:排产数量小于需求数量时,剩余数量自动切出子工单(不再"剩余排不进去") -->
+        {{ tt('排产数量小于需求数量时，剩余数量会自动切出子工单（子工单进待排产池，可单独排产）') }}。
         <!-- 2026-10-28:新工序/未建线车间的行,下拉是**全部启用产线** —— 说明一句,免得以为筛选坏了 -->
         <span v-if="hasOpenLineRow" class="prp-open">
           {{ tt('有工序没有固定车间(或该车间还没有产线),这些行的「生产线」已列出全部启用产线,可任选一条') }}。
@@ -122,7 +124,8 @@ import { ElMessage } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { applyLineDefaults, lineOptions } from '@/business/routeDefaults'
-import { cascadeDue, cascadeStart, invertedPlanRows, normalizePlanChain } from '@/business/planChain'
+import { cascadeDue, cascadeStart, normalizePlanChain } from '@/business/planChain'
+import { planFixMessages, planProblemMessages } from '@/business/planChainNotice'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -171,18 +174,16 @@ function lineNotInOptions(row) {
 /** 有没有「不限定车间」的行 —— 有就在表格下方提示一句,别让人以为筛选坏了 */
 const hasOpenLineRow = computed(() => rows.value.some((r) => !lineOptions(r, lines.value).limited))
 
-/** 计划完工日变化 → 本道开工不得晚于完工,下一道的计划开工日跟着变,并沿链一路往下传(2026-10-29 用户口径;
- *  日期链纯逻辑在 business/planChain.js,与批量排产弹窗共用同一份) */
+/** 计划完工日变化 → 本道不得早于上道完工、本道开工不得晚于本道完工,下一道开工日跟着变并沿链下传
+ *  (2026-10-29 用户口径;纯逻辑在 business/planChain.js,话术在 business/planChainNotice.js,与批量弹窗共用) */
 function onDueChange(index, v) {
-  const fixedStart = cascadeDue(rows.value, index, v)
-  // 2026-11-09 校验:原来改完工日早于本道开工日会留下「开工 11-09 / 完工 11-03」的倒挂,现在自动调平并明说
-  // (整句走语言包,`{d}` 换成本次被调平的日期)
-  if (fixedStart) ElMessage.warning(tt('计划开工日期不能晚于计划完工日期，已把开工日期调为 {d}').replace('{d}', fixedStart))
+  const msgs = planFixMessages(cascadeDue(rows.value, index, v), 'due')
+  if (msgs.length) ElMessage.warning(msgs.join('; '))
 }
-/** 计划开工日晚于计划完工日时,把完工日拉到开工日(避免提交被后端拒),并继续向后传链 */
+/** 计划开工日早于上道完工 ⇒ 夹到上道完工日;晚于本道完工 ⇒ 完工拉到开工日,并继续向后传链 */
 function onStartChange(index, v) {
-  const pushedDue = cascadeStart(rows.value, index, v)
-  if (pushedDue) ElMessage.warning(tt('计划开工日期不能晚于计划完工日期，已把完工日期调为 {d}').replace('{d}', pushedDue))
+  const msgs = planFixMessages(cascadeStart(rows.value, index, v), 'start')
+  if (msgs.length) ElMessage.warning(msgs.join('; '))
 }
 
 async function load() {
@@ -243,14 +244,10 @@ async function submit() {
     ElMessage.warning(`${tt('还有工序未选生产线')}：${miss.map((r) => r['工序']).join('、')}`)
     return
   }
-  // 计划日期硬校验(2026-11-09 用户口径「开工日期不得大于完工日期」):改日期时已自动调平,这里再兜一道
-  const badDates = invertedPlanRows(rows.value)
-  if (badDates.length) {
-    ElMessage.warning(`${tt('计划开工日期不能晚于计划完工日期')}: ${badDates
-      .map((b) => `${b.row['工序'] || ''} ${b.row['计划开工日期']} → ${b.row['计划完工日期']}`.trim())
-      .join('; ')}`)
-    return
-  }
+  // 计划日期硬校验(2026-11-09「开工不得晚于完工」+ 2026-11-11「下方的工序不能比上方的工序小」):
+  //   改日期时已自动调平,这里再兜一道,把两类问题一次点名单
+  const badMsg = planProblemMessages(rows.value)
+  if (badMsg) { ElMessage.warning(badMsg); return }
   // 排产数量:前端只做"非空"这一层便利挡(上限由 el-input-number 的 :max 收口),
   // 范围/超需求/改小到低于已报工等**业务守卫一律由后端**给话术(避免同一句提示两处维护)
   const q = Number(qty.value || 0)
@@ -273,6 +270,12 @@ async function submit() {
     const d = res.data || {}
     const plan = (d['计划线'] || []).join(' → ')
     ElMessage.success(`${tt('已排产')}${d['排产产线'] ? `「${d['排产产线']}」` : ''}${d['排产数量'] ? ` ${tt('排产数量')} ${num(d['排产数量'])}` : ''}；${tt('预排')}${d['预排道数'] || 0}${tt('道')}：${plan}`)
+    // 排产数量 < 需求数量:后端已把剩余数量自动切出子工单(2026-11-13 第五轮)——
+    //   子工单未排产,进「待排产池」可单独排;这里必须让排产员看到,否则会以为剩余数量丢了
+    if (d['自动切出子工单']) {
+      ElMessage.warning(d['自动切单提示']
+        || `${tt('剩余数量已自动切出子工单')} ${d['自动切出子工单']}`)
+    }
     emit('changed')
     visible.value = false
   } catch (e) {
