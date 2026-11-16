@@ -1,4 +1,4 @@
-﻿/**
+/**
  * print-formats.test.js — printProductCards 卡面渲染单测(2026-09-28,采购入库单·打印标识卡)
  * 口径:
  *  ① 单据行多带可选键(订单编号/供应商名称/数量/批次/生产日期)时卡面填充事实值;
@@ -187,6 +187,18 @@ test('打印采购订单:没传 buyer 时用公司默认那组(老纸不变)', (
   const html = captured.html
   assert.ok(html.includes('联 系 人：孙郝聪') && html.includes('联系方式：13718162430'),
     '未传 buyer ⇒ 回落 COMPANY.buyer(历史行为)')
+})
+
+// 2026-11-16 用户口径「打印的这两个填写需要可以删除数据的」:
+// 弹窗里把「需方联系人 / 联系方式」清空后,纸面需方框必须**留空** ——
+// 以前弹窗把"两个都空"当成"没传 buyer"(null),出纸回落到公司默认那组,
+// 用户清了半天、打出来还是孙郝聪/13718162430 = 看起来删不掉。
+test('打印采购订单:需方联系人/联系方式清空后纸面留空(不回落公司默认那组,2026-11-16)', () => {
+  printPuOrder(PU_DOC, PU_LINES, { buyer: { 联系人: '', 联系方式: '' } })
+  const html = captured.html
+  assert.ok(html.includes('联 系 人：<br/>联系方式：</div>'), '需方框的联系人/联系方式留空(手填)')
+  assert.ok(!html.includes('孙郝聪') && !html.includes('13718162430'),
+    '显式传空 = 用户删掉了,不得回落到 COMPANY.buyer')
 })
 
 test('打印采购订单回归:抽取公共版式块后仍保留金额列(输出不变)', () => {

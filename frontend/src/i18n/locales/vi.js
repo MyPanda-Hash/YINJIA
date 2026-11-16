@@ -442,6 +442,7 @@ export default {
     '请先填写联系人姓名': 'Vui lòng nhập tên liên hệ trước',
     '新增一行': 'Thêm dòng',
     '这两个会印在「需方」框里；填了名单里没有的名字或电话，打印时会自动存进下拉选项': 'Cả hai được in trong khung "Bên mua"; tên/số chưa có trong danh sách sẽ tự lưu khi in',
+    '不填（点「清空」）则需方框不印联系人和联系方式': 'Nếu để trống (nhấn "Xóa sạch"), khung "Bên mua" sẽ không in người liên hệ và số điện thoại',
     '每箱数量': 'Số lượng mỗi thùng',
     '零头不足一箱，已自动出卡': 'thùng lẻ chưa đầy, nhãn được in tự động',
     '请填写每箱数量（必填）': 'Vui lòng nhập số lượng mỗi thùng (bắt buộc)',

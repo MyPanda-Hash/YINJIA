@@ -452,6 +452,7 @@ export default {
     '请先填写联系人姓名': 'Bitte zuerst den Namen des Ansprechpartners eingeben',
     '新增一行': 'Zeile hinzufügen',
     '这两个会印在「需方」框里；填了名单里没有的名字或电话，打印时会自动存进下拉选项': 'Beide werden im Kasten „Käufer“ gedruckt; nicht gelistete Namen/Nummern werden beim Drucken gespeichert',
+    '不填（点「清空」）则需方框不印联系人和联系方式': 'Bleiben beide leer („Leeren“ anklicken), wird der Käufer-Kasten ohne Ansprechpartner und Telefon gedruckt',
     '每箱数量': 'Menge pro Karton',
     '零头不足一箱，已自动出卡': 'Restkarton unter einer vollen Kiste, Etikett automatisch gedruckt',
     '请填写每箱数量（必填）': 'Bitte Menge pro Karton eingeben (Pflichtfeld)',

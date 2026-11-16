@@ -452,6 +452,7 @@ export default {
     '请先填写联系人姓名': 'Veuillez d’abord saisir le nom du contact',
     '新增一行': 'Ajouter une ligne',
     '这两个会印在「需方」框里；填了名单里没有的名字或电话，打印时会自动存进下拉选项': 'Les deux sont imprimés dans le cadre « Acheteur » ; un nom ou téléphone absent est enregistré à l’impression',
+    '不填（点「清空」）则需方框不印联系人和联系方式': 'Si vous les laissez vides (cliquez sur « Vider »), le cadre « Acheteur » est imprimé sans contact ni téléphone',
     '每箱数量': 'Quantité par boîte',
     '零头不足一箱，已自动出卡': 'boîte partielle incomplète, étiquette imprimée automatiquement',
     '请填写每箱数量（必填）': 'Veuillez saisir la quantité par boîte (obligatoire)',

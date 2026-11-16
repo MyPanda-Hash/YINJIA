@@ -1049,6 +1049,7 @@ export default {
     '名单保存失败': 'Saving the list failed',
     '请先填写联系人姓名': 'Please fill in the contact name first',
     '这两个会印在「需方」框里；填了名单里没有的名字或电话，打印时会自动存进下拉选项': 'Both are printed in the Buyer box; a name or phone not in the list is saved into the dropdown when you print',
+    '不填（点「清空」）则需方框不印联系人和联系方式': 'Leave both empty (click Clear) and the Buyer box prints without contact or phone',
     '打印退货单': 'Print Return Note',
     '请先选择一张单据': 'Select a document first',
     '未取到单据数据': 'Document data not found',
