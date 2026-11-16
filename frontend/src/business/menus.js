@@ -396,6 +396,15 @@ export const menuTree = [
           // 生产领料(2026-10-30 重写):未完成/已完成两组单据 + 扫码定位 + 单据内扫码核销 → 全部领完提交。
           //   ⚠ **生单不在这一页**(见上面那张),本页只负责"领"。
           { code: 'mobilePick', title: '生产领料', path: '/panelx/list/MOBILE_PICK', panelCode: 'MOBILE_PICK', icon: 'ShoppingCart' },
+          // 其他领料 / 其他退料(2026-11-16 新增)。用户口径:「手机端再做一个其他领料和其他退料……
+          //   都是直接扫物料二维码进行的。扫完几个二维码后,可以点提交。就生成了,之后重新扫就是另一个单据了」。
+          //   · 其他领料 → 其他出库单 OTHER_OUT(扣库存;三问确认时用户勾的就是这条)
+          //   · 其他退料 → 生产退料单 MATERIAL_RET,业务类型仍写「生产退料」
+          //   · 两页共用 views/mobile/MobileOtherScan.vue,side 由路由 props 钉死;
+          //     菜单叶子挂**目标单据的面板码**(不是新开的页面码),所以角色的单据权限一变,入口跟着变。
+          //   顺序:紧跟「生产领料」—— 先按工单领(主路径),再是随手领/随手退(补充路径)。
+          { code: 'mobileOtherPick', title: '其他领料', path: '/panelx/list/MOBILE_OTHER_PICK', panelCode: 'OTHER_OUT', icon: 'Upload' },
+          { code: 'mobileOtherRet', title: '其他退料', path: '/panelx/list/MOBILE_OTHER_RET', panelCode: 'MATERIAL_RET', icon: 'RefreshLeft' },
           // 工序报工(2026-10-21 原样搬迁,页面逻辑一行不动):扫工单码 → 选工序 → 填完工数量 →
           //   提交即报工并审核;工序进度/当前工序由既有审核钩子推进。
           { code: 'mobileReport', title: '工序报工', path: '/panelx/list/MOBILE_REPORT', panelCode: 'MOBILE_REPORT', icon: 'Memo' },

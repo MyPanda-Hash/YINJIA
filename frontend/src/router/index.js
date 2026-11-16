@@ -158,6 +158,26 @@ const routes = [
         path: 'panelx/list/MOBILE_PICK/doc', component: () => import('@/views/mobile/MobilePickDoc.vue'),
         meta: { title: '生产领料单', code: 'mobilePickDoc', panelCode: 'MOBILE_PICK' },
       },
+      // 手机扫码 · 其他领料 / 其他退料(2026-11-16,用户口径「手机端再做一个其他领料和其他退料……
+      //   都是直接扫物料二维码进行的。扫完几个二维码后,可以点提交。就生成了,之后重新扫就是另一个单据了」)。
+      //   同一个组件两个入口,side 由 props 钉死:
+      //     pick = 其他领料 → 其他出库单 OTHER_OUT(扣库存)
+      //     ret  = 其他退料 → 生产退料单 MATERIAL_RET(业务类型「生产退料」)
+      //   ⚠ 菜单叶子挂的是**目标单据的面板码**(OTHER_OUT / MATERIAL_RET),没有另开页面级虚拟码 ——
+      //     理由:这两页的能力边界就是那两张单据本身(能不能保存/审核仍由它们的面板权限判定),
+      //     而当前工作区有其它任务未提交的后端改动,不走「新增 PagePanelRegistry 码 + 重编 jar」这条重路;
+      //     等后端工作区干净了要独立权限时,再补 MOBILE_OTHER_PICK / MOBILE_OTHER_RET 两个页面码即可。
+      //   必须排在 `panelx/list/:panelCode` 之前,否则会被通用面板列表页吃掉。
+      {
+        path: 'panelx/list/MOBILE_OTHER_PICK', component: () => import('@/views/mobile/MobileOtherScan.vue'),
+        props: { side: 'pick' },
+        meta: { title: '其他领料', code: 'mobileOtherPick', panelCode: 'OTHER_OUT' },
+      },
+      {
+        path: 'panelx/list/MOBILE_OTHER_RET', component: () => import('@/views/mobile/MobileOtherScan.vue'),
+        props: { side: 'ret' },
+        meta: { title: '其他退料', code: 'mobileOtherRet', panelCode: 'MATERIAL_RET' },
+      },
       // 工序报工(2026-10-21 原样搬迁,页面逻辑一行不动):扫工单 → 选工序 → 填完工数量 → 提交。
       {
         path: 'panelx/list/MOBILE_REPORT', component: () => import('@/views/mobile/MobileReport.vue'),
