@@ -86,16 +86,11 @@ const routes = [
       },
       // 兼容老地址/书签:直接落到标准面板地址
       { path: 'scm/supplierPrint/:panelCode', redirect: '/panelx/list/SUPPLIER_PU_ORDER' },
-      // 扫码领料(2026-10-18):条码管理 → 扫码领料。页面级(无 panelCode),扫标签码 `存货编码|批号`
-      // 按批号查 v_stock_pick 可用量 → 组材料出库单草稿。理由见 views/scm/ScanPick.vue 头注释。
-      { path: 'scm/scanPick', component: () => import('@/views/scm/ScanPick.vue'), meta: { title: '扫码领料', code: 'barcodeScanPick', panelCode: 'BARCODE_SCAN_PICK' } },
-      // 工单扫码领料(2026-10-21,手机端):扫工单码 → 按 BOM 列出该领的料 → 逐项扫物料码 →
-      // 自动抓台车电子秤数量 → 整单提交生成材料出库单。页面级虚拟面板 WORK_ORDER_PICK
-      // (定义见后端 PagePanelRegistry),理由与数据源见 views/scm/WorkOrderPick.vue 头注释。
-      { path: 'scm/workOrderPick', component: () => import('@/views/scm/WorkOrderPick.vue'), meta: { title: '工单扫码领料', code: 'workOrderPick', panelCode: 'WORK_ORDER_PICK' } },
-      // 扫码领料记录(2026-10-21):工单扫码领料的逐笔留痕查询 —— 谁/何时/哪张工单/哪个物料/多少。
-      // 数据源 wo_pick_scan_log(只增不改),接口 GET /px/woPick/scanLogs。只读页面。
-      { path: 'scm/pickScanLog', component: () => import('@/views/scm/PickScanLog.vue'), meta: { title: '扫码领料记录', code: 'pickScanLog', panelCode: 'WORK_ORDER_PICK' } },
+      // ══════════ 2026-11-18:条码管理三个扫码入口已删除 ══════════
+      // 用户口径:「把 wms 管理-条码管理里面的扫码领料和扫码领料记录和工单扫码领料删除」。
+      // 路由 /scm/scanPick、/scm/workOrderPick、/scm/pickScanLog 连同页面组件一起撤掉
+      // (不留 redirect:留着会让人以为还有这个功能,点进去就是另一张单的流程)。
+      // 扫码混料改在「手机扫码」下,见下面 MOBILE_MIX_SCAN 那条路由。
       // ERP系统集成 · ERP集成配置清单(2026-10-18):导入/转出两向 × 分类的接口/设备/字段映射统一配置页。
       // 页面级虚拟面板 ERP_INTEG(定义见后端 PagePanelRegistry),菜单项带 panelCode ⇒ 不进 flatMenus 自动路由。
       { path: 'erp/integConfig', component: () => import('@/views/erp/ErpIntegConfig.vue'), meta: { title: 'ERP集成配置清单', code: 'erpIntegCfg', panelCode: 'ERP_INTEG' } },
@@ -163,6 +158,58 @@ const routes = [
         path: 'panelx/list/MOBILE_PICK/doc', component: () => import('@/views/mobile/MobilePickDoc.vue'),
         meta: { title: '生产领料单', code: 'mobilePickDoc', panelCode: 'MOBILE_PICK' },
       },
+      // 手机扫码 · 其他领料 / 其他退料(2026-11-16,用户口径「手机端再做一个其他领料和其他退料……
+      //   都是直接扫物料二维码进行的。扫完几个二维码后,可以点提交。就生成了,之后重新扫就是另一个单据了」)。
+      //   同一个组件两个入口,side 由 props 钉死:
+      //     pick = 其他领料 → 其他出库单 OTHER_OUT(扣库存)
+      //     ret  = 其他退料 → 生产退料单 MATERIAL_RET(业务类型「生产退料」)
+      //   ⚠ 菜单叶子挂的是**目标单据的面板码**(OTHER_OUT / MATERIAL_RET),没有另开页面级虚拟码 ——
+      //     理由:这两页的能力边界就是那两张单据本身(能不能保存/审核仍由它们的面板权限判定),
+      //     而当前工作区有其它任务未提交的后端改动,不走「新增 PagePanelRegistry 码 + 重编 jar」这条重路;
+      //     等后端工作区干净了要独立权限时,再补 MOBILE_OTHER_PICK / MOBILE_OTHER_RET 两个页面码即可。
+      //   必须排在 `panelx/list/:panelCode` 之前,否则会被通用面板列表页吃掉。
+      {
+        path: 'panelx/list/MOBILE_OTHER_PICK', component: () => import('@/views/mobile/MobileOtherScan.vue'),
+        props: { side: 'pick' },
+        meta: { title: '其他领料', code: 'mobileOtherPick', panelCode: 'OTHER_OUT' },
+      },
+      {
+        path: 'panelx/list/MOBILE_OTHER_RET', component: () => import('@/views/mobile/MobileOtherScan.vue'),
+        props: { side: 'ret' },
+        meta: { title: '其他退料', code: 'mobileOtherRet', panelCode: 'MATERIAL_RET' },
+      },
+      // 其他领料 / 其他退料的**单据明细页**(2026-11-16 第三轮用户口径:
+      //   「点击进明细界面再打印,前端设计可以和生产领料一致。只是功能不同,
+      //     补打印就不要扫码了,就查询补打印就可以。」)。
+      //   列表页点一行 → 带 ?no=单号 进来 → 核一眼明细 → 在这点「打印」出纸(补打印同此)。
+      //   必须排在 `panelx/list/:panelCode` 之前(与上面两条同理)。
+      {
+        path: 'panelx/list/MOBILE_OTHER_PICK/doc', component: () => import('@/views/mobile/MobileOtherDoc.vue'),
+        props: { side: 'pick' },
+        meta: { title: '其他领料单', code: 'mobileOtherPickDoc', panelCode: 'OTHER_OUT' },
+      },
+      {
+        path: 'panelx/list/MOBILE_OTHER_RET/doc', component: () => import('@/views/mobile/MobileOtherDoc.vue'),
+        props: { side: 'ret' },
+        meta: { title: '其他退料单', code: 'mobileOtherRetDoc', panelCode: 'MATERIAL_RET' },
+      },
+      // 手机扫码 · 生产退料(2026-11-18 从「生产领料」独立出来)。
+      //   用户口径:「我还想生产退料独立出来,就是已经领料且审核的领料单据,来扫码退料。
+      //     其实就是独立出来一个面版,让生产领料不用负责那么多功能,操作也方便。」
+      //   ⇒ 页面 = views/mobile/MobileReturnList.vue(查可退单据 → 扫物料 → 填数量 → 提交)。
+      //   静态路径,必须排在下面 `panelx/list/:panelCode` 之前。
+      {
+        path: 'panelx/list/MOBILE_RETURN', component: () => import('@/views/mobile/MobileReturnList.vue'),
+        meta: { title: '生产退料', code: 'mobileReturn', panelCode: 'MOBILE_RETURN' },
+      },
+      // 手机扫码 · 扫码混料(2026-11-18,新增;接替已下架的「工单扫码领料」)。
+      // 扫工单码 → 带出一级BOM(物料清单)→ 逐项扫物料码 → 取电子秤数 → 逐笔保存 → 整单保存 →
+      // 自动打印混料单 → 重扫工单可补打印。页面级虚拟面板 MIX_SCAN(定义见后端 PagePanelRegistry)。
+      // ⚠ 必须排在下面 `panelx/list/:panelCode` 参数路由**之前**(静态路径优先),否则会被当成面板码。
+      {
+        path: 'panelx/list/MOBILE_MIX_SCAN', component: () => import('@/views/mobile/MobileMixScan.vue'),
+        meta: { title: '扫码混料', code: 'mobileMixScan', panelCode: 'MIX_SCAN' },
+      },
       // 工序报工(2026-10-21 原样搬迁,页面逻辑一行不动):扫工单 → 选工序 → 填完工数量 → 提交。
       {
         path: 'panelx/list/MOBILE_REPORT', component: () => import('@/views/mobile/MobileReport.vue'),
@@ -218,7 +265,7 @@ const routes = [
       { path: 'panelx/list/:panelCode', component: PanelxList, meta: { title: '单据', operationName: '新增流程' } },
       { path: 'panelx/form/:panelCode', component: PanelxForm, meta: { title: '表单' } },
       ...flatMenus()
-        .filter((m) => m.path && m.path !== '/dashboard' && m.code !== 'manufactureOrder' && m.code !== 'manufactureBoard' && m.code !== 'reworkDesk' && m.code !== 'solutionCenter' && m.code !== 'orderConvert' && m.code !== 'scheduleBoard' && m.code !== 'workOrderBoard' && m.code !== 'workOrderList' && m.code !== 'sysConsole' && m.code !== 'sysOrg' && m.code !== 'sysUsage' && m.code !== 'sysBackup' && m.code !== 'dcConfig' && m.code !== 'dcMonitor' && m.code !== 'dcStats' && m.code !== 'barcodeScanPick' && m.code !== 'supplierPrint' && m.code !== 'supplierAccount' && m.code !== 'printStation' && !m.panelCode)
+        .filter((m) => m.path && m.path !== '/dashboard' && m.code !== 'manufactureOrder' && m.code !== 'manufactureBoard' && m.code !== 'reworkDesk' && m.code !== 'solutionCenter' && m.code !== 'orderConvert' && m.code !== 'scheduleBoard' && m.code !== 'workOrderBoard' && m.code !== 'workOrderList' && m.code !== 'sysConsole' && m.code !== 'sysOrg' && m.code !== 'sysUsage' && m.code !== 'sysBackup' && m.code !== 'dcConfig' && m.code !== 'dcMonitor' && m.code !== 'dcStats' && m.code !== 'supplierPrint' && m.code !== 'supplierAccount' && m.code !== 'printStation' && !m.panelCode)
         .map((m) => ({
           path: m.path.slice(1),
           component: ModuleView,

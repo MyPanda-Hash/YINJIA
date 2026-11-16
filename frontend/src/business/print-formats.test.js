@@ -1,4 +1,4 @@
-﻿/**
+/**
  * print-formats.test.js — printProductCards 卡面渲染单测(2026-09-28,采购入库单·打印标识卡)
  * 口径:
  *  ① 单据行多带可选键(订单编号/供应商名称/数量/批次/生产日期)时卡面填充事实值;
@@ -53,7 +53,7 @@ globalThis.requestAnimationFrame = (cb) => { cb(); return 1 }
 globalThis.alert = () => { throw new Error('不应触发打印失败告警') }
 
 const { printProductCards, productCardQrText, printPuOrder, printPuOrderNoAmount, printLocationCards, locationCardQrText,
-  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows, planSheetShop, planSheetTitle, planSheetDatesFromRows, planSheetWindow, ymdAddDays, MAX_SHEET_DAYS, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS, PLAN_SHEET_MAX_PRINT_DAYS, pickSlipHtml, printWoQr, moldPlanQty } = await import('./print-formats.js')
+  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows, planSheetShop, planSheetTitle, planSheetDatesFromRows, planSheetWindow, ymdAddDays, MAX_SHEET_DAYS, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS, PLAN_SHEET_MAX_PRINT_DAYS, pickSlipHtml, mixSheetHtml, printWoQr, moldPlanQty } = await import('./print-formats.js')
 
 test('单据行(带可选键):订单编号/供应商/数量/批次/生产日期填充进卡面', async () => {
   const before = captured.printed
@@ -613,4 +613,87 @@ test('schedPlanSheetHtml:生产计划数量印**工序计划量**(成型 0.5:排
   const iP = heads.findIndex((h) => h.includes('生产计划数量'))
   assert.ok(iP >= 0, '纸面应有「生产计划数量」列')
   assert.equal(cells[iP], '25', '生产计划数量 = 工序计划量 25(不是排产数量 50)')
+})
+
+// 2026-11-16 用户口径「打印的这两个填写需要可以删除数据的」:
+// 弹窗里把「需方联系人 / 联系方式」清空后,纸面需方框必须**留空** ——
+// 以前弹窗把"两个都空"当成"没传 buyer"(null),出纸回落到公司默认那组,
+// 用户清了半天、打出来还是孙郝聪/13718162430 = 看起来删不掉。
+test('打印采购订单:需方联系人/联系方式清空后纸面留空(不回落公司默认那组,2026-11-16)', () => {
+  printPuOrder(PU_DOC, PU_LINES, { buyer: { 联系人: '', 联系方式: '' } })
+  const html = captured.html
+  assert.ok(html.includes('联 系 人：<br/>联系方式：</div>'), '需方框的联系人/联系方式留空(手填)')
+  assert.ok(!html.includes('孙郝聪') && !html.includes('13718162430'),
+    '显式传空 = 用户删掉了,不得回落到 COMPANY.buyer')
+})
+
+// 2026-11-18 混料单纸面:同一套版式,只换文案(列头/部门标签/签名)
+// 与打印代理 print-agent.ps1 的 $heads / $deptText / $signTexts 一一对应
+// ══════════════════════════════════════════════════════════════════
+const mixPayload = () => ({
+  标题: '混料单', 领料单号: 'PL-1', 领料部门: 'Admin', 打印日期: '2026-11-18',
+  表头: ['工单号', '物料名称', '规格', '单位', '计划用量', '实际用量', '备注'],
+  部门标签: '生产线',
+  签名: ['配料人:', '复核人:', '工艺员:', '班长:'],
+  明细: [{ 材料名称: '雅可比CS', 规格: '', 单位: 'kg', 请领数量: 86.172, 实发数量: 86.172, 备注: '' }],
+})
+
+test('pickSlipHtml:混料单换列头/部门标签/四条签名(缺省仍是领料单那套)', () => {
+  const html = pickSlipHtml(mixPayload(), '')
+  assert.ok(html.includes('<th>工单号</th>') && html.includes('<th>计划用量</th>')
+    && html.includes('<th>实际用量</th>'), '七列列头换成混料的')
+  assert.ok(!html.includes('<th>请领数量</th>'), '不再出现领料单的列头')
+  assert.ok(html.includes('生产线:') && !html.includes('领料部门:'), '抬头那一栏叫「生产线」')
+  for (const s of ['配料人:', '复核人:', '工艺员:', '班长:']) assert.ok(html.includes(s), '签名里有 ' + s)
+  assert.ok(!html.includes('仓管员:'), '不再出现领料单的签名')
+  assert.ok(html.includes('86.172'), '实际用量照印')
+  // 版式没变:仍是中一刀横打
+  assert.ok(html.includes('@page{size:210mm 148.5mm'), '同一套纸张')
+})
+
+test('pickSlipHtml:类别符号未给时回落领料单默认(老调用方零影响)', () => {
+  const html = pickSlipHtml(slipPayload(1), '')
+  assert.ok(html.includes('<th>订单号</th>') && html.includes('<th>请领数量</th>'), '默认列头不变')
+  assert.ok(html.includes('领料部门:'), '默认部门标签不变')
+  assert.ok(html.includes('部门主管:') && html.includes('仓管员:'), '默认签名不变')
+})
+
+// ══════════════════════════════════════════════════════════════════
+// 2026-11-18 第二轮:混料单改《成型配料记录》(YJ-QR-147)横板 A4
+// 纸样 17 列,左右两坨纵向合并格 —— 浏览器兜底也必须是这张纸
+// ══════════════════════════════════════════════════════════════════
+const mixSheetPayload = (n = 2) => ({
+  标题: '成型配料记录',
+  领料单号: 'PL-1',
+  纸面: {
+    标题: '成型配料记录', 文件编码: 'YJ-QR-147', 序号: 1, 车间: '成型1线', 产品编号: 'A-45-01',
+    配方版本号: '', 开始时间: '2026-11-18 09:01', 结束时间: '2026-11-18 09:20', 转速: '',
+    配料批次号: 'PL-1', 物料水分: '', 配料人: 'admin', 确认人: '',
+  },
+  明细: Array.from({ length: n }, (_, i) => ({
+    物料编号: 'M-00' + (i + 1), 物料名: '物料' + (i + 1), 添加比例: (50).toFixed(2) + '%',
+    应投重量: '10', 实投重量: '9.8', 物料批次: 'B2026' + (i + 1),
+  })),
+})
+
+test('mixSheetHtml:横板 A4 + 17 列 + 左右合并格(纸样版式)', () => {
+  const html = mixSheetHtml(mixSheetPayload(2))
+  assert.ok(html.includes('@page{size:297mm 210mm'), '横板 A4')
+  assert.ok(html.includes('成型配料记录') && html.includes('YJ-QR-147'), '标题 + 右上文件编码')
+  for (const h of ['序号', '车间', '产品编号', '配方版本号', '物料编号', '物料名', '添加比例',
+    '应投重量', '实投重量', '物料批次', '开始时间', '结束时间', '转速', '配料批次号',
+    '物料水分', '配料人', '确认人']) {
+    assert.ok(html.includes('>' + h + '<'), '列头缺:' + h)
+  }
+  // 左四列 + 右七列各只有一格(rowspan 合并),中间六列每行一个
+  assert.equal((html.match(/rowspan="8"/g) || []).length, 11, '11 个合并格(左4 + 右7),rowspan = 纸表 8 行')
+  assert.ok(html.includes('M-001') && html.includes('B20261'), '物料行数据在')
+  assert.ok(html.includes('admin') && html.includes('成型1线'), '抬头值在')
+})
+
+test('mixSheetHtml:明细超过 8 行自动续页,一行都不丢', () => {
+  const html = mixSheetHtml(mixSheetPayload(11))
+  assert.equal((html.match(/<div class="card">/g) || []).length, 2, '11 行 → 2 张纸')
+  for (let i = 1; i <= 11; i++) assert.ok(html.includes('M-00' + (i < 10 ? i : i)), '第 ' + i + ' 行必须在纸上')
+  assert.ok(html.includes('第 1/2 页') && html.includes('第 2/2 页'), '每页标页码')
 })

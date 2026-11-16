@@ -254,6 +254,7 @@ import request from '@core/request'
 import { tt } from '@/i18n'
 import { queryFormDataList, callButton, errMsg } from '@/business/engine'
 import { sumAvailable, buildMaterialOutForm } from '@/business/scanPick'
+import { focusScanNow } from '@/business/scanFocus'
 import {
   parseWorkOrderCode, parseMaterialCode,
   makeBatchRows, autoAllocateFifo, isNonFifo, selectedBatchRows, selectedTotal, checkSelection,
@@ -576,6 +577,8 @@ async function probeMaterial() {
     errText.value = errMsg(e) || tt('查询可用量失败')
   } finally {
     matLoading.value = false
+    // PDA 连扫(2026-11-16):扫完物料(命中/没命中)光标回到物料扫码框,接着扫下一个
+    focusScanNow(() => matInput.value, { delay: 120 })
   }
 }
 
@@ -708,6 +711,8 @@ async function submit() {
     errText.value = errMsg(e) || tt('生成材料出库单失败')
   } finally {
     saving.value = false
+    // PDA 连扫(2026-11-16):提交完回工单扫码框,下一张工单直接扫
+    focusScanNow(() => woInput.value, { delay: 200 })
   }
 }
 </script>

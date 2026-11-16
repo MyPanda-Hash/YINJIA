@@ -236,14 +236,29 @@ export const menuTree = [
               // (migrate-other-docs-rebuild-20261014.sql);委外入库单(OUTSOURCE_IN)仍保持 2026-10-08 下架状态。
               { code: 'otherIn', title: '其他入库单', path: '/panelx/list/OTHER_IN', icon: 'Download', panelCode: 'OTHER_IN', operationName: '新增' },
               { code: 'saleOut', title: '销售出库单', path: '/panelx/list/SALE_OUT', icon: 'Upload', panelCode: 'SALE_OUT', operationName: '新增流程' },
+              // 销售退货单(2026-11-13 新增):金蝶有、MES 缺的退货类单据之一,
+              // 面板/表/字段由 tools/migrate-return-docs-20261113.sql 按 sal_in_bound 键集克隆销售出库单;
+              // 紧跟销售出库单(一出一进配成对,找单的人不会跑错组)。
+              { code: 'saleIn', title: '销售退货单', path: '/panelx/list/SALE_IN', icon: 'RefreshLeft', panelCode: 'SALE_IN', operationName: '新增流程' },
               { code: 'materialOut', title: '材料出库单', path: '/panelx/list/MATERIAL_OUT', icon: 'Upload', panelCode: 'MATERIAL_OUT', operationName: '新增流程' },
+              // 生产退料单(2026-11-13 新增):金蝶 inv_pick_ret,MES 侧与材料出库单成对(领/退同组)。
+              { code: 'materialRet', title: '生产退料单', path: '/panelx/list/MATERIAL_RET', icon: 'RefreshLeft', panelCode: 'MATERIAL_RET', operationName: '新增流程' },
               // 生产领料(2026-10-22 用户口径「在库存核算里面加一个生产领料的查看面版,与混料记录一样;
               //   把 outh 里面的材料出库单据显示出来」):只读报表,形态对齐「混料记录」——
               //   flat + 报表,面板码 PROD_PICK_LIST,数据源 = 包装视图 v_prod_pick_list
               //   (dbo.outh 里 src=6「材料出库」且未删除的行,即 SCLL-* 生产领料单)。
               //   入口钉在「材料出库单」之后:先建单、再看已过账的领料明细,找单据的人不会跑错组。
               //   面板/视图/译名/授权见 tools/migrate-prod-pick-outh-20261022.sql。
-              { code: 'prodPickList', title: '生产领料', path: '/panelx/list/PROD_PICK_LIST', icon: 'List', panelCode: 'PROD_PICK_LIST' },
+              // 2026-11-16 改名:显示名 →「生产领料明细表」(面板码 PROD_PICK_LIST / 路径 / 数据源都不动,
+              //   页签恢复按 path、权限按 panelCode 认,改的只是这一层的标题 —— 见 migrate-prod-ret-list-20261116.sql)。
+              { code: 'prodPickList', title: '生产领料明细表', path: '/panelx/list/PROD_PICK_LIST', icon: 'List', panelCode: 'PROD_PICK_LIST' },
+              // 生产退料明细表(2026-11-16 新增,与上面那张成对):数据源 = 包装视图 v_prod_ret_list,
+              //   即生产退料单(bd_material_ret 头 + bl_material_ret 行)逐行展开。
+              //   ⚠ 与领料那张的取数差别是**刻意的**:手机扫码从 2026-10-30 第三轮起不再预生成
+              //   「0 数量的退料草稿」,只有现场真的退料才生一张生产退料单 —— 所以这里天然只列
+              //   「生成过退料单」的单据,不必也不该去补「每张领料单都有一行」。
+              //   多带一列「工单号」:手机扫码是扫工单号起手的,2026-11-13 起退料单上也写了工单号/工单行号。
+              { code: 'prodRetList', title: '生产退料明细表', path: '/panelx/list/PROD_RET_LIST', icon: 'List', panelCode: 'PROD_RET_LIST' },
               // 2026-10-14 恢复:其他出库单(OTHER_OUT)—— 同其他入库单;委外发料单(OUTSOURCE_ISSUE)仍保持下架。
               { code: 'otherOut', title: '其他出库单', path: '/panelx/list/OTHER_OUT', icon: 'Upload', panelCode: 'OTHER_OUT', operationName: '新增' },
               // 2026-10-18 新增:调拨单 / 盘点单 —— 库存核算里两张**会改 kucun** 的单据
@@ -266,7 +281,9 @@ export const menuTree = [
           { code: 'otherInDetail', title: '其他入库单明细表', path: '/panelx/list/OTHER_IN_DETAIL', panelCode: 'OTHER_IN_DETAIL', icon: 'List' },
           { code: 'otherOutDetail', title: '其他出库单明细表', path: '/panelx/list/OTHER_OUT_DETAIL', panelCode: 'OTHER_OUT_DETAIL', icon: 'List' },
           { code: 'saleOutDetail', title: '销售出库单明细表', path: '/panelx/list/SALE_OUT_DETAIL', panelCode: 'SALE_OUT_DETAIL', icon: 'List' },
+          { code: 'saleInDetail', title: '销售退货单明细表', path: '/panelx/list/SALE_IN_DETAIL', panelCode: 'SALE_IN_DETAIL', icon: 'List' },
           { code: 'materialOutDetail', title: '材料出库单明细表', path: '/panelx/list/MATERIAL_OUT_DETAIL', panelCode: 'MATERIAL_OUT_DETAIL', icon: 'List' },
+          { code: 'materialRetDetail', title: '生产退料单明细表', path: '/panelx/list/MATERIAL_RET_DETAIL', panelCode: 'MATERIAL_RET_DETAIL', icon: 'List' },
           // 2026-10-18 新增:调拨单/盘点单明细表(视图 v_transfer_detail / v_stocktake_detail)
           { code: 'transferDetail', title: '调拨单明细表', path: '/panelx/list/TRANSFER_DETAIL', panelCode: 'TRANSFER_DETAIL', icon: 'List' },
           { code: 'stocktakeDetail', title: '盘点单明细表', path: '/panelx/list/STOCKTAKE_DETAIL', panelCode: 'STOCKTAKE_DETAIL', icon: 'List' },
@@ -283,7 +300,9 @@ export const menuTree = [
           { code: 'otherInStats', title: '其他入库单统计表', path: '/panelx/list/OTHER_IN_STATS', panelCode: 'OTHER_IN_STATS', icon: 'Histogram' },
           { code: 'otherOutStats', title: '其他出库单统计表', path: '/panelx/list/OTHER_OUT_STATS', panelCode: 'OTHER_OUT_STATS', icon: 'Histogram' },
           { code: 'saleOutStats', title: '销售出库单统计表', path: '/panelx/list/SALE_OUT_STATS', panelCode: 'SALE_OUT_STATS', icon: 'Histogram' },
+          { code: 'saleInStats', title: '销售退货单统计表', path: '/panelx/list/SALE_IN_STATS', panelCode: 'SALE_IN_STATS', icon: 'Histogram' },
           { code: 'materialOutStats', title: '材料出库单统计表', path: '/panelx/list/MATERIAL_OUT_STATS', panelCode: 'MATERIAL_OUT_STATS', icon: 'Histogram' },
+          { code: 'materialRetStats', title: '生产退料单统计表', path: '/panelx/list/MATERIAL_RET_STATS', panelCode: 'MATERIAL_RET_STATS', icon: 'Histogram' },
           // 2026-10-18 新增:调拨单/盘点单统计表(视图 v_transfer_stats / v_stocktake_stats)
           { code: 'transferStats', title: '调拨单统计表', path: '/panelx/list/TRANSFER_STATS', panelCode: 'TRANSFER_STATS', icon: 'Histogram' },
           { code: 'stocktakeStats', title: '盘点单统计表', path: '/panelx/list/STOCKTAKE_STATS', panelCode: 'STOCKTAKE_STATS', icon: 'Histogram' },
@@ -322,19 +341,13 @@ export const menuTree = [
           { code: 'barcodeMat', title: '材料仓条码管理', path: '/panelx/list/BARCODE_MAT', panelCode: 'BARCODE_MAT', icon: 'Tickets' },
           { code: 'barcodeWip', title: '半成品仓条码管理', path: '/panelx/list/BARCODE_WIP', panelCode: 'BARCODE_WIP', icon: 'Box' },
           { code: 'barcodeFin', title: '成品仓条码管理', path: '/panelx/list/BARCODE_FIN', panelCode: 'BARCODE_FIN', icon: 'Finished' },
-          // 扫码领料(2026-10-18 用户口径:「根据这个规则或设定在条码管理里面通过标签进行操作」):
-          // 页面级(无 panelCode),扫标签码 `存货编码|批号` → 按批号查 v_stock_pick 可用量 → 组单。
-          // 存在的理由:材料出库单里选商品看的是(物料,仓库)聚合口径,常显示「没有库存」;
-          // 仓库实际发料关心的是批号级可用量,而标签里正好带着批号。
-          { code: 'barcodeScanPick', title: '扫码领料', path: '/scm/scanPick', panelCode: 'BARCODE_SCAN_PICK', icon: 'FullScreen' },
-          // 工单扫码领料(2026-10-21 用户口径):「扫那个工单码,上面显示出来工单内容,中间显示这个工单要领
-          // 哪些料(按 BOM),一项项扫物料码,自动抓台车电子秤数量,点提交保存一笔;整单领完整单提交」。
-          // 与上面「扫码领料」的区别:那张是**按物料找库存**(扫到哪领到哪),这张是**按工单找用料**
-          // (先知道该领哪些、再逐项核销),作业口径不同故并列两个入口。
-          { code: 'workOrderPick', title: '工单扫码领料', path: '/scm/workOrderPick', panelCode: 'WORK_ORDER_PICK', icon: 'DocumentChecked' },
-          // 扫码领料记录(2026-10-21 用户口径:「要监控 App 使用情况…还要记扫了哪些料、各多少、什么时候」):
-          // 只读查询页,数据源 wo_pick_scan_log。权限沿用 WORK_ORDER_PICK(同一作业的作业与留痕)。
-          { code: 'pickScanLog', title: '扫码领料记录', path: '/scm/pickScanLog', panelCode: 'WORK_ORDER_PICK', icon: 'Tickets' },
+          // ══════════ 2026-11-18:三个扫码入口已删除 ══════════
+          // 用户口径:「把 wms 管理-条码管理里面的扫码领料和扫码领料记录和工单扫码领料删除」。
+          // 一并撤掉的不只是菜单:页面(views/scm/ScanPick|WorkOrderPick|PickScanLog.vue)、
+          // 路由、后端端点(/px/woPick/*)、页面级面板码(BARCODE_SCAN_PICK / WORK_ORDER_PICK)
+          // 与它们的 yj_role_panel 授权行都清了 —— 只删菜单会让权限矩阵里留一张点开 404 的面板。
+          // 作业能力没丢:「工单扫码领料」升级成「手机扫码 → 扫码混料」(落混料记录 + 自动打印/补打印),
+          // 「扫码领料」按批号找库存那套并入「手机扫码 → 其他领料」。见 docs/development/扫码混料-20261118.md。
         ],
       },
     ],
@@ -377,6 +390,29 @@ export const menuTree = [
           // 生产领料(2026-10-30 重写):未完成/已完成两组单据 + 扫码定位 + 单据内扫码核销 → 全部领完提交。
           //   ⚠ **生单不在这一页**(见上面那张),本页只负责"领"。
           { code: 'mobilePick', title: '生产领料', path: '/panelx/list/MOBILE_PICK', panelCode: 'MOBILE_PICK', icon: 'ShoppingCart' },
+          // 生产退料(2026-11-18 独立成面板)。用户口径:「我还想生产退料独立出来,就是已经领料且审核的
+          //   领料单据,来扫码退料。其实就是独立出来一个面版,让生产领料不用负责那么多功能,操作也方便。」
+          //   ⇒ 生产领料单据页里的退料入口**已删掉**,退料只在这里做:
+          //     列出「已完成 + 材料出库单已审核」的领料单 → 扫物料码 → 填退料数量 → 提交(生成生产退料单)。
+          //   放在「生产领料」之后:先领后退,现场按作业顺序找菜单。
+          { code: 'mobileReturn', title: '生产退料', path: '/panelx/list/MOBILE_RETURN', panelCode: 'MOBILE_RETURN', icon: 'RefreshLeft' },
+          // 其他领料 / 其他退料(2026-11-16 新增)。用户口径:「手机端再做一个其他领料和其他退料……
+          //   都是直接扫物料二维码进行的。扫完几个二维码后,可以点提交。就生成了,之后重新扫就是另一个单据了」。
+          //   · 其他领料 → 其他出库单 OTHER_OUT(扣库存;三问确认时用户勾的就是这条)
+          //   · 其他退料 → 生产退料单 MATERIAL_RET,业务类型仍写「生产退料」
+          //   · 两页共用 views/mobile/MobileOtherScan.vue,side 由路由 props 钉死;
+          //     菜单叶子挂**目标单据的面板码**(不是新开的页面码),所以角色的单据权限一变,入口跟着变。
+          //   顺序:紧跟「生产领料」—— 先按工单领(主路径),再是随手领/随手退(补充路径)。
+          { code: 'mobileOtherPick', title: '其他领料', path: '/panelx/list/MOBILE_OTHER_PICK', panelCode: 'OTHER_OUT', icon: 'Upload' },
+          { code: 'mobileOtherRet', title: '其他退料', path: '/panelx/list/MOBILE_OTHER_RET', panelCode: 'MATERIAL_RET', icon: 'RefreshLeft' },
+          // 扫码混料(2026-11-18 用户口径:「在手机扫码里面加一个扫码混料的面版。逻辑:扫工单码,带出一级BOM
+          //   (就是物料清单,之前生产领料的是组装物料清单),逐项扫物料码,自动获取电子秤的数量……
+          //   提交保存一笔,全部扫完,整单保存。保存后自动打印,并且保留单据,重新扫码后进入可以补打印。」)。
+          //   · 落库 = 混料记录 wo_mixing_list(「生产过程 → 混料记录」的底表,保存后电脑端立刻可查);
+          //   · 与「生产领料」的取料差别是刻意的:领料读《组装物料清单》,混料读《物料清单》;
+          //   · 打印 = 新增「混料单」类型(自动打印页可勾),提交即打、重扫工单可补打。
+          // 位置:紧跟「其他退料」之后 —— 混料是首道工序,与其他扫码登记同属现场作业页。
+          { code: 'mobileMixScan', title: '扫码混料', path: '/panelx/list/MOBILE_MIX_SCAN', panelCode: 'MIX_SCAN', icon: 'ScaleToOriginal' },
           // 工序报工(2026-10-21 原样搬迁,页面逻辑一行不动):扫工单码 → 选工序 → 填完工数量 →
           //   提交即报工并审核;工序进度/当前工序由既有审核钩子推进。
           { code: 'mobileReport', title: '工序报工', path: '/panelx/list/MOBILE_REPORT', panelCode: 'MOBILE_REPORT', icon: 'Memo' },

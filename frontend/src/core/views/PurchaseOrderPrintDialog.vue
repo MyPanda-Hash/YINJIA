@@ -57,7 +57,24 @@
               :label="c['联系方式'] || c['姓名']" :value="c['联系方式']" />
           </el-select>
         </span>
-        <span class="pup-tip">{{ tt('这两个会印在「需方」框里；填了名单里没有的名字或电话，打印时会自动存进下拉选项') }}</span>
+        <span class="pup-tip pup-buyer-tip">
+          <span class="pup-buyer-tip1">{{ tt('这两个会印在「需方」框里；填了名单里没有的名字或电话，打印时会自动存进下拉选项') }}</span>
+          <span class="pup-buyer-tip2">{{ tt('不填（点「清空联系人」）则需方框不印联系人和联系方式') }}</span>
+        </span>
+        <!-- 清空(2026-11-16 用户口径「打印的这两个填写需要可以删除数据的」):
+             ① 下拉悬停的 ⓧ 太小不好找 ⇒ 给一个显式的「清空联系人」按钮,一次清掉这两个;
+                ⚠ 刻意**不复用** tt('清空'):词条 '清空' 在 biz 里出现多次,最后一条是修改记录的
+                kind 值 '清空'→'Cleared' ⇒ 英文界面下所有 tt('清空') 按钮都显示成 "Cleared"(老问题);
+                这里用自己的词条 '清空联系人'(en: Clear contact),按钮文字才对。
+             ② 更关键是**清空后纸面必须真的空** —— 以前清空了出纸仍回落公司默认那组
+                (孙郝聪/13718162430),看起来就是"删不掉"(见 buyerOf 注释)。 -->
+        <el-button link type="primary" size="small" class="pup-buyer-clear"
+          :disabled="!buyerName && !buyerPhone" @click="clearBuyer">{{ tt('清空联系人') }}</el-button>
+        <!-- 名单管理入口(2026-11-11 用户口径「没有删除按钮吗,输错了怎么办」):
+             只加不删的话,打错一次名字就一直留在下拉里,条数上限(12)满了会彻底卡死 -->
+        <el-button link type="primary" size="small" class="pup-buyer-mgr" @click="openContactsMgr">
+          {{ tt('管理名单') }}
+        </el-button>
       </div>
 
       <el-table ref="tableRef" :data="rows" row-key="__key" border size="small" :height="mainTableHeight"
@@ -226,6 +243,33 @@
       <el-button @click="recDetailVisible = false">{{ tt('关闭') }}</el-button>
     </template>
   </el-dialog>
+
+  <!-- 需方联系人名单管理(2026-11-11 用户口径「没有删除按钮吗,输错了怎么办」):
+       名字/电话打错了在这里改掉或删掉;删掉的不再出现在打印下拉里(系统参数整份覆盖) -->
+  <el-dialog v-model="mgrVisible" :title="tt('需方联系人名单')" width="min(560px, 94vw)" append-to-body>
+    <div class="pup-mgr">
+      <div class="pup-tip">{{ tt('名字或电话输错了，在这里改掉或删掉；删掉的不再出现在打印下拉里') }}</div>
+      <div class="pup-mgr-head">
+        <span>{{ tt('姓名') }}</span>
+        <span>{{ tt('联系方式') }}</span>
+        <span />
+      </div>
+      <div v-for="(c, i) in mgrRows" :key="i" class="pup-mgr-row">
+        <el-input v-model="c['姓名']" size="small" maxlength="20" :placeholder="tt('姓名')" />
+        <el-input v-model="c['联系方式']" size="small" maxlength="30" :placeholder="tt('联系方式')" />
+        <el-button link type="danger" :disabled="mgrBusy" @click="mgrRows.splice(i, 1)">{{ tt('删除') }}</el-button>
+      </div>
+      <div class="pup-mgr-add">
+        <el-button link type="primary" :disabled="mgrBusy" @click="mgrRows.push({ 姓名: '', 联系方式: '' })">
+          ＋ {{ tt('新增一行') }}
+        </el-button>
+      </div>
+    </div>
+    <template #footer>
+      <el-button @click="mgrVisible = false">{{ tt('取消') }}</el-button>
+      <el-button type="primary" :loading="mgrBusy" @click="saveContactsMgr">{{ tt('保存名单') }}</el-button>
+    </template>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -390,13 +434,67 @@ async function rememberBuyerContact() {
     console.warn('[pu-print] 需方联系人保存失败(不影响打印):', e?.message || e)
   }
 }
-/** 传给出纸的需方信息(送货运单不用,所以只在有金额时给) */
+/** 清空需方联系人 + 联系方式(2026-11-16 用户口径「打印的这两个填写需要可以删除数据的」) */
+function clearBuyer() {
+  buyerName.value = ''
+  buyerPhone.value = ''
+}
+/**
+ * 传给出纸的需方信息(送货单不用,所以只在有金额时给)。
+ * ⚠ 2026-11-16 用户口径「这两个填写需要可以删除数据的」—— 以前两者都空时返回 null,
+ * 出纸函数 `puSignHtml` 会把 null 当成"没传"回落到公司默认那组(孙郝聪/13718162430),
+ * 于是用户把两个框清空、点打印,纸面上的需方联系人又出现了 = 看起来"删不掉"。
+ * ⇒ 只要是有金额版,就**原样**把当前两个值传下去(空就是空),回落只留给压根没传 buyer 的老调用。
+ */
 function buyerOf() {
   if (!showAmount.value) return null
-  const nm = String(buyerName.value || '').trim()
-  const ph = String(buyerPhone.value || '').trim()
-  if (!nm && !ph) return null
-  return { 联系人: nm, 联系方式: ph }
+  return {
+    联系人: String(buyerName.value || '').trim(),
+    联系方式: String(buyerPhone.value || '').trim(),
+  }
+}
+
+/* ── 候选名单管理(2026-11-11 用户口径「没有删除按钮吗,输错了怎么办」) ─────────────────────
+   原来是"只能加、不能改不能删":打错一次名字就一直留在下拉里,攒满 12 条更彻底没法用。
+   这里给一份可编辑的名单(改/删/加),保存时整份覆盖系统参数 pu_order.buyer_contacts。 */
+const mgrVisible = ref(false)
+const mgrBusy = ref(false)
+/** 管理弹窗里的编辑副本(改完点保存才落库;取消不影响下拉里的原名单) */
+const mgrRows = ref([])
+
+function openContactsMgr() {
+  // 深拷贝:弹窗里改了又取消,不能动 buyerContacts 本身
+  mgrRows.value = buyerContacts.value.map((c) => ({
+    姓名: String(c['姓名'] || ''),
+    联系方式: String(c['联系方式'] || ''),
+  }))
+  if (!mgrRows.value.length) mgrRows.value.push({ 姓名: '', 联系方式: '' })
+  mgrVisible.value = true
+}
+
+/** 保存整份名单:空行忽略、姓名必填;成功后就地刷新下拉候选 */
+async function saveContactsMgr() {
+  const clean = mgrRows.value
+    .map((c) => ({ 姓名: String(c['姓名'] || '').trim(), 联系方式: String(c['联系方式'] || '').trim() }))
+    .filter((c) => c.姓名)
+  if (!clean.length) return ElMessage.warning(tt('请先填写联系人姓名'))
+  mgrBusy.value = true
+  try {
+    const list = await engine.puPrintBuyerContactSave(clean)
+    if (Array.isArray(list)) buyerContacts.value = list
+    // 当前选中的名字被删掉(或改了名)⇒ 落到新名单第一条,别让下拉里挂着一个名单里没有的名字
+    const nm = String(buyerName.value || '').trim()
+    if (nm && !buyerContacts.value.some((c) => String(c['姓名']) === nm)) {
+      buyerName.value = String(buyerContacts.value[0]?.['姓名'] || '')
+      buyerPhone.value = String(buyerContacts.value[0]?.['联系方式'] || '')
+    }
+    ElMessage.success(tt('名单已保存'))
+    mgrVisible.value = false
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('名单保存失败'))
+  } finally {
+    mgrBusy.value = false
+  }
 }
 /** 该行的「剩余可打」(服务端已按单位精度取整:订单×(1+比例)−已送+已退回−已打印);没取到 → null */
 function capOf(row) {
@@ -747,6 +845,11 @@ async function doVoid(row) {
 .pup-buyer-item { display: inline-flex; align-items: center; gap: 4px; }
 .pup-buyer-sel { width: 150px; }
 .pup-buyer-tel { width: 170px; }
+/* 说明文字随宽度自己折行(2026-11-16 加了「不填则需方框不印…」后半句):
+   不给 flex 基宽的话这行会被撑到 800px,把后面的「清空 / 管理名单」挤到第二行 */
+.pup-buyer-tip { flex: 1 1 300px; min-width: 200px; display: flex; flex-direction: column; gap: 1px; }
+/* 第二句(清空的作用)另起一行,别跟第一句挤成一条长行(窄屏会只剩一个字掉到下一行) */
+.pup-buyer-tip2 { color: #a5762f; }
 .pup-ratio { color: #1f6f4a; font-weight: 600; }
 .pup-foot { display: flex; justify-content: flex-end; align-items: center; font-size: 12.5px; color: #46586e; }
 /* 已打印记录:与上方勾选表隔一道浅线,说明用途 */
@@ -768,4 +871,11 @@ async function doVoid(row) {
 .pup-rec-table :deep(.el-table__row:hover > td) { background: #eef6ff !important; }
 /* 记录明细弹窗 */
 .pup-detail { display: flex; flex-direction: column; gap: 8px; }
+/* 需方联系人名单管理(2026-11-11):一行 = 姓名 + 联系方式 + 删除,与打印弹窗同一套 12.5px 字号 */
+.pup-mgr { display: flex; flex-direction: column; gap: 8px; font-size: 12.5px; color: #46586e; }
+.pup-mgr-head, .pup-mgr-row { display: grid; grid-template-columns: 1fr 1fr 44px; gap: 8px; align-items: center; }
+.pup-mgr-head { color: #8b9bb0; font-size: 12px; }
+.pup-mgr-row :deep(.el-button) { justify-self: center; }
+.pup-mgr-add { padding-top: 2px; }
+.pup-buyer-mgr { margin-left: 2px; }
 </style>

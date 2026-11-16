@@ -828,10 +828,23 @@ try {
 if ($Server) {
     $srvBase = $Server.TrimEnd('/')
     $compatForJob = Join-Path $script:HereDir 'compat-ps2.ps1'
-    $pollArgs = @($compatForJob, $srvBase, $User, $Pass, $Factory, $Station, $Port, $Mode, $PdfDir, $Printer)
+    # 🔴 2026-11-16:轮询作业原来把所有输出 Write-Output 到作业流(没人读)⇒ agent.log 里
+    #   看不到任何轮询痕迹,现场无法判断"是代理掉了,还是只是没任务"。改成写同一个 agent.log;
+    #   另写一个 poll-heartbeat.txt(每轮刷新),给 watchdog.ps1 判断"轮询作业是不是死了"。
+    $script:HbFile = Join-Path $script:HereDir 'poll-heartbeat.txt'
+    $pollArgs = @($compatForJob, $srvBase, $User, $Pass, $Factory, $Station, $Port, $Mode, $PdfDir, $Printer, $script:SayLog, $script:HbFile)
     $script:pollJob = Start-Job -ScriptBlock {
-        param($Cmp, $Srv, $Usr, $Pwd, $Fac, $Sta, $AgentPort, $ModeX, $PdfDirX, $PrinterX)
+        param($Cmp, $Srv, $Usr, $Pwd, $Fac, $Sta, $AgentPort, $ModeX, $PdfDirX, $PrinterX, $LogX, $HbX)
         if ($PSVersionTable.PSVersion.Major -lt 3) { . $Cmp }
+        # 作业里的日志:直接追加到代理的 agent.log(带时间戳),不再丢进没人读的作业流
+        function JobLog {
+            param([string]$T)
+            try { Add-Content -LiteralPath $LogX -Value ((Get-Date -Format 'yyyy-MM-dd HH:mm:ss') + ' ' + $T) -Encoding UTF8 -ErrorAction SilentlyContinue } catch { }
+        }
+        # 轮询心跳文件:每轮刷新一次(mtime 就是"轮询还活着"的证据)
+        function Touch-Hb {
+            try { [System.IO.File]::WriteAllText($HbX, (Get-Date -Format 'yyyy-MM-dd HH:mm:ss')) } catch { }
+        }
         # ⚠ 全部走 Invoke-WebRequest + 手动 UTF-8 解码,不用 Invoke-RestMethod ——
         #   实测 PS 5.1 的 Invoke-RestMethod 会把 JSON 响应按 Latin1 解,中文键名全变乱码
         #   ("二维码内容" → "äºç»´ç å å®¹"),后面 $task.'二维码内容' 就永远取不到值,
@@ -857,22 +870,33 @@ if ($Server) {
             return $r.data.token
         }
         $token = ''
+        $loginErr = 0
         while (-not $token) {
-            try { $token = Login-Once; Write-Output "[轮询] 已登录 $Srv(站点:$Sta)" }
-            catch { Write-Output "[轮询] 登录失败,10 秒后重试: $($_.Exception.Message)"; Start-Sleep -Seconds 10 }
+            try { $token = Login-Once; JobLog "[轮询] 已登录 $Srv(站点:$Sta)"; if ($loginErr -gt 0) { JobLog "[轮询] 登录已恢复正常(之前失败 $loginErr 次)" } }
+            catch {
+                $loginErr++
+                # 每 6 次(约 1 分钟)记一行,免得断网时把 agent.log 刷爆
+                if ($loginErr -eq 1 -or ($loginErr % 6) -eq 0) { JobLog "[轮询] 登录失败(第 $loginErr 次,10 秒后重试): $($_.Exception.Message)" }
+                Start-Sleep -Seconds 10
+            }
         }
         $st = [uri]::EscapeDataString($Sta)
+        $pollErr = 0
+        $pollErrMsg = ''
+        JobLog "[轮询] 开始轮询(每 4 秒一次;站点:$Sta)"
         while ($true) {
             $did = $false
             try {
+                Touch-Hb
                 $hd = @{ Authorization = "Bearer $token" }
                 $pend = Api-Get "$base/px/print/pending?station=$st" $hd
+                if ($pollErr -gt 0) { JobLog "[轮询] 取任务恢复正常(之前连续失败 $pollErr 次)"; $pollErr = 0; $pollErrMsg = '' }
                 if ($pend.data.task) {
                     $task = $pend.data.task
                     $did = $true
                     $pr = $null
                     try { $pr = Api-Post "http://127.0.0.1:$AgentPort/print" @{} $task 180 }
-                    catch { Write-Output "[轮询] 本机打印失败(id=$($task.id)): $($_.Exception.Message)" }
+                    catch { JobLog "[轮询] 本机打印失败(id=$($task.id)): $($_.Exception.Message)" }
                     $ack = @{
                         taskId = $task.id
                         ok = [bool]($pr -and $pr.ok)
@@ -884,13 +908,21 @@ if ($Server) {
                     }
                     try {
                         Api-Post "$base/px/print/ack" $hd $ack 30 | Out-Null
-                        Write-Output "[轮询] 任务 $($task.id) 完成 → $(if ($pr) { $pr.mode } else { '失败' })"
-                    } catch { Write-Output "[轮询] 回执失败: $($_.Exception.Message)" }
+                        JobLog "[轮询] 任务 $($task.id) 完成 → $(if ($pr) { $pr.mode } else { '失败' })"
+                    } catch { JobLog "[轮询] 回执失败: $($_.Exception.Message)" }
                 }
             } catch {
                 $msg = "$($_.Exception.Message)"
                 if ($msg -match '401|403|未授权|Forbidden') {
-                    try { $token = Login-Once; Write-Output '[轮询] token 过期,已重新登录' } catch { }
+                    JobLog '[轮询] token 过期/权限不足,重新登录'
+                    try { $token = Login-Once; JobLog '[轮询] token 已刷新' } catch { JobLog "[轮询] 重新登录失败: $($_.Exception.Message)" }
+                } else {
+                    $pollErr++
+                    # 同样的错只记第一次和每 30 次(约 2 分钟)一条:断网时日志仍可读
+                    if ($msg -ne $pollErrMsg -or ($pollErr % 30) -eq 0) {
+                        JobLog "[轮询] 取任务失败(连续第 $pollErr 次): $msg"
+                        $pollErrMsg = $msg
+                    }
                 }
             }
             # 🔴 2026-11-06 用户口径「多单生成没有连续打印」:一批 9 张单以前要 9×4 秒才轮到底。
@@ -900,6 +932,12 @@ if ($Server) {
     } -ArgumentList $pollArgs
     Say "[轮询] 已启动:每 4 秒去 $srvBase 拉一次任务(站点:$Station)" 'Cyan'
     Say '[轮询] 这个模式下**不需要**浏览器页面开着;页面只用来开关/看队列。' 'DarkGray'
+} else {
+    # 🔴 2026-11-16:这是最隐蔽的一种"掉" —— 进程活着、/health 正常、面板上却永远是离线。
+    #   原因:2026-11-10 起自启只传 -File,参数全在 print-agent.config.json;
+    #   配置丢了/被搬走/被改名 ⇒ 没有 -Server ⇒ 谁也不会来取任务,而且**没有任何报错**。
+    Say '[WARN] 没有服务器地址:本代理不会自己去拉任务,只能由页面推任务(面板上会一直显示离线)' 'Yellow'
+    Say '       修法:在这个文件夹里重新双击「安装.bat」(会写回 print-agent.config.json 与开机自启)' 'Yellow'
 }
 
 
@@ -920,9 +958,34 @@ Say ' 按 Ctrl+C 退出' 'DarkGray'
 Say '════════════════════════════════════════════════════════' 'Cyan'
 Say ''
 
+$loopErr = 0
 try {
-    while ($listener.IsListening) {
-        $ctx = $listener.GetContext()      # 阻塞等请求
+    while ($true) {
+        # 🔴 2026-11-16:GetContext 抛一次异常(网络栈重置/RDP 重连/会话切换/http.sys 抽风),
+        #   旧版会顺着 finally 收尾 → 整个代理进程退出 → 面板离线、再也不出纸,**没有任何人重启它**。
+        #   现在:单次异常只记一行 + 重建监听器continue;连续 20 次才放弃,交给 watchdog.ps1 拉起。
+        try {
+            if (-not $listener.IsListening) { throw 'listener 已停止' }
+            $ctx = $listener.GetContext()      # 阻塞等请求
+        } catch {
+            $loopErr++
+            Say "[监听] 接收请求出错(连续第 $loopErr 次):$($_.Exception.Message)" 'Yellow'
+            if ($loopErr -ge 20) { throw }
+            try {
+                if (-not $listener.IsListening) {
+                    try { $listener.Close() } catch { }
+                    $listener = New-Object System.Net.HttpListener
+                    $listener.Prefixes.Add($prefix)
+                    $listener.Start()
+                    Say '[监听] 已重建监听器' 'Cyan'
+                }
+            } catch {
+                Say "[监听] 重建监听器失败:$($_.Exception.Message)" 'Red'
+            }
+            Start-Sleep -Seconds 1
+            continue
+        }
+        $loopErr = 0
         $req = $ctx.Request
         $res = $ctx.Response
         # 网页与本机代理不同源 ⇒ 必须放 CORS,否则 fetch 被浏览器拦掉
@@ -947,7 +1010,12 @@ try {
             }
             elseif ($req.HttpMethod -eq 'GET' -and $path -eq '/health') {
                 # mode 让网页知道这台代理现在是"真出纸"还是"落 PDF"
-                Write-JsonResponse $res @{ ok = $true; version = $AgentVersion; mode = $Mode; printer = $effective; pdfDir = $PdfDir }
+                # 2026-11-16 加 server/station/poll:watchdog 与本机排障靠这几个字段判断
+                #   "进程活着但轮询已经停了"(最隐蔽的掉线),别删。
+                $pollOn = $false
+                try { $pollOn = [bool]($script:pollJob -and $script:pollJob.State -eq 'Running') } catch { }
+                Write-JsonResponse $res @{ ok = $true; version = $AgentVersion; mode = $Mode; printer = $effective;
+                    pdfDir = $PdfDir; server = $Server; station = $Station; poll = $pollOn }
             }
             elseif ($path -eq '/config') {
                 # 运行时配置(2026-11-01):让网页能改**出纸方式**和 **PDF 存放目录**,

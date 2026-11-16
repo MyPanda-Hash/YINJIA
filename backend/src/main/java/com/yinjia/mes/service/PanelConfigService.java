@@ -1300,6 +1300,23 @@ public class PanelConfigService {
                     new String[]{"修改", "修改"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"导入", "导入"})),
+            // 销售退货单(2026-11-13 新增,用户口径「销售退货 sal_in_bound … 补齐这两个单,并且测试转erp」):
+            // 表单/表/面板字段由 tools/migrate-return-docs-20261113.sql 按金蝶 sal_in_bound 键集克隆销售出库单而来;
+            // 转ERP 推金蝶「销售退货单」/jdy/v2/scm/sal_in_bound(见 KingdeePushService 的 isSaleRet 分支)。
+            // 选单来源 = 销售订单(SELECT_FLOWS),与销售出库单同源;没有下游生单,故不放「生单」组。
+            java.util.Map.entry("SALE_IN", List.of(
+                    new String[]{"新增", "新增"},
+                    new String[]{"选单", "选单", "选销售订单"},
+                    new String[]{"修改", "修改"},
+                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
+                    new String[]{"删除", "删除", "删除单据"},
+                    new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
+                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
+                    new String[]{"转ERP", "转ERP", "批量转ERP"},
+                    new String[]{"打印", "打印", "预览", "导出"},
+                    new String[]{"查找", "查找", "刷新"},
+                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
+                    new String[]{"导入", "导入"})),
             // 材料出库单:选单=生产工单;生单灰(PANDA:生成材料出库单（直接退料）)
             // 转ERP(2026-09-28):材料出库单 → 金蝶「生产领料单」/jdy/v2/scm/inv_pick
             java.util.Map.entry("MATERIAL_OUT", List.of(
@@ -1315,6 +1332,22 @@ public class PanelConfigService {
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"修改", "修改"},
                     new String[]{"查找", "查找", "刷新"},
+                    new String[]{"导入", "导入"})),
+            // 生产退料单(2026-11-13 新增,与材料出库单同形):
+            // 表单/表/面板字段由 tools/migrate-return-docs-20261113.sql 按金蝶 inv_pick_ret 键集克隆材料出库单而来
+            // (金蝶生产退料单是生产领料单的**严格子集**,故只隐藏 MES 独有的领料类型/领料用途/单据标签);
+            // 转ERP 推金蝶「生产退料单」/jdy/v2/scm/inv_pick_ret(见 KingdeePushService 的 isPickRet 分支)。
+            java.util.Map.entry("MATERIAL_RET", List.of(
+                    new String[]{"新增", "新增"},
+                    new String[]{"修改", "修改"},
+                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
+                    new String[]{"删除", "删除", "删除单据"},
+                    new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
+                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
+                    new String[]{"转ERP", "转ERP", "批量转ERP"},
+                    new String[]{"打印", "打印", "预览", "导出"},
+                    new String[]{"查找", "查找", "刷新"},
+                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"导入", "导入"})),
             // 其他出库单(2026-10-14 重建):同其他入库单,转ERP 推金蝶「其他出库单」/jdy/v2/scm/inv_other_out
             // (业务类型 trans_type_id 真实账套=13)。委外三单(OUTSOURCE_*)仍保持 2026-10-08 下架状态。
@@ -1428,6 +1461,8 @@ public class PanelConfigService {
             java.util.Map.entry("OUTSOURCE_ORDER", "SO_ORDER"),      // 销售订单 → 委外加工单
             // OUTSOURCE_ISSUE / OUTSOURCE_IN 两条「委外加工单 → 委外发料单/入库单」已随两张面板下架移除(2026-10-08)
             java.util.Map.entry("SALE_OUT", "SO_ORDER"),             // 销售订单 → 销售出库单
+            // 2026-11-13 新增销售退货单:与销售出库单同源(销售订单 → 退货单:按订单挑货再退回来)
+            java.util.Map.entry("SALE_IN", "SO_ORDER"),
             // 「PU_ORDER ← PU_REQ」已随请购单下架移除(2026-10-08):采购订单现无上游可选单
             java.util.Map.entry("QC_RECV", "PU_ORDER"),              // 采购订单 → 送料暂收单(库存核算,2026-09-15;编码 9-20 由 SL_RECV 改)
             java.util.Map.entry("QC_INSP", "QC_RECV"),               // 送料暂收单 → 来料检验单(暂收入库单已下线,来源指向送料暂收单 QC_RECV)

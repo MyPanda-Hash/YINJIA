@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -72,14 +73,90 @@ public class MobilePickController {
 
     /** 领料单面板(材料出库单,业务类型「生产领料」) */
     private static final String PANEL_OUT = "MATERIAL_OUT";
-    /** 退料单面板(其他入库单,业务类型「生产退料」;用户口径「退料生成的应该是其他入库单」) */
-    private static final String PANEL_BACK = "OTHER_IN";
+    /**
+     * 退料单面板(**生产退料单**,业务类型「生产退料」)。
+     *
+     * <p>2026-11-13 用户口径:「手机扫码的生产退料扫码后退料后填入的单据从其他入库改成生产退料单」
+     * —— 此前退料落的是「其他入库单」(OTHER_IN / bd_other_in),理由是当时 MES 没有生产退料单;
+     * 现在 MATERIAL_RET 已按金蝶 inv_pick_ret 补齐(表 bd_material_ret/bl_material_ret),
+     * 退料就该落自己的单据类型,否则金蝶侧一张「其他入库 QTRK-」、现场明明是「生产退料 SCTL-」,对账口径分裂。
+     */
+    private static final String PANEL_BACK = "MATERIAL_RET";
     /** 本页自身的页面级虚拟面板码(权限词:create / pick / submit / print) */
     private static final String PANEL_SELF = PagePanelRegistry.MOBILE_PICK;
     /** 领料业务类型(数据键,不翻译) */
     private static final String BIZ_PICK = "生产领料";
-    /** 退料业务类型:金蝶「其他入库单」里这一类的业务类型写「生产退料」(数据键,不翻译) */
+    /** 退料业务类型:生产退料单的「业务类型」固定写「生产退料」(数据键,不翻译) */
     private static final String BIZ_BACK = "生产退料";
+
+    // ══════════════ 领料类型(2026-11-18:一个工单行可以有两张领料单)══════════════
+    //
+    // 用户口径:「现在的生成工单领料需要生成两张领料单(一种就是现在的叫做组装领料,
+    //   一种是混料领料(根据半成品的物料清单现在是空的))。并且明细要对这两个做区分。」
+    // 三问确认:① 混料「有明细才生成」,半成品清单为空 ⇒ 只出组装单、不产生空单;
+    //           ② 生产领料单据页里的退料功能去掉,退料全走新面板;
+    //           ③ 明细只做**单据级**区分(不给 wo_pick_line 加行级列)。
+    /** 组装领料(= 原来那张单,按工单产品的组装物料清单展开) */
+    private static final String KIND_ASSEMBLY = WoPickDocService.KIND_ASSEMBLY;
+    /** 混料领料(按半成品自己的物料清单展开;清单空则不出单) */
+    private static final String KIND_MIX = WoPickDocService.KIND_MIX;
+
+    // ══════════════════════ 半成品:只显示、不领料、可跳过 ══════════════════════
+
+    /**
+     * 半成品标记(2026-11-16 用户口径:「生产领料单有一行带TB的是半成品,在客户那边半成品是不入库的,
+     * 所以只要显示这行数据,但是实际并不领料就可以,不要影响别的物料正常领料,半成品是可跳过的」)。
+     *
+     * <p>实测半成品编码形如 {@code T410**TB} / {@code A-32-01**TB} / {@code C-87**TB}
+     * (bs_inv 里 1146 个,全部带 {@code **TB})。
+     *
+     * <p>🔴 **只认「**TB」这个双星标记**,不能只认 `TB`:实测 {@code YJ-TB-009}(密封圈)、
+     * {@code TB-20120}、{@code D-55-04*TB} 都是**要正常领的料**,按裸 TB 匹配会把它们一起吞掉,
+     * 那就是"影响了别的物料正常领料"。
+     */
+    private static final String SEMI_MARK = "**TB";
+
+    /** 这个物料编码是不是半成品 */
+    static boolean isSemiFinished(Object code) {
+        if (code == null) return false;
+        return String.valueOf(code).toUpperCase(Locale.ROOT).contains(SEMI_MARK);
+    }
+
+    /** 明细行是不是半成品(以 normalizeLine 打的 {@code 半成品} 标记为准,免得各处重复判编码) */
+    private static boolean isSemiLine(Map<String, Object> it) {
+        Object v = it == null ? null : it.get("半成品");
+        if (v instanceof Boolean b) return b;
+        return isSemiFinished(it == null ? null : it.get("编码"));
+    }
+
+    /** 本单**需要真领料**的明细(半成品不算) */
+    private static int pickableCount(List<Map<String, Object>> items) {
+        int n = 0;
+        for (Map<String, Object> it : items) if (!isSemiLine(it)) n++;
+        return n;
+    }
+
+    /**
+     * 同上,但入参是**生单时组装的出库行**(键是 {@code 材料编码},还没走 normalizeLine)。
+     *
+     * <p>两个形状别混:normalizeLine 的产物是 {@code 编码/半成品},insertPickLines 的入参是
+     * {@code 材料编码/数量}。用错形状不会报错、只会静默算错(半成品被算进分母)。
+     */
+    private static int pickableCountOfOutItems(List<Map<String, Object>> items) {
+        int n = 0;
+        for (Map<String, Object> it : items) if (!isSemiFinished(it.get("材料编码"))) n++;
+        return n;
+    }
+
+    /** 已领项数(只数需要真领料的行) */
+    private static int pickedCount(List<Map<String, Object>> items) {
+        int n = 0;
+        for (Map<String, Object> it : items) {
+            if (isSemiLine(it)) continue;
+            if (num(it.get("数量")) > 0) n++;
+        }
+        return n;
+    }
 
     /**
      * 列表每组最多返回多少条(2026-10-30 由 200 调整)。
@@ -219,7 +296,10 @@ public class MobilePickController {
                         // LEFT JOIN:物料档案可能没建档,这时显示空而不是把工单丢掉
                         + " LEFT JOIN dbo.bs_inv i ON i.存货编码 = p.dm"
                         + " LEFT JOIN dbo.wo_pick_doc d"
+                        // 2026-11-18:一个工单行现在可能有组装 + 混料两张单,
+                        // 这里按**组装**那张 JOIN 以保持"一行一条工单行"(混料单在 /create/list 里看)
                         + "   ON d.工单号 = p.pl_no AND d.工单行号 = p.pl_xc AND d.状态 <> N'已作废'"
+                        + "  AND ISNULL(d.领料类型,N'组装') = N'组装'"
                         + " WHERE ISNULL(p.asp_cancel,'N') <> 'Y'");
         List<Object> args = new ArrayList<>();
         if (!kw.isEmpty()) {
@@ -282,7 +362,7 @@ public class MobilePickController {
      *
      * <p>退料单数量**全部为 0**(用户口径「退料默认数量为0。可以不进行退料操作」)——
      * 0 数量行不参与库存记账({@code StockLedgerService.apply} 对 qty=0 直接 continue),
-     * 所以这张草稿单挂着不会动库存;不做退料就整单作废、不产生其他入库单。
+     * 所以这张草稿单挂着不会动库存;不做退料就整单作废、不产生退料单。
      *
      * @param body {woNo:工单号, line:工单行号(0=取该工单第一行)}
      * @return {id:台账主键, 领料单号, 退料单号, 工单:{...}, 领料明细:[...], 退料明细:[...], 打印:{...}}
@@ -332,8 +412,8 @@ public class MobilePickController {
             throw new IllegalStateException("工单 " + lineWoNo + " 第 " + line + " 行已结案,不能再开领料单");
         }
 
-        // 已开过单就不重开 —— 用户第二次扫同一行时应当"进到那张单",而不是再开一对空单
-        WoPickDocService.PickDoc exist = docs.findActive(lineWoNo, line);
+        // 已开过**组装**单就不重开 —— 用户第二次扫同一行时应当"进到那张单",而不是再开一对空单
+        WoPickDocService.PickDoc exist = docs.findActive(lineWoNo, line, KIND_ASSEMBLY);
         if (exist != null) {
             return existingResult(exist, lineWoNo, line, wo, wantPrint);
         }
@@ -352,18 +432,7 @@ public class MobilePickController {
                     + "请先到 数据建模 → 生产 → 组装物料清单 维护该产品,或用「生产工单 → 新增 → 临时工单」录入所需物料");
         }
         // 映射成本类下游沿用的领料行形态(物料编号/物料名/物料规格/用量/计量单位)
-        List<Map<String, Object>> bomLines = new ArrayList<>();
-        for (Map<String, Object> b : bom.lines()) {
-            String code = str(b.get("子件编码"));
-            if (code.isEmpty()) continue;      // 没有物料编号的行不参与领料
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("物料编号", code);
-            m.put("物料名", str(b.get("子件名称")));
-            m.put("物料规格", str(b.get("子件规格")));
-            m.put("用量", num(b.get("标准用量")));
-            m.put("计量单位", str(b.get("计量单位")));
-            bomLines.add(m);
-        }
+        List<Map<String, Object>> bomLines = toPickLines(bom.lines());
         if (bomLines.isEmpty()) {
             throw new IllegalStateException("「" + ("临时工单".equals(bom.source()) ? "临时工单用料" : "组装物料清单 " + bom.docNo())
                     + "」没有可用的明细行(物料编码为空),无法生成领料单");
@@ -382,20 +451,111 @@ public class MobilePickController {
         }
 
         String user = currentUserName();
-        // 仓库(2026-10-30 修正):工单行不带仓库,但材料出库单**审核过账时必须有仓库**
-        // (StockLedgerService 按 (物料,仓库,批号) 写 kucun,仓库为空会抛
-        //  「仓库档案不存在:[null],请先在基础档案-仓库中建立」—— 实测生单能成、提交才炸)。
-        // ⇒ 生单时按**该物料的库存所在仓库**预填明细行仓库(优先恒亿仓/主料仓,其次库存最大的仓),
-        //   现场扫物料时若换了仓库,前端会把实际仓库一起写回。
-        String today = java.time.LocalDate.now().toString();
-        String prodLine = str(wo.get("生产线"));
-
         // 工单需求数量 = 该工单行的**排产数量**(plang.pl_sl)。
         // 用户口径(2026-10-30):「对应的 bom 生成的领料单明细,应该是每条明细的
         //   bom 组成个数 × 工单需求数量」,且 BOM 的「用量」是**每 1 个成品的用量**。
         double woQty = num(wo.get("排产数量"));
 
-        // ── 领料单草稿(材料出库单,业务类型「生产领料」)
+        // ① 组装领料单(原来那张,行为不变;失败照旧抛错)
+        //   BOM 来源文案/单号由这里算好传进去(远端把 BOM 收口成 WorkOrderBomService.Bom 之后,
+        //   方法里已经没有 bomHead 了):临时工单没有独立单号,备注写「临时工单用料」。
+        String asmBomNo = "临时工单".equals(bom.source()) ? "" : bom.docNo();
+        Map<String, Object> asm = createPickDoc(wo, productCode, str(wo.get("产品名称")),
+                "生产领料·" + bomLabel, asmBomNo, bomLines, KIND_ASSEMBLY, woQty, wantPrint, user);
+
+        List<Map<String, Object>> made = new ArrayList<>();
+        made.add(asm);
+        Map<String, Object> mix = null;
+
+        // ② 混料领料单(2026-11-18 用户口径)——
+        //   「一种是混料领料(根据半成品的物料清单)」+ 三问确认「**有明细才生成**,
+        //    半成品清单为空就不产生空单」。
+        //   半成品 = 组装清单里编码含 **TB 的那一行(与"只显示不领料"同一判定);
+        //   它自己的清单 = bs_asm_bom 里 产品编码 = 半成品编码 的组装 BOM。
+        try {
+            for (Map<String, Object> b : bomLines) {
+                String semiCode = str(b.get("物料编号"));
+                if (!isSemiFinished(semiCode)) continue;
+                // 半成品自己的清单 = 该编码在《组装物料清单》里的标准 BOM
+                // (2026-11-16 合并:原来的 latestAsmBom/bomDetail 已收口到 WorkOrderBomService)
+                WorkOrderBomService.Bom mixBom = bomService.standardOf(semiCode);
+                if (mixBom.isEmpty()) continue;                       // 半成品没维护清单 ⇒ 不出单
+                List<Map<String, Object>> mixLines = toPickLines(mixBom.lines());
+                if (mixLines.isEmpty()) continue;                     // 清单是空的 ⇒ 不出空单
+                // 需求基数 = 工单数量 × 该半成品在组装清单里的单件用量(多数是 1:1,但不假定)
+                double base = round4(woQty * num(b.get("用量")));
+                String mixNo = mixBom.docNo();
+                mix = createPickDoc(wo, semiCode, str(b.get("物料名")),
+                        "生产领料·混料物料清单 " + mixNo, mixNo, mixLines, KIND_MIX, base, wantPrint, user);
+                made.add(mix);
+                break;   // 一个工单行目前只有一个半成品;多的话唯一约束会撞,取第一个即可
+            }
+        } catch (RuntimeException e) {
+            // 混料单失败**不回滚组装单**:组装那张已经建好、号也占了,
+            // 整体报错只会让现场以为"什么都没生成"。原因带回前端提示,组装单照常可用。
+            log.warn("混料领料单生成失败(组装单已生成):{}/{} - {}", lineWoNo, line, e.getMessage(), e);
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>(asm);
+        out.put("工单", wo);
+        // 新结构:一个工单行可能生成两张单,前端按这个数组逐个列出
+        out.put("单据", made);
+        if (mix != null) out.put("混料单", mix);
+        return out;
+    }
+
+    /**
+     * 把 WorkOrderBomService 的 BOM 子件行映射成领料行形态(物料编号/物料名/物料规格/用量/计量单位)。
+     *
+     * <p>2026-11-16 合并时抽出来:组装单与混料单**同一套映射**(混料单的 BOM 是取半成品编码的
+     * 标准 BOM,再用本方法转一次),两处各写一遍迟早会不一致(单位/用量列一改就漏)。
+     * 没有物料编号的行直接丢掉 —— 没编码的行不可能领料。
+     */
+    private static List<Map<String, Object>> toPickLines(List<Map<String, Object>> bomLines) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (bomLines == null) return out;
+        for (Map<String, Object> b : bomLines) {
+            String code = str(b.get("子件编码"));
+            if (code.isEmpty()) continue;      // 没有物料编号的行不参与领料
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("物料编号", code);
+            m.put("物料名", str(b.get("子件名称")));
+            m.put("物料规格", str(b.get("子件规格")));
+            m.put("用量", num(b.get("标准用量")));
+            m.put("计量单位", str(b.get("计量单位")));
+            out.add(m);
+        }
+        return out;
+    }
+
+    /**
+     * 生成**一张**领料单(组装 / 混料共用)。
+     *
+     * <p>2026-11-18 从 {@link #generateOne} 抽出来:同一套「按 BOM 展开明细 → 预留单号 →
+     * 写台账 → 写 wo_pick_line → 返回结果」,组装与混料只差**数据源**(哪张 BOM)、
+     * **类型**和**需求基数**。两处复制会让"改一处漏一处"(半成品跳过、只读字段、打印载荷…)重现。
+     *
+     * @param wo          工单行(抬头用)
+     * @param productCode 这张单的"产品":组装单=工单产品;混料单=半成品编码(便于在单据上看清混的是哪支半成品)
+     * @param productName 同上(名称)
+     * @param bomLabel    该单依据的 BOM 来源文案(写进明细备注,两张单来源不同要分得清)
+     * @param bomNo       该 BOM 的单据编号(临时工单没有独立单号 ⇒ 传空串)
+     * @param bomLines    该 BOM 的明细行
+     * @param kind        {@link #KIND_ASSEMBLY} / {@link #KIND_MIX}
+     * @param qtyBase     需求量基数(组装 = 工单排产数量;混料 = 工单数量 × 半成品单件用量)
+     * @return 与旧 {@code generateOne} 同结构的单张结果
+     */
+    private Map<String, Object> createPickDoc(Map<String, Object> wo, String productCode, String productName,
+                                              String bomLabel, String bomNo, List<Map<String, Object>> bomLines,
+                                              String kind, double qtyBase, boolean wantPrint, String user) {
+        String lineWoNo = str(wo.get("工单号"));
+        int line = toInt(wo.get("工单行号"));
+
+        // 仓库(2026-10-30 修正):工单行不带仓库,但材料出库单**审核过账时必须有仓库**
+        // (StockLedgerService 按 (物料,仓库,批号) 写 kucun,仓库为空会抛
+        //  「仓库档案不存在:[null],请先在基础档案-仓库中建立」—— 实测生单能成、提交才炸)。
+        // ⇒ 生单时按**该物料的库存所在仓库**预填明细行仓库(优先恒亿仓/主料仓,其次库存最大的仓),
+        //   现场扫物料时若换了仓库,前端会把实际仓库一起写回。
         List<Map<String, Object>> outItems = new ArrayList<>();
         String wh = "";          // 单头仓库(全部明细同仓时才有意义,见下)
         String whCode = "";
@@ -404,9 +564,9 @@ public class MobilePickController {
             String code = str(b.get("物料编号"));
             // 每行按**该物料有库存的那个仓**预填(库存最大的仓优先,恒亿仓/主料仓优先于不良品仓)
             String[] lineWh = defaultWarehouseOf(code);
-            // 需求用量 = BOM 单件用量 × 工单数量(四位小数,与 decimal(18,4) 同口径)
+            // 需求用量 = BOM 单件用量 × 基数(四位小数,与 decimal(18,4) 同口径)
             double unit = num(b.get("用量"));
-            double need = round4(unit * woQty);
+            double need = round4(unit * qtyBase);
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("行号", String.valueOf(i + 1));
             item.put("材料编码", code);
@@ -428,17 +588,17 @@ public class MobilePickController {
             item.put("需求数量", need);
             item.put("仓库", lineWh[0]);
             if (!lineWh[1].isEmpty()) item.put("仓库编码", lineWh[1]);
-            // 备注留痕:**单件用量、工单数量、需求合计**都写清楚 —— 现场看到 2000 时能自己算出
+            // 备注留痕:**单件用量、需求基数、需求合计**都写清楚 —— 现场看到 2000 时能自己算出
             // 「2/支 × 1000 支 = 2000」。bomUsageOf 取的是「需求 N」里的 N(合计),不是单件用量。
-            item.put("明细备注", "生产领料·" + bomLabel
-                    + "(用量 " + fmtQty(unit) + " × 工单 " + fmtQty(woQty) + " = 需求 " + fmtQty(need) + ")");
+            // 2026-11-16 合并:来源名由调用方算好传进来(组装 = 「生产领料·组装工艺清单 <单号>」/
+            //   临时工单 = 「生产领料·临时工单用料」;混料 = 「生产领料·混料物料清单 <单号>」)——
+            //   远端把 BOM 来源收口成 WorkOrderBomService.Bom 之后,方法里已经拿不到 bomHead 了。
+            item.put("明细备注", bomLabel
+                    + "(用量 " + fmtQty(unit) + " × 基数 " + fmtQty(qtyBase) + " = 需求 " + fmtQty(need) + ")");
             outItems.add(item);
             // 单头仓库:第一行有仓就记第一行的(全部同仓时才是"这单从哪个仓出")
             if (wh.isEmpty() && !lineWh[0].isEmpty()) { wh = lineWh[0]; whCode = lineWh[1]; }
         }
-        // 单头仓库:全部明细同仓时才算"这单从哪个仓出"(多仓出库时单头留空,按明细行各自过账)
-        // ⚠ 用 final 副本参与 lambda:wh 在循环里被赋值,lambda 不能捕获非 effectively-final 的变量
-        final String whFinal = wh;
 
         // ── 🔴 2026-11-01 两阶段改造:生单**只取号 + 写领料明细**,不建材料出库单
         //
@@ -455,45 +615,49 @@ public class MobilePickController {
         // 用户口径:「退料直接在生产领料界面。可以点开已完成的生产领料数据再次进行扫码。
         //   这样就可以来退料了。然后退料的单据做一个退料的标志。」
         // ⇒ 退料是**领完之后的后续动作**:生单时只建领料单;
-        //   现场真要退料时,点开这张**已完成**的领料单扫码退,退多少生多少
-        //   (见 {@link #returnScan} / {@link #submitReturn})。
+        //   现场真要退料时,走独立的「生产退料」面板(2026-11-18 起独立成面板),
+        //   退多少生多少(见 {@link #returnScan} / {@link #submitReturn})。
         //
         // 上一版按首轮口径预建「数量全 0 的退料草稿」已废弃 —— 那是空单:
-        //   它躺在其他入库单列表里像待办,没人退料还得专门作废,纯噪声。
+        //   它躺在退料单列表里像待办,没人退料还得专门作废,纯噪声。
         //   历史遗留的空退料单由 migrate-wo-pick-return-20261030.sql 统一作废。
 
-        // ── 台账(唯一约束在这里挡"连扫两下")
+        // ── 台账(唯一约束在这里挡"连扫两下";索引含领料类型 ⇒ 组装/混料各占一行)
+        // 物料项数只数**需要真领料**的行:半成品只显示不领,若把它算进分母,
+        // 进度会永远差一项、提交闸门就过不去(2026-11-16 用户口径「半成品是可跳过的」)。
+        int pickable = pickableCountOfOutItems(outItems);
         long id;
         try {
-            id = docs.insert(lineWoNo, line, productCode, str(wo.get("产品名称")),
-                    outNo, null, bomLines.size(), user);
+            id = docs.insert(lineWoNo, line, productCode, productName,
+                    outNo, null, pickable, user, kind);
         } catch (RuntimeException e) {
-            // 并发:另一个手机刚给同一工单行建了单。把已存在的还给调用方,不要留半截数据
-            WoPickDocService.PickDoc raced = docs.findActive(lineWoNo, line);
+            // 并发:另一个手机刚给同一工单行 + 同一类型建了单。把已存在的还给调用方,不要留半截数据
+            WoPickDocService.PickDoc raced = docs.findActive(lineWoNo, line, kind);
             if (raced != null) {
-                log.warn("手机扫码生单并发撞唯一约束:{}/{};已回落到既有台账 {}", lineWoNo, line, raced.id(), e);
+                log.warn("手机扫码生单并发撞唯一约束:{}/{} [{}];已回落到既有台账 {}",
+                        lineWoNo, line, kind, raced.id(), e);
                 return existingResult(raced, lineWoNo, line, wo, wantPrint);
             }
             throw e;
         }
 
         // 领料明细落到 wo_pick_line(材料出库单要等提交才生成,见 submit)
-        insertPickLines(id, outItems, woQty, user);
+        insertPickLines(id, outItems, qtyBase, user);
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", id);
         out.put("领料单号", outNo);
+        out.put("领料类型", kind);
         out.put("工单", wo);
-        out.put("BOM单据编号", bom.docNo());
-        out.put("BOM来源", bom.source());
-        out.put("物料项数", bomLines.size());
+        out.put("BOM单据编号", bomNo);
+        out.put("物料项数", pickable);
         out.put("状态", WoPickDocService.STATE_OPEN);
         out.put("重复", false);
         // 生单即自动打印工单二维码一次(用户口径「在生成生产领料单的时候自动打印一次」)。
         // 这里只把"要打什么"回给前端 —— 真正的出纸由前端打印通道或打印站点完成,
         // 服务端不持有打印机(服务端也可能在另一台机器上)。
         out.put("打印", wantPrint
-                ? printPayload(lineWoNo, line, str(wo.get("产品名称")), str(wo.get("规格型号")), id)
+                ? printPayload(lineWoNo, line, productName, str(wo.get("规格型号")), id)
                 : null);
         return out;
     }
@@ -597,10 +761,8 @@ public class MobilePickController {
                     "SELECT id FROM dbo.wo_pick_doc WHERE 领料单号 = ? AND 状态 <> ? ORDER BY id DESC",
                     Long.class, no, WoPickDocService.STATE_VOID);
             if (!ids.isEmpty()) {
-                out.put("found", true);
-                out.put("id", ids.get(0));
-                out.put("by", "领料单号");
-                return ApiResult.ok(out);
+                WoPickDocService.PickDoc hit = docs.byId(ids.get(0));
+                return ApiResult.ok(locateResult(hit == null ? List.of() : List.of(hit), "领料单号"));
             }
             // 单据号在台账里完全没有(或已作废)—— 明确告诉前端
             long anyDoc = jdbc.queryForObject(
@@ -612,37 +774,83 @@ public class MobilePickController {
             return ApiResult.ok(out);
         }
 
-        WoPickDocService.PickDoc hit = null;
+        // ── 按工单号(可带行号)定位
+        //
+        // 2026-11-18:一个工单行现在可能有**两张**单(组装 / 混料)⇒ 命中的整组一起返回,
+        // 前端把两张都列出来让人选(用户口径「都能列出、都能点进去」)。
+        // 但**跨多行**时仍按老口径返回 candidates 让人指定行号 —— 那是另一个歧义维度。
+        List<WoPickDocService.PickDoc> hits = new ArrayList<>();
         if (line != null && line > 0) {
-            hit = docs.findActive(no, line);
+            hits = docs.listActive(no, line);
         } else {
-            // 没带行号 ⇒ 按工单号找**全部**有效单;只有唯一的才直接打开,多条让用户选
-            for (Map<String, Object> r : jdbc.queryForList(
-                    "SELECT id FROM dbo.wo_pick_doc WHERE 工单号 = ? AND 状态 <> ? ORDER BY 工单行号",
-                    no, WoPickDocService.STATE_VOID)) {
-                if (hit == null) hit = docs.byId(((Number) r.get("id")).longValue());
-                else { hit = null; break; }   // 多条 ⇒ 视为"未定位"
-            }
-            if (hit == null) {
-                List<Map<String, Object>> many = jdbc.queryForList(
-                        "SELECT id, 工单行号, 状态 FROM dbo.wo_pick_doc WHERE 工单号 = ? AND 状态 <> ? ORDER BY 工单行号",
-                        no, WoPickDocService.STATE_VOID);
-                out.put("found", false);
-                out.put("candidates", many);
-                out.put("hint", many.isEmpty() ? "no-doc" : "multi-line");
-                return ApiResult.ok(out);
+            List<Long> ids = jdbc.queryForList(
+                    "SELECT id FROM dbo.wo_pick_doc WHERE 工单号 = ? AND 状态 <> ? ORDER BY 工单行号, id",
+                    Long.class, no, WoPickDocService.STATE_VOID);
+            for (Long id : ids) {
+                WoPickDocService.PickDoc d = docs.byId(id);
+                if (d != null) hits.add(d);
             }
         }
-        if (hit == null) {
+        if (hits.isEmpty()) {
             out.put("found", false);
             out.put("candidates", List.of());
             out.put("hint", "no-doc");
             return ApiResult.ok(out);
         }
+        // 跨多行 ⇒ 让用户挑行(沿用旧口径)
+        long distinctLines = hits.stream().map(WoPickDocService.PickDoc::woLine).distinct().count();
+        if (distinctLines > 1) {
+            List<Map<String, Object>> many = new ArrayList<>();
+            for (WoPickDocService.PickDoc d : hits) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", d.id());
+                m.put("工单行号", d.woLine());
+                m.put("领料类型", d.pickKind());
+                m.put("领料单号", d.outNo());
+                m.put("状态", d.state());
+                many.add(m);
+            }
+            out.put("found", false);
+            out.put("candidates", many);
+            out.put("hint", "multi-line");
+            return ApiResult.ok(out);
+        }
+        return ApiResult.ok(locateResult(hits, "工单号"));
+    }
+
+    /**
+     * 定位结果:命中的那一组单(组装 / 混料可能两张)。
+     *
+     * <p>{@code id} 仍给第一张(组装在前)以兼容旧前端;新前端看 {@code 单据} 数组逐个打开。
+     */
+    private Map<String, Object> locateResult(List<WoPickDocService.PickDoc> list, String by) {
+        Map<String, Object> out = new LinkedHashMap<>();
         out.put("found", true);
-        out.put("id", hit.id());
-        out.put("by", "工单号");
-        return ApiResult.ok(out);
+        out.put("by", by);
+        if (list == null || list.isEmpty()) {
+            out.put("found", false);
+            out.put("hint", "no-doc");
+            return out;
+        }
+        out.put("id", list.get(0).id());
+        List<Map<String, Object>> arr = new ArrayList<>();
+        for (WoPickDocService.PickDoc d : list) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", d.id());
+            m.put("领料单号", d.outNo());
+            m.put("领料类型", d.pickKind());
+            m.put("工单号", d.woNo());
+            m.put("工单行号", d.woLine());
+            m.put("产品名称", d.productName());
+            m.put("状态", d.state());
+            m.put("物料项数", d.itemCount());
+            m.put("已领项数", d.doneCount());
+            arr.add(m);
+        }
+        out.put("单据", arr);
+        out.put("领料类型", list.get(0).pickKind());
+        if (arr.size() > 1) out.put("hint", "multi-kind");
+        return out;
     }
 
     /**
@@ -688,6 +896,8 @@ public class MobilePickController {
         out.put("产品名称", d.productName());
         out.put("领料单号", d.outNo());
         out.put("退料单号", d.backNo());
+        // 2026-11-18:组装领料 / 混料领料 —— 单据页标题与列表标签都按它显示
+        out.put("领料类型", d.pickKind());
         out.put("状态", d.state());
         // 材料出库单是否已被仓管审批(2026-11-01:提交只建单不过账,审批才扣库存)。
         // 前端据此把「开始退料」换成「待仓管审批」,别让人点了才被服务端拒。
@@ -753,11 +963,11 @@ public class MobilePickController {
         WoPickDocService.PickDoc d = docs.byId(id);
         if (d == null) throw new IllegalArgumentException("没有找到这张单据(可能已作废)");
         if (WoPickDocService.STATE_DONE.equals(d.state())) {
-            // 2026-10-30:已完成 = 已审核过账,之后只能退料(生成其他入库单),**不能再改领料数量**。
+            // 2026-10-30:已完成 = 已审核过账,之后只能退料(生成生产退料单),**不能再改领料数量**。
             // 之前这里只笼统报"已经提交,不能再改数量";现在把"该走哪条路"直接告诉调用方 ——
             // 用户报障「已完成的进去扫码应该是其他入库才对」,根因之一就是界面在完成态仍走领料分支。
             throw new IllegalStateException("这张单已经完成并过账,不能再改领料数量:"
-                    + "如需退货请走「开始退料」(生成其他入库单)");
+                    + "如需退货请走「开始退料」(生成生产退料单)");
         }
 
         // ① 这个物料码必须在**本单的明细里**(领料/退料各自的明细) —— 「对应的物料码存在」的第一个含义
@@ -770,6 +980,11 @@ public class MobilePickController {
         if (hit == null) {
             throw new IllegalStateException("物料 " + code + " 不在本单的"
                     + ("back".equals(side) ? "退料" : "领料") + "明细里:请核对是否扫错了料(本单只含组装BOM表里的用料)");
+        }
+        // 半成品:只显示、不领料、可跳过(2026-11-16 用户口径)
+        if (!"back".equals(side) && isSemiLine(hit)) {
+            throw new IllegalStateException("物料 " + code + " 是半成品(编码含 **TB),本厂不入库、不需要领料:"
+                    + "这一行只作展示,直接跳过即可");
         }
 
         // ② 库存可用量(按 物料+仓库 汇总;批次明细另给,前端沿用先进先出拆批)
@@ -816,12 +1031,12 @@ public class MobilePickController {
         double qty = round4(num(body.get("qty")));
         WoPickDocService.PickDoc d = docs.byId(id);
         if (d == null) throw new IllegalArgumentException("没有找到这张单据(可能已作废)");
-        // 已完成 = 已审核过账,之后只能退料(生成其他入库单),不能再改领料数量。
+        // 已完成 = 已审核过账,之后只能退料(生成生产退料单),不能再改领料数量。
         // ⚠ 与 scanMaterial 里同一道闸门:两处都在,漏一处就能绕过(2026-10-30 改了一处后
         //   实测仍报旧文案才发现 —— 后端两个入口必须同口径)。
         if (WoPickDocService.STATE_DONE.equals(d.state())) {
             throw new IllegalStateException("这张单已经完成并过账,不能再改领料数量:"
-                    + "如需退货请走「开始退料」(生成其他入库单)");
+                    + "如需退货请走「开始退料」(生成生产退料单)");
         }
         if (code.isEmpty()) throw new IllegalArgumentException("物料编码不能为空");
         if (qty < 0) throw new IllegalArgumentException("数量不能为负数");
@@ -832,6 +1047,10 @@ public class MobilePickController {
         Map<String, Object> hit = null;
         for (Map<String, Object> it : items) if (code.equals(str(it.get("编码")))) { hit = it; break; }
         if (hit == null) throw new IllegalStateException("物料 " + code + " 不在本单的明细里");
+        // 半成品不许填数量(2026-11-16):它不入库,填了会凭空扣库存;只显示、可跳过
+        if (!"back".equals(side) && isSemiLine(hit) && qty > 0) {
+            throw new IllegalStateException("物料 " + code + " 是半成品(编码含 **TB),不需要领料:数量请留 0 直接跳到下一项");
+        }
 
         // 库存守卫(领料):超出跨批次合计就拦 —— 用户口径「只要仓库数量足够,多少都可以」
         if (!"back".equals(side) && qty > 0) {
@@ -855,16 +1074,15 @@ public class MobilePickController {
         // 直接改明细行的数量(草稿单可改)。批次留痕由 batches 写进明细备注。
         writeQty(panel, no, str(hit.get("行号")), str(hit.get("原始行号")), qty, body, side, code);
 
-        int done = 0;
-        for (Map<String, Object> it : linesOf(d.outNo(), "pick")) if (num(it.get("数量")) > 0) done++;
-        docs.updateProgress(id, done, items.size(), currentUserName());
+        // 进度的分母/分子都**不算半成品**(2026-11-16:半成品只显示不领,算进去就永远差一项)
+        List<Map<String, Object>> pickNow = linesOf(d.outNo(), "pick");
+        int totalItems = pickableCount(pickNow);
+        int doneNow = pickedCount(pickNow);
+        docs.updateProgress(id, doneNow, totalItems, currentUserName());
 
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("领料明细", linesOf(d.outNo(), "pick"));
+        out.put("领料明细", pickNow);
         out.put("退料明细", linesOf(d.backNo(), "back"));
-        int totalItems = linesOf(d.outNo(), "pick").size();
-        int doneNow = 0;
-        for (Map<String, Object> it : linesOf(d.outNo(), "pick")) if (num(it.get("数量")) > 0) doneNow++;
         out.put("物料项数", totalItems);
         out.put("已领项数", doneNow);
         // 「全部领料完成后才可以提交」的判据就这一个 —— 由服务端算,前端只管显示
@@ -899,6 +1117,8 @@ public class MobilePickController {
         if (items.isEmpty()) throw new IllegalStateException("这张领料单没有明细行,无法提交(请作废后重新生成)");
         List<String> missing = new ArrayList<>();
         for (Map<String, Object> it : items) {
+            // 半成品不参与"是否领完"的判定:它只显示、不领料、可跳过(2026-11-16 用户口径)
+            if (isSemiLine(it)) continue;
             if (num(it.get("数量")) <= 0) missing.add(str(it.get("编码")));
         }
         if (!missing.isEmpty()) {
@@ -917,7 +1137,8 @@ public class MobilePickController {
         // 库存立刻被扣、仓管的审批完全被绕过。
         // 现在:用生单时预留的号建一张**待审批**的材料出库单(数量=实领),状态停在草稿;
         // 仓管在「材料出库单」面板点「审核」才走 StockLedgerService 扣库存。
-        createMaterialOutFromPick(d, items, user);
+        // ── 生单:半成品不进材料出库单(不入库 ⇒ 不能有出库流水)
+        int madeLines = createMaterialOutFromPick(d, items, user);
 
         // 退料不在这里做(2026-10-30 第三轮用户改口径):
         //   用户口径「可以点开已完成的生产领料数据再次进行扫码。这样就可以来退料了」——
@@ -929,9 +1150,12 @@ public class MobilePickController {
         out.put("已提交", true);
         out.put("领料单号", d.outNo());
         out.put("状态", WoPickDocService.STATE_DONE);
-        out.put("说明", "已生成材料出库单 " + d.outNo() + ",等仓管在「材料出库单」里审批;"
-                + "审批通过才扣库存。如需退料,点开这张单再次扫码即可(剩余可退 "
-                + fmtQty(pickedQtyOf(d.outNo())) + ")");
+        out.put("出库行数", madeLines);
+        out.put("说明", madeLines == 0
+                ? "本单明细全是半成品(编码含 **TB),按口径不入库、不生成材料出库单;领料单已结束"
+                : "已生成材料出库单 " + d.outNo() + ",等仓管在「材料出库单」里审批;"
+                        + "审批通过才扣库存。如需退料,点开这张单再次扫码即可(剩余可退 "
+                        + fmtQty(pickedQtyOf(d.outNo())) + ")");
         return ApiResult.ok(out);
     }
 
@@ -945,16 +1169,23 @@ public class MobilePickController {
      * 保存出来的就是一张**草稿**,审核留给仓管 —— 这正是要的语义。
      *
      * <p>数量取**实领数量**(不是需求):需求只是预填参考,实领才是这次真出库的量。
+     *
+     * <p>🔴 半成品的行**不进材料出库单**(2026-11-16 用户口径:「半成品是不入库的,只要显示这行数据,
+     * 但是实际并不领料」)—— 它不出现在出库明细里就等于不过账,库存不动;
+     * 全部都是半成品时**连单都不建**(建一张 0 行的出库单只会污染材料出库单列表)。
+     *
+     * @return 真正写进出库单的明细行数(0 = 没建单)
      */
-    private void createMaterialOutFromPick(WoPickDocService.PickDoc d,
-                                           List<Map<String, Object>> items, String user) {
+    private int createMaterialOutFromPick(WoPickDocService.PickDoc d,
+                                          List<Map<String, Object>> items, String user) {
         String today = java.time.LocalDate.now().toString();
         List<Map<String, Object>> outItems = new ArrayList<>();
         String wh = "", whCode = "";
-        for (int i = 0; i < items.size(); i++) {
-            Map<String, Object> it = items.get(i);
+        for (Map<String, Object> it : items) {
+            // 半成品跳过:只显示不领料,不影响别的物料正常出库
+            if (isSemiLine(it)) continue;
             Map<String, Object> line = new LinkedHashMap<>();
-            line.put("行号", String.valueOf(i + 1));
+            line.put("行号", String.valueOf(outItems.size() + 1));
             line.put("材料编码", str(it.get("编码")));
             line.put("材料名称", str(it.get("名称")));
             line.put("规格型号", str(it.get("规格")));
@@ -968,6 +1199,7 @@ public class MobilePickController {
             outItems.add(line);
             if (wh.isEmpty()) { wh = str(it.get("仓库")); whCode = str(it.get("仓库编码")); }
         }
+        if (outItems.isEmpty()) return 0;
         final String whFinal = wh;
         boolean allSameWh = !whFinal.isEmpty()
                 && outItems.stream().allMatch(x -> whFinal.equals(str(x.get("仓库"))));
@@ -990,9 +1222,93 @@ public class MobilePickController {
         form.put("detail", Map.of("items", outItems));
 
         buttons.callButton(PANEL_OUT, "保存", form, null);
+        return outItems.size();
     }
 
     // ══════════════════════════ ④ 退料(已完成单上按需退) ══════════════════════════
+
+    /**
+     * **生产退料面板**:可退的领料单列表(2026-11-18 独立成面板)。
+     *
+     * <h3>用户口径(原话)</h3>
+     * 「我还想生产退料独立出来,就是已经领料且审核的领料单据,来扫码退料。
+     *  其实就是独立出来一个面版,让生产领料不用负责那么多功能,操作也方便。」
+     *
+     * <h3>筛什么</h3>
+     * <ol>
+     *   <li>台账状态 = <b>已完成</b>(没提交的领料单还没有材料出库单,无可退之物);</li>
+     *   <li>它的<b>材料出库单已被仓管审核</b>({@link #isMaterialOutAudited}) ——
+     *       库存是审核那一刻才扣的,没审核就退 = 凭空把料加进仓库
+     *       (这条闸门 {@code requireReturnable} 里也有一份,两处同口径);</li>
+     *   <li>关键字按 工单号/领料单号/产品/退料单号 模糊匹配(与列表页同一口径)。</li>
+     * </ol>
+     *
+     * <h3>带什么回去</h3>
+     * 除了台账那几列,补 {@code 已领数量 / 已退数量 / 可退数量}(按 WO_PICK_RETURN 台账累计,
+     * 与 {@code returnScan} 的"累计可退"同一真源),前端直接显示、不用自己算。
+     *
+     * @param keyword 查询框内容(空 = 全部)
+     */
+    @GetMapping("/returnables")
+    public ApiResult<Map<String, Object>> returnables(@RequestParam(required = false) String keyword) {
+        // 新面板有独立面板码 MOBILE_RETURN;老用户仍在「生产领料」里 -> 两个码任一可见即放行
+        perm.requirePanelViewAny(PagePanelRegistry.MOBILE_RETURN, PANEL_SELF);
+        requireLedger();
+
+        List<Map<String, Object>> raw = docs.list(WoPickDocService.STATE_DONE, keyword, LIST_LIMIT);
+        List<Map<String, Object>> out = new ArrayList<>();
+        double sumCan = 0;
+        for (Map<String, Object> r : raw) {
+            String outNo = str(r.get("领料单号"));
+            if (outNo.isEmpty()) continue;
+            // 材料出库单没被审核 ⇒ 库存还没扣 ⇒ 退料会凭空加库存,直接不列
+            if (!isMaterialOutAudited(outNo)) continue;
+            double picked = 0;
+            int canItems = 0;
+            for (Map<String, Object> it : linesOf(outNo, "pick")) {
+                double q = num(it.get("数量"));
+                if (q <= 0) continue;
+                picked += q;
+                double back = returnedQtyOf(outNo, str(it.get("编码")));
+                if (round4(q - back) > 0) canItems++;
+            }
+            double returned = returnedTotalOf(outNo);
+            double can = round4(Math.max(0, picked - returned));
+            Map<String, Object> m = new LinkedHashMap<>(r);
+            m.put("已领数量", round4(picked));
+            m.put("已退数量", returned);
+            m.put("可退数量", can);
+            m.put("可退项数", canItems);
+            m.put("出库已审批", true);
+            out.add(m);
+            sumCan += can;
+        }
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("list", out);
+        res.put("total", out.size());
+        res.put("可退合计数", round4(sumCan));
+        return ApiResult.ok(res);
+    }
+
+    /**
+     * 该领料单上**所有物料**已退数量合计(退料面板列表用)。
+     *
+     * <p>与 {@link #returnedQtyOf} 同一真源({@code wo_pick_return},作废不计),只是一个按物料、
+     * 一个按整单汇总 —— 列表上要显示"这单退了多少",逐个物料去加没意义。
+     */
+    private double returnedTotalOf(String outNo) {
+        if (outNo == null || outNo.isBlank()) return 0;
+        try {
+            Double n = jdbc.queryForObject(
+                    "SELECT ISNULL(SUM(退料数量),0) FROM dbo.wo_pick_return"
+                            + " WHERE 领料单号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    Double.class, outNo);
+            return round4(n == null ? 0 : n);
+        } catch (RuntimeException e) {
+            log.debug("退料台账不可用(迁移未执行?)已退合计按 0 计:{}", e.getMessage());
+            return 0;
+        }
+    }
 
     /**
      * 扫物料码 → 返回"这个料还能退多少"(累计可退 = 已领 − 已退)。
@@ -1007,7 +1323,9 @@ public class MobilePickController {
      */
     @PostMapping("/returnScan")
     public ApiResult<Map<String, Object>> returnScan(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView(PANEL_SELF);
+        // 2026-11-18:退料独立成面板(MOBILE_RETURN)后,只授了新面板、没授「生产领料」的角色
+        //   也必须能用这两个端点 ⇒ 两个面板码任一可见即放行(动作词仍是 pick)。
+        perm.requirePanelViewAny(PagePanelRegistry.MOBILE_RETURN, PANEL_SELF);
         perm.requireAnyPerm(PANEL_SELF, "扫码核销", "pick");
         requireLedger();
         long id = toLong(body.get("id"));
@@ -1040,18 +1358,23 @@ public class MobilePickController {
     }
 
     /**
-     * 提交退料:为本次退料生成一张**其他入库单**(业务类型「生产退料」+ 退料标志)并审核入账。
+     * 提交退料:为本次退料生成一张**生产退料单**(业务类型「生产退料」)并审核入账。
      *
-     * <p>用户口径:「退料生成的应该是其他入库单,并且写好备注」+「退多少生多少」。
+     * <p>用户口径:「退多少生多少」(2026-10-30)+
+     * 「手机扫码的生产退料扫码后退料后填入的单据从其他入库改成生产退料单」(2026-11-13)。
      * 一张退料单可以一次退多个料(前端把本次要退的几项一起提交),
-     * 明细逐行落 {@code bl_other_in},台账逐行落 {@code wo_pick_return}。
+     * 明细逐行落 {@code bl_material_ret},台账逐行落 {@code wo_pick_return}。
+     *
+     * <p>与领料单的对应关系(2026-11-13 追加用户口径「生产退料要有工单号和工单行号」):
+     * 单头写 **工单号(物理列 加工单号)+ 工单行号**,并把来源领料单号写进备注,
+     * 这样在金蝶侧(生产退料单 inv_pick_ret)与 MES 侧都能按工单追溯。
      *
      * @param body {id:台账主键, items:[{code, qty}]}
      * @return {退料单号, 明细:[{code,qty}], 合计数量}
      */
     @PostMapping("/submitReturn")
     public ApiResult<Map<String, Object>> submitReturn(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView(PANEL_SELF);
+        perm.requirePanelViewAny(PagePanelRegistry.MOBILE_RETURN, PANEL_SELF);
         perm.requireAnyPerm(PANEL_SELF, "扫码核销", "pick");
         requireLedger();
         long id = toLong(body.get("id"));
@@ -1089,26 +1412,37 @@ public class MobilePickController {
             row.put("仓库编码", str(line.get("仓库编码")));
             row.put("批号", str(line.get("批号")));
             row.put("数量", qty);
+            // 2026-11-13:退料单要带**领料行的出库单价**(金蝶 inv_pick_ret 行有 price/cost)。
+            //   注意这里必须从领料行 line 取 —— 早前只放进 lines 的少数几个键,
+            //   ② 段再读 l.get("单价") 会永远是 0(实测确实退料金额为 0)。
+            row.put("单价", num(line.get("单价")));
             lines.add(row);
             total = round4(total + qty);
         }
         if (lines.isEmpty()) throw new IllegalArgumentException("退料数量必须大于 0");
 
-        // ② 建其他入库单(业务类型「生产退料」+ 退料标志)
+        // ② 建**生产退料单**(MATERIAL_RET;字段按金蝶 inv_pick_ret 口径:材料编码/材料名称/数量/单价/仓库)
         String today = java.time.LocalDate.now().toString();
         List<Map<String, Object>> backItems = new ArrayList<>();
         for (int i = 0; i < lines.size(); i++) {
             Map<String, Object> l = lines.get(i);
             Map<String, Object> item = new LinkedHashMap<>();
-            item.put("序号", String.valueOf(i + 1));
-            item.put("存货编码", str(l.get("编码")));
-            item.put("存货名称", str(l.get("名称")));
+            item.put("行号", String.valueOf(i + 1));
+            item.put("材料编码", str(l.get("编码")));
+            item.put("材料名称", str(l.get("名称")));
             item.put("规格型号", str(l.get("规格")));
             item.put("计量单位", str(l.get("单位")));
             if (!str(l.get("仓库")).isEmpty()) item.put("仓库", str(l.get("仓库")));
             if (!str(l.get("仓库编码")).isEmpty()) item.put("仓库编码", str(l.get("仓库编码")));
             if (!str(l.get("批号")).isEmpty()) item.put("批号", str(l.get("批号")));
             item.put("数量", num(l.get("数量")));
+            // 单价/金额:退料按**领料时的出库单价**退回(领料行里带,拿不到就留空 →
+            //   StockLedgerService 按 金额=单价×数量 记 0,与旧「其他入库」口径一致,不臆造成本)
+            double price = num(l.get("单价"));
+            if (price > 0) {
+                item.put("单价", price);
+                item.put("金额", round4(price * num(l.get("数量"))));
+            }
             item.put("明细备注", "生产退料:退自领料单 " + d.outNo() + "(工单 " + d.woNo() + " 第 " + d.woLine() + " 行)");
             backItems.add(item);
         }
@@ -1116,9 +1450,13 @@ public class MobilePickController {
         backForm.put("单据日期", today);
         backForm.put("单据编号", "");
         backForm.put("业务类型", BIZ_BACK);
-        // 退料标志(迁移加的列):系统按它识别"这是一张退料单",不随业务类型下拉被人工改掉
-        backForm.put("退料标志", BIZ_BACK);
-        backForm.put("经手人", user);
+        // 🔴 2026-11-13 用户口径「生产退料要有工单号和工单行号」:
+        //   ⚠ 面板显示名是「工单号」(物理列仍是 加工单号),而 ButtonService.save 是**按面板标签**取值的
+        //   ⇒ 这里必须写 "工单号";写 "加工单号" 会被静默丢弃(实测存进去是 NULL)。
+        backForm.put("工单号", d.woNo());
+        backForm.put("工单行号", d.woLine());
+        backForm.put("领用人", user);
+        backForm.put("经手人编码", user);
         // 备注按用户口径「写好备注」
         backForm.put("备注", "【生产退料】退自领料单 " + d.outNo()
                 + ";工单 " + d.woNo() + " 第 " + d.woLine() + " 行;产品 " + nz(d.productName())
@@ -1127,7 +1465,7 @@ public class MobilePickController {
 
         String backNo = saveDoc(PANEL_BACK, backForm);
 
-        // ③ 审核 → StockLedgerService 按其他入库(+)过账,库存加回来
+        // ③ 审核 → StockLedgerService 按生产退料(+)过账,库存加回来
         buttons.callButton(PANEL_BACK, "审核", docNoForm(backNo), null);
 
         // ④ 退料台账:一行 = 一次退料(这是"已退数量"的唯一真源)
@@ -1166,7 +1504,7 @@ public class MobilePickController {
         out.put("明细", lines);
         out.put("合计数量", total);
         out.put("剩余", remain);
-        out.put("说明", "已生成退料单 " + backNo + " 并审核入账(其他入库单,带退料标志)");
+        out.put("说明", "已生成生产退料单 " + backNo + " 并审核入账");
         return ApiResult.ok(out);
     }
 
@@ -1233,7 +1571,7 @@ public class MobilePickController {
     /**
      * 该领料单上某物料**已退多少**(累计)。
      *
-     * <p>唯一真源 = {@code wo_pick_return}(作废的退料不计)。**不查 bl_other_in** ——
+     * <p>唯一真源 = {@code wo_pick_return}(作废的退料不计)。**不查退料单明细** ——
      * 那是物料的账面流水,按 (领料单, 物料) 去数它既慢又容易被手改的单据带偏。
      *
      * <p>表没建(迁移没跑)时返回 0:退料功能不可用比整个页面 500 好,
@@ -1383,12 +1721,28 @@ public class MobilePickController {
         out.put("id", d.id());
         out.put("领料单号", d.outNo());
         out.put("退料单号", d.backNo());
+        out.put("领料类型", d.pickKind());
         out.put("状态", d.state());
         out.put("物料项数", d.itemCount());
         out.put("重复", true);      // 前端据此提示"该工单行已经开过单,已帮你打开(并重打这张单)"
         out.put("打印", wantPrint && wo != null
                 ? printPayload(woNo, line, str(wo.get("产品名称")), str(wo.get("规格型号")), d.id())
                 : null);
+        // 2026-11-18:同一工单行可能有**两张**单(组装 + 混料) —— 一并带回去,
+        // 前端据此把两张都列出来、都能点进去(用户口径)。
+        List<Map<String, Object>> made = new ArrayList<>();
+        for (WoPickDocService.PickDoc x : docs.listActive(woNo, line)) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", x.id());
+            m.put("领料单号", x.outNo());
+            m.put("领料类型", x.pickKind());
+            m.put("状态", x.state());
+            m.put("物料项数", x.itemCount());
+            m.put("已领项数", x.doneCount());
+            m.put("重复", true);
+            made.add(m);
+        }
+        out.put("单据", made);
         return out;
     }
 
@@ -1451,7 +1805,7 @@ public class MobilePickController {
      * 读单据明细行(领料/退料统一形态)。
      *
      * @param no 单据编号
-     * @param side pick=领料 / back=退料(bl_other_in)
+     * @param side pick=领料 / back=退料(bl_material_ret,2026-11-13 起)
      *
      * <p>🔴 2026-11-01 改造:领料明细**按单据状态分两个数据源** ——
      * <ul>
@@ -1466,14 +1820,15 @@ public class MobilePickController {
         if (no == null || no.isBlank()) return List.of();
         List<Map<String, Object>> out = new ArrayList<>();
         if ("back".equals(side)) {
+            // 2026-11-13:退料单改为「生产退料单」MATERIAL_RET ⇒ 明细读 bl_material_ret(列名与材料出库单同族)
             for (Map<String, Object> r : jdbc.queryForList(
-                    "SELECT id, 序号, ISNULL(存货编码,N'') AS 编码, ISNULL(存货名称,N'') AS 名称,"
+                    "SELECT id, 行号 AS 行号, ISNULL(材料编码,N'') AS 编码, ISNULL(材料名称,N'') AS 名称,"
                             + " ISNULL(规格型号,N'') AS 规格, ISNULL(计量单位,N'') AS 单位,"
                             + " ISNULL(仓库,N'') AS 仓库, ISNULL(仓库编码,N'') AS 仓库编码,"
                             + " ISNULL(数量,0) AS 数量, ISNULL(批号,N'') AS 批号, ISNULL(明细备注,N'') AS 明细备注"
-                            + " FROM dbo.bl_other_in WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
-                            + " ORDER BY 序号, id", no)) {
-                out.add(normalizeLine(r, "序号", "存货编码"));
+                            + " FROM dbo.bl_material_ret WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                            + " ORDER BY TRY_CAST(行号 AS int), id", no)) {
+                out.add(normalizeLine(r, "行号", "材料编码"));
             }
         } else if (isDraftPick(no)) {
             // 未完成:读领料明细表(此时还没有材料出库单)
@@ -1494,7 +1849,8 @@ public class MobilePickController {
                     "SELECT id, 行号, ISNULL(材料编码,N'') AS 编码, ISNULL(材料名称,N'') AS 名称,"
                             + " ISNULL(规格型号,N'') AS 规格, ISNULL(计量单位,N'') AS 单位,"
                             + " ISNULL(仓库,N'') AS 仓库, ISNULL(仓库编码,N'') AS 仓库编码,"
-                            + " ISNULL(数量,0) AS 数量, ISNULL(批号,N'') AS 批号, ISNULL(明细备注,N'') AS 明细备注"
+                            + " ISNULL(数量,0) AS 数量, ISNULL(批号,N'') AS 批号, ISNULL(明细备注,N'') AS 明细备注,"
+                            + " ISNULL(单价,0) AS 单价"
                             + " FROM dbo.bl_material_out WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                             + " ORDER BY TRY_CAST(行号 AS int), id", no)) {
                 out.add(normalizeLine(r, "行号", "材料编码"));
@@ -1530,12 +1886,17 @@ public class MobilePickController {
         m.put("数量", r.get("数量"));
         m.put("批号", r.get("批号"));
         m.put("明细备注", r.get("明细备注"));
+        // 2026-11-13:退料单要按领料行的**出库单价**记金额(金蝶 inv_pick_ret 行有 price/cost),
+        //   领料行没这一列时返回 null ⇒ 退料金额留 0(不臆造成本)。
+        m.put("单价", r.get("单价"));
         // BOM 需求用量 —— 前端扫物料码时用它做**默认领用数量**。
         //
         // 🔴 2026-11-01:未完成的单已经改读 wo_pick_line,那里有独立的「需求数量」列,
         //   直接用它(比从备注解析可靠);已完成的历史单没有这一列,退回解析备注。
         Object needCol = r.get("需求数量");
         m.put("BOM用量", needCol != null ? num(needCol) : bomUsageOf(str(r.get("明细备注"))));
+        // 半成品标记(2026-11-16):前端据此把这一行显示成「半成品·免领」、不参与进度、不可填数量
+        m.put("半成品", isSemiFinished(m.get("编码")));
         m.put("codeCol", codeCol);
         return m;
     }
@@ -1672,8 +2033,9 @@ public class MobilePickController {
             return;
         }
 
-        String table = "back".equals(side) ? "bl_other_in" : "bl_material_out";
-        String lineCol = "back".equals(side) ? "序号" : "行号";
+        // 2026-11-13:退料单已是「生产退料单」(bl_material_ret),行号列同领料单叫「行号」
+        String table = "back".equals(side) ? "bl_material_ret" : "bl_material_out";
+        String lineCol = "行号";
         if (note.isEmpty()) {
             jdbc.update("UPDATE dbo." + table + " SET 数量 = ? WHERE 单据编号 = ? AND " + lineCol + " = ?",
                     qty, no, line);
@@ -1733,6 +2095,10 @@ public class MobilePickController {
             if (d != null) {
                 m.put("领料单号", d.outNo());
                 m.put("状态", d.state());
+                // 纸面标题按领料类型区分(2026-11-18):组装领料单 / 混料领料单,
+                // 现场拿到纸一眼看得出这是哪一张,不用去翻单号。
+                m.put("领料类型", d.pickKind());
+                m.put("标题", KIND_MIX.equals(d.pickKind()) ? "混料领料单" : "生产领料单");
                 m.put("打印日期", java.time.LocalDate.now().toString());
                 // 明细与页面同源(未完成读 wo_pick_line,已完成读材料出库单)
                 for (Map<String, Object> it : linesOf(d.outNo(), "pick")) {
@@ -1849,3 +2215,5 @@ public class MobilePickController {
         return auth != null && auth.getName() != null && !auth.getName().isBlank() ? auth.getName() : "system";
     }
 }
+
+

@@ -4908,3 +4908,8 @@ migrate-sample-insp-20261115.sql
 
 # 2026-11-16 「样品检验」提升为一级模块:两张面板 yj_panel.module_group 品质管理→样品检验(导航顺序由 menus.js 决定;权限矩阵分组口径对齐);面板码/字段/表/授权不动;幂等;两账套
 migrate-sample-insp-module-20261116.sql
+# 2026-11-16 自动打印·打印缓存(离线补打):建表 yj_print_task(任务载荷 JSON 整条落库 + targets/delivered 逗号站点名 + 状态机)
+#   背景:代理掉线期间手机点的打印以前当场丢(目标只算在线站点)且队列只在内存(服务端重启即清空);
+#   现在按配置派单、落库,代理回来第一次 /pending 按 id 顺序补打;默认保留 3 天 = 72 小时(print.cache_hours,用户口径「补打印保留3天」)。
+#   含中文注明(表+15 列)、pk/ix 命名与末尾自检(关键列 5/5、索引 1/1、注明 ≥15)。两账套已执行
+migrate-print-task-cache-20261116.sql

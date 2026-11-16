@@ -286,6 +286,7 @@ import { useRouter } from 'vue-router'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { parseWorkOrderCode } from '@/business/scanCode'
+import { focusScanNow } from '@/business/scanFocus'
 import { printWoQr } from '@/business/print-formats'
 import { queueToPrintStation, PRINT_TYPE_PICK_SLIP } from '@/business/printStation'
 
@@ -581,6 +582,8 @@ async function generateBatch() {
     errText.value = errMsgOf(e) || tt('生成失败')
   } finally {
     genLoading.value = false
+    // PDA 连扫(2026-11-16):生单完把光标放回工单扫码框
+    focusScanNow(() => woInput.value, { delay: 200 })
   }
 }
 
@@ -599,7 +602,9 @@ async function autoPrintAll() {
     if (!r.打印) continue
     try {
       const queued = await queueToPrintStation({ ...r.打印, 类型: PRINT_TYPE_PICK_SLIP, 来源: 'mobilePick.create' })
-      if (!(queued && queued.online)) await printWoQr(r.打印)
+      // 2026-11-16 打印缓存:服务端收了就算成功(代理掉线 ⇒ 进缓存、回来补打),
+      //   不能再按 online 判 —— 否则掉线时手机又打一遍,同一张单出两张纸。
+      if (!(queued && queued.queued)) await printWoQr(r.打印)
     } catch {
       // 打印失败只在控制台账:生单本身已成功
       console.warn('工单二维码自动打印失败(单据已生成,可在单据里重打)')

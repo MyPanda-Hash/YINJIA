@@ -167,6 +167,38 @@ test('pickProgress:空明细不能提交', () => {
   assert.equal(p.total, 0)
 })
 
+/**
+ * 半成品(编码含 **TB)只显示、不领料、可跳过(2026-11-16 用户口径:
+ * 「生产领料单有一行带TB的是半成品…只要显示这行数据,但是实际并不领料就可以,
+ * 不要影响别的物料正常领料,半成品是可跳过的」)。
+ */
+test('pickProgress:半成品不算进分母 —— 别把它当成"还没领的那一项"', () => {
+  const p = pickProgress(toRows([
+    { 编码: 'A-1', 数量: 5 },                    // 正常物料,已领
+    { 编码: 'T410**TB', 数量: 0, 半成品: true },  // 半成品:数量永远是 0
+  ], 'pick'))
+  assert.equal(p.total, 1, '分母只算能领的')
+  assert.equal(p.done, 1)
+  assert.equal(p.ok, true, '半成品没领也不该挡住提交')
+  assert.deepEqual(p.missing, [], '半成品不能被点名成"缺料"')
+})
+
+test('pickProgress:只有半成品时不能提交(等于没有可领的料)', () => {
+  const p = pickProgress(toRows([{ 编码: 'T410**TB', 数量: 0, 半成品: true }], 'pick'))
+  assert.equal(p.total, 0)
+  assert.equal(p.ok, false)
+})
+
+test('pickProgress:半成品不影响别的物料缺料判定', () => {
+  const p = pickProgress(toRows([
+    { 编码: 'T410**TB', 数量: 0, 半成品: true },
+    { 编码: 'A-1', 数量: 0 },   // 真的没领
+  ], 'pick'))
+  assert.equal(p.total, 1)
+  assert.equal(p.ok, false)
+  assert.deepEqual(p.missing, ['A-1'], '只点名真正要领而没领的那项')
+})
+
 // ─── ④ 退料默认 0 ────────────────────────────────────────────────
 
 test('backIsEmpty:退料全 0 ⇒ true(提交时这张退料单会被作废)', () => {

@@ -192,7 +192,8 @@ test('截图宽度不能用写死的 w0，必须用实测 scrollWidth 兜底', (
   assert.match(seg, /\bw0\b/, 'realW 要与 w0 取 max（不缩窄原本就正常的页面）')
   // domToPng 与返回值都必须用 realW，不能回退到 w0
   assert.match(vue, /width: realW,/, 'domToPng 必须按 realW 裁图')
-  assert.match(vue, /return \{ dataUrl, w0: realW, h0, rowBreaks \}/, '返回的 w0 必须是 realW')
+  // 2026-11-16 合并:qcSheet 键是后来加的(origin 上这条单测就已过时),正则放宽到允许额外键
+  assert.match(vue, /return \{ dataUrl, w0: realW, h0, rowBreaks, qcSheet: [^}]+ \}/, '返回的 w0 必须是 realW')
 })
 
 test('克隆体必须清掉屏幕适配的 zoom（否则内容只占截图宽的一部分）', () => {
