@@ -60,3 +60,10 @@
 `round-19.mjs`/`round-20.mjs`(打印,20 先清 deviceMetrics override)、`round-22.mjs`(English)。
 
 运行方式:`ego-browser nodejs -e "await import('file:///<绝对路径>/ui/round-XX.mjs')"`(脚本内 taskSpace 固定为本任务空间)。
+
+## 8090 打包版复核(重建 jar 后,正式账套 YJ,只读)
+
+`shots/round-23-8090-screen.png` + `ui/round-23.mjs`:本轮用 `tools/scripts/rebuild-prod.ps1`(JDK 25)重打
+`backend/target/yinjia-mes-backend-0.1.0.jar`(SHA256 351A69E6…)并重启 8090 ⇒ 打包版同样显示:
+一级模块「样品检验」紧跟品质管理、纸面三行合并(每行两个输入框,占位=名称/地址字段名)。
+只打开既有草稿 `WT-2026-11-0001` 查看,**未在正式账套保存任何数据**。
