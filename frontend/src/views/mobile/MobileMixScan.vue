@@ -474,7 +474,8 @@ async function onScanMaterial() {
     return
   }
   activeIdx.value = hit
-  await submitLine(lines.value[hit])
+  // 物料码是 `存货编码|批号`:批号随码带下去落库,纸面《成型配料记录》要印「物料批次」
+  await submitLine(lines.value[hit], p.batch)
 }
 
 async function submitActive() {
@@ -485,7 +486,7 @@ async function submitActive() {
 }
 
 /** 提交本笔:取数量(手输优先,否则读秤)→ 落库 → 累加到清单 → 跳下一项 */
-async function submitLine(line) {
+async function submitLine(line, batch) {
   if (!line || !order.value) return
   savingOne.value = true
   try {
@@ -494,7 +495,7 @@ async function submitLine(line) {
       errText.value = reasonText('no-qty')
       return
     }
-    const body = buildScanPayload({ order: order.value, line, qty })
+    const body = buildScanPayload({ order: order.value, line, qty, batch })
     const res = await request.post('/px/mix/scan', body)
     const saved = res?.data?.data || res?.data || res || {}
     const r = applyScan(lines.value, { code: line.code }, qty)

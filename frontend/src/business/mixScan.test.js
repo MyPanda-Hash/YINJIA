@@ -221,7 +221,7 @@ test('mixProgress:空清单不算 allDone', () => {
 test('buildScanPayload:字段名与后端 /px/mix/scan 一致,含 计划用量 与 实际用量', () => {
   const order = { orderNo: 'GD-2026-10-0089', lineNo: 3, lineId: 88, productCode: 'A-32-01', productName: '炭棒' }
   const line = { code: 'YJ-TJHZ-001', name: '雅可比CS', uom: 'kg', required: 226.18 }
-  const body = buildScanPayload({ order, line, qty: 226.1849 })
+  const body = buildScanPayload({ order, line, qty: 226.1849, batch: '20261118001' })
   assert.equal(body.工单号, 'GD-2026-10-0089')
   assert.equal(body.工单行号, 3)
   assert.equal(body.工单行id, 88)
@@ -230,6 +230,7 @@ test('buildScanPayload:字段名与后端 /px/mix/scan 一致,含 计划用量 �
   assert.equal(body.物料名称, '雅可比CS')
   assert.equal(body.计划用量, 226.18)
   assert.equal(body.实际用量, 226.1849)   // 4 位收敛
+  assert.equal(body.物料批次, '20261118001')  // 物料码里的批号要落库(纸面「物料批次」列)
   assert.equal(body.单位, 'kg')
 })
 
@@ -240,38 +241,52 @@ test('buildScanPayload:没有行 id 时不下发该字段(后端 longOrNull 会�
     qty: 1,
   })
   assert.equal(body.工单行id, undefined)
+  assert.equal(body.物料批次, '')   // 取秤提交(没扫到码)时批次为空,不是 undefined
 })
 
-test('buildMixSlipPayload:混料单纸面 = 混料标题 + 计划/实际 两列 + 混料签名', () => {
+test('buildMixSlipPayload:专用纸表 = 《成型配料记录》横板 A4 的抬头 + 物料行', () => {
   const payload = buildMixSlipPayload({
     docNo: 'PL2611180001',
     data: {
+      标题: '成型配料记录',
+      文件编码: 'YJ-QR-147',
       单据编号: 'PL2611180001',
-      部门: 'admin',
+      车间: '成型1线',
+      产品编号: 'A-45-01',
+      配方版本号: '',
+      开始时间: '2026-11-18 09:01:02',
+      结束时间: '2026-11-18 09:20:00',
+      配料批次号: 'PL2611180001',
+      配料人: 'admin',
       单据日期: '2026-11-18 09:01:02',
-      明细: [{ 材料名称: '雅可比CS', 请领数量: 86, 实发数量: 85.6 }],
+      明细: [{ 物料编号: 'YJ-TJHZ-001', 物料名: '雅可比CS', 添加比例: '18.67%', 应投重量: '86.172', 实投重量: '86.172', 物料批次: '20261118001' }],
     },
   })
-  assert.equal(payload.标题, '混料单')
-  assert.equal(payload.领料单号, 'PL2611180001')
-  assert.equal(payload.领料部门, 'admin')
-  assert.equal(payload.打印日期, '2026-11-18')      // 只取日期,补打印时不至于印成"单据日期=打印日"
+  assert.equal(payload.标题, '成型配料记录')
+  assert.equal(payload.领料单号, 'PL2611180001')      // 任务单号(打印缓存/站点列表认单)
+  assert.equal(payload.打印日期, '2026-11-18')
+  assert.equal(payload.纸面.车间, '成型1线')
+  assert.equal(payload.纸面.产品编号, 'A-45-01')
+  assert.equal(payload.纸面.配料批次号, 'PL2611180001')
+  assert.equal(payload.纸面.文件编码, 'YJ-QR-147')
+  assert.equal(payload.纸面.序号, 1)
   assert.equal(payload.明细.length, 1)
-  assert.deepEqual(payload.表头.slice(0, 2), ['工单号', '物料名称'])
-  assert.equal(payload.表头[4], '计划用量')
-  assert.equal(payload.表头[5], '实际用量')
-  assert.equal(payload.部门标签, '生产线')
-  assert.equal(payload.签名.length, 4)
+  assert.equal(payload.明细[0].物料批次, '20261118001')
 })
 
-test('MIX_PAPER:七列表头与四条签名是固定口径(代理按位取)', () => {
-  assert.equal(MIX_PAPER.表头.length, 7)
-  assert.equal(MIX_PAPER.签名.length, 4)
-  assert.equal(MIX_PAPER.标题, '混料单')
-})
-
-test('buildMixSlipPayload:后端没给明细时给空数组(纸表照样画 8 行空格)', () => {
+test('buildMixSlipPayload:后端缺字段时给空串/默认抬头(纸表照样画格子)', () => {
   const payload = buildMixSlipPayload({ docNo: 'PL1', data: {} })
+  assert.equal(payload.纸面.标题, '成型配料记录')
+  assert.equal(payload.纸面.文件编码, 'YJ-QR-147')
+  assert.equal(payload.纸面.配料批次号, 'PL1')     // 没有配料批次号就用单号兜
+  assert.equal(payload.纸面.车间, '')
   assert.deepEqual(payload.明细, [])
   assert.equal(payload.打印日期, '')
+})
+
+test('MIX_PAPER:纸样口径固定(标题/文件编码/横板 A4)', () => {
+  assert.equal(MIX_PAPER.标题, '成型配料记录')
+  assert.equal(MIX_PAPER.文件编码, 'YJ-QR-147')
+  assert.equal(MIX_PAPER.纸张.w, '297mm')
+  assert.equal(MIX_PAPER.纸张.h, '210mm')
 })

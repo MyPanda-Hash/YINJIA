@@ -100,8 +100,7 @@ if ($Install) {
 
 # ── 打印机 ────────────────────────────────────────────────────────
 
-function Get-SystemPrinterName {
-    try {
+function Get-SystemPrinterName {    try {
         $p = Get-CimInstance -ClassName Win32_Printer -ErrorAction Stop |
              Where-Object { $_.Default -eq $true } | Select-Object -First 1
         if ($p) { return $p.Name }
@@ -536,6 +535,277 @@ function Send-LabelToPrinter {
     if ($qrImg) { $qrImg.Dispose() }
 }
 
+function Send-MixSheetToPrinter {
+    <#
+      《成型配料记录》横板 A4 —— 扫码混料的纸面(2026-11-18 用户给纸样,文件编码 YJ-QR-147)。
+
+      为什么单独一套版面:纸样不是「领料单七列表」,而是一张**固定纸表**:
+        · 左四列  序号/车间/产品编号/配方版本号        —— 整张单只有一格;
+        · 中六列  物料编号/物料名/添加比例/应投重量/实投重量/物料批次 —— 每个物料一行;
+        · 右七列  开始时间/结束时间/转速/配料批次号/物料水分/配料人/确认人 —— 整张单只有一格。
+      实现上**不做真合并单元格**:竖线按 17 列贯通整表,横线只在中间六列那一段画 ——
+      视觉上就是纸样那种左右两坨合并格,而且不会因为合并坐标算错而错位。
+
+      纸张:**强制 A4 横打(297×210mm)**,不跟「自动打印」页的 A5/A4 配置走 ——
+      纸样本来就是 A4 横的一张宽表,压到中一刀上 17 列会看不清。
+    #>
+    param(
+        $Sheet = $null,
+        [array]$Rows = @(),
+        [string]$PdfPath = '',
+        [string]$PrinterName = ''
+    )
+    Add-Type -AssemblyName System.Drawing -ErrorAction Stop
+
+    $doc = New-Object System.Drawing.Printing.PrintDocument
+    if ($PdfPath) {
+        $pdfPrinter = 'Microsoft Print to PDF'
+        $doc.PrinterSettings.PrinterName = $pdfPrinter
+        if (-not $doc.PrinterSettings.IsValid) {
+            throw "找不到虚拟打印机「$pdfPrinter」:请在 Windows「打印机和传真」里启用它(系统自带,可能被关掉了)"
+        }
+        $doc.PrinterSettings.PrintToFile = $true
+        $doc.PrinterSettings.PrintFileName = $PdfPath
+    } else {
+        if ($PrinterName) { $doc.PrinterSettings.PrinterName = $PrinterName }
+        if (-not $doc.PrinterSettings.IsValid) {
+            throw "打印机不可用:[$PrinterName](检查打印机名称,或在网页里留空使用系统默认打印机)"
+        }
+    }
+    $doc.DocumentName = 'YINJIA-MES 成型配料记录'
+    $doc.PrintController = New-Object System.Drawing.Printing.StandardPrintController
+
+    try {
+        $ps = $doc.PrinterSettings.PaperSizes | Where-Object { $_.Kind -eq 'A4' } | Select-Object -First 1
+        if (-not $ps) { $ps = $doc.PrinterSettings.PaperSizes | Where-Object { $_.PaperName -match 'A4' } | Select-Object -First 1 }
+        if ($ps) { $doc.DefaultPageSettings.PaperSize = $ps }
+        $doc.DefaultPageSettings.Landscape = $true
+        $doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
+    } catch {
+        Write-Host ("[WARN] A4 横版设置失败,按默认纸输出: {0}" -f $_.Exception.Message) -ForegroundColor Yellow
+    }
+
+    $script:mixSheet = $Sheet
+    $script:mixRows = @($Rows)
+    $script:mixPage = 0
+    $script:mixPerPage = 12
+    $script:mixTotalPages = [Math]::Max(1, [int][Math]::Ceiling((@($script:mixRows).Count) / $script:mixPerPage))
+
+    $doc.add_PrintPage({
+        param($sender, $e)
+        try {
+            $g = $e.Graphics
+            $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+            $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::ClearTypeGridFit
+            $black = [System.Drawing.Brushes]::Black
+            $gray = [System.Drawing.Brushes]::DimGray
+            $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::Black, 1.2)
+
+            $fmtC = New-Object System.Drawing.StringFormat
+            $fmtC.Alignment = [System.Drawing.StringAlignment]::Center
+            $fmtC.LineAlignment = [System.Drawing.StringAlignment]::Center
+
+            # 字号阶梯:列窄(转速/确认人)也要放得下,放不下就折两行
+            $headFonts = @(8.5, 7.5, 6.5, 6) | ForEach-Object { New-Object System.Drawing.Font('Microsoft YaHei', $_, [System.Drawing.FontStyle]::Bold) }
+            $cellFonts = @(9, 8, 7, 6) | ForEach-Object { New-Object System.Drawing.Font('Microsoft YaHei', $_) }
+            $fontTitle = New-Object System.Drawing.Font('Microsoft YaHei', 22, [System.Drawing.FontStyle]::Bold)
+            $fontSmall = New-Object System.Drawing.Font('Microsoft YaHei', 9)
+
+            $sheet = $script:mixSheet
+            $getVal = {
+                param($k)
+                if ($null -eq $sheet) { return '' }
+                $names = @($sheet.PSObject.Properties.Name)
+                if ($names -contains $k) { return [string]$sheet.$k }
+                return ''
+            }
+
+            # ① 标题 + 右上角文件编码(纸样:左上「成型配料记录」,右上「文件编码 YJ-QR-147」)
+            $title = '成型配料记录'
+            if ($null -ne $sheet) {
+                $t2 = & $getVal '标题'
+                if ($t2) { $title = $t2 }
+            }
+            $g.DrawString($title, $fontTitle, $black, 40, 28)
+            $codeText = '文件编码 ' + (& $getVal '文件编码')
+            if (-not (& $getVal '文件编码')) { $codeText = '文件编码 YJ-QR-147' }
+            $codeRect = New-Object System.Drawing.RectangleF((1169 - 460), 40, 420, 24)
+            $fmtR = New-Object System.Drawing.StringFormat
+            $fmtR.Alignment = [System.Drawing.StringAlignment]::Far
+            $g.DrawString($codeText, $fontSmall, $black, $codeRect, $fmtR)
+
+            # ② 表格几何:17 列,总宽 1088(页 1169 - 左右各 40)
+            $x0 = 40
+            $y0 = 100
+            $colW = @(40, 55, 72, 55, 84, 110, 55, 58, 58, 70, 88, 88, 40, 78, 48, 45, 45)
+            $heads = @('序号', '车间', '产品编号', '配方版本号', '物料编号', '物料名', '添加比例', '应投重量',
+                       '实投重量', '物料批次', '开始时间', '结束时间', '转速', '配料批次号', '物料水分',
+                       '配料人', '确认人')
+            $totalW = 0
+            foreach ($cw in $colW) { $totalW += $cw }
+            $headH = 46
+            $tableH = 827 - $y0 - 70          # 底部留 70:纸样下沿还有一点空白
+            $pageIdx = [int]$script:mixPage
+            $script:mixPage = $pageIdx + 1
+            $allRows = @($script:mixRows)
+            $startAt = $pageIdx * [int]$script:mixPerPage
+            $pageRows = @()
+            if ($startAt -lt $allRows.Count) {
+                $takeN = [Math]::Min([int]$script:mixPerPage, $allRows.Count - $startAt)
+                $pageRows = @($allRows[$startAt..($startAt + $takeN - 1)])
+            }
+            $rowCount = [Math]::Max(8, $pageRows.Count)
+            $rowH = [Math]::Floor(($tableH - $headH) / $rowCount)
+            $bodyH = $rowH * $rowCount
+
+            # ③ 表格框架:外框 + 17 列的贯通竖线(左右两坨合并格就靠"竖线不断、横线不画"实现)
+            $g.DrawRectangle($pen, $x0, $y0, $totalW, $headH + $bodyH)
+            $colX = @()
+            $cx = $x0
+            for ($i = 0; $i -lt $colW.Count; $i++) {
+                $colX += $cx
+                $cx += $colW[$i]
+            }
+            for ($i = 1; $i -lt $colW.Count; $i++) {
+                $g.DrawLine($pen, $colX[$i], $y0, $colX[$i], $y0 + $headH + $bodyH)
+            }
+            # 中间六列(物料编号..物料批次 = 索引 4..9)那一段才画横线:表头下沿 + 每行分隔
+            $midLeft = $colX[4]
+            $midRight = $colX[10]
+            $g.DrawLine($pen, $midLeft, $y0 + $headH, $midRight, $y0 + $headH)
+            for ($ri = 1; $ri -lt $rowCount; $ri++) {
+                $yy = $y0 + $headH + $rowH * $ri
+                $g.DrawLine($pen, $midLeft, $yy, $midRight, $yy)
+            }
+
+            # ④ 列头(逐字自适应:先缩字号,再折两行)
+            for ($i = 0; $i -lt $heads.Count; $i++) {
+                $avail = [double]($colW[$i] - 8)
+                $drawn = $false
+                foreach ($f in $headFonts) {
+                    if ($g.MeasureString($heads[$i], $f).Width -le $avail) {
+                        $rect = New-Object System.Drawing.RectangleF(($colX[$i] + 2), ($y0 + 6), ($colW[$i] - 4), ($headH - 8))
+                        $g.DrawString($heads[$i], $f, $black, $rect, $fmtC)
+                        $drawn = $true
+                        break
+                    }
+                }
+                if (-not $drawn) {
+                    $small = $headFonts[$headFonts.Count - 1]
+                    $lines = Get-CellLines $g $heads[$i] $small $avail 2
+                    $ly = $y0 + 8
+                    foreach ($ln in $lines) {
+                        $rect = New-Object System.Drawing.RectangleF(($colX[$i] + 2), $ly, ($colW[$i] - 4), 14)
+                        $g.DrawString($ln, $small, $black, $rect, $fmtC)
+                        $ly += 14
+                    }
+                }
+            }
+
+            # ⑤ 合并格的值(左四列 + 右七列):在整段高度里上下居中
+            $merged = @(
+                @{ i = 0; v = (& $getVal '序号'); def = '1' },
+                @{ i = 1; v = (& $getVal '车间'); def = '' },
+                @{ i = 2; v = (& $getVal '产品编号'); def = '' },
+                @{ i = 3; v = (& $getVal '配方版本号'); def = '' },
+                @{ i = 10; v = (& $getVal '开始时间'); def = '' },
+                @{ i = 11; v = (& $getVal '结束时间'); def = '' },
+                @{ i = 12; v = (& $getVal '转速'); def = '' },
+                @{ i = 13; v = (& $getVal '配料批次号'); def = '' },
+                @{ i = 14; v = (& $getVal '物料水分'); def = '' },
+                @{ i = 15; v = (& $getVal '配料人'); def = '' },
+                @{ i = 16; v = (& $getVal '确认人'); def = '' }
+            )
+            foreach ($m in $merged) {
+                $text = [string]$m.v
+                if (-not $text) { $text = [string]$m.def }
+                if (-not $text) { continue }
+                $w = $colW[$m.i] - 6
+                $f = $cellFonts[0]
+                foreach ($cand in $cellFonts) { if ($g.MeasureString($text, $cand).Width -le $w) { $f = $cand; break } }
+                # 时间/单号这类长值:先按空格拆成两行(2026-11-18 / 09:01),别让贪心折行把数字劈断
+                $lines = @()
+                if ($text -match '^\d{4}-\d{2}-\d{2} ') {
+                    $lines = @($text.Substring(0, 10), $text.Substring(11))
+                } else {
+                    $lines = Get-CellLines $g $text $f $w 4
+                }
+                $lh = [Math]::Min(18, [Math]::Floor(($headH + $bodyH - 10) / [Math]::Max(1, $lines.Count)))
+                $blockH = $lh * $lines.Count
+                $ty = $y0 + ($headH + $bodyH - $blockH) / 2
+                foreach ($ln in $lines) {
+                    $rect = New-Object System.Drawing.RectangleF(($colX[$m.i] + 3), $ty, $w, $lh)
+                    $g.DrawString($ln, $f, $black, $rect, $fmtC)
+                    $ty += $lh
+                }
+            }
+
+            # ⑥ 物料行(中间六列)
+            $rowKeys = @('物料编号', '物料名', '添加比例', '应投重量', '实投重量', '物料批次')
+            for ($ri = 0; $ri -lt $rowCount; $ri++) {
+                if ($ri -ge $pageRows.Count) { continue }   # 空行留白(纸表照画格子)
+                $row = $pageRows[$ri]
+                for ($k = 0; $k -lt $rowKeys.Count; $k++) {
+                    $col = 4 + $k
+                    $raw = ''
+                    $names = @($row.PSObject.Properties.Name)
+                    if ($names -contains $rowKeys[$k]) { $raw = [string]$row.($rowKeys[$k]) }
+                    if (-not $raw) { continue }
+                    $w = $colW[$col] - 6
+                    $f = $cellFonts[0]
+                    foreach ($cand in $cellFonts) { if ($g.MeasureString($raw, $cand).Width -le $w) { $f = $cand; break } }
+                    $lines = Get-CellLines $g $raw $f $w 3
+                    $lh = [Math]::Min(16, [Math]::Floor(($rowH - 8) / [Math]::Max(1, $lines.Count)))
+                    if ($lh -lt 10) { $lh = 10 }
+                    $blockH = $lh * $lines.Count
+                    $ty = $y0 + $headH + $rowH * $ri + (($rowH - $blockH) / 2)
+                    foreach ($ln in $lines) {
+                        $rect = New-Object System.Drawing.RectangleF(($colX[$col] + 3), $ty, $w, $lh)
+                        $g.DrawString($ln, $f, $black, $rect, $fmtC)
+                        $ty += $lh
+                    }
+                }
+            }
+
+            # ⑦ 多页续打
+            if (($pageIdx + 1) -lt [int]$script:mixTotalPages) { $e.HasMorePages = $true }
+
+            $pen.Dispose(); $fmtC.Dispose(); $fmtR.Dispose()
+            $headFonts | ForEach-Object { $_.Dispose() }
+            $cellFonts | ForEach-Object { $_.Dispose() }
+            $fontTitle.Dispose(); $fontSmall.Dispose()
+        } catch {
+            Write-Host "[绘制失败] $($_.Exception.Message)" -ForegroundColor Red
+            Write-Host "  堆栈: $($_.ScriptStackTrace)" -ForegroundColor DarkYellow
+            throw
+        }
+    })
+    $doc.Print()
+}
+
+function Send-JobSheet {
+    <#
+      一张打印任务的出纸分发器(2026-11-18):
+        · 任务带 `纸面`(整张单的抬头数据)⇒ 走**专用纸表**(目前只有混料单《成型配料记录》A4 横);
+        · 否则 ⇒ 还是原来的「生产领料单」版式(210×148 中一刀横,列头/部门标签/签名可覆盖)。
+      三个调用点(Pdf / Printer / Auto)都从这里出去,免得再一次"改了 pdf 忘了真打印机"。
+    #>
+    param(
+        [string]$Title, [string]$WoNo, [int]$WoLine, [string]$ProductName, [string]$Spec,
+        [string]$QrText, [string]$QrImage, [string]$OutNo, [string]$Dept, [string]$PrintDate,
+        [array]$Rows, [string]$Paper, [array]$Heads, [string]$DeptLabel, [array]$Signs,
+        $Sheet = $null, [string]$PdfPath = '', [string]$PrinterName = ''
+    )
+    if ($null -ne $Sheet) {
+        Send-MixSheetToPrinter -Sheet $Sheet -Rows $Rows -PdfPath $PdfPath -PrinterName $PrinterName
+        return
+    }
+    Send-LabelToPrinter -Title $Title -WoNo $WoNo -WoLine $WoLine -ProductName $ProductName `
+                        -Spec $Spec -QrText $QrText -QrImage $QrImage -PdfPath $PdfPath -PrinterName $PrinterName `
+                        -OutNo $OutNo -Dept $Dept -PrintDate $PrintDate -Rows $Rows -Paper $Paper `
+                        -Heads $Heads -DeptLabel $DeptLabel -Signs $Signs
+}
+
 function Invoke-PrintJob {
     param($Job)
 
@@ -559,11 +829,17 @@ function Invoke-PrintJob {
     $deptLbl  = [string]($Job.'部门标签')
     $signs    = @()
     if ($Job.'签名') { $signs = @($Job.'签名') }
+    # 专用纸表(2026-11-18 第二轮):混料单 →《成型配料记录》横板 A4。服务端把整张单的抬头数据
+    # (车间/产品编号/配方版本号/开始结束时间/转速/配料批次号/物料水分/配料人/确认人)放在 纸面 里;
+    # 有它就走专用版式,没有就还是领料单那套 —— 别的单据一个字节不受影响。
+    $sheet = $null
+    if ($Job.'纸面') { $sheet = $Job.'纸面' }
     # 纸张(2026-11-05):由「自动打印」页按**每台电脑**配置,服务端派单时随任务下发(A5/A4)。
     # 缺省 A5(中一刀),与以前完全一致。
     $paper    = [string]($Job.'纸张')
     $printerN = [string]($Job.'printer')
-    if (-not $qrText) {
+    # 专用纸表(有 纸面)不看二维码:混料单《成型配料记录》本来就是无码的纸表
+    if (-not $qrText -and -not $sheet) {
         if ($woNo) {
             $n = 1000 + [Math]::Max(1, $woLine)
             $qrText = "0@$woNo@$n"
@@ -582,10 +858,10 @@ function Invoke-PrintJob {
         if (-not $safeWo) { $safeWo = 'label' }
         $name = "$safeWo" + "_L$woLine" + "_$stamp.pdf"
         $path = Join-Path $PdfDir $name
-        Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
+        Send-JobSheet -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
                             -Spec $spec -QrText $qrText -QrImage $qrImage -PdfPath $path `
                             -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows -Paper $paper `
-                            -Heads $heads -DeptLabel $deptLbl -Signs $signs
+                            -Heads $heads -DeptLabel $deptLbl -Signs $signs -Sheet $sheet
         return $path
     }
 
@@ -599,10 +875,10 @@ function Invoke-PrintJob {
 
     # ── Printer 模式:真出纸 ────────────────────────────────────────
     if ($Mode -eq 'Printer') {
-        Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
+        Send-JobSheet -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
                             -Spec $spec -QrText $qrText -QrImage $qrImage -PrinterName $printerN `
                             -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows -Paper $paper `
-                            -Heads $heads -DeptLabel $deptLbl -Signs $signs
+                            -Heads $heads -DeptLabel $deptLbl -Signs $signs -Sheet $sheet
         return @{ ok = $true; mode = 'printer'; printer = $printerN }
     }
 
@@ -617,10 +893,10 @@ function Invoke-PrintJob {
             $pdfPath = & $doPdf
             return @{ ok = $true; mode = 'pdf'; pdfPath = $pdfPath; pdfDir = $PdfDir; fallback = 'no-printer' }
         }
-        Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
+        Send-JobSheet -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
                             -Spec $spec -QrText $qrText -QrImage $qrImage -PrinterName $real `
                             -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows -Paper $paper `
-                            -Heads $heads -DeptLabel $deptLbl -Signs $signs
+                            -Heads $heads -DeptLabel $deptLbl -Signs $signs -Sheet $sheet
         return @{ ok = $true; mode = 'printer'; printer = $real }
     } catch {
         $why = $_.Exception.Message

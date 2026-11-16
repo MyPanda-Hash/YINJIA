@@ -4858,3 +4858,6 @@ migrate-prod-ret-list-20261116.sql
 #   下架 BARCODE_SCAN_PICK / WORK_ORDER_PICK 两个页面级码的授权行;删空表 wo_pick_scan_log(非空则跳过并提示);
 #   补「扫码混料」面板 en/ja 译名;末尾 4 条守卫(授权在、旧码零、权限词对、译名在)。两账套已执行
 migrate-mix-scan-20261118.sql
+# 2026-11-18(二) 混料记录加「物料批次」列(扫码混料的物料码 存货编码|批号 里的批号要印到《成型配料记录》纸上);
+#   混料记录面板补第 20 个只读字段 + en/ja 译名;列/字段/译名三条守卫。两账套已执行
+migrate-mix-batch-20261118.sql

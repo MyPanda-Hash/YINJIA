@@ -14,9 +14,10 @@
  */
 import request from '@core/request'
 import { printInPage } from '@core/panel/printChannel'
-import { pickSlipHtml } from './print-formats'
+import { pickSlipHtml, mixSheetHtml } from './print-formats'
 import { queueToPrintStation } from './printStation'
 import { buildSlipPayload, typeOfKind, panelOfKind, isSlipKind } from './slipPrint'
+import { buildMixSlipPayload } from './mixScan'
 
 /**
  * 取一张单据的纸面数据。
@@ -51,7 +52,12 @@ export async function fetchSlipData({ kind, docNo } = {}) {
 export async function printSlipLocal(payload, opts = {}) {
   const p = payload || {}
   const title = String(p['标题'] || '').trim() || '领料单'
-  return printInPage(title, pickSlipHtml(p, ''), opts)
+  // 2026-11-18 第二轮:带 `纸面` 的是**专用纸表**(混料单《成型配料记录》横板 A4),
+  // 版式与领料单完全不同 ⇒ 走 mixSheetHtml;其余仍是领料单那套 pickSlipHtml。
+  const html = (p['纸面'] && typeof p['纸面'] === 'object')
+    ? mixSheetHtml(p)
+    : pickSlipHtml(p, '')
+  return printInPage(title, html, opts)
 }
 
 /**
@@ -76,7 +82,11 @@ export async function printSlip({ kind, docNo, source, opts } = {}) {
     return { ok: false, mode: 'none', docNo: no, message: msg || '取单据明细失败' }
   }
 
-  const payload = buildSlipPayload({ kind, docNo: no, data })
+  // 2026-11-18 第二轮:混料单是**专用纸表**(《成型配料记录》横板 A4),载荷口径与三张领料/退料单不同
+  //   —— 它带 `纸面`(整张单的抬头),代理据此走 Send-MixSheetToPrinter,浏览器兜底走 mixSheetHtml。
+  const payload = kind === 'MIX'
+    ? buildMixSlipPayload({ docNo: no, data })
+    : buildSlipPayload({ kind, docNo: no, data })
   const type = typeOfKind(kind)
   const queued = await queueToPrintStation({ ...payload, 类型: type, 来源: source || 'mobileOther' })
 

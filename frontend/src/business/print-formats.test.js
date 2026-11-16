@@ -53,7 +53,7 @@ globalThis.requestAnimationFrame = (cb) => { cb(); return 1 }
 globalThis.alert = () => { throw new Error('不应触发打印失败告警') }
 
 const { printProductCards, productCardQrText, printPuOrder, printPuOrderNoAmount, printLocationCards, locationCardQrText,
-  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows, planSheetShop, planSheetTitle, planSheetDatesFromRows, planSheetWindow, ymdAddDays, MAX_SHEET_DAYS, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS, PLAN_SHEET_MAX_PRINT_DAYS, pickSlipHtml, printWoQr } = await import('./print-formats.js')
+  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows, planSheetShop, planSheetTitle, planSheetDatesFromRows, planSheetWindow, ymdAddDays, MAX_SHEET_DAYS, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS, PLAN_SHEET_MAX_PRINT_DAYS, pickSlipHtml, mixSheetHtml, printWoQr } = await import('./print-formats.js')
 
 test('单据行(带可选键):订单编号/供应商/数量/批次/生产日期填充进卡面', async () => {
   const before = captured.printed
@@ -580,4 +580,44 @@ test('pickSlipHtml:类别符号未给时回落领料单默认(老调用方零影
   assert.ok(html.includes('<th>订单号</th>') && html.includes('<th>请领数量</th>'), '默认列头不变')
   assert.ok(html.includes('领料部门:'), '默认部门标签不变')
   assert.ok(html.includes('部门主管:') && html.includes('仓管员:'), '默认签名不变')
+})
+
+// ══════════════════════════════════════════════════════════════════
+// 2026-11-18 第二轮:混料单改《成型配料记录》(YJ-QR-147)横板 A4
+// 纸样 17 列,左右两坨纵向合并格 —— 浏览器兜底也必须是这张纸
+// ══════════════════════════════════════════════════════════════════
+const mixSheetPayload = (n = 2) => ({
+  标题: '成型配料记录',
+  领料单号: 'PL-1',
+  纸面: {
+    标题: '成型配料记录', 文件编码: 'YJ-QR-147', 序号: 1, 车间: '成型1线', 产品编号: 'A-45-01',
+    配方版本号: '', 开始时间: '2026-11-18 09:01', 结束时间: '2026-11-18 09:20', 转速: '',
+    配料批次号: 'PL-1', 物料水分: '', 配料人: 'admin', 确认人: '',
+  },
+  明细: Array.from({ length: n }, (_, i) => ({
+    物料编号: 'M-00' + (i + 1), 物料名: '物料' + (i + 1), 添加比例: (50).toFixed(2) + '%',
+    应投重量: '10', 实投重量: '9.8', 物料批次: 'B2026' + (i + 1),
+  })),
+})
+
+test('mixSheetHtml:横板 A4 + 17 列 + 左右合并格(纸样版式)', () => {
+  const html = mixSheetHtml(mixSheetPayload(2))
+  assert.ok(html.includes('@page{size:297mm 210mm'), '横板 A4')
+  assert.ok(html.includes('成型配料记录') && html.includes('YJ-QR-147'), '标题 + 右上文件编码')
+  for (const h of ['序号', '车间', '产品编号', '配方版本号', '物料编号', '物料名', '添加比例',
+    '应投重量', '实投重量', '物料批次', '开始时间', '结束时间', '转速', '配料批次号',
+    '物料水分', '配料人', '确认人']) {
+    assert.ok(html.includes('>' + h + '<'), '列头缺:' + h)
+  }
+  // 左四列 + 右七列各只有一格(rowspan 合并),中间六列每行一个
+  assert.equal((html.match(/rowspan="8"/g) || []).length, 11, '11 个合并格(左4 + 右7),rowspan = 纸表 8 行')
+  assert.ok(html.includes('M-001') && html.includes('B20261'), '物料行数据在')
+  assert.ok(html.includes('admin') && html.includes('成型1线'), '抬头值在')
+})
+
+test('mixSheetHtml:明细超过 8 行自动续页,一行都不丢', () => {
+  const html = mixSheetHtml(mixSheetPayload(11))
+  assert.equal((html.match(/<div class="card">/g) || []).length, 2, '11 行 → 2 张纸')
+  for (let i = 1; i <= 11; i++) assert.ok(html.includes('M-00' + (i < 10 ? i : i)), '第 ' + i + ' 行必须在纸上')
+  assert.ok(html.includes('第 1/2 页') && html.includes('第 2/2 页'), '每页标页码')
 })

@@ -155,7 +155,7 @@ public class MixScanService {
      * 现场看不出到底投了几次,打印出来也没法用。
      *
      * @param body {工单号, 工单行id?, 工单行号?, 产品编码?, 产品名称?, 物料编号, 物料名称?,
-     *             计划用量?, 实际用量, 单位?, 秤值?, 秤设备?, 秤时间?}
+     *             物料批次?, 计划用量?, 实际用量, 单位?, 秤值?, 秤设备?, 秤时间?}
      * @param user 登录账号(记 asp_user1)
      * @return {行id, 序号, 单据编号(仍为空直到整单保存), 累计实际用量, 累计笔数}
      */
@@ -178,8 +178,15 @@ public class MixScanService {
         if (exists != null) {
             long id = longOf(exists.get("id"));
             BigDecimal sum = round4(exists.get("实际用量")).add(qty);
-            jdbc.update("UPDATE dbo.wo_mixing_list SET 实际用量 = ?, asp_user2 = ?, asp_time2 = GETDATE()"
-                    + " WHERE id = ?", sum, user, id);
+            // 物料批次随最新一次扫码走(同一料换了批次,纸面印最后一次扫到的那个)
+            String batch = trim(body.get("物料批次"));
+            if (batch.isEmpty()) {
+                jdbc.update("UPDATE dbo.wo_mixing_list SET 实际用量 = ?, asp_user2 = ?, asp_time2 = GETDATE()"
+                        + " WHERE id = ?", sum, user, id);
+            } else {
+                jdbc.update("UPDATE dbo.wo_mixing_list SET 实际用量 = ?, 物料批次 = ?, asp_user2 = ?,"
+                        + " asp_time2 = GETDATE() WHERE id = ?", sum, batch, user, id);
+            }
             return rowResult(id, woNo, woLine, materialCode, sum, user);
         }
 
@@ -188,11 +195,11 @@ public class MixScanService {
                         + " AND ISNULL(asp_cancel,'N') <> 'Y'", Integer.class, woNo, woLine, MARK_DRAFT));
 
         jdbc.update("INSERT INTO dbo.wo_mixing_list ("
-                        + "工单号, 工单行id, 工单行号, 序号, 物料编号, 物料名称, 计划用量, 实际用量, 标记,"
-                        + "asp_user1, asp_time1, asp_cancel) VALUES (?,?,?,?,?,?,?,?,?,?,GETDATE(),'N')",
+                        + "工单号, 工单行id, 工单行号, 序号, 物料编号, 物料名称, 计划用量, 实际用量, 物料批次, 标记,"
+                        + "asp_user1, asp_time1, asp_cancel) VALUES (?,?,?,?,?,?,?,?,?,?,?,GETDATE(),'N')",
                 woNo, longOrNull(body.get("工单行id")), woLine, String.format("%d", seq),
                 materialCode, trim(body.get("物料名称")),
-                round4(body.get("计划用量")), qty, MARK_DRAFT, user);
+                round4(body.get("计划用量")), qty, trim(body.get("物料批次")), MARK_DRAFT, user);
         Long id = jdbc.queryForObject("SELECT MAX(id) FROM dbo.wo_mixing_list WHERE 工单号 = ? AND 工单行号 = ?"
                 + " AND 物料编号 = ? AND 标记 = ?", Long.class, woNo, woLine, materialCode, MARK_DRAFT);
         return rowResult(id == null ? 0 : id, woNo, woLine, materialCode, qty, user);
@@ -361,11 +368,26 @@ public class MixScanService {
     }
 
     /**
-     * 按混料单号取一张单(打印与明细页共用)。
+     * 按混料单号取一张单(**《成型配料记录》纸面** + 明细页共用)。
      *
-     * <p>明细键与打印代理要的**领料单版式**对齐(材料名称/规格/单位/请领数量/实发数量/备注)——
-     * 代理那段绘制分支不区分单据种类,混料单只是把表头换成「工单号/物料名称/规格/单位/
-     * 计划用量/实际用量/备注」,故这里把 计划用量 塞进 请领数量、实际用量 塞进 实发数量。
+     * <p>2026-11-18 用户给了纸样:「这是混料打印的格式,按横板的 A4 打印」——
+     * 纸面是《成型配料记录》(文件编码 YJ-QR-147),横板 A4:
+     * <pre>
+     *   序号 | 车间 | 产品编号 | 配方版本号 | 物料编号 | 物料名 | 添加比例 | 应投重量 |
+     *   实投重量 | 物料批次 | 开始时间 | 结束时间 | 转速 | 配料批次号 | 物料水分 | 配料人 | 确认人
+     * </pre>
+     * 左四列与右七列在纸上是**纵向合并**的一格(整张单一行头 + N 行物料)。
+     *
+     * <p>各列取值:
+     * <ul>
+     *   <li>车间/产品编号 ← {@code plang.scx / plang.dm}(工单行);</li>
+     *   <li>配方版本号 ← {@code wo_mixing_list.配方版本}(本版不挂配方,留空);</li>
+     *   <li>添加比例 ← 该行 计划用量 / 本单 计划用量合计(与配方配料比同口径);</li>
+     *   <li>应投重量 ← 计划用量;实投重量 ← 实际用量(电子秤);</li>
+     *   <li>物料批次 ← 扫码时从物料码 {@code 存货编码|批号} 带下来的批号;</li>
+     *   <li>配料批次号 ← 混料单号;配料人 ← 创建人;开始/结束时间 ← 首笔与保存时间;</li>
+     *   <li>转速 / 物料水分 / 确认人:本系统没有对应数据源,留空由现场手填。</li>
+     * </ul>
      *
      * @param docNo 混料单号(PL…)
      */
@@ -373,54 +395,108 @@ public class MixScanService {
         String no = trim(docNo);
         if (no.isEmpty()) throw new IllegalArgumentException("请提供混料单号");
         List<Map<String, Object>> heads = jdbc.queryForList(
-                "SELECT TOP 1 工单号, 工单行号, asp_user1, asp_time1, ISNULL(asp_print,0) AS 打印次数"
+                "SELECT TOP 1 工单号, 工单行号, asp_user1, asp_time1, ISNULL(asp_print,0) AS 打印次数,"
+                        + " 配方版本, ISNULL(物料批次,'') AS 物料批次"
                         + " FROM dbo.wo_mixing_list WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                         + " ORDER BY id", no);
         if (heads.isEmpty()) throw new IllegalArgumentException("没有找到混料单 " + no);
         Map<String, Object> h = heads.get(0);
+        String woNo = trim(h.get("工单号"));
+        int woLine = intOf(h.get("工单行号"));
+
+        // 工单行:车间(生产线)/产品编号/产品名称;工单行不存在(历史数据)就留空,不让整张纸打不出来
+        Map<String, Object> wo = null;
+        if (!woNo.isEmpty()) {
+            List<Map<String, Object>> woRows = jdbc.queryForList(
+                    "SELECT TOP 1 scx, dm, mc FROM dbo.plang WHERE pl_no = ? AND pl_xc = ?"
+                            + " AND ISNULL(asp_cancel,'N') <> 'Y'", woNo, woLine);
+            if (woRows.isEmpty()) {
+                woRows = jdbc.queryForList(
+                        "SELECT TOP 1 scx, dm, mc FROM dbo.plang WHERE pl_no = ?"
+                                + " AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY pl_xc", woNo);
+            }
+            if (!woRows.isEmpty()) wo = woRows.get(0);
+        }
 
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT 序号, 物料编号, 物料名称, 计划用量, 实际用量, 工单行号"
+                "SELECT 序号, 物料编号, 物料名称, 计划用量, 实际用量, ISNULL(物料批次,'') AS 物料批次"
                         + " FROM dbo.wo_mixing_list WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                         + " ORDER BY TRY_CAST(序号 AS int), id", no);
-        List<Map<String, Object>> lines = new ArrayList<>();
+
+        // 添加比例的分母 = 本单应投合计(与配方「配料比」同口径;合计为 0 时整列留空)
         double planSum = 0;
         double realSum = 0;
         for (Map<String, Object> r : rows) {
+            planSum += dbl(r.get("计划用量"));
+            realSum += dbl(r.get("实际用量"));
+        }
+
+        List<Map<String, Object>> lines = new ArrayList<>();
+        for (Map<String, Object> r : rows) {
             double plan = dbl(r.get("计划用量"));
             double real = dbl(r.get("实际用量"));
-            planSum += plan;
-            realSum += real;
             Map<String, Object> v = new LinkedHashMap<>();
-            v.put("材料名称", trim(r.get("物料名称")).isEmpty() ? trim(r.get("物料编号")) : trim(r.get("物料名称")));
-            v.put("规格", "");
-            v.put("单位", "");
+            v.put("物料编号", trim(r.get("物料编号")));
+            v.put("物料名", trim(r.get("物料名称")).isEmpty() ? trim(r.get("物料编号")) : trim(r.get("物料名称")));
+            // 纸面「添加比例」按百分比印(18.67%);分母 0 ⇒ 空串,不印 "0.00%"
+            v.put("添加比例", planSum > 0 ? pct(plan / planSum) : "");
+            v.put("应投重量", num(plan));
+            v.put("实投重量", num(real));
+            v.put("物料批次", trim(r.get("物料批次")));
+            // 兼容旧调用方(明细页/老的 7 列版式)的键:同一份数据换个名字
+            v.put("材料名称", v.get("物料名"));
             v.put("请领数量", plan);
             v.put("实发数量", real);
-            v.put("备注", "");
-            // 明细页单独用的键(代理只读它认识的那几个)
+            v.put("备注", trim(r.get("物料批次")));
             v.put("序号", trim(r.get("序号")));
-            v.put("物料编码", trim(r.get("物料编号")));
-            v.put("物料名称", trim(r.get("物料名称")));
-            v.put("计划用量", plan);
-            v.put("实际用量", real);
             lines.add(v);
         }
+
+        List<Map<String, Object>> times = jdbc.queryForList(
+                "SELECT MIN(asp_time1) AS 开始时间, MAX(ISNULL(asp_time2, asp_time1)) AS 结束时间"
+                        + " FROM dbo.wo_mixing_list WHERE 单据编号 = ?", no);
+        String startAt = times.isEmpty() ? "" : trim(times.get(0).get("开始时间"));
+        String endAt = times.isEmpty() ? "" : trim(times.get(0).get("结束时间"));
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("面板", PagePanelRegistry.MIX_SCAN);
         out.put("单据编号", no);
-        out.put("工单号", trim(h.get("工单号")));
-        out.put("工单行号", intOf(h.get("工单行号")));
-        out.put("单据日期", trim(h.get("asp_time1")));
-        // 纸面「领料部门」位置放操作人(混料没有部门/领料人,写操作人现场最有用)
+        // ↓ 纸面《成型配料记录》抬头
+        out.put("标题", "成型配料记录");
+        out.put("文件编码", "YJ-QR-147");
+        out.put("工单号", woNo);
+        out.put("工单行号", woLine);
+        out.put("车间", wo == null ? "" : trim(wo.get("scx")));
+        out.put("产品编号", wo == null ? "" : trim(wo.get("dm")));
+        out.put("产品名称", wo == null ? "" : trim(wo.get("mc")));
+        out.put("配方版本号", trim(h.get("配方版本")));
+        out.put("开始时间", startAt);
+        out.put("结束时间", endAt);
+        out.put("转速", "");
+        out.put("配料批次号", no);
+        out.put("物料水分", "");
+        out.put("配料人", trim(h.get("asp_user1")));
+        out.put("确认人", "");
+        // ↓ 明细页/兼容用的抬头
+        out.put("单据日期", startAt);
         out.put("部门", trim(h.get("asp_user1")));
         out.put("创建人", trim(h.get("asp_user1")));
         out.put("打印次数", intOf(h.get("打印次数")));
-        out.put("计划用量合计", planSum);
-        out.put("实际用量合计", realSum);
+        out.put("计划用量合计", num(planSum));
+        out.put("实际用量合计", num(realSum));
         out.put("明细", lines);
         return out;
+    }
+
+    /** 百分比文案:0.1867 → "18.67%"(两位小数,与纸样一致) */
+    private static String pct(double v) {
+        return BigDecimal.valueOf(v * 100).setScale(2, RoundingMode.HALF_UP).toPlainString() + "%";
+    }
+
+    /** 重量文案:去掉无意义的尾随 0(86.172 / 21.04 / 100) */
+    private static String num(double v) {
+        return BigDecimal.valueOf(v).setScale(4, RoundingMode.HALF_UP)
+                .stripTrailingZeros().toPlainString();
     }
 
     /**

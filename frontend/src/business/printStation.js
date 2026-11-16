@@ -105,6 +105,9 @@ export async function queueToPrintStation(payload) {
       领料部门: payload?.领料部门 || '',
       打印日期: payload?.打印日期 || '',
       明细: Array.isArray(payload?.明细) ? payload.明细 : [],
+      // 2026-11-18 第二轮:整张单的抬头数据(混料单 →《成型配料记录》横板 A4 专用纸表)。
+      // 服务端把 `纸面` 原样存进打印缓存、派单时一起下发,代理按固定版式画。
+      纸面: payload?.纸面 && typeof payload.纸面 === 'object' ? payload.纸面 : undefined,
       来源: payload?.来源 || 'mobile',
     })
     const d = res.data?.data || res.data || {}

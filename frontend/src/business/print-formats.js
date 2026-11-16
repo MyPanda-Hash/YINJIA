@@ -652,6 +652,87 @@ export function pickSlipHtml(payload, qr = '') {
 }
 
 /**
+ * 《成型配料记录》浏览器打印层(2026-11-18 第二轮)。
+ *
+ * 与打印代理的 {@code Send-MixSheetToPrinter} 是**同一张纸**:横板 A4(297×210mm)、
+ * 17 列、左右两坨纵向合并格。放在这里是为了守住老规矩 ——
+ * **没有打印电脑在线时现场至少还能用浏览器打印层打出来**(2026-11-02 吃过的亏)。
+ *
+ * 纸张/列宽/字号与代理那份对齐,不追求像素级一致,但换台机器看不能"少了列/折行错位"。
+ *
+ * @param {object} payload buildMixSlipPayload 的返回(含 纸面 与 明细)
+ * @returns {string} 可直接塞进打印层的 HTML(含 <style>)
+ */
+export function mixSheetHtml(payload) {
+  const p = payload || {}
+  const sheet = (p['纸面'] && typeof p['纸面'] === 'object') ? p['纸面'] : {}
+  const rows = Array.isArray(p['明细']) ? p['明细'] : []
+  const val = (v) => String(v ?? '').trim()
+  // 纸表是固定 8 行格子(纸样就是 8 行):不足补空行,多了续页
+  const PER_PAGE = 8
+  const pageCount = Math.max(1, Math.ceil(rows.length / PER_PAGE))
+  const heads = ['序号', '车间', '产品编号', '配方版本号', '物料编号', '物料名', '添加比例',
+    '应投重量', '实投重量', '物料批次', '开始时间', '结束时间', '转速', '配料批次号',
+    '物料水分', '配料人', '确认人']
+  // 与代理同一套列宽(单位:1/1088),按百分比落到 table-layout:fixed 上
+  const colW = [40, 55, 72, 56, 84, 110, 55, 58, 58, 70, 88, 88, 40, 78, 48, 45, 45]
+  const colTotal = colW.reduce((a, b) => a + b, 0)
+  const leftVals = [val(sheet['序号']) || '1', val(sheet['车间']), val(sheet['产品编号']), val(sheet['配方版本号'])]
+  const rightVals = [val(sheet['开始时间']), val(sheet['结束时间']), val(sheet['转速']),
+    val(sheet['配料批次号']), val(sheet['物料水分']), val(sheet['配料人']), val(sheet['确认人'])]
+  const rowKeys = ['物料编号', '物料名', '添加比例', '应投重量', '实投重量', '物料批次']
+
+  const cards = []
+  for (let pg = 0; pg < pageCount; pg++) {
+    const slice = rows.slice(pg * PER_PAGE, (pg + 1) * PER_PAGE)
+    const n = Math.max(PER_PAGE, slice.length)
+    const body = []
+    for (let i = 0; i < n; i++) {
+      const r = slice[i] || {}
+      let tr = '<tr>'
+      if (i === 0) {
+        // 左四列 / 右七列:纵向合并整段(纸样就是"整张单只有一格")
+        for (const v of leftVals) tr += `<td rowspan="${n}" class="mg">${esc(v)}</td>`
+      }
+      for (const k of rowKeys) tr += `<td>${esc(val(r[k]))}</td>`
+      if (i === 0) {
+        for (const v of rightVals) tr += `<td rowspan="${n}" class="mg">${esc(v)}</td>`
+      }
+      body.push(tr + '</tr>')
+    }
+    cards.push('<div class="card">'
+      + `<div class="cap"><span class="t">${esc(val(sheet['标题']) || '成型配料记录')}</span>`
+      + `<span class="code">文件编码 ${esc(val(sheet['文件编码']) || 'YJ-QR-147')}</span></div>`
+      + '<table>'
+      + '<colgroup>' + colW.map((w) => `<col style="width:${((w / colTotal) * 100).toFixed(3)}%">`).join('') + '</colgroup>'
+      + `<thead><tr>${heads.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead>`
+      + `<tbody>${body.join('')}</tbody>`
+      + '</table>'
+      + (pageCount > 1 ? `<div class="pg">第 ${pg + 1}/${pageCount} 页</div>` : '')
+      + '</div>')
+  }
+
+  const style = '<style>'
+    + '@page{size:297mm 210mm;margin:8mm 8mm}'      // 横板 A4
+    + '.card{width:281mm;box-sizing:border-box;page-break-after:always;'
+    + 'font-family:"Microsoft YaHei",system-ui,sans-serif;color:#000}'
+    + '.card:last-child{page-break-after:auto}'
+    + '.cap{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:2mm}'
+    + '.t{font-size:15pt;font-weight:700;letter-spacing:1mm}'
+    + '.code{font-size:8pt}'
+    + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
+    + 'th,td{border:0.3mm solid #000;padding:0.6mm 0.8mm;font-size:7pt;'
+    + 'text-align:center;vertical-align:middle;word-break:break-all;line-height:1.25}'
+    + 'th{font-weight:700;height:8mm;background:#fff}'
+    + 'td{height:10mm}'
+    + 'td.mg{font-size:8pt}'
+    + '.pg{text-align:right;font-size:8pt;margin-top:1.5mm}'
+    + 'body{margin:0;background:#fff}'
+    + '</style>'
+  return style + cards.join('')
+}
+
+/**
  * 排单计划纸表(2026-10-31;2026-11-04 标题/车间列头改为**按工序产线动态**)—— 照纸表出的整张报表。
  *
  * <p>用户口径演化:
