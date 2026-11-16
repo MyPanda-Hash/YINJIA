@@ -715,11 +715,11 @@ function resetOrder() {
 .mm-linepick-sel { flex: 1; min-width: 0; }
 .mm-scale { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; border: 1px solid var(--el-border-color-light); border-left: 3px solid var(--el-color-warning); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; }
 .mm-scale.live { border-left-color: var(--el-color-success); }
-.mm-scale-main { display: flex; align-items: baseline; gap: 10px; flex: 1; min-width: 0; }
-.mm-scale-label { font-size: 12px; color: var(--el-text-color-secondary); }
+.mm-scale-main { display: flex; align-items: baseline; gap: 10px; flex: 1; min-width: 0; flex-wrap: wrap; }
+.mm-scale-label { font-size: 12px; color: var(--el-text-color-secondary); white-space: nowrap; }
 .mm-scale-num { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.mm-scale-hint { font-size: 11px; color: var(--el-text-color-secondary); }
-.mm-scale-manual { display: flex; align-items: center; gap: 8px; }
+.mm-scale-hint { font-size: 11px; color: var(--el-text-color-secondary); white-space: nowrap; }
+.mm-scale-manual { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
 .mm-scale-manual :deep(.el-input-number) { width: 132px; }
 .mm-list { margin-bottom: 12px; }
 .mm-list-head { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--el-text-color-regular); margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--el-border-color-lighter); }
@@ -751,6 +751,11 @@ function resetOrder() {
 .mm-doc-l3 :deep(.el-button) { margin-left: auto; }
 @media (max-width: 480px) {
   .mm-scan { padding: 10px 12px 22px; }
+  /* 手机上二维码/料码扫描框与三颗按钮一行放不下:让输入框独占一行,按钮平分下一行
+     (2026-11-18 手机竖屏走查:三颗按钮把输入框挤到只剩「扫描或输入物料」几个字) */
+  .mm-scanbar { flex-wrap: wrap; }
+  .mm-scanbar :deep(.el-input) { flex: 1 1 100%; }
+  .mm-scanbar :deep(.el-button) { flex: 1 1 0; margin-left: 0; }
   .mm-scale-manual :deep(.el-input-number) { width: 110px; }
 }
 </style>
