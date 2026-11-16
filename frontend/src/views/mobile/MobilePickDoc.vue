@@ -202,7 +202,11 @@
       >
         <span class="mp-line-dot" :class="{ on: r.数量 > 0 }"></span>
         <div class="mp-line-main">
-          <div class="mp-line-name">{{ r.名称 || r.编码 }}</div>
+          <div class="mp-line-name">
+            {{ r.名称 || r.编码 }}
+            <!-- 半成品(2026-11-16):编码含 **TB,本厂不入库 ⇒ 只显示、不领料、可跳过 -->
+            <span v-if="r.半成品 && !returnMode" class="mp-semi">{{ tt('半成品·免领') }}</span>
+          </div>
           <!-- 🔴 2026-11-04 用户口径:「表头是要带物料编码和规格型号和计量单位的,信息不完全」。
                原来是「编码 · 规格 · 批号」挤成一行小字,手机上一挤就看不全;改成三行标签对,
                编码/规格型号/单位各自成列,缺值显示 — (不省略行,避免看着像"没这个信息")。 -->
@@ -227,7 +231,12 @@
             <b class="num">{{ r.BOM用量 > 0 ? fmtQty(r.BOM用量) : '—' }}</b>
             <i>{{ r.单位 }}</i>
           </div>
-          <div class="mp-q-row" :class="{ ok: r.BOM用量 > 0 && r.数量 >= r.BOM用量, zero: !(r.数量 > 0) }">
+          <!-- 半成品:不领料(2026-11-16),这里不给"已领"数字,免得看着像还没领 -->
+          <div v-if="r.半成品" class="mp-q-row mp-q-semi">
+            <span class="mp-q-lab">{{ tt('已领') }}</span>
+            <b>{{ tt('免领') }}</b>
+          </div>
+          <div v-else class="mp-q-row" :class="{ ok: r.BOM用量 > 0 && r.数量 >= r.BOM用量, zero: !(r.数量 > 0) }">
             <span class="mp-q-lab">{{ tt('已领') }}</span>
             <b class="num">{{ fmtQty(r.数量) }}</b>
             <i>{{ r.单位 }}</i>
@@ -559,6 +568,8 @@ function normalize(l) {
     明细备注: String(l?.明细备注 ?? '').trim(),
     BOM用量: Number(l?.BOM用量) || 0,
     已退数量: round4(l?.已退数量 || 0),
+    // 半成品(后端按编码含 **TB 判定,2026-11-16):只显示不领料、可跳过
+    半成品: !!l?.['半成品'],
   }
 }
 
@@ -573,6 +584,11 @@ function normalize(l) {
  */
 function pickRow(r) {
   if (rowLocked.value) return
+  // 半成品点了不进入扫码/填数(它不入库、不需要领料),只给一句说明
+  if (r.半成品 && !returnMode.value) {
+    errText.value = `${tt('这一行是半成品（编码含 **TB），本厂不入库、不需要领料，直接跳过即可')}：${r.编码}`
+    return
+  }
   curRow.value = r
   okText.value = `${tt('请扫物料码')}: ${r.编码}${r.名称 ? ' · ' + r.名称 : ''}`
 }
@@ -976,6 +992,10 @@ async function submit() {
 .mp-line-dot.on { background: var(--el-color-success); }
 .mp-line-main { flex: 1; min-width: 0; }
 .mp-line-name { font-size: 14px; }
+/* 半成品标记(2026-11-16):编码含 **TB 的行只显示不领料,给个醒目标签免得现场找它扫码 */
+.mp-semi { margin-left: 6px; padding: 0 5px; border-radius: 8px; font-size: 11px; font-weight: 400;
+  color: var(--el-color-warning); background: var(--el-color-warning-light-9); border: 1px solid var(--el-color-warning-light-5); }
+.mp-q-semi b { color: var(--el-color-warning); font-weight: 500; }
 /* 明细行的字段对(2026-11-04):编码/规格型号/单位各占一行,标签灰、值黑。
    手机屏窄,用 grid 两列(标签 68px 固定 + 值自适应),值过长自动换行不溢出。 */
 .mp-line-fields { margin: 4px 0 0; padding: 0; }

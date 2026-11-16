@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -84,6 +85,63 @@ public class MobilePickController {
     private static final String BIZ_PICK = "生产领料";
     /** 退料业务类型:生产退料单的「业务类型」固定写「生产退料」(数据键,不翻译) */
     private static final String BIZ_BACK = "生产退料";
+
+    // ══════════════════════ 半成品:只显示、不领料、可跳过 ══════════════════════
+
+    /**
+     * 半成品标记(2026-11-16 用户口径:「生产领料单有一行带TB的是半成品,在客户那边半成品是不入库的,
+     * 所以只要显示这行数据,但是实际并不领料就可以,不要影响别的物料正常领料,半成品是可跳过的」)。
+     *
+     * <p>实测半成品编码形如 {@code T410**TB} / {@code A-32-01**TB} / {@code C-87**TB}
+     * (bs_inv 里 1146 个,全部带 {@code **TB})。
+     *
+     * <p>🔴 **只认「**TB」这个双星标记**,不能只认 `TB`:实测 {@code YJ-TB-009}(密封圈)、
+     * {@code TB-20120}、{@code D-55-04*TB} 都是**要正常领的料**,按裸 TB 匹配会把它们一起吞掉,
+     * 那就是"影响了别的物料正常领料"。
+     */
+    private static final String SEMI_MARK = "**TB";
+
+    /** 这个物料编码是不是半成品 */
+    static boolean isSemiFinished(Object code) {
+        if (code == null) return false;
+        return String.valueOf(code).toUpperCase(Locale.ROOT).contains(SEMI_MARK);
+    }
+
+    /** 明细行是不是半成品(以 normalizeLine 打的 {@code 半成品} 标记为准,免得各处重复判编码) */
+    private static boolean isSemiLine(Map<String, Object> it) {
+        Object v = it == null ? null : it.get("半成品");
+        if (v instanceof Boolean b) return b;
+        return isSemiFinished(it == null ? null : it.get("编码"));
+    }
+
+    /** 本单**需要真领料**的明细(半成品不算) */
+    private static int pickableCount(List<Map<String, Object>> items) {
+        int n = 0;
+        for (Map<String, Object> it : items) if (!isSemiLine(it)) n++;
+        return n;
+    }
+
+    /**
+     * 同上,但入参是**生单时组装的出库行**(键是 {@code 材料编码},还没走 normalizeLine)。
+     *
+     * <p>两个形状别混:normalizeLine 的产物是 {@code 编码/半成品},insertPickLines 的入参是
+     * {@code 材料编码/数量}。用错形状不会报错、只会静默算错(半成品被算进分母)。
+     */
+    private static int pickableCountOfOutItems(List<Map<String, Object>> items) {
+        int n = 0;
+        for (Map<String, Object> it : items) if (!isSemiFinished(it.get("材料编码"))) n++;
+        return n;
+    }
+
+    /** 已领项数(只数需要真领料的行) */
+    private static int pickedCount(List<Map<String, Object>> items) {
+        int n = 0;
+        for (Map<String, Object> it : items) {
+            if (isSemiLine(it)) continue;
+            if (num(it.get("数量")) > 0) n++;
+        }
+        return n;
+    }
 
     /**
      * 列表每组最多返回多少条(2026-10-30 由 200 调整)。
@@ -442,10 +500,13 @@ public class MobilePickController {
         //   历史遗留的空退料单由 migrate-wo-pick-return-20261030.sql 统一作废。
 
         // ── 台账(唯一约束在这里挡"连扫两下")
+        // 物料项数只数**需要真领料**的行:半成品只显示不领,若把它算进分母,
+        // 进度会永远差一项、提交闸门就过不去(2026-11-16 用户口径「半成品是可跳过的」)。
+        int pickable = pickableCountOfOutItems(outItems);
         long id;
         try {
             id = docs.insert(lineWoNo, line, productCode, str(wo.get("产品名称")),
-                    outNo, null, bomLines.size(), user);
+                    outNo, null, pickable, user);
         } catch (RuntimeException e) {
             // 并发:另一个手机刚给同一工单行建了单。把已存在的还给调用方,不要留半截数据
             WoPickDocService.PickDoc raced = docs.findActive(lineWoNo, line);
@@ -464,7 +525,7 @@ public class MobilePickController {
         out.put("领料单号", outNo);
         out.put("工单", wo);
         out.put("BOM单据编号", str(bomHead.get("单据编号")));
-        out.put("物料项数", bomLines.size());
+        out.put("物料项数", pickable);
         out.put("状态", WoPickDocService.STATE_OPEN);
         out.put("重复", false);
         // 生单即自动打印工单二维码一次(用户口径「在生成生产领料单的时候自动打印一次」)。
@@ -749,6 +810,11 @@ public class MobilePickController {
             throw new IllegalStateException("物料 " + code + " 不在本单的"
                     + ("back".equals(side) ? "退料" : "领料") + "明细里:请核对是否扫错了料(本单只含组装BOM表里的用料)");
         }
+        // 半成品:只显示、不领料、可跳过(2026-11-16 用户口径)
+        if (!"back".equals(side) && isSemiLine(hit)) {
+            throw new IllegalStateException("物料 " + code + " 是半成品(编码含 **TB),本厂不入库、不需要领料:"
+                    + "这一行只作展示,直接跳过即可");
+        }
 
         // ② 库存可用量(按 物料+仓库 汇总;批次明细另给,前端沿用先进先出拆批)
         String wh = str(hit.get("仓库"));
@@ -810,6 +876,10 @@ public class MobilePickController {
         Map<String, Object> hit = null;
         for (Map<String, Object> it : items) if (code.equals(str(it.get("编码")))) { hit = it; break; }
         if (hit == null) throw new IllegalStateException("物料 " + code + " 不在本单的明细里");
+        // 半成品不许填数量(2026-11-16):它不入库,填了会凭空扣库存;只显示、可跳过
+        if (!"back".equals(side) && isSemiLine(hit) && qty > 0) {
+            throw new IllegalStateException("物料 " + code + " 是半成品(编码含 **TB),不需要领料:数量请留 0 直接跳到下一项");
+        }
 
         // 库存守卫(领料):超出跨批次合计就拦 —— 用户口径「只要仓库数量足够,多少都可以」
         if (!"back".equals(side) && qty > 0) {
@@ -833,16 +903,15 @@ public class MobilePickController {
         // 直接改明细行的数量(草稿单可改)。批次留痕由 batches 写进明细备注。
         writeQty(panel, no, str(hit.get("行号")), str(hit.get("原始行号")), qty, body, side, code);
 
-        int done = 0;
-        for (Map<String, Object> it : linesOf(d.outNo(), "pick")) if (num(it.get("数量")) > 0) done++;
-        docs.updateProgress(id, done, items.size(), currentUserName());
+        // 进度的分母/分子都**不算半成品**(2026-11-16:半成品只显示不领,算进去就永远差一项)
+        List<Map<String, Object>> pickNow = linesOf(d.outNo(), "pick");
+        int totalItems = pickableCount(pickNow);
+        int doneNow = pickedCount(pickNow);
+        docs.updateProgress(id, doneNow, totalItems, currentUserName());
 
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("领料明细", linesOf(d.outNo(), "pick"));
+        out.put("领料明细", pickNow);
         out.put("退料明细", linesOf(d.backNo(), "back"));
-        int totalItems = linesOf(d.outNo(), "pick").size();
-        int doneNow = 0;
-        for (Map<String, Object> it : linesOf(d.outNo(), "pick")) if (num(it.get("数量")) > 0) doneNow++;
         out.put("物料项数", totalItems);
         out.put("已领项数", doneNow);
         // 「全部领料完成后才可以提交」的判据就这一个 —— 由服务端算,前端只管显示
@@ -877,6 +946,8 @@ public class MobilePickController {
         if (items.isEmpty()) throw new IllegalStateException("这张领料单没有明细行,无法提交(请作废后重新生成)");
         List<String> missing = new ArrayList<>();
         for (Map<String, Object> it : items) {
+            // 半成品不参与"是否领完"的判定:它只显示、不领料、可跳过(2026-11-16 用户口径)
+            if (isSemiLine(it)) continue;
             if (num(it.get("数量")) <= 0) missing.add(str(it.get("编码")));
         }
         if (!missing.isEmpty()) {
@@ -895,7 +966,8 @@ public class MobilePickController {
         // 库存立刻被扣、仓管的审批完全被绕过。
         // 现在:用生单时预留的号建一张**待审批**的材料出库单(数量=实领),状态停在草稿;
         // 仓管在「材料出库单」面板点「审核」才走 StockLedgerService 扣库存。
-        createMaterialOutFromPick(d, items, user);
+        // ── 生单:半成品不进材料出库单(不入库 ⇒ 不能有出库流水)
+        int madeLines = createMaterialOutFromPick(d, items, user);
 
         // 退料不在这里做(2026-10-30 第三轮用户改口径):
         //   用户口径「可以点开已完成的生产领料数据再次进行扫码。这样就可以来退料了」——
@@ -907,9 +979,12 @@ public class MobilePickController {
         out.put("已提交", true);
         out.put("领料单号", d.outNo());
         out.put("状态", WoPickDocService.STATE_DONE);
-        out.put("说明", "已生成材料出库单 " + d.outNo() + ",等仓管在「材料出库单」里审批;"
-                + "审批通过才扣库存。如需退料,点开这张单再次扫码即可(剩余可退 "
-                + fmtQty(pickedQtyOf(d.outNo())) + ")");
+        out.put("出库行数", madeLines);
+        out.put("说明", madeLines == 0
+                ? "本单明细全是半成品(编码含 **TB),按口径不入库、不生成材料出库单;领料单已结束"
+                : "已生成材料出库单 " + d.outNo() + ",等仓管在「材料出库单」里审批;"
+                        + "审批通过才扣库存。如需退料,点开这张单再次扫码即可(剩余可退 "
+                        + fmtQty(pickedQtyOf(d.outNo())) + ")");
         return ApiResult.ok(out);
     }
 
@@ -923,16 +998,23 @@ public class MobilePickController {
      * 保存出来的就是一张**草稿**,审核留给仓管 —— 这正是要的语义。
      *
      * <p>数量取**实领数量**(不是需求):需求只是预填参考,实领才是这次真出库的量。
+     *
+     * <p>🔴 半成品的行**不进材料出库单**(2026-11-16 用户口径:「半成品是不入库的,只要显示这行数据,
+     * 但是实际并不领料」)—— 它不出现在出库明细里就等于不过账,库存不动;
+     * 全部都是半成品时**连单都不建**(建一张 0 行的出库单只会污染材料出库单列表)。
+     *
+     * @return 真正写进出库单的明细行数(0 = 没建单)
      */
-    private void createMaterialOutFromPick(WoPickDocService.PickDoc d,
-                                           List<Map<String, Object>> items, String user) {
+    private int createMaterialOutFromPick(WoPickDocService.PickDoc d,
+                                          List<Map<String, Object>> items, String user) {
         String today = java.time.LocalDate.now().toString();
         List<Map<String, Object>> outItems = new ArrayList<>();
         String wh = "", whCode = "";
-        for (int i = 0; i < items.size(); i++) {
-            Map<String, Object> it = items.get(i);
+        for (Map<String, Object> it : items) {
+            // 半成品跳过:只显示不领料,不影响别的物料正常出库
+            if (isSemiLine(it)) continue;
             Map<String, Object> line = new LinkedHashMap<>();
-            line.put("行号", String.valueOf(i + 1));
+            line.put("行号", String.valueOf(outItems.size() + 1));
             line.put("材料编码", str(it.get("编码")));
             line.put("材料名称", str(it.get("名称")));
             line.put("规格型号", str(it.get("规格")));
@@ -946,6 +1028,7 @@ public class MobilePickController {
             outItems.add(line);
             if (wh.isEmpty()) { wh = str(it.get("仓库")); whCode = str(it.get("仓库编码")); }
         }
+        if (outItems.isEmpty()) return 0;
         final String whFinal = wh;
         boolean allSameWh = !whFinal.isEmpty()
                 && outItems.stream().allMatch(x -> whFinal.equals(str(x.get("仓库"))));
@@ -968,6 +1051,7 @@ public class MobilePickController {
         form.put("detail", Map.of("items", outItems));
 
         buttons.callButton(PANEL_OUT, "保存", form, null);
+        return outItems.size();
     }
 
     // ══════════════════════════ ④ 退料(已完成单上按需退) ══════════════════════════
@@ -1604,6 +1688,8 @@ public class MobilePickController {
         //   直接用它(比从备注解析可靠);已完成的历史单没有这一列,退回解析备注。
         Object needCol = r.get("需求数量");
         m.put("BOM用量", needCol != null ? num(needCol) : bomUsageOf(str(r.get("明细备注"))));
+        // 半成品标记(2026-11-16):前端据此把这一行显示成「半成品·免领」、不参与进度、不可填数量
+        m.put("半成品", isSemiFinished(m.get("编码")));
         m.put("codeCol", codeCol);
         return m;
     }

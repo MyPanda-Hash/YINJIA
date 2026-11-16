@@ -68,6 +68,9 @@ export function toRows(lines, side = 'pick') {
     批号: String(l?.批号 ?? '').trim(),
     明细备注: String(l?.明细备注 ?? '').trim(),
     BOM用量: parseUsage(l?.BOM用量),
+    // 半成品标记(2026-11-16):必须原样带过来 —— 丢了它,pickProgress 会把半成品
+    // 当成"还没领的那一项",提交闸门永远过不去
+    半成品: !!l?.半成品,
     // 退料默认 0 且**不算已扫**(用户口径「退料默认数量为0。可以不进行退料操作」);
     // 领料侧"有数量"即视为已领(用户口径「每行都有领料数量(>0)就算完成」)
     已扫: side === 'pick' ? round4(l?.数量) > 0 : round4(l?.数量) > 0,
@@ -160,7 +163,9 @@ export function allocateScannedFirst(batchRows, need) {
  * @returns {{ok: boolean, total: number, done: number, missing: string[]}}
  */
 export function pickProgress(pickRows) {
-  const rows = Array.isArray(pickRows) ? pickRows : []
+  // 半成品(物料编码含 **TB)只显示、不领料、可跳过(2026-11-16 用户口径):
+  //   它**不算进分母** —— 否则进度永远差一项,"全部领完才能提交"这道闸门就永远过不去。
+  const rows = (Array.isArray(pickRows) ? pickRows : []).filter((r) => !r?.半成品)
   const total = rows.length
   const missing = rows.filter((r) => round4(r?.数量) <= 0).map((r) => String(r?.编码 || r?.名称 || ''))
   const done = total - missing.length
