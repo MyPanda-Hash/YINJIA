@@ -59,14 +59,17 @@
         </span>
         <span class="pup-tip pup-buyer-tip">
           <span class="pup-buyer-tip1">{{ tt('这两个会印在「需方」框里；填了名单里没有的名字或电话，打印时会自动存进下拉选项') }}</span>
-          <span class="pup-buyer-tip2">{{ tt('不填（点「清空」）则需方框不印联系人和联系方式') }}</span>
+          <span class="pup-buyer-tip2">{{ tt('不填（点「清空联系人」）则需方框不印联系人和联系方式') }}</span>
         </span>
         <!-- 清空(2026-11-16 用户口径「打印的这两个填写需要可以删除数据的」):
-             ① 下拉悬停的 ⓧ 太小不好找 ⇒ 给一个显式的「清空」按钮,一次清掉这两个;
+             ① 下拉悬停的 ⓧ 太小不好找 ⇒ 给一个显式的「清空联系人」按钮,一次清掉这两个;
+                ⚠ 刻意**不复用** tt('清空'):词条 '清空' 在 biz 里出现多次,最后一条是修改记录的
+                kind 值 '清空'→'Cleared' ⇒ 英文界面下所有 tt('清空') 按钮都显示成 "Cleared"(老问题);
+                这里用自己的词条 '清空联系人'(en: Clear contact),按钮文字才对。
              ② 更关键是**清空后纸面必须真的空** —— 以前清空了出纸仍回落公司默认那组
                 (孙郝聪/13718162430),看起来就是"删不掉"(见 buyerOf 注释)。 -->
         <el-button link type="primary" size="small" class="pup-buyer-clear"
-          :disabled="!buyerName && !buyerPhone" @click="clearBuyer">{{ tt('清空') }}</el-button>
+          :disabled="!buyerName && !buyerPhone" @click="clearBuyer">{{ tt('清空联系人') }}</el-button>
         <!-- 名单管理入口(2026-11-11 用户口径「没有删除按钮吗,输错了怎么办」):
              只加不删的话,打错一次名字就一直留在下拉里,条数上限(12)满了会彻底卡死 -->
         <el-button link type="primary" size="small" class="pup-buyer-mgr" @click="openContactsMgr">

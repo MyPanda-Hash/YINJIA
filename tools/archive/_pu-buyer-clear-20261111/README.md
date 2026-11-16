@@ -54,9 +54,19 @@ round-12(改前取证):
 | 20 / 21 | 名单管理:加一行「探针小李」保存 → 删掉再保存 | ✅ toast「名单已保存」,名单回到只剩 `孙郝聪`(探针已清) |
 | **23** | 8090 打包版同一套流程 | ✅ 清空后重打纸面需方框为空 |
 | 24 / 25 | 8090 截图取证 + 作废本次测试落的 `MP-2026-11-0003` | ✅ 记录数回到 0 |
+| **26 / 27** | 切英文走查(AGENTS 强制项) | ⚠ 发现 `tt('清空')` 在英文里显示成 **`Cleared`** —— `biz` 词条里 `'清空'` 出现多次,最后一条是修改记录的 kind 值 |
+| **28 / 29** | 改独立词条 `清空联系人` 后英文复验(5173 + 8090) | ✅ `Clear contact` / `Manage list`,提示句同步 `(click Clear contact)`;界面已切回中文 |
+| **30** | 中文最终版面(按钮变长后是否仍单行) | ✅ 单行,`round-30-8090-zh-row.png` |
 
-其它:`node --test` **1850/1850** 通过;`npm run build` 通过;
-`apply-frontend-only.ps1` 输出 `[OK] http://127.0.0.1:8090 已下发 assets/index-C91qsNFI.js`。
+其它:`node --test` **1858/1858** 通过;`npm run build` 通过;
+`apply-frontend-only.ps1` 输出 `[OK] http://127.0.0.1:8090 已下发 assets/index-0EQQm_Kr.js`
+(第一次同步是 `assets/index-C91qsNFI.js`,随后按钮改名又重发了一次)。
+
+> ⚠ **`backend/src/main/resources/static` 这一步没提交**:本次重构建时仓库里同时有另一个会话
+> 正在做的「其他领料/其他退料」(`MobileOtherScan.vue` / `scanOther.js` / `menus.js` 未提交),
+> dist 里已经带上了它 ⇒ 不把别人半成品的前端产物 commit 进来。上一轮的静态产物(`index-C91qsNFI.js`,
+> 已含本修复但按钮还叫「清空」)在 commit `5782f4b2f` 里;等那边收口后任何一次 `npm run build`
+> 都会把「清空联系人」一起带上。8090 当前跑的 jar 已是 `index-0EQQm_Kr.js`。
 
 ## 四、踩过的坑
 
