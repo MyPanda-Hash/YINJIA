@@ -4905,3 +4905,6 @@ migrate-qc-line-patrol-20261114.sql
 
 # 2026-11-15 品质管理 → 新增目录「样品检验」:送样登记表 SAMPLE_REG(archive,新表 qc_sample_reg + 44 行内部检测目录种子) + 检验委托单 INSP_COMMISSION(doc,新表 qc_insp_commission_head/_detail,前缀 WT,头 32/行 10 字段,纸面「检验类别」从目录带入);角色授权照 QC_INSP + 面板与 44 个新标签 en 译名;幂等;两账套
 migrate-sample-insp-20261115.sql
+
+# 2026-11-16 「样品检验」提升为一级模块:两张面板 yj_panel.module_group 品质管理→样品检验(导航顺序由 menus.js 决定;权限矩阵分组口径对齐);面板码/字段/表/授权不动;幂等;两账套
+migrate-sample-insp-module-20261116.sql

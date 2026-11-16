@@ -6243,6 +6243,10 @@ export default {
     "送样登记表面板不存在（SAMPLE_REG），请检查面板是否已发布": "The Sample Submission Register panel (SAMPLE_REG) does not exist. Please check whether the panel has been published.",
     "送样登记表目录加载失败，请关闭弹窗后重试": "Failed to load the Sample Submission Register catalog. Please close the dialog and try again.",
     // 纸面里以变量传给 tt() 的词条(单选组整句/委托方信息格头/装饰列头) —— 2026-11-15
+    // 2026-11-16 纸样三行合并(名称 + 对应地址同一行一格):合并后的行标签,数据键不变
+    "委托单位/单位地址": "Client / Address",
+    "制造商/地址": "Manufacturer / Address",
+    "生产厂/地址": "Production Plant / Address",
     "委托单位": "Client",
     "委托单位地址": "Client Address",
     "制造商": "Manufacturer",

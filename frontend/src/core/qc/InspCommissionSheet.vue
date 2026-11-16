@@ -7,7 +7,9 @@
        渲染图见 .tmp/srcdoc/render-doc/page-0001.png):
          纸头 : 左「□ 惠州市银嘉环保科技有限公司 / 水家电综合检测中心」· 右「检验委托单（委托检验合同）」
          次行 : 左「年 月 日(单据日期)」· 右「委托单编号:<单据编号>」
-         主表 : 标签列 + 值列(可见时 2 列 / 联系人等行 6 列 / 确认行 4 列),框线细灰、宋体 13px
+         主表 : 标签列 + 值列(可见时 2 列 / 联系人等行 6 列 / 确认行 4 列),框线细灰、宋体 13px;
+                委托方三行按纸样合并 = 「委托单位/单位地址」「制造商/地址」「生产厂/地址」各一行一格
+                (名称与地址同一行,数据键仍是两个独立字段,见 2026-11-16 用户口径)
          带项目格: 「检验类别」= 已选目录项目摘要 + 「选择检验项目」按钮(开 SampleCatalogPickDialog);
                    「检验项目及要求」= 文本要求 + 从送样登记表带入的行表小表(可逐行「×」删)
          尾部 : 说明 1./2./3. + 右下文件号 YJ-QP-701-1-01 (00)
@@ -70,19 +72,27 @@
         <col class="ic-col-6" />
       </colgroup>
       <tbody>
-        <!-- ── 委托方/制造方:标签 + 值(值跨后 5 列) ── -->
-        <tr v-for="key in PARTY_LABELS" :key="key">
-          <th class="ic-lbl">{{ tt(key) }}</th>
+        <!-- ── 委托方/制造方/生产方:每行「名称/地址」合并成一格(纸样三行,值跨后 5 列) ── -->
+        <tr v-for="row in PARTY_ROWS" :key="row.label">
+          <th class="ic-lbl">{{ tt(row.label) }}</th>
           <td class="ic-cell" colspan="5">
-            <el-input
-              v-if="canEdit(key)"
-              :model-value="headVal(key)"
-              size="small"
-              class="ic-input"
-              maxlength="200"
-              @update:model-value="(v) => setHead(key, v)"
-            />
-            <span v-else class="ic-text">{{ headVal(key) }}</span>
+            <div class="ic-party-line">
+              <template v-for="(key, ki) in row.keys" :key="key">
+                <el-input
+                  v-if="canEdit(key)"
+                  :model-value="headVal(key)"
+                  size="small"
+                  :class="['ic-input', ki === 0 ? 'ic-party-name' : 'ic-party-addr']"
+                  maxlength="200"
+                  :placeholder="tt(key)"
+                  @update:model-value="(v) => setHead(key, v)"
+                />
+                <span
+                  v-else
+                  :class="['ic-text', 'ic-party-text', ki === 0 ? 'ic-party-name' : 'ic-party-addr']"
+                >{{ headVal(key) }}</span>
+              </template>
+            </div>
           </td>
         </tr>
 
@@ -448,8 +458,18 @@ const bump = ref(0)
 
 /* ───────────────────────── 表头字段(数据键 = yj_field.label,中文即键) ───────────────────────── */
 
-/** 标签 + 值(值跨后 5 列)的六行,顺序照纸样 */
-const PARTY_LABELS = ['委托单位', '委托单位地址', '制造商', '制造商地址', '生产厂', '生产厂地址']
+/**
+ * 委托方三行(纸样 2026-11-16 口径:名称与对应地址合并成同一行一格):
+ *   委托单位/单位地址 | 值(委托单位 + 委托单位地址)
+ *   制造商/地址      | 值(制造商 + 制造商地址)
+ *   生产厂/地址      | 值(生产厂 + 生产厂地址)
+ * 显示标签是合并文案(照 .doc 纸样),数据键仍是两个独立字段 —— 没有合并 SQL 列、没改 yj_field。
+ */
+const PARTY_ROWS = [
+  { label: '委托单位/单位地址', keys: ['委托单位', '委托单位地址'] },
+  { label: '制造商/地址', keys: ['制造商', '制造商地址'] },
+  { label: '生产厂/地址', keys: ['生产厂', '生产厂地址'] },
+]
 
 /**
  * 纸面上的 6 格行(标签|值|标签|值|标签|值):
@@ -993,6 +1013,26 @@ watch(
 }
 .ic-input-fill {
   width: 100%;
+}
+
+/* ── 委托方三行:名称 + 地址同一行一格(纸样「委托单位/单位地址」合并行) ──
+   名称左、地址右,同一个值格里并排;只读/打印态就是两段文字,不留额外框线。 */
+.ic-party-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.ic-party-line > * {
+  min-width: 0;
+}
+.ic-party-name {
+  flex: 1 1 42%;
+}
+.ic-party-addr {
+  flex: 1.35 1 52%;
+}
+.ic-party-text {
+  width: auto;
 }
 
 /* ── 检验类别格:摘要 + 「选择检验项目」按钮 ── */
