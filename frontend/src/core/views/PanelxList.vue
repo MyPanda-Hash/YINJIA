@@ -8762,12 +8762,72 @@ function prepareQcSheetSnapshot(clone) {
     n.style.width = `${n.scrollWidth}px`
   }
 }
+/**
+ * 检验委托单纸张(`.ic-sheet`)整页截图的预处理 —— 2026-11-16。
+ *
+ * 🔴 用户报障(两张截图):「打印的格式存在问题,字的格式会挤压」「按钮实现不应该被打印出来」。
+ *   根因:「导出 → 打印预览 / 导出 PDF」走的是**离屏克隆 + 截图**(`@media print` 对截图不生效),
+ *   而 `ic-sheet` 的打印态清理(隐藏「选择检验项目」按钮 / 日期控件 / 占位提示)全写在
+ *   `@media print` 里 ⇒ 截图上原样带着这些编辑控件;同时克隆体被压到 A4 宽(733px)重排,
+ *   纸面上的 880px 版式被挤窄 ⇒ 打出来文字挤在一起。屏幕「打印」按钮走 window.print() 那条路是对的。
+ *
+ * 修法(只动克隆体,不碰线上 DOM):按 papar 打印口径把控件/占位摘掉,并让日期回到「年 月 日」文字态。
+ * 与 `@media print` 的隐藏名单保持同一口径(见 InspCommissionSheet.vue 的 @media print 块)。
+ */
+function prepareInspSheetSnapshot(clone) {
+  // a) 编辑控件不上纸:选择检验项目按钮 / 明细行「×」/ 字段管理或其它 no-print 装饰
+  clone.querySelectorAll('.ic-pick-btn, .ic-items-op, .no-print').forEach((n) => n.remove())
+  // b) 日期控件换成纸面「年 月 日」文字(只读态本来就是文字;编辑态被 .is-edit-hide 藏起来了)
+  clone.querySelectorAll('.ic-date-pick').forEach((n) => n.remove())
+  clone.querySelectorAll('.ic-date-text').forEach((n) => {
+    n.classList.remove('is-edit-hide')
+    n.style.display = 'inline'
+  })
+  // c) 输入框占位提示、日历/清除图标不是纸面内容(输入值本身照常留在 value 里)
+  clone.querySelectorAll('input, textarea').forEach((n) => n.setAttribute('placeholder', ''))
+  clone.querySelectorAll('.el-input__suffix, .el-input__prefix').forEach((n) => n.remove())
+  // d) 克隆体里输入框按纸面观感去掉控件边框阴影(屏幕态已是无边框,这里兜底)
+  clone.querySelectorAll('.el-input__wrapper, .el-textarea__inner').forEach((n) => {
+    n.style.boxShadow = 'none'
+    n.style.background = 'transparent'
+  })
+}
+/**
+ * 检验委托单(.ic-sheet)整页截图 —— **单独走 html2canvas**(2026-11-16)。
+ *
+ * 为什么不用 modern-screenshot:它用 SVG `<foreignObject>` 光栅化,对中文衬线字体(纸面是宋体
+ * `font-family: SimSun`)会以默认 sans 度量渲染 ⇒ 排版按宋体、出图按黑体,行宽不一致,
+ * 文字换行错位、行与行叠在一起(用户报障的「字的格式会挤压」;实测 SimSun/NSimSun/serif 都重叠,
+ * 仿宋/雅黑才正常,但换字体会改变受控表单的字体)。html2canvas 直接在页面上按实测文本排版绘制,
+ * 字体度量与屏幕一致 ⇒ 宋体也能完整出字(实测填值/空表都正常)。
+ *
+ * 截图前用 {@link prepareInspSheetSnapshot} 在**克隆件**上摘掉编辑控件(按钮/日期控件/占位提示),
+ * 与 `@media print` 的隐藏名单同一口径;不动线上 DOM、不改屏幕版式。
+ */
+async function snapInspSheetPage(el, w0) {
+  const h0 = Math.max(el.scrollHeight, el.offsetHeight)
+  const mod = await import('html2canvas')
+  const html2canvas = mod.default || mod
+  const canvas = await html2canvas(el, {
+    backgroundColor: '#ffffff',
+    scale: 2,
+    logging: false,
+    width: w0,
+    height: h0,
+    windowWidth: Math.max(w0, 1600),
+    onclone: (doc, clonedEl) => prepareInspSheetSnapshot(clonedEl),
+  })
+  return { dataUrl: canvas.toDataURL('image/png'), w0, h0, rowBreaks: [], qcSheet: false }
+}
 /** 截一张纸:离屏克隆(定宽) → domToPng;返回 { dataUrl, w0, h0, rowBreaks, qcSheet } */
 async function snapSheetPage(el, domToPng) {
   let holder = null
   try {
     // 纸宽=scrollWidth(max-width:100% 压缩 offsetWidth 时,内容横向溢出,scrollWidth 才是整张纸)
     const paperW = Math.max(el.scrollWidth, el.offsetWidth)
+    // 检验委托单:中文衬线字体在 modern-screenshot 的 foreignObject 里会重叠 ⇒ 改走 html2canvas
+    const isInspSheet = !!(el.matches?.('.ic-sheet') || el.querySelector?.('.ic-sheet'))
+    if (isInspSheet) return await snapInspSheetPage(el, paperW)
     /**
      * A4 内容宽(px)：194mm @96dpi ≈ 733px。
      *
@@ -9281,6 +9341,20 @@ async function previewSheetPdf() {
   // 出厂检验报告:预览服务端受控表单 PDF(与「导出报表 → 打印预览」同一份)
   //   通用面板走页内打印层(2026-10-31 打印通道统一:打印页 HTML + 原生打印预览,不再把 blob PDF 交给浏览器)
   if (isOqcSheetPanel.value) { await previewOqcReport(); return }
+  /**
+   * 检验委托单(.ic-sheet,2026-11-16 用户报障「打印预览字被挤压、按钮也被打印出来」):
+   * 截图预览会把屏幕编辑态(选择检验项目按钮/日期控件/占位提示)一起拍进去,还是位图放大,
+   * 字发虚发挤 ⇒ **和侧栏「打印」走同一条原生打印通道**(window.print + @media print,矢量、A4 竖版)。
+   * 其余纸面(多页签文书/宽表)仍走截图打印层。
+   */
+  const sheetEl = approvalSheetRef.value?.$el
+  const paperEl = sheetEl instanceof HTMLElement && sheetEl.offsetWidth > 0
+    ? sheetEl
+    : document.querySelector('.approval-layout .ic-sheet')
+  if (paperEl && (paperEl.matches?.('.ic-sheet') || paperEl.querySelector?.('.ic-sheet'))) {
+    await printApprovalSheet()
+    return
+  }
   await openSheetPrint('正在生成打印预览…')
 }
 /** 导出 Excel(.xlsx):当前单据 头字段键值 + 各明细页签(全字段全数据,不受纸张限制);控制列表走专属导出 */

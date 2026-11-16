@@ -137,7 +137,7 @@
                 size="small"
                 type="primary"
                 plain
-                class="ic-pick-btn"
+                class="ic-pick-btn no-print"
                 @click="openCatalog"
               >
                 {{ tt('选择检验项目') }}
@@ -1422,6 +1422,40 @@ watch(
   body.approval-printing .ic-items-op,
   body.approval-printing .ic-pick-btn {
     display: none !important;
+  }
+  /* 🔴 2026-11-16:编辑控件一律不上纸 —— 这一段**不依赖** body.approval-printing 类:
+     Ctrl+P / 浏览器打印预览 / 以后新加的打印入口都会走 @media print;纸样上没有按钮/控件。
+     (「导出 → 打印预览 / 导出 PDF」走截图,另由 PanelxList.prepareInspSheetSnapshot 摘节点) */
+  .ic-sheet .ic-pick-btn,
+  .ic-sheet .ic-items-op,
+  .ic-sheet .no-print {
+    display: none !important;
+  }
+  .ic-sheet .ic-date-pick {
+    display: none !important;
+  }
+  .ic-sheet .ic-date-text.is-edit-hide {
+    display: inline !important;
+  }
+  .ic-sheet .el-input__suffix,
+  .ic-sheet .el-input__prefix {
+    display: none !important;
+  }
+  .ic-sheet input::placeholder,
+  .ic-sheet textarea::placeholder {
+    color: transparent !important;
+  }
+  /* 行距收紧的相反面:印刷态行与行不要贴住(用户 2026-11-16「字的格式会挤压」) */
+  .ic-sheet .ic-grid th,
+  .ic-sheet .ic-grid td,
+  .ic-sheet .ic-opt,
+  .ic-sheet .ic-note-text {
+    line-height: 1.5 !important;
+  }
+  .ic-sheet .ic-items,
+  .ic-sheet .ic-items th,
+  .ic-sheet .ic-items td {
+    line-height: 1.45 !important;
   }
   /* 弹窗(append-to-body,不在 .portal 里)不跟着隐藏 ⇒ 开着弹窗按打印会印上去 */
   body.approval-printing .el-overlay,
