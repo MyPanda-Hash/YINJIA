@@ -58,6 +58,17 @@ if ($has) {
     Say '[--] 没有开机自启项' 'DarkGray'
 }
 
+# ── ①b 注销守护任务(2026-11-16)──────────────────────────────────
+# 必须先注销:否则代理被结束后,守护任务 1 分钟内又把它拉起来,卸载等于没做
+$taskName = 'YinjiaMesPrintAgent-Watch'
+try {
+    $o = (& cmd.exe /c ('schtasks /delete /tn "' + $taskName + '" /f') 2>&1 | Out-String).Trim()
+    if ($LASTEXITCODE -eq 0) { Say '[OK] 已注销守护任务(不会再有程序自动拉起代理)' 'Green' }
+    else { Say '[--] 没有守护任务' 'DarkGray' }
+} catch {
+    Say "[WARN] 注销守护任务失败:$($_.Exception.Message)" 'Yellow'
+}
+
 # ── ② 结束代理进程(按命令行匹配,不按端口) ──────────────────────
 $killed = 0
 try {
