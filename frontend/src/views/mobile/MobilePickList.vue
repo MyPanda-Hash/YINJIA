@@ -1,4 +1,4 @@
-<!--
+﻿<!--
   MobilePickList.vue — 手机扫码 · 生产领料(列表页 + 生单入口,2026-10-30 重写)
 
   【为什么是这一页】(用户 2026-10-30 口径原文)
@@ -88,6 +88,7 @@
         >
           <div class="mp-doc-l1">
             <span class="mp-doc-no mono">{{ d.领料单号 || tt('未生成') }}</span>
+            <span class="mp-doc-kind">{{ tt(d.领料类型 || '组装') }}</span>
             <span class="mp-doc-state">{{ d.状态 }}</span>
           </div>
           <div class="mp-doc-l2">
@@ -127,6 +128,7 @@
         >
           <div class="mp-doc-l1">
             <span class="mp-doc-no mono">{{ d.领料单号 || '—' }}</span>
+            <span class="mp-doc-kind">{{ tt(d.领料类型 || '组装') }}</span>
             <!-- 退料标志(2026-10-30 第三轮):退过料的单在列表里就能认出来 -->
             <span v-if="hasReturn(d)" class="mp-flag" :title="d.退料单号">{{ tt('含退料') }}</span>
             <span class="mp-doc-state is-done">{{ d.状态 }}</span>
@@ -496,6 +498,7 @@ function openDoc(id) {
   background: var(--el-color-warning-light-8); color: var(--el-color-warning-dark-2);
 }
 .mp-doc-state {
+.mp-doc-kind { padding: 0 6px; border-radius: 8px; font-size: 11px; background: var(--el-color-warning-light-9); color: var(--el-color-warning); }
   margin-left: auto; padding: 0 6px; border-radius: 4px; font-size: 11px;
   background: var(--el-color-warning-light-8); color: var(--el-color-warning-dark-2);
 }

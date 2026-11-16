@@ -188,6 +188,15 @@ const routes = [
         props: { side: 'ret' },
         meta: { title: '其他退料单', code: 'mobileOtherRetDoc', panelCode: 'MATERIAL_RET' },
       },
+      // 手机扫码 · 生产退料(2026-11-18 从「生产领料」独立出来)。
+      //   用户口径:「我还想生产退料独立出来,就是已经领料且审核的领料单据,来扫码退料。
+      //     其实就是独立出来一个面版,让生产领料不用负责那么多功能,操作也方便。」
+      //   ⇒ 页面 = views/mobile/MobileReturnList.vue(查可退单据 → 扫物料 → 填数量 → 提交)。
+      //   静态路径,必须排在下面 `panelx/list/:panelCode` 之前。
+      {
+        path: 'panelx/list/MOBILE_RETURN', component: () => import('@/views/mobile/MobileReturnList.vue'),
+        meta: { title: '生产退料', code: 'mobileReturn', panelCode: 'MOBILE_RETURN' },
+      },
       // 手机扫码 · 扫码混料(2026-11-18,新增;接替已下架的「工单扫码领料」)。
       // 扫工单码 → 带出一级BOM(物料清单)→ 逐项扫物料码 → 取电子秤数 → 逐笔保存 → 整单保存 →
       // 自动打印混料单 → 重扫工单可补打印。页面级虚拟面板 MIX_SCAN(定义见后端 PagePanelRegistry)。

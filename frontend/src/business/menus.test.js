@@ -299,15 +299,16 @@ test('手机扫码:二级 = 生产扫码登记(原 4 项)+ 实验室记录手机
 
   // ③ 生产扫码登记 = 原来那 4 项,面板码/标题/地址/顺序一律不变
   //   (2026-11-16:在「生产领料」后插入「其他领料 / 其他退料」两页,原有 4 项的相对顺序不变)
+  //   (2026-11-18:再插入「生产退料」—— 退料从生产领料里独立成面板,紧跟生产领料之后)
   const prod = scan.children.find((c) => c.code === 'prodScanReg')
   assert.deepEqual((prod.children || []).map((c) => c.code),
-    ['mobilePickCreate', 'mobilePick', 'mobileOtherPick', 'mobileOtherRet', 'mobileMixScan', 'mobileReport', 'printStation'])
+    ['mobilePickCreate', 'mobilePick', 'mobileReturn', 'mobileOtherPick', 'mobileOtherRet', 'mobileMixScan', 'mobileReport', 'printStation'])
   assert.deepEqual((prod.children || []).map((c) => c.panelCode),
-    ['MOBILE_PICK_CREATE', 'MOBILE_PICK', 'OTHER_OUT', 'MATERIAL_RET', 'MIX_SCAN', 'MOBILE_REPORT', 'PRINT_STATION'])
+    ['MOBILE_PICK_CREATE', 'MOBILE_PICK', 'MOBILE_RETURN', 'OTHER_OUT', 'MATERIAL_RET', 'MIX_SCAN', 'MOBILE_REPORT', 'PRINT_STATION'])
   assert.deepEqual((prod.children || []).map((c) => c.title),
-    ['生成工单领料/退料单', '生产领料', '其他领料', '其他退料', '扫码混料', '工序报工', '自动打印'])
+    ['生成工单领料/退料单', '生产领料', '生产退料', '其他领料', '其他退料', '扫码混料', '工序报工', '自动打印'])
   assert.deepEqual((prod.children || []).map((c) => c.path), [
-    '/panelx/list/MOBILE_PICK_CREATE', '/panelx/list/MOBILE_PICK',
+    '/panelx/list/MOBILE_PICK_CREATE', '/panelx/list/MOBILE_PICK', '/panelx/list/MOBILE_RETURN',
     '/panelx/list/MOBILE_OTHER_PICK', '/panelx/list/MOBILE_OTHER_RET',
     '/panelx/list/MOBILE_MIX_SCAN',
     '/panelx/list/MOBILE_REPORT', '/sys/printStation',
@@ -317,8 +318,12 @@ test('手机扫码:二级 = 生产扫码登记(原 4 项)+ 实验室记录手机
   const OTHERRET = prod.children.find((c) => c.code === 'mobileOtherRet')
   assert.equal(OTHER.panelCode, 'OTHER_OUT', '其他领料必须落其他出库单(领料是出库)')
   assert.equal(OTHERRET.panelCode, 'MATERIAL_RET', '其他退料落生产退料单')
-  assert.equal(prod.children.indexOf(OTHER), prod.children.indexOf(
-    prod.children.find((c) => c.code === 'mobilePick')) + 1, '其他领料/退料紧跟生产领料')
+  // 2026-11-18:生产退料紧跟生产领料(退料从领料里独立成面板),其他领料/退料再跟在后面
+  const RETURN = prod.children.find((c) => c.code === 'mobileReturn')
+  assert.equal(RETURN.panelCode, 'MOBILE_RETURN', '生产退料是独立的面板码')
+  assert.equal(prod.children.indexOf(RETURN), prod.children.indexOf(
+    prod.children.find((c) => c.code === 'mobilePick')) + 1, '生产退料紧跟生产领料')
+  assert.equal(prod.children.indexOf(OTHER), prod.children.indexOf(RETURN) + 1, '其他领料紧跟生产退料')
   assert.equal(prod.children.indexOf(OTHERRET), prod.children.indexOf(OTHER) + 1, '其他退料紧跟其他领料')
 
   // ④ 实验室记录手机登记 = 研发那三张记录表(面板码复用 ⇒ 数据回填到同一面板)

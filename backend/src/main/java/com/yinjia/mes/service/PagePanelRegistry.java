@@ -184,6 +184,20 @@ public final class PagePanelRegistry {
     public static final String MIX_SCAN = "MIX_SCAN";
 
     /**
+     * 手机扫码 · **生产退料**(2026-11-18 从「生产领料」独立出来的页面)。
+     *
+     * <p>用户口径:「我还想生产退料独立出来,就是已经领料且审核的领料单据,来扫码退料。
+     * 其实就是独立出来一个面版,让生产领料不用负责那么多功能,操作也方便。」
+     *
+     * <p>页面 = {@code views/mobile/MobileReturnList.vue},数据来自
+     * {@code GET /px/mobilePick/returnables}(已完成 + 材料出库单已审核的领料单);
+     * 退料动作仍复用 {@code /returnScan} 与 {@code /submitReturn}(生成生产退料单 MATERIAL_RET)。
+     * 不是 yj_panel 单据面板 ⇒ 页面级虚拟面板,授权落 {@code yj_role_panel}
+     * (migrate-pick-two-docs-20261116.sql 已给全部角色授 view,query,pick)。
+     */
+    public static final String MOBILE_RETURN = "MOBILE_RETURN";
+
+    /**
      * 手机扫码 · 自动打印(2026-10-30)。
      *
      * <p>用户口径:「(打印)要单独配一个自动打印的面版(这个面版是电脑上的)。只要这个面版配置参数
@@ -359,6 +373,19 @@ public final class PagePanelRegistry {
     };
 
     /**
+     * 生产退料(2026-11-18 独立面板):看可退单据 + 扫码退料。
+     *
+     * <p>动作按页面真实能力裁剪:只有「可见 / 查询 / 扫码退料」——
+     * 退料单是退料动作**按需生成**的(形态上更像 create),但现场只认"扫码退料"这一个动作,
+     * 多给几个格子只会让授权时不知道该勾哪个。
+     */
+    private static final String[][] MOBILE_RETURN_ACTIONS = {
+            {"view",  "可见"},
+            {"query", "查询"},
+            {"pick",  "扫码退料"},
+    };
+
+    /**
      * 手机扫码 · 生产领料(2026-10-30 重写):扫工单生单 → 逐项扫码核销 → 提交转材料出库单。
      *
      * <p>动作按页面真实能力给:
@@ -489,6 +516,8 @@ public final class PagePanelRegistry {
             // 2026-10-30 第二轮:「生成工单领料/退料单」是**独立面板**(开单工作台),排在领料之前
             new PagePanelDef(MOBILE_PICK_CREATE, "生成工单领料/退料单", "手机扫码", MOBILE_PICK_CREATE_ACTIONS),
             new PagePanelDef(MOBILE_PICK, "生产领料", "手机扫码", MOBILE_PICK_ACTIONS),
+            // 2026-11-18:生产退料从「生产领料」独立出来(只做"已完成 + 已审核"单的扫码退料)
+            new PagePanelDef(MOBILE_RETURN, "生产退料", "手机扫码", MOBILE_RETURN_ACTIONS),
             // 2026-11-18:扫码混料(替代已下架的 WMS管理·条码管理 三张扫码页)
             new PagePanelDef(MIX_SCAN, "扫码混料", "手机扫码", MIX_SCAN_ACTIONS),
             new PagePanelDef(MOBILE_REPORT, "工序报工", "手机扫码", PROD_REPORT_ACTIONS),

@@ -78,9 +78,9 @@
       </div>
     </section>
 
-    <!-- 扫码区:未完成=扫料领料;已完成=扫料退料(生成生产退料单)
-         ⚠ 只读模式下(从开单工作台点进来)整块**不渲染**:那里只看明细,不做任何操作 -->
-    <section v-if="!readOnly" class="mp-card">
+    <!-- 扫码区:**只在未完成时**出现(扫料领料)。已完成 = 已过账,本页不再进退料模式
+         (2026-11-18 退料独立到「生产退料」面板;底部给跳转)。只读模式下整块不渲染。 -->
+    <section v-if="!readOnly && !isDone" class="mp-card">
       <div class="mp-sec">
         <!-- 已完成 = 退料(生成生产退料单);未完成 = 领料。标题跟着状态走,不让人误会 -->
         <span>{{ isDone ? (outAudited ? tt('扫物料码 · 退料') : tt('扫物料码')) : tt('扫物料码 · 领料') }}</span>
@@ -271,13 +271,12 @@
         >
           {{ tt('提交转材料出库单') }}
         </el-button>
-        <!-- 已完成单:分两种状态(2026-11-01)
-             提交只生成**待审批**的材料出库单,库存要等仓管审批才扣;
-             未审批时不能退料(退了等于凭空把料退进仓库),所以这里不给按钮,只提示等审批。 -->
+        <!-- 已完成单:材料出库单还没审批 ⇒ 还没扣库存,不能退(退了等于凭空把料退进仓库)。
+             已审批 ⇒ 退料统一到「生产退料」面板做(2026-11-18 独立成面板,本页不再承担退料)。 -->
         <el-button v-else-if="!outAudited" type="info" size="large" disabled>
           {{ tt('待仓管审批材料出库单') }}
         </el-button>
-        <el-button v-else type="primary" size="large" @click="startReturn">{{ tt('开始退料') }}</el-button>
+        <el-button v-else type="primary" size="large" @click="goReturn">{{ tt('去生产退料') }}</el-button>
       </template>
     </div>
   </div>
@@ -297,6 +296,16 @@ import { queueToPrintStation, PRINT_TYPE_PICK_SLIP } from '@/business/printStati
 
 const route = useRoute()
 const router = useRouter()
+
+/**
+ * 去「生产退料」面板(2026-11-18 退料独立成页)。
+ *
+ * <p>用户口径:「生产退料独立出来,就是已经领料且审核的领料单据,来扫码退料……
+ * 让生产领料不用负责那么多功能」。本页只保留一个跳转,不再自己处理退料。
+ */
+function goReturn() {
+  router.push({ path: '/panelx/list/MOBILE_RETURN', query: { no: String(doc.value?.领料单号 || '').trim() } })
+}
 
 /**
  * 单据主键 —— ⚠ 必须是**响应式**的(2026-10-30 修)。
@@ -538,16 +547,12 @@ async function loadDoc() {
     //   原来要先点一下「开始退料」才切模式,而完成态下扫码框默认走的是**领料**分支 ——
     //   用户直接扫就会调错接口(scanMaterial side='pick'),像是"还能领料"。
     //   领料只应发生在**未完成**的单上;已完成 = 已过账,之后只能退(生成生产退料单)。
-    // 🔴 2026-11-01:只有「已完成 **且** 材料出库单已被仓管审批」才自动进退料模式。
-    //   提交只生成待审批的出库单,库存还没扣;这时进退料等于凭空退料进仓。
-    const done = String(d.状态 || '') === '已完成'
-    if (done && d.出库已审批 === true) {
-      returnMode.value = true
-      returnQty.value = {}
-    } else {
-      returnMode.value = false
-      returnQty.value = {}
-    }
+    // 🔴 2026-11-18:退料**不再由本页承担** —— 生产领料只管领料。
+    //   用户口径:「生产退料独立出来……让生产领料不用负责那么多功能,操作也方便。」
+    //   ⇒ 本页永远不进退料模式;已完成的单在底部给一个「去生产退料」的跳转。
+    //   (退料相关函数保留在文件里但已无入口,属于待清理的技术债,见代码规范 §E。)
+    returnMode.value = false
+    returnQty.value = {}
   } catch (e) {
     errText.value = errMsgOf(e) || tt('加载单据失败')
   }
