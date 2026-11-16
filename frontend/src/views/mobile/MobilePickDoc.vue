@@ -841,7 +841,9 @@ async function reprint() {  printing.value = true
     const payload = (res.data?.data || res.data || {}).打印 || {}
     // 类型 = 生产领料单(2026-11-04):服务端按类型派单,只有勾了这个类型的电脑才会出纸
     const queued = await queueToPrintStation({ ...payload, 类型: PRINT_TYPE_PICK_SLIP, 来源: 'mobilePick.doc' })
-    if (queued && queued.online) { okText.value = tt('已发送到打印电脑'); return }
+    // 2026-11-16 打印缓存:服务端**收了**就算成功(代理掉线时单子进缓存,回来补打),
+    //   所以判 queued 而不是 online —— 否则掉线时手机上再打一遍,现场就是两张纸。
+    if (queued && queued.queued) { okText.value = queued.message || tt('已发送到打印电脑'); return }
     // 没有电脑订阅/开关关着 ⇒ 退回本机打印层(现场至少打得出来)
     if (queued && queued.message) errText.value = queued.message
     await printWoQr(payload)

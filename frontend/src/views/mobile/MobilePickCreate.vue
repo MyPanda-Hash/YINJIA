@@ -599,7 +599,9 @@ async function autoPrintAll() {
     if (!r.打印) continue
     try {
       const queued = await queueToPrintStation({ ...r.打印, 类型: PRINT_TYPE_PICK_SLIP, 来源: 'mobilePick.create' })
-      if (!(queued && queued.online)) await printWoQr(r.打印)
+      // 2026-11-16 打印缓存:服务端收了就算成功(代理掉线 ⇒ 进缓存、回来补打),
+      //   不能再按 online 判 —— 否则掉线时手机又打一遍,同一张单出两张纸。
+      if (!(queued && queued.queued)) await printWoQr(r.打印)
     } catch {
       // 打印失败只在控制台账:生单本身已成功
       console.warn('工单二维码自动打印失败(单据已生成,可在单据里重打)')

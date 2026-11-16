@@ -90,8 +90,12 @@ export async function printSlip({ kind, docNo, source, opts } = {}) {
   const type = typeOfKind(kind)
   const queued = await queueToPrintStation({ ...payload, 类型: type, 来源: source || 'mobileOther' })
 
-  if (queued && queued.online) {
-    return { ok: true, mode: 'station', docNo: no, message: queued.message || '已发送到打印电脑' }
+  // 🔴 2026-11-16「打印缓存(离线补打)」:判"已经交给服务器的打印队列"要看 **queued**,
+  //   不能只看 online —— 代理掉线时服务端照样收单(进打印缓存,那台电脑回来就补打),
+  //   这时 online=false;若按 online 判,手机会紧接着自己再打一遍 ⇒ 现场变成**打两张**。
+  //   用户口径:「代理掉了后重新连上把期间打印的补回来」,所以掉线时手机不再兜底打印。
+  if (queued && queued.queued) {
+    return { ok: true, mode: 'station', docNo: no, message: queued.message || '已交给打印队列' }
   }
   // 没有电脑订阅 / 开关关着 ⇒ 退回本机打印层(任务说清楚原因,别让人猜)
   const fell = await printSlipLocal(payload, opts || {})
