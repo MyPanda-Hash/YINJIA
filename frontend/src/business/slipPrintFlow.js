@@ -27,10 +27,14 @@ export async function fetchSlipData({ kind, docNo } = {}) {
   if (!isSlipKind(kind)) throw new Error('未知的报表类型:' + kind)
   const no = String(docNo || '').trim()
   if (!no) throw new Error('请提供单据编号')
-  const res = await request.post('/px/slip/rows', {
-    面板: panelOfKind(kind),
-    单据编号: no,
-  })
+  // 2026-11-18:混料单不是 yj_panel 单据面板(落的是混料记录报表),取数走自己的窄接口;
+  // 其余三类仍走 /px/slip/rows(通用「单号 → 头 + 行」取数)
+  const res = kind === 'MIX'
+    ? await request.get('/px/mix/doc', { params: { docNo: no } })
+    : await request.post('/px/slip/rows', {
+      面板: panelOfKind(kind),
+      单据编号: no,
+    })
   return res.data?.data || res.data || {}
 }
 

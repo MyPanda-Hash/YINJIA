@@ -83,8 +83,14 @@ public final class PagePanelRegistry {
     public static final String DC_MONITOR = "DC_MONITOR";
     /** 数采平台·状态统计(2026-10-20) */
     public static final String DC_STATS = "DC_STATS";
-    /** 库存管理(现 WMS管理)·条码管理 → 扫码领料(2026-10-20) */
-    public static final String BARCODE_SCAN_PICK = "BARCODE_SCAN_PICK";
+    /**
+     * ⚠ 2026-11-18:**已下架**。原「WMS管理 · 条码管理 → 扫码领料」页面级面板码。
+     *
+     * <p>用户口径:「把 wms 管理-条码管理里面的扫码领料和扫码领料记录和工单扫码领料删除」——
+     * 页面、路由、菜单与后端取数端点一并撤除,本码连同
+     * {@code WORK_ORDER_PICK} 的授权行由 {@code tools/migrate-mix-scan-20261118.sql} 清掉。
+     * 常量不保留、{@link #ALL} 不再登记:留着只会让权限矩阵里出现一张点开 404 的空面板。
+     */
     /**
      * 生产计划 → 生产领料(2026-10-20,用户口径「把他写成面版,这样我也可以选择在电脑端操作,
      * 名字叫生产领料在生产计划里面」)。
@@ -156,6 +162,28 @@ public final class PagePanelRegistry {
     public static final String MOBILE_REPORT = "MOBILE_REPORT";
 
     /**
+     * 手机扫码 · **扫码混料**(2026-11-18,新增;接替已下架的「工单扫码领料」)。
+     *
+     * <p>用户口径(原话):「在手机扫码里面加一个扫码混料的面版。逻辑:扫工单码,带出一级BOM
+     * (就是物料清单,之前生产领料的是组装物料清单),逐项扫物料码,自动获取电子秤的数量
+     * (我们系统已经有了(之前的工单扫码领料读的就是这个的数据)),提交保存一笔,全部扫完,
+     * 整单保存。保存后自动打印,并且保留单据,重新扫码后进入可以补打印。」
+     *
+     * <p>数据侧:
+     * <ul>
+     *   <li>工单行 = {@code plang};</li>
+     *   <li>用料 = **《物料清单》**({@code WLBOM} / 底表 {@code mate})—— 与生产领料读的
+     *       《组装物料清单》({@code bs_asm_bom})**刻意不是同一份**;</li>
+     *   <li>落库 = {@code wo_mixing_list}(「生产过程 → 混料记录」的底表,含 计划用量/实际用量/
+     *       标记 N 保存前 Y 保存后/打印次数);</li>
+     *   <li>秤值 = 数采平台 {@code /api/dc/monitor}。</li>
+     * </ul>
+     *
+     * <p>动作:view/query(看工单与清单)、save(逐笔保存 + 整单保存)、print(保存后自动打印 + 补打印)。
+     */
+    public static final String MIX_SCAN = "MIX_SCAN";
+
+    /**
      * 手机扫码 · 自动打印(2026-10-30)。
      *
      * <p>用户口径:「(打印)要单独配一个自动打印的面版(这个面版是电脑上的)。只要这个面版配置参数
@@ -190,12 +218,13 @@ public final class PagePanelRegistry {
      */
     public static final String SUPPLIER_ACCOUNT = "SUPPLIER_ACCOUNT";
     /**
-     * WMS管理·条码管理 → 工单扫码领料(2026-10-21,手机端)。
-     * 扫工单码 → 按 BOM 列出该领的料 → 逐项扫物料码 → 自动抓台车电子秤数量 → 整单提交生成材料出库单。
-     * 数据侧走既有面板(PLANG 查工单 / WLBOM 查 BOM / MATERIAL_OUT 生单),
-     * 页面本身是 Vue ⇒ 按页面级虚拟面板登记,授权落 yj_role_panel。
+     * ⚠ 2026-11-18:**已下架**,由 {@link #MIX_SCAN}(扫码混料)接替。
+     *
+     * <p>原「WMS管理 · 条码管理 → 工单扫码领料」(2026-10-21):扫工单码 → 按《物料清单》列出该领的料
+     * → 逐项扫物料码 → 抓台车电子秤 → 整单生成材料出库单。用户 2026-11-18 口径把它与
+     * 扫码领料/扫码领料记录一起删除,改在「手机扫码」下做**扫码混料**(落混料记录而非材料出库单,
+     * 并交付自动打印/补打印)。授权行由 {@code tools/migrate-mix-scan-20261118.sql} 清理。
      */
-    public static final String WORK_ORDER_PICK = "WORK_ORDER_PICK";
     /**
      * 研发管理·项目管理 → 项目流程管控(2026-10-20 用户口径):
      * 按立项申请单号查这条项目在「立项申请 → 定级分发 → 责任人确认 → 实施计划 → 审批归档 → 进度查询」
@@ -307,14 +336,26 @@ public final class PagePanelRegistry {
     };
 
     /**
-     * 扫码领料(2026-10-20):扫标签码 `存货编码|批号` → 组材料出库单草稿。
-     * 数据侧走通用面板引擎(STOCK_PICK 选货 + MATERIAL_OUT 生单),服务端闸门本来就在 MATERIAL_OUT 上;
-     * 这里登记的只是**页面本身**的可见/查询权,让它在「角色与面板权限」里能勾。
+     * ⚠ 2026-11-18 已随页面一起删除(见 {@link #BARCODE_SCAN_PICK} 的说明)。
+     * 原动作集:view / query / pick(生成领料单)。
      */
-    private static final String[][] BARCODE_SCAN_PICK_ACTIONS = {
+
+    /**
+     * 手机扫码 · 扫码混料(2026-11-18):扫工单 → 物料清单 → 逐项扫码取秤 → 逐笔保存 → 整单保存 → 打印。
+     *
+     * <p>动作按页面真实能力裁剪:
+     * <ul>
+     *   <li>{@code view}  —— 能看到这个菜单;</li>
+     *   <li>{@code query} —— 查工单/物料清单/已保存的混料单(读);</li>
+     *   <li>{@code save}  —— 逐笔落库与整单保存(**唯一写词**;它会真的往混料记录里写行);</li>
+     *   <li>{@code print} —— 保存后自动打印与补打印(同时累加 asp_print)。</li>
+     * </ul>
+     */
+    private static final String[][] MIX_SCAN_ACTIONS = {
             {"view",  "可见"},
             {"query", "查询"},
-            {"pick",  "生成领料单"},
+            {"save",  "扫码保存"},
+            {"print", "打印"},
     };
 
     /**
@@ -375,22 +416,9 @@ public final class PagePanelRegistry {
             {"config", "配置打印机"},
     };
     /**
-     * 工单扫码领料(2026-10-21,手机端):扫工单码 → 按 BOM 列出该领的料 → 逐项扫物料码
-     * → 自动抓台车电子秤数量 → 整单提交生成材料出库单。
-     *
-     * <p>数据侧全部走既有面板引擎:工单查 {@code PLANG}、BOM 查 {@code WLBOM}(mate)、
-     * 生单走 {@code MATERIAL_OUT};秤值取数采平台 {@code /api/dc/monitor}。
-     * 这里登记的只是**页面本身**的可见/查询/生单权,让它在「角色与面板权限」里能勾 ——
-     * 与 {@link #BARCODE_SCAN_PICK} 同一套做法。
-     *
-     * <p>与「扫码领料」的区别:那张按**物料**找库存(扫到哪领到哪),这张按**工单**找用料
-     * (先知道该领哪些、再逐项核销),作业口径不同故并列两个入口。
+     * ⚠ 2026-11-18 已随页面一起删除(见 {@link #WORK_ORDER_PICK} 的说明)。
+     * 原动作集:view / query / pick(生成领料单);其中 BOM 取数改由扫码混料({@link #MIX_SCAN})承接。
      */
-    private static final String[][] WORK_ORDER_PICK_ACTIONS = {
-            {"view",  "可见"},
-            {"query", "查询"},
-            {"pick",  "生成领料单"},
-    };
 
     /**
      * 工序报工(2026-10-21):扫工单 → 选工序(成型/切炭/组装)→ 填数量 → 提交。
@@ -461,6 +489,8 @@ public final class PagePanelRegistry {
             // 2026-10-30 第二轮:「生成工单领料/退料单」是**独立面板**(开单工作台),排在领料之前
             new PagePanelDef(MOBILE_PICK_CREATE, "生成工单领料/退料单", "手机扫码", MOBILE_PICK_CREATE_ACTIONS),
             new PagePanelDef(MOBILE_PICK, "生产领料", "手机扫码", MOBILE_PICK_ACTIONS),
+            // 2026-11-18:扫码混料(替代已下架的 WMS管理·条码管理 三张扫码页)
+            new PagePanelDef(MIX_SCAN, "扫码混料", "手机扫码", MIX_SCAN_ACTIONS),
             new PagePanelDef(MOBILE_REPORT, "工序报工", "手机扫码", PROD_REPORT_ACTIONS),
             new PagePanelDef(PRINT_STATION, "自动打印", "手机扫码", PRINT_STATION_ACTIONS),
             // 2026-10-29:工序流程追踪卡(批次 → 小批次 → 工序照片 → 追溯)。
@@ -472,9 +502,9 @@ public final class PagePanelRegistry {
             new PagePanelDef(DC_MONITOR, "数据监控", "数采平台", DC_MONITOR_ACTIONS),
             new PagePanelDef(DC_STATS, "状态统计", "数采平台", DC_STATS_ACTIONS),
             // ⚠ 模块名以远端改版为准(2026-10-20 导航改版:「WMS管理系统」→「WMS管理」)
-            new PagePanelDef(BARCODE_SCAN_PICK, "扫码领料", "WMS管理", BARCODE_SCAN_PICK_ACTIONS),
-            // 2026-10-21:工单扫码领料(手机端,按工单+BOM 作业)
-            new PagePanelDef(WORK_ORDER_PICK, "工单扫码领料", "WMS管理", WORK_ORDER_PICK_ACTIONS),
+            // 2026-11-18:原「扫码领料」(BARCODE_SCAN_PICK)与「工单扫码领料」(WORK_ORDER_PICK)
+            //   两个页面级码随页面下架一并撤出本表(用户口径:条码管理里这两个入口删除),
+            //   其权限行由 tools/migrate-mix-scan-20261118.sql 清理;改由「手机扫码 → 扫码混料」承接。
             // 2026-10-20:研发管理·项目管理 → 项目流程管控(归「研发管理」组,与菜单一级目录一致)
             new PagePanelDef(PROJECT_FLOW, "项目流程管控", "研发管理", PROJECT_FLOW_ACTIONS),
             // 2026-10-24 用户口径:「采购管理里面多增加俩个面版,一个是供应商采购打印面版,一个是供应商权限配置」

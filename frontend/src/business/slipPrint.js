@@ -29,6 +29,17 @@ export const SLIP_KINDS = {
   OTHER_PICK: { panel: 'OTHER_OUT', type: 'OTHER_PICK_SLIP', title: '其他领料单' },
   OTHER_RET: { panel: 'MATERIAL_RET', type: 'OTHER_RET_SLIP', title: '其他退料单' },
   MAT_RET: { panel: 'MATERIAL_RET', type: 'MAT_RET_SLIP', title: '生产退料单' },
+  /**
+   * 2026-11-18 新增:手机扫码 →「扫码混料」的**混料单**。
+   *
+   * <p>它**不是** yj_panel 单据面板(落的是混料记录 wo_mixing_list,报表型 flat 表),
+   * 所以取数走自己的窄接口 {@code GET /px/mix/doc?docNo=}(见 slipPrintFlow.fetchSlipData),
+   * 面板码只是用来把权限词对齐到页面级虚拟面板 MIX_SCAN。
+   *
+   * <p>版式仍是「领料单」那套纸表(210×148 中一刀横打),只是文案换成混料的
+   * (表头/部门标签/签名由 {@code mixScan.MIX_PAPER} 提供,随任务下发)。
+   */
+  MIX: { panel: 'MIX_SCAN', type: 'MIX_SLIP', title: '混料单' },
 }
 
 /** 该 kind 是否存在 */
@@ -67,7 +78,7 @@ export function buildSlipPayload({ kind, docNo, data, today } = {}) {
   const d = data || {}
   const no = String(docNo || d['单据编号'] || '').trim()
   const k = String(kind || '').trim()
-  return {
+  const payload = {
     标题: titleOfKind(k),
     领料单号: no,
     // 纸面「领料部门」:其他出库看「部门」、生产退料看「领用人」,后端已归一到 部门 字段
@@ -76,4 +87,9 @@ export function buildSlipPayload({ kind, docNo, data, today } = {}) {
     打印日期: String(d['单据日期'] || today || '').trim(),
     明细: Array.isArray(d['明细']) ? d['明细'] : [],
   }
+  // 2026-11-18:后端/调用方若给了纸面可变文案(混料单),原样带上 —— 代理与浏览器打印层都认这三项
+  if (Array.isArray(d['表头']) && d['表头'].length) payload.表头 = d['表头']
+  if (d['部门标签']) payload.部门标签 = String(d['部门标签'])
+  if (Array.isArray(d['签名']) && d['签名'].length) payload.签名 = d['签名']
+  return payload
 }

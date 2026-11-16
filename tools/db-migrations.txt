@@ -4854,3 +4854,7 @@ migrate-return-fields-layout-20261113.sql
 #   数据源 = 生产退料单(bd_material_ret/bl_material_ret),只列真实生成过的退料单(不是每张领料单都有退料单)
 #   带「工单号」列(手机扫码追溯键) · 只读报表(flat) · WMS管理/库存核算 · 授权按「生产退料单明细表」等价补授 · 两账套已执行
 migrate-prod-ret-list-20261116.sql
+# 2026-11-18 手机扫码·扫码混料(新面板 MIX_SCAN):按 MOBILE_PICK 角色整份授权 + 老 WORK_ORDER_PICK 持有者补授;
+#   下架 BARCODE_SCAN_PICK / WORK_ORDER_PICK 两个页面级码的授权行;删空表 wo_pick_scan_log(非空则跳过并提示);
+#   补「扫码混料」面板 en/ja 译名;末尾 4 条守卫(授权在、旧码零、权限词对、译名在)。两账套已执行
+migrate-mix-scan-20261118.sql

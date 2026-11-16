@@ -549,3 +549,35 @@ test('printWoQr:带明细的载荷走同一套版式(打印层收到的是新 HT
   assert.ok(captured.html.includes('width:24mm'), '新二维码尺寸')
   assert.equal((captured.html.match(/GD-T-1#1/g) || []).length, 3, '空行不印单号')
 })
+
+// ══════════════════════════════════════════════════════════════════
+// 2026-11-18 混料单纸面:同一套版式,只换文案(列头/部门标签/签名)
+// 与打印代理 print-agent.ps1 的 $heads / $deptText / $signTexts 一一对应
+// ══════════════════════════════════════════════════════════════════
+const mixPayload = () => ({
+  标题: '混料单', 领料单号: 'PL-1', 领料部门: 'Admin', 打印日期: '2026-11-18',
+  表头: ['工单号', '物料名称', '规格', '单位', '计划用量', '实际用量', '备注'],
+  部门标签: '生产线',
+  签名: ['配料人:', '复核人:', '工艺员:', '班长:'],
+  明细: [{ 材料名称: '雅可比CS', 规格: '', 单位: 'kg', 请领数量: 86.172, 实发数量: 86.172, 备注: '' }],
+})
+
+test('pickSlipHtml:混料单换列头/部门标签/四条签名(缺省仍是领料单那套)', () => {
+  const html = pickSlipHtml(mixPayload(), '')
+  assert.ok(html.includes('<th>工单号</th>') && html.includes('<th>计划用量</th>')
+    && html.includes('<th>实际用量</th>'), '七列列头换成混料的')
+  assert.ok(!html.includes('<th>请领数量</th>'), '不再出现领料单的列头')
+  assert.ok(html.includes('生产线:') && !html.includes('领料部门:'), '抬头那一栏叫「生产线」')
+  for (const s of ['配料人:', '复核人:', '工艺员:', '班长:']) assert.ok(html.includes(s), '签名里有 ' + s)
+  assert.ok(!html.includes('仓管员:'), '不再出现领料单的签名')
+  assert.ok(html.includes('86.172'), '实际用量照印')
+  // 版式没变:仍是中一刀横打
+  assert.ok(html.includes('@page{size:210mm 148.5mm'), '同一套纸张')
+})
+
+test('pickSlipHtml:类别符号未给时回落领料单默认(老调用方零影响)', () => {
+  const html = pickSlipHtml(slipPayload(1), '')
+  assert.ok(html.includes('<th>订单号</th>') && html.includes('<th>请领数量</th>'), '默认列头不变')
+  assert.ok(html.includes('领料部门:'), '默认部门标签不变')
+  assert.ok(html.includes('部门主管:') && html.includes('仓管员:'), '默认签名不变')
+})

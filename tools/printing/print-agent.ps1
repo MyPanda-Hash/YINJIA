@@ -238,6 +238,14 @@ function Send-LabelToPrinter {
         [string]$Dept = '',
         [string]$PrintDate = '',
         [array]$Rows = @(),
+        # 纸面可变文案(2026-11-18,扫码混料的「混料单」引入):
+        #   表头 7 列 = 订单号/材料名称/规格/单位/请领数量/实发数量/备注 的替代文案;
+        #   部门标签  = 抬头里「领料部门:」那三个字(混料单写「生产线:」/「配料:」);
+        #   签名 4 条 = 底部「部门主管/仓库主管/领料人/仓管员」的替代文案。
+        # 空 ⇒ 一律回落到领料单默认值,老任务/老客户端行为一个字节不变。
+        [array]$Heads = @(),
+        [string]$DeptLabel = '',
+        [array]$Signs = @(),
         # 纸张(2026-11-05,按每台电脑在「自动打印」页配置):A5=中一刀 210×148.5 横(默认) / A4=297×210 横。
         # ⚠ 只换纸不缩放:绘制坐标永远是 210×148mm,内容大小与版面一个像素都不变。
         [string]$Paper = 'A5'
@@ -330,6 +338,10 @@ function Send-LabelToPrinter {
     $script:pDept  = $Dept
     $script:pDate  = $PrintDate
     $script:pRows  = @($Rows)
+    # 纸面可变文案(2026-11-18):空就回落到领料单默认(见下面绘制处 $heads/$deptText/$signTexts)
+    $script:pHeads      = @($Heads)
+    $script:pDeptLabel  = $DeptLabel
+    $script:pSigns      = @($Signs)
 
     # 🔴 2026-11-05 分页:用户问「打印行数会有限制吗?如果大于 9 行,还能打印吗」。
     #   改前是 `if ($rowCount -gt 12) { $rowCount = 12 }` —— 一页最多 12 行,**第 13 行起
@@ -400,7 +412,10 @@ function Send-LabelToPrinter {
         $g.DrawString($noText, $fontNo, $black, 590, 40)
 
         # ③ 领料部门 / 日期(随二维码缩小上移,让表格多吃两行)
-        $g.DrawString('领料部门:', $fontFoot, $gray, 26, 134)
+        # 🔴 2026-11-18:标签与值都由任务给(混料单写「生产线:」),缺省仍是「领料部门:」
+        $deptText = '领料部门:'
+        if ($script:pDeptLabel) { $deptText = [string]$script:pDeptLabel + ':' }
+        $g.DrawString($deptText, $fontFoot, $gray, 26, 134)
         $g.DrawString($script:pDept, $fontCell, $black, 112, 134)
         $g.DrawString('日期:', $fontFoot, $gray, 590, 134)
         $g.DrawString($script:pDate, $fontCell, $black, 638, 134)
@@ -437,7 +452,13 @@ function Send-LabelToPrinter {
             $g.DrawLine($penLine, $x0, $yy, $x0 + $totalW, $yy)
         }
 
+        # 列头:默认「领料单」那七列;任务带了 `表头`(7 个)就整套换成它(混料单:
+        # 工单号/物料名称/规格/单位/计划用量/实际用量/备注)。个数不足 7 ⇒ 用默认补齐,
+        # 免得少传一个字符串就把整张表的列头错位。
         $heads = @('订单号', '材料名称', '规格', '单位', '请领数量', '实发数量', '备注')
+        if (@($script:pHeads).Count -ge 7) {
+            $heads = @($script:pHeads)[0..6]
+        }
         $cx = $x0
         for ($i = 0; $i -lt $heads.Count; $i++) {
             $rect = New-Object System.Drawing.RectangleF($cx, ($y0 + 9), ($colW[$i]), ($headH - 12))
@@ -490,12 +511,14 @@ function Send-LabelToPrinter {
             }
         }
 
-        # ⑤ 底部四栏签名
+        # ⑤ 底部四栏签名(2026-11-18:任务带了 `签名`(4 条)就整套换;缺省仍是领料单那四条)
         $fy = $y0 + $headH + $rowH * $rowCount + 20
-        $g.DrawString('部门主管:', $fontFoot, $gray, 26, $fy)
-        $g.DrawString('仓库主管:', $fontFoot, $gray, 230, $fy)
-        $g.DrawString('领料人:', $fontFoot, $gray, 440, $fy)
-        $g.DrawString('仓管员:', $fontFoot, $gray, 630, $fy)
+        $signTexts = @('部门主管:', '仓库主管:', '领料人:', '仓管员:')
+        if (@($script:pSigns).Count -ge 4) { $signTexts = @($script:pSigns)[0..3] }
+        $signXs = @(26, 230, 440, 630)
+        for ($si = 0; $si -lt 4; $si++) {
+            $g.DrawString($signTexts[$si], $fontFoot, $gray, $signXs[$si], $fy)
+        }
 
         # ⑥ 还有下一行没画完 ⇒ 让打印框架再调一次本回调(续页,抬头/表格线/签名都重画)
         if (($pageIdx + 1) -lt [int]$script:pTotalPages) { $e.HasMorePages = $true }
@@ -530,6 +553,12 @@ function Invoke-PrintJob {
     if (-not $printDt) { $printDt = (Get-Date -Format 'yyyy-MM-dd') }
     $rows     = @()
     if ($Job.'明细') { $rows = @($Job.'明细') }
+    # 纸面可变文案(2026-11-18):混料单把七列列头/部门标签/四条签名换成自己的;空 = 用领料单默认
+    $heads    = @()
+    if ($Job.'表头') { $heads = @($Job.'表头') }
+    $deptLbl  = [string]($Job.'部门标签')
+    $signs    = @()
+    if ($Job.'签名') { $signs = @($Job.'签名') }
     # 纸张(2026-11-05):由「自动打印」页按**每台电脑**配置,服务端派单时随任务下发(A5/A4)。
     # 缺省 A5(中一刀),与以前完全一致。
     $paper    = [string]($Job.'纸张')
@@ -555,7 +584,8 @@ function Invoke-PrintJob {
         $path = Join-Path $PdfDir $name
         Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
                             -Spec $spec -QrText $qrText -QrImage $qrImage -PdfPath $path `
-                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows -Paper $paper
+                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows -Paper $paper `
+                            -Heads $heads -DeptLabel $deptLbl -Signs $signs
         return $path
     }
 
@@ -571,7 +601,8 @@ function Invoke-PrintJob {
     if ($Mode -eq 'Printer') {
         Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
                             -Spec $spec -QrText $qrText -QrImage $qrImage -PrinterName $printerN `
-                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows -Paper $paper
+                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows -Paper $paper `
+                            -Heads $heads -DeptLabel $deptLbl -Signs $signs
         return @{ ok = $true; mode = 'printer'; printer = $printerN }
     }
 
@@ -588,7 +619,8 @@ function Invoke-PrintJob {
         }
         Send-LabelToPrinter -Title $title -WoNo $woNo -WoLine $woLine -ProductName $product `
                             -Spec $spec -QrText $qrText -QrImage $qrImage -PrinterName $real `
-                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows -Paper $paper
+                            -OutNo $outNo -Dept $dept -PrintDate $printDt -Rows $rows -Paper $paper `
+                            -Heads $heads -DeptLabel $deptLbl -Signs $signs
         return @{ ok = $true; mode = 'printer'; printer = $real }
     } catch {
         $why = $_.Exception.Message

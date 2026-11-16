@@ -301,14 +301,15 @@ test('手机扫码:二级 = 生产扫码登记(原 4 项)+ 实验室记录手机
   //   (2026-11-16:在「生产领料」后插入「其他领料 / 其他退料」两页,原有 4 项的相对顺序不变)
   const prod = scan.children.find((c) => c.code === 'prodScanReg')
   assert.deepEqual((prod.children || []).map((c) => c.code),
-    ['mobilePickCreate', 'mobilePick', 'mobileOtherPick', 'mobileOtherRet', 'mobileReport', 'printStation'])
+    ['mobilePickCreate', 'mobilePick', 'mobileOtherPick', 'mobileOtherRet', 'mobileMixScan', 'mobileReport', 'printStation'])
   assert.deepEqual((prod.children || []).map((c) => c.panelCode),
-    ['MOBILE_PICK_CREATE', 'MOBILE_PICK', 'OTHER_OUT', 'MATERIAL_RET', 'MOBILE_REPORT', 'PRINT_STATION'])
+    ['MOBILE_PICK_CREATE', 'MOBILE_PICK', 'OTHER_OUT', 'MATERIAL_RET', 'MIX_SCAN', 'MOBILE_REPORT', 'PRINT_STATION'])
   assert.deepEqual((prod.children || []).map((c) => c.title),
-    ['生成工单领料/退料单', '生产领料', '其他领料', '其他退料', '工序报工', '自动打印'])
+    ['生成工单领料/退料单', '生产领料', '其他领料', '其他退料', '扫码混料', '工序报工', '自动打印'])
   assert.deepEqual((prod.children || []).map((c) => c.path), [
     '/panelx/list/MOBILE_PICK_CREATE', '/panelx/list/MOBILE_PICK',
     '/panelx/list/MOBILE_OTHER_PICK', '/panelx/list/MOBILE_OTHER_RET',
+    '/panelx/list/MOBILE_MIX_SCAN',
     '/panelx/list/MOBILE_REPORT', '/sys/printStation',
   ])
   // 2026-11-16:其他领料 = 其他出库单(扣库存);其他退料 = 生产退料单(业务类型仍写「生产退料」)
@@ -503,8 +504,11 @@ test('WMS管理 = 与智能供应链同级的一级目录,含 库存核算/库�
   //   6 个新挂点全唯一 ⇒ 挂点 37+6=43、唯一 36+6=42。
   // 2026-11-16 新增只读报表「生产退料明细表」PROD_RET_LIST(与生产领料明细表成对,数据源 = 生产退料单)
   //   ⇒ 挂点 43+1=44、唯一 42+1=43。
-  assert.equal(invCodes.length, 44, `WMS管理应有 44 个面板码挂点,实际 ${invCodes.length}`)
-  assert.equal(new Set(invCodes).size, 43, 'WMS管理内唯一面板码应为 43(工单扫码领料与扫码领料记录共用 WORK_ORDER_PICK)')
+  // 2026-11-18 用户口径「把 wms 管理-条码管理里面的扫码领料和扫码领料记录和工单扫码领料删除」:
+  //   三个挂点一并撤除(BARCODE_SCAN_PICK 1 + WORK_ORDER_PICK 2)⇒ 挂点 44-3=41、唯一 43-2=41
+  //   (撤掉那对重复挂点后,挂点数与唯一数相等)。
+  assert.equal(invCodes.length, 41, `WMS管理应有 41 个面板码挂点,实际 ${invCodes.length}`)
+  assert.equal(new Set(invCodes).size, 41, 'WMS管理内唯一面板码应为 41(下架三个扫码入口后不再有共用面板码)')
   // 生产领料:入口在「库存核算 > 单据」里,紧跟材料出库单(可点进通用列表页)
   const invAcct = (inv.children || []).find((c) => c.code === 'invAcct')
   // ⚠ 子组 code 以远端改版为准:invAcctDoc(原 doc)
@@ -528,8 +532,11 @@ test('WMS管理 = 与智能供应链同级的一级目录,含 库存核算/库�
   // 销售退货单紧跟销售出库单(一出一进配成对)
   assert.equal(docCodes.indexOf('SALE_IN'), docCodes.indexOf('SALE_OUT') + 1,
     '销售退货单应紧跟销售出库单')
-  assert.ok(invCodes.includes('BARCODE_SCAN_PICK'), '扫码领料应挂页面级面板码)')
-  assert.ok(invCodes.includes('WORK_ORDER_PICK'), '工单扫码领料应挂页面级面板码(2026-10-21)')
+  // 2026-11-18:两个扫码页(BARCODE_SCAN_PICK / WORK_ORDER_PICK)随用户口径下架 ——
+  //   作业能力改由「手机扫码 → 扫码混料」(MIX_SCAN)承接,故这里**断言它们不在了**
+  //   (留着断言"应该在"会让回归闸失去意义:菜单删了测试还绿)。
+  assert.ok(!invCodes.includes('BARCODE_SCAN_PICK'), '扫码领料入口已于 2026-11-18 下架,不该再挂面板码')
+  assert.ok(!invCodes.includes('WORK_ORDER_PICK'), '工单扫码领料入口已于 2026-11-18 下架,不该再挂面板码')
   assert.ok(invCodes.includes('STOCK_DETAIL') && invCodes.includes('STOCK_BALANCE'), '库存明细/报表入口应在WMS管理')
   // 调拨单 / 盘点单:库存核算里唯二「审核即改 kucun」的新单据 —— 单据 + 明细表 + 统计表 入口钉死
   for (const p of ['TRANSFER', 'TRANSFER_DETAIL', 'TRANSFER_STATS',
@@ -736,13 +743,11 @@ test('成型检验单 / 切炭检验单 / 成品检验规范 已下架:菜单树
  *   · 三个 panelCode 必须在导航里且各自独立(不能挤成一张面板);
  *   · 走的必须是通用面板路由 /panelx/list/<code>(后端 flat 面板,前端零页面)。
  */
-test('条码管理组(库存管理下):材料/半成品/成品 三个只读面板 + 扫码领料入口', () => {
+test('条码管理组(库存管理下):只剩材料/半成品/成品 三个只读面板', () => {
   const inv = menuTree.find((n) => n.code === 'inv')
   const bc = (inv.children || []).find((c) => c.code === 'barcode')
   assert.ok(bc, '库存管理下应有「条码管理」分组')
   assert.equal(bc.title, '条码管理')
-  // 2026-10-18 追加第四个叶子「扫码领料」;2026-10-20 起它也挂页面级面板码 BARCODE_SCAN_PICK
-  //   (此前无码 ⇒ 权限矩阵里勾不到、任何人可进)。三个只读报表面板与本页区分开断言。
   const panelLeaves = (bc.children || []).filter((c) => c.panelCode && c.path.startsWith('/panelx/list/'))
   assert.deepEqual(panelLeaves.map((c) => c.panelCode),
     ['BARCODE_MAT', 'BARCODE_WIP', 'BARCODE_FIN'])
@@ -751,17 +756,34 @@ test('条码管理组(库存管理下):材料/半成品/成品 三个只读面�
   for (const leaf of panelLeaves) {
     assert.equal(leaf.path, '/panelx/list/' + leaf.panelCode)
   }
-  const scanPick = (bc.children || []).find((c) => c.code === 'barcodeScanPick')
-  assert.ok(scanPick, '条码管理下应有「扫码领料」入口')
-  assert.equal(scanPick.path, '/scm/scanPick')
-  assert.equal(scanPick.panelCode, 'BARCODE_SCAN_PICK', '扫码领料应挂页面级面板码(2026-10-20)')
-  assert.equal(scanPick.title, '扫码领料')
-  // 工单扫码领料(2026-10-21):与上面「扫码领料」并列,但作业口径不同 —— 这张按工单+BOM,
-  // 那张按物料找库存。两者都必须有各自的页面级面板码,否则权限矩阵里勾不到。
-  const woPick = (bc.children || []).find((c) => c.code === 'workOrderPick')
-  assert.ok(woPick, '条码管理下应有「工单扫码领料」入口')
-  assert.equal(woPick.path, '/scm/workOrderPick')
-  assert.equal(woPick.panelCode, 'WORK_ORDER_PICK')
-  assert.equal(woPick.title, '工单扫码领料')
+  // 2026-11-18 用户口径:「把 wms 管理-条码管理里面的扫码领料和扫码领料记录和工单扫码领料删除」
+  //   ⇒ 本组**只留三个只读条码面板**;三个扫码叶子(code / path / panelCode)一个都不该在。
+  const codes = (bc.children || []).map((c) => c.code)
+  assert.deepEqual(codes, ['barcodeMat', 'barcodeWip', 'barcodeFin'],
+    '条码管理下只应有三个只读条码面板(扫码领料/工单扫码领料/扫码领料记录已于 2026-11-18 删除)')
+  for (const gone of ['BARCODE_SCAN_PICK', 'WORK_ORDER_PICK']) {
+    assert.ok(!(bc.children || []).some((c) => c.panelCode === gone), `${gone} 不该再出现在条码管理里`)
+  }
+})
+
+/**
+ * 2026-11-18:扫码混料(用户口径「在手机扫码里面加一个扫码混料的面版」)。
+ * 钉住:① 在「手机扫码 → 生产扫码登记」组内;② 页面级面板码 MIX_SCAN;
+ * ③ 地址走 /panelx/list/MOBILE_MIX_SCAN(与其它手机扫码页同形态,router 里有静态路由)。
+ */
+test('手机扫码:生产扫码登记里有「扫码混料」入口(MIX_SCAN)', () => {
+  const ms = menuTree.find((n) => n.code === 'mobileScan')
+  assert.ok(ms, '应有「手机扫码」一级目录')
+  const reg = (ms.children || []).find((c) => c.code === 'prodScanReg')
+  assert.ok(reg, '手机扫码下应有「生产扫码登记」分组')
+  const mix = (reg.children || []).find((c) => c.code === 'mobileMixScan')
+  assert.ok(mix, '生产扫码登记下应有「扫码混料」入口')
+  assert.equal(mix.title, '扫码混料')
+  assert.equal(mix.panelCode, 'MIX_SCAN', '扫码混料应挂页面级面板码 MIX_SCAN')
+  assert.equal(mix.path, '/panelx/list/MOBILE_MIX_SCAN')
+  // 顺序:紧跟「其他退料」之后(混料是首道工序,与其他扫码登记同属现场作业页)
+  const codes = (reg.children || []).map((c) => c.code)
+  assert.equal(codes.indexOf('mobileMixScan'), codes.indexOf('mobileOtherRet') + 1,
+    '扫码混料应紧跟其他退料')
 })
 

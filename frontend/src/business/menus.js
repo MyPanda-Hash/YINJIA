@@ -341,19 +341,13 @@ export const menuTree = [
           { code: 'barcodeMat', title: '材料仓条码管理', path: '/panelx/list/BARCODE_MAT', panelCode: 'BARCODE_MAT', icon: 'Tickets' },
           { code: 'barcodeWip', title: '半成品仓条码管理', path: '/panelx/list/BARCODE_WIP', panelCode: 'BARCODE_WIP', icon: 'Box' },
           { code: 'barcodeFin', title: '成品仓条码管理', path: '/panelx/list/BARCODE_FIN', panelCode: 'BARCODE_FIN', icon: 'Finished' },
-          // 扫码领料(2026-10-18 用户口径:「根据这个规则或设定在条码管理里面通过标签进行操作」):
-          // 页面级(无 panelCode),扫标签码 `存货编码|批号` → 按批号查 v_stock_pick 可用量 → 组单。
-          // 存在的理由:材料出库单里选商品看的是(物料,仓库)聚合口径,常显示「没有库存」;
-          // 仓库实际发料关心的是批号级可用量,而标签里正好带着批号。
-          { code: 'barcodeScanPick', title: '扫码领料', path: '/scm/scanPick', panelCode: 'BARCODE_SCAN_PICK', icon: 'FullScreen' },
-          // 工单扫码领料(2026-10-21 用户口径):「扫那个工单码,上面显示出来工单内容,中间显示这个工单要领
-          // 哪些料(按 BOM),一项项扫物料码,自动抓台车电子秤数量,点提交保存一笔;整单领完整单提交」。
-          // 与上面「扫码领料」的区别:那张是**按物料找库存**(扫到哪领到哪),这张是**按工单找用料**
-          // (先知道该领哪些、再逐项核销),作业口径不同故并列两个入口。
-          { code: 'workOrderPick', title: '工单扫码领料', path: '/scm/workOrderPick', panelCode: 'WORK_ORDER_PICK', icon: 'DocumentChecked' },
-          // 扫码领料记录(2026-10-21 用户口径:「要监控 App 使用情况…还要记扫了哪些料、各多少、什么时候」):
-          // 只读查询页,数据源 wo_pick_scan_log。权限沿用 WORK_ORDER_PICK(同一作业的作业与留痕)。
-          { code: 'pickScanLog', title: '扫码领料记录', path: '/scm/pickScanLog', panelCode: 'WORK_ORDER_PICK', icon: 'Tickets' },
+          // ══════════ 2026-11-18:三个扫码入口已删除 ══════════
+          // 用户口径:「把 wms 管理-条码管理里面的扫码领料和扫码领料记录和工单扫码领料删除」。
+          // 一并撤掉的不只是菜单:页面(views/scm/ScanPick|WorkOrderPick|PickScanLog.vue)、
+          // 路由、后端端点(/px/woPick/*)、页面级面板码(BARCODE_SCAN_PICK / WORK_ORDER_PICK)
+          // 与它们的 yj_role_panel 授权行都清了 —— 只删菜单会让权限矩阵里留一张点开 404 的面板。
+          // 作业能力没丢:「工单扫码领料」升级成「手机扫码 → 扫码混料」(落混料记录 + 自动打印/补打印),
+          // 「扫码领料」按批号找库存那套并入「手机扫码 → 其他领料」。见 docs/development/扫码混料-20261118.md。
         ],
       },
     ],
@@ -405,6 +399,14 @@ export const menuTree = [
           //   顺序:紧跟「生产领料」—— 先按工单领(主路径),再是随手领/随手退(补充路径)。
           { code: 'mobileOtherPick', title: '其他领料', path: '/panelx/list/MOBILE_OTHER_PICK', panelCode: 'OTHER_OUT', icon: 'Upload' },
           { code: 'mobileOtherRet', title: '其他退料', path: '/panelx/list/MOBILE_OTHER_RET', panelCode: 'MATERIAL_RET', icon: 'RefreshLeft' },
+          // 扫码混料(2026-11-18 用户口径:「在手机扫码里面加一个扫码混料的面版。逻辑:扫工单码,带出一级BOM
+          //   (就是物料清单,之前生产领料的是组装物料清单),逐项扫物料码,自动获取电子秤的数量……
+          //   提交保存一笔,全部扫完,整单保存。保存后自动打印,并且保留单据,重新扫码后进入可以补打印。」)。
+          //   · 落库 = 混料记录 wo_mixing_list(「生产过程 → 混料记录」的底表,保存后电脑端立刻可查);
+          //   · 与「生产领料」的取料差别是刻意的:领料读《组装物料清单》,混料读《物料清单》;
+          //   · 打印 = 新增「混料单」类型(自动打印页可勾),提交即打、重扫工单可补打。
+          // 位置:紧跟「其他退料」之后 —— 混料是首道工序,与其他扫码登记同属现场作业页。
+          { code: 'mobileMixScan', title: '扫码混料', path: '/panelx/list/MOBILE_MIX_SCAN', panelCode: 'MIX_SCAN', icon: 'ScaleToOriginal' },
           // 工序报工(2026-10-21 原样搬迁,页面逻辑一行不动):扫工单码 → 选工序 → 填完工数量 →
           //   提交即报工并审核;工序进度/当前工序由既有审核钩子推进。
           { code: 'mobileReport', title: '工序报工', path: '/panelx/list/MOBILE_REPORT', panelCode: 'MOBILE_REPORT', icon: 'Memo' },

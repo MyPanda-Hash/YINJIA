@@ -12,20 +12,25 @@ import {
   SLIP_KINDS, isSlipKind, panelOfKind, typeOfKind, titleOfKind, buildSlipPayload,
 } from './slipPrint.js'
 
-test('三种报表 → 面板 / 打印类型 / 标题', () => {
-  assert.deepEqual(Object.keys(SLIP_KINDS), ['OTHER_PICK', 'OTHER_RET', 'MAT_RET'])
+test('四种报表 → 面板 / 打印类型 / 标题', () => {
+  // 2026-11-18:新增 MIX(手机扫码 → 扫码混料 的混料单),排在最后,不影响前三张的既有口径
+  assert.deepEqual(Object.keys(SLIP_KINDS), ['OTHER_PICK', 'OTHER_RET', 'MAT_RET', 'MIX'])
   assert.equal(panelOfKind('OTHER_PICK'), 'OTHER_OUT', '其他领料落其他出库单')
   assert.equal(panelOfKind('OTHER_RET'), 'MATERIAL_RET', '其他退料落生产退料单')
   assert.equal(panelOfKind('MAT_RET'), 'MATERIAL_RET', '生产退料也落生产退料单')
+  // 混料单不是 yj_panel 单据面板(落混料记录 wo_mixing_list),面板码只用于对齐 MIX_SCAN 权限词
+  assert.equal(panelOfKind('MIX'), 'MIX_SCAN', '混料单挂页面级虚拟面板 MIX_SCAN')
 
   // 打印类型必须与后端 PrintStationController.PRINT_TYPES 的键逐字一致
   assert.equal(typeOfKind('OTHER_PICK'), 'OTHER_PICK_SLIP')
   assert.equal(typeOfKind('OTHER_RET'), 'OTHER_RET_SLIP')
   assert.equal(typeOfKind('MAT_RET'), 'MAT_RET_SLIP')
+  assert.equal(typeOfKind('MIX'), 'MIX_SLIP')
 
   assert.equal(titleOfKind('OTHER_PICK'), '其他领料单')
   assert.equal(titleOfKind('OTHER_RET'), '其他退料单')
   assert.equal(titleOfKind('MAT_RET'), '生产退料单')
+  assert.equal(titleOfKind('MIX'), '混料单')
 
   // 非法 kind:一律空串(调用方据此报错,绝不猜成别的报表)
   assert.equal(panelOfKind('PICK'), '')

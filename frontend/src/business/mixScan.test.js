@@ -1,13 +1,15 @@
 /**
- * workOrderPick.test.js — 工单扫码领料纯逻辑单测(2026-10-21)
+ * mixScan.test.js — 扫码混料纯逻辑单测(2026-11-18)
  *
  * 每条断言都指向具体生产逻辑,改坏必红:
  *   · parseWorkOrderQr   → 工单码 `公司代码@工单号@(1000+行号)` 的解析与减 1000
- *   · expandBom          → 应领 = 标准用量 × 排产数量 + 损耗量
+ *   · expandBom          → 应投量 = 标准用量 × 排产数量 + 损耗量
  *   · applyScan          → **只按编码匹配**(批号不参与过滤)、累加与 remain 计算
  *   · checkScaleReading  → 脏值(-1)/过期/跳动 的拦截
- *   · buildPickForm      → MATERIAL_OUT 字段名与必填项
- *   · pickProgress       → 整单提交判据
+ *   · scaleReadingOf     → /dc/monitor 扁平 points 的形状归一(重量点位 / 状态 / 设备码)
+ *   · mixProgress        → 「全部扫完才能整单保存」的判据
+ *   · buildScanPayload   → POST /px/mix/scan 的字段名(与后端正文字段逐一对应)
+ *   · buildMixSlipPayload→ 混料单纸面载荷(表头/部门标签/签名 + 计划→请领、实际→实发)
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -16,9 +18,12 @@ import {
   expandBom,
   applyScan,
   checkScaleReading,
-  buildPickForm,
-  pickProgress,
-} from './workOrderPick.js'
+  scaleReadingOf,
+  mixProgress,
+  buildScanPayload,
+  buildMixSlipPayload,
+  MIX_PAPER,
+} from './mixScan.js'
 
 test('parseWorkOrderQr:标准工单码 → 行号减 1000', () => {
   const r = parseWorkOrderQr('YJ@GD-2026-10-0220@1002')
@@ -59,20 +64,20 @@ test('parseWorkOrderQr:扫到物料码(含 |)不该被当工单码', () => {
   assert.equal(r.reason, 'no-order')
 })
 
-test('expandBom:应领 = 标准用量 × 排产数量 + 损耗量', () => {
+test('expandBom:应投 = 标准用量 × 排产数量 + 损耗量', () => {
   const bom = [
-    { 子件代码: 'M-001', 子件名称: '炭棒', 子件单位: '支', 标准用量: 2, 损耗量: 1 },
-    { 子件代码: 'M-003', 子件名称: '炭纤维', 子件单位: '支', 标准用量: 0.5, 损耗量: 0 },
+    { 子件代码: 'YJ-TJHZ-001', 子件名称: '雅可比CS', 子件单位: 'kg', 标准用量: 0.086, 损耗量: 0 },
+    { 子件代码: 'YJ-YKRS-005', 子件名称: '活性炭', 子件单位: 'kg', 标准用量: 0.021, 损耗量: 0.5 },
   ]
-  const lines = expandBom(bom, 10)
+  const lines = expandBom(bom, 1000)
   assert.equal(lines.length, 2)
-  assert.equal(lines[0].required, 21)   // 2*10 + 1
-  assert.equal(lines[1].required, 5)    // 0.5*10
+  assert.equal(lines[0].required, 86)     // 0.086*1000
+  assert.equal(lines[1].required, 21.5)   // 0.021*1000 + 0.5
   assert.equal(lines[0].picked, 0)
-  assert.equal(lines[0].remain, 21)
+  assert.equal(lines[0].remain, 86)
 })
 
-test('expandBom:排产数量 0 → 应领只剩损耗量', () => {
+test('expandBom:排产数量 0 → 应投只剩损耗量', () => {
   const lines = expandBom([{ 子件代码: 'M-1', 标准用量: 3, 损耗量: 2 }], 0)
   assert.equal(lines[0].required, 2)
 })
@@ -104,7 +109,7 @@ test('applyScan:多次扫码累加', () => {
   assert.equal(lines[0].remain, 3)
 })
 
-test('applyScan:编码不在 BOM 里 → miss,不改动任何行', () => {
+test('applyScan:编码不在物料清单里 → miss,不改动任何行', () => {
   const lines = expandBom([{ 子件代码: 'M-001', 标准用量: 1 }], 5)
   const r = applyScan(lines, { code: 'X-999', batch: '' }, 2)
   assert.equal(r.ok, false)
@@ -119,7 +124,7 @@ test('applyScan:数量 <=0 或非数字 → no-qty', () => {
   assert.equal(applyScan(lines, { code: 'M-001' }, 'abc').reason, 'no-qty')
 })
 
-test('applyScan:超领不拦死,但 remain 为负且标 exceed', () => {
+test('applyScan:超投不拦死,但 remain 为负且标 exceed', () => {
   const lines = expandBom([{ 子件代码: 'M-001', 标准用量: 1 }], 5)
   const r = applyScan(lines, { code: 'M-001' }, 8)
   assert.equal(r.ok, true)
@@ -172,50 +177,101 @@ test('checkScaleReading:非数字/无时间 → 拒绝', () => {
   assert.equal(checkScaleReading({ value: 5 }, null, { now }).reason, 'stale')
 })
 
-test('buildPickForm:表头/明细字段名与 MATERIAL_OUT 一致', () => {
-  const lines = expandBom([
-    { 子件代码: 'M-001', 子件名称: '炭棒', 子件单位: '支', 标准用量: 2 },
-  ], 5)
-  applyScan(lines, { code: 'M-001' }, 10)
-  const f = buildPickForm({ orderNo: 'GD-2026-10-0220', lineNo: 2, warehouse: 'CK00001', lines })
-  assert.equal(f.业务类型, '生产领料')
-  assert.equal(f.单据编号, '')                    // 后端生成
-  assert.equal(f.加工单号, 'GD-2026-10-0220')     // 回写 plang.ll_no2 用
-  assert.equal(f.工单行号, '2')
-  assert.equal(f.detail.items.length, 1)
-  const it = f.detail.items[0]
-  assert.equal(it.材料编码, 'M-001')
-  assert.equal(it.材料名称, '炭棒')
-  assert.equal(it.计量单位, '支')
-  assert.equal(it.数量, 10)
-  assert.equal(it.仓库, 'CK00001')
-  assert.equal(it.行号, '1')
+test('scaleReadingOf:扁平 points 里取「重量」点位(2026-10-21 的踩坑结构)', () => {
+  const r = scaleReadingOf({ data: { deviceCode: 'DZ-001', points: [
+    { name: '温度', valueNum: 25, unit: 'C', at: '2026-11-18T09:00:00', status: 'normal' },
+    { name: '重量(kg)', valueNum: 0.39, unit: 'kg', at: '2026-11-18T09:00:01', status: 'normal' },
+  ] } })
+  assert.equal(r.value, 0.39)
+  assert.equal(r.stable, true)
+  assert.equal(r.deviceCode, 'DZ-001')
 })
 
-test('buildPickForm:未领(picked=0)的行不进单据', () => {
+test('scaleReadingOf:没有点位/没有重量列 → null(页面显示「等待称重」)', () => {
+  assert.equal(scaleReadingOf({ data: {} }), null)
+  assert.equal(scaleReadingOf(null), null)
+})
+
+test('scaleReadingOf:非 normal 状态不算稳定(报警/超限不取值)', () => {
+  const r = scaleReadingOf({ points: [{ name: '重量', valueNum: 2, unit: 'kg', status: 'alarm' }] })
+  assert.equal(r.value, 2)
+  assert.equal(r.stable, false)
+})
+
+test('mixProgress:每行都记过才能整单保存', () => {
   const lines = expandBom([
     { 子件代码: 'M-001', 标准用量: 1 },
     { 子件代码: 'M-002', 标准用量: 1 },
   ], 5)
-  applyScan(lines, { code: 'M-001' }, 3)
-  const f = buildPickForm({ orderNo: 'GD-1', lineNo: 1, lines })
-  assert.equal(f.detail.items.length, 1)
-  assert.equal(f.detail.items[0].材料编码, 'M-001')
-})
-
-test('pickProgress:每行都领过才 allPicked', () => {
-  const lines = expandBom([
-    { 子件代码: 'M-001', 标准用量: 1 },
-    { 子件代码: 'M-002', 标准用量: 1 },
-  ], 5)
-  assert.deepEqual(pickProgress(lines), { total: 2, done: 0, allPicked: false, anyPicked: false })
+  assert.deepEqual(mixProgress(lines),
+    { total: 2, done: 0, allDone: false, anyDone: false, remainCount: 2 })
   applyScan(lines, { code: 'M-001' }, 1)
-  assert.deepEqual(pickProgress(lines), { total: 2, done: 1, allPicked: false, anyPicked: true })
+  assert.deepEqual(mixProgress(lines),
+    { total: 2, done: 1, allDone: false, anyDone: true, remainCount: 1 })
   applyScan(lines, { code: 'M-002' }, 1)
-  assert.deepEqual(pickProgress(lines), { total: 2, done: 2, allPicked: true, anyPicked: true })
+  assert.deepEqual(mixProgress(lines),
+    { total: 2, done: 2, allDone: true, anyDone: true, remainCount: 0 })
 })
 
-test('pickProgress:空清单不算 allPicked', () => {
-  assert.equal(pickProgress([]).allPicked, false)
-  assert.equal(pickProgress(null).allPicked, false)
+test('mixProgress:空清单不算 allDone', () => {
+  assert.equal(mixProgress([]).allDone, false)
+  assert.equal(mixProgress(null).allDone, false)
+})
+
+test('buildScanPayload:字段名与后端 /px/mix/scan 一致,含 计划用量 与 实际用量', () => {
+  const order = { orderNo: 'GD-2026-10-0089', lineNo: 3, lineId: 88, productCode: 'A-32-01', productName: '炭棒' }
+  const line = { code: 'YJ-TJHZ-001', name: '雅可比CS', uom: 'kg', required: 226.18 }
+  const body = buildScanPayload({ order, line, qty: 226.1849 })
+  assert.equal(body.工单号, 'GD-2026-10-0089')
+  assert.equal(body.工单行号, 3)
+  assert.equal(body.工单行id, 88)
+  assert.equal(body.产品编码, 'A-32-01')
+  assert.equal(body.物料编号, 'YJ-TJHZ-001')
+  assert.equal(body.物料名称, '雅可比CS')
+  assert.equal(body.计划用量, 226.18)
+  assert.equal(body.实际用量, 226.1849)   // 4 位收敛
+  assert.equal(body.单位, 'kg')
+})
+
+test('buildScanPayload:没有行 id 时不下发该字段(后端 longOrNull 会兜底)', () => {
+  const body = buildScanPayload({
+    order: { orderNo: 'GD-1', lineNo: 1, lineId: 0 },
+    line: { code: 'M-1', required: 1 },
+    qty: 1,
+  })
+  assert.equal(body.工单行id, undefined)
+})
+
+test('buildMixSlipPayload:混料单纸面 = 混料标题 + 计划/实际 两列 + 混料签名', () => {
+  const payload = buildMixSlipPayload({
+    docNo: 'PL2611180001',
+    data: {
+      单据编号: 'PL2611180001',
+      部门: 'admin',
+      单据日期: '2026-11-18 09:01:02',
+      明细: [{ 材料名称: '雅可比CS', 请领数量: 86, 实发数量: 85.6 }],
+    },
+  })
+  assert.equal(payload.标题, '混料单')
+  assert.equal(payload.领料单号, 'PL2611180001')
+  assert.equal(payload.领料部门, 'admin')
+  assert.equal(payload.打印日期, '2026-11-18')      // 只取日期,补打印时不至于印成"单据日期=打印日"
+  assert.equal(payload.明细.length, 1)
+  assert.deepEqual(payload.表头.slice(0, 2), ['工单号', '物料名称'])
+  assert.equal(payload.表头[4], '计划用量')
+  assert.equal(payload.表头[5], '实际用量')
+  assert.equal(payload.部门标签, '生产线')
+  assert.equal(payload.签名.length, 4)
+})
+
+test('MIX_PAPER:七列表头与四条签名是固定口径(代理按位取)', () => {
+  assert.equal(MIX_PAPER.表头.length, 7)
+  assert.equal(MIX_PAPER.签名.length, 4)
+  assert.equal(MIX_PAPER.标题, '混料单')
+})
+
+test('buildMixSlipPayload:后端没给明细时给空数组(纸表照样画 8 行空格)', () => {
+  const payload = buildMixSlipPayload({ docNo: 'PL1', data: {} })
+  assert.deepEqual(payload.明细, [])
+  assert.equal(payload.打印日期, '')
 })

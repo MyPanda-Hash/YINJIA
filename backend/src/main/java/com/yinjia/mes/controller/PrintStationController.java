@@ -136,6 +136,12 @@ public class PrintStationController {
         PRINT_TYPES.put("OTHER_PICK_SLIP", "其他领料单");
         PRINT_TYPES.put("OTHER_RET_SLIP", "其他退料单");
         PRINT_TYPES.put("MAT_RET_SLIP", "生产退料单");
+        // 2026-11-18:手机扫码 →「扫码混料」整单保存后自动打印的**混料单**。
+        // 版式仍复用代理那套「领料单纸表」(210×148 中一刀横打),只是表头/签名换成混料的:
+        //   表头 = 工单号/物料名称/规格/单位/计划用量/实际用量/备注(随任务 `表头` 下发);
+        //   签名 = 配料人/复核人/工艺员/班长(随任务 `签名` 下发)。
+        // ⚠ 这样加类型**不改绘制分支**:代理读 `表头`/`签名`,取不到就回落到领料单的默认字。
+        PRINT_TYPES.put("MIX_SLIP", "混料单");
     }
     /**
      * **纸上不打二维码**的打印类型(2026-11-16 用户口径:「二维码也不用打了」)。
@@ -148,7 +154,7 @@ public class PrintStationController {
      * 并把二维码内容/二维码图都清空 —— 代理端拿到空图就不贴码(print-agent.ps1 的 $QrImage 判空)。
      */
     private static final Set<String> NO_QR_TYPES = Set.of(
-            "OTHER_PICK_SLIP", "OTHER_RET_SLIP", "MAT_RET_SLIP");
+            "OTHER_PICK_SLIP", "OTHER_RET_SLIP", "MAT_RET_SLIP", "MIX_SLIP");
 
     /** 手机端没带 {@code 类型} 时的默认值(旧调用方兼容;现役只有领料单会入队) */
     private static final String DEFAULT_TYPE = "PICK_SLIP";
@@ -204,6 +210,12 @@ public class PrintStationController {
                              String 二维码图,
                              String 领料单号, String 领料部门, String 打印日期,
                              java.util.List<java.util.Map<String, Object>> 明细,
+                             /**
+                              * 纸面可变文案(2026-11-18,扫码混料引入):
+                              * {@code 表头} = 七个列头、{@code 部门标签} = 抬头里那三个字、{@code 签名} = 底部四条签名。
+                              * 空 ⇒ 代理回落到「生产领料单」的默认文案,故老任务/老客户端不受影响。
+                              */
+                             java.util.List<String> 表头, String 部门标签, java.util.List<String> 签名,
                              /** 这条任务该给哪些站点(入队那一刻算好:在线 + 开关开 + 订阅了该类型) */
                              Set<String> targets,
                              /** 已经投递给哪些站点(每个站点只投一次;全部投完就出队) */
@@ -221,6 +233,10 @@ public class PrintStationController {
             m.put("领料部门", 领料部门);
             m.put("打印日期", 打印日期);
             m.put("明细", 明细 == null ? java.util.List.of() : 明细);
+            // 2026-11-18:纸面可变文案(空则由代理回落默认)
+            if (表头 != null && !表头.isEmpty()) m.put("表头", 表头);
+            if (部门标签 != null && !部门标签.isBlank()) m.put("部门标签", 部门标签);
+            if (签名 != null && !签名.isEmpty()) m.put("签名", 签名);
             m.put("工单号", 工单号);
             m.put("工单行号", 工单行号);
             m.put("产品名称", 产品名称);
@@ -308,6 +324,7 @@ public class PrintStationController {
                 str(body.get("领料单号")), str(body.get("领料部门")), str(body.get("打印日期")),
                 body.get("明细") instanceof java.util.List<?> dl
                         ? (java.util.List<java.util.Map<String, Object>>) dl : java.util.List.of(),
+                strList(body.get("表头")), str(body.get("部门标签")), strList(body.get("签名")),
                 targetNames, ConcurrentHashMap.newKeySet(), System.currentTimeMillis());
         QUEUE.addLast(t);
         // 上限保护:超了挤掉最旧的(内存安全;现场重打一次即可)
@@ -385,6 +402,9 @@ public class PrintStationController {
                     str(body.get("工单号")), toInt(body.get("工单行号")), "", "",
                     ok ? "已出纸" : "失败", str(body.get("发起人")), LocalDateTime.now().format(TS), "",
                     "", "", "", java.util.List.of(),
+                    // 2026-11-18:PrintTask 多了「纸面可变文案」三项(表头/部门标签/签名),回执不再出纸,
+                    //   一律给空 —— 出纸记录只用于「自动打印」页显示最近打了什么。
+                    java.util.List.of(), "", java.util.List.of(),
                     Set.of(), Set.of(), System.currentTimeMillis()));
             while (DONE.size() > MAX_DONE) DONE.removeLast();
         }
@@ -846,6 +866,22 @@ public class PrintStationController {
     private static String str1(Object o, String dft) {
         String s = str(o);
         return s.isEmpty() ? dft : s;
+    }
+
+    /**
+     * 取字符串数组(2026-11-18,纸面可变文案 `表头` / `签名`)。
+     *
+     * <p>前端可能传 List&lt;String&gt;、也可能传 JSON 数组对象;空/非数组一律给空列表,
+     * 由代理回落到领料单的默认文案 —— 不让"少传一个字段"变成打不出来。
+     */
+    private static java.util.List<String> strList(Object o) {
+        if (!(o instanceof java.util.List<?> l)) return java.util.List.of();
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (Object x : l) {
+            String s = str(x);
+            if (!s.isEmpty()) out.add(s);
+        }
+        return out;
     }
 
     private static int toInt(Object o) {

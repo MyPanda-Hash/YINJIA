@@ -564,6 +564,18 @@ export function pickSlipHtml(payload, qr = '') {
   const fmtQty = (v) => (Number(v) > 0 ? String(Math.round(Number(v) * 10000) / 10000) : '')
   const woTag = woNo + (line ? '#' + line : '')
 
+  // 2026-11-18:纸面可变文案(与打印代理同一套口径)
+  //   混料单把七列列头换成 工单号/物料名称/规格/单位/计划用量/实际用量/备注,
+  //   「领料部门」换成「生产线」,底部四条签名换成 配料人/复核人/工艺员/班长。
+  //   取不到就回落到领料单默认值 —— 老调用方(其他领料/其他退料/生产退料)行为一字不变。
+  const heads = (Array.isArray(p['表头']) && p['表头'].length >= 7)
+    ? p['表头'].slice(0, 7).map((x) => String(x ?? ''))
+    : ['订单号', '材料名称', '规格', '单位', '请领数量', '实发数量', '备注']
+  const deptLabel = String(p['部门标签'] || '').trim() || '领料部门'
+  const signs = (Array.isArray(p['签名']) && p['签名'].length >= 4)
+    ? p['签名'].slice(0, 4).map((x) => String(x ?? ''))
+    : ['部门主管:', '仓库主管:', '领料人:', '仓管员:']
+
   const perPage = 10
   const pageCount = Math.max(1, Math.ceil(rows.length / perPage))
   const cards = []
@@ -597,18 +609,17 @@ export function pickSlipHtml(payload, qr = '') {
       + '<div class="hm">'
       + `<div class="no">No ${esc(outNo || '-')}</div>`
       + `<div class="t">${esc(title)}</div>`
-      + `<div class="meta"><span>领料部门:${esc(dept)}</span><span>日期:${esc(printDate)}</span></div>`
+      + `<div class="meta"><span>${esc(deptLabel)}:${esc(dept)}</span><span>日期:${esc(printDate)}</span></div>`
       + '</div>'
       + '</div>'
       + '<table>'
       // 2026-11-06:列宽重排 —— 订单号收窄、材料名称/规格加宽,长文本折行显示全(不再被省略号截断)
       + '<colgroup><col style="width:17%"><col style="width:19%"><col style="width:21%">'
       + '<col style="width:6%"><col style="width:12%"><col style="width:12%"><col style="width:13%"></colgroup>'
-      + '<thead><tr><th>订单号</th><th>材料名称</th><th>规格</th><th>单位</th>'
-      + '<th>请领数量</th><th>实发数量</th><th>备注</th></tr></thead>'
+      + `<thead><tr>${heads.map((h) => `<th>${esc(h)}</th>`).join('')}</tr></thead>`
       + `<tbody>${tbody}</tbody>`
       + '</table>'
-      + '<div class="sign"><span>部门主管:</span><span>仓库主管:</span><span>领料人:</span><span>仓管员:</span></div>'
+      + `<div class="sign">${signs.map((s) => `<span>${esc(s)}</span>`).join('')}</div>`
       + (pageCount > 1 ? `<div class="pg">第 ${pg + 1}/${pageCount} 页</div>` : '')
       + '</div>')
   }
