@@ -58,7 +58,7 @@ export const PRINT_TYPE_MAT_RET_SLIP = 'MAT_RET_SLIP'         // 生产退料单
  * @param {string} text 二维码内容
  * @returns {Promise<string>} 形如 data:image/png;base64,...
  */
-export async function qrDataUrl(text) {
+async function qrDataUrl(text) {
   const content = String(text || '').trim()
   if (!content) return ''
   try {

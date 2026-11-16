@@ -137,6 +137,19 @@ public class PrintStationController {
         PRINT_TYPES.put("OTHER_RET_SLIP", "其他退料单");
         PRINT_TYPES.put("MAT_RET_SLIP", "生产退料单");
     }
+    /**
+     * **纸上不打二维码**的打印类型(2026-11-16 用户口径:「二维码也不用打了」)。
+     *
+     * <p>为什么按类型而不是一刀切:生产领料单(PICK_SLIP)的二维码是**工单码**,
+     * 现场拿它继续扫码领料/报工,不能去掉;而这三张「扫码单」的码只用来做单据身份,
+     * 用户已经明确改走「查询补打印」,纸上留个扫了没用的码不如留白。
+     *
+     * <p>落在这里的效果:入队时**不校验二维码内容**(否则这三类会被"打印内容为空"挡下),
+     * 并把二维码内容/二维码图都清空 —— 代理端拿到空图就不贴码(print-agent.ps1 的 $QrImage 判空)。
+     */
+    private static final Set<String> NO_QR_TYPES = Set.of(
+            "OTHER_PICK_SLIP", "OTHER_RET_SLIP", "MAT_RET_SLIP");
+
     /** 手机端没带 {@code 类型} 时的默认值(旧调用方兼容;现役只有领料单会入队) */
     private static final String DEFAULT_TYPE = "PICK_SLIP";
 
@@ -264,20 +277,26 @@ public class PrintStationController {
         String woNo = str(body.get("工单号"));
         int line = toInt(body.get("工单行号"));
         String qr = str(body.get("二维码内容"));
-        if (qr.isEmpty() && !woNo.isEmpty()) {
-            // 与 print-formats.woQrText 同口径:公司代码@工单号@(1000+行号);公司代码全库为 '0'
-            qr = "0@" + woNo + "@" + (1000 + Math.max(1, line));
-        }
-        if (qr.isEmpty()) throw new IllegalArgumentException("打印内容为空:请提供二维码内容或工单号");
-
-        // 🔴 2026-11-01 后端兜底出图。
-        //
-        // 正常路径是**前端**用 qrcode 库渲好 dataURL 随任务送上来(与工单打印同一份算法)。
-        // 但现场一定会有"客户端是旧版"的情况 —— 旧 APK、浏览器缓存了旧 chunk —— 那时
-        // `二维码图` 为空,打出来就是一张没有码的标签(用户实测报障:PDF 里没二维码)。
-        // ⇒ 这里用 ZXing(pom 里已有,报表 QRCode 在用)自己补一张,**任何客户端都能出图**。
         String qrImg = str(body.get("二维码图"));
-        if (qrImg.isEmpty()) qrImg = qrDataUrl(qr);
+        if (NO_QR_TYPES.contains(type)) {
+            // 这几类纸上不打码(用户 2026-11-16 口径):不校验、不留内容、不兜底出图
+            qr = "";
+            qrImg = "";
+        } else {
+            if (qr.isEmpty() && !woNo.isEmpty()) {
+                // 与 print-formats.woQrText 同口径:公司代码@工单号@(1000+行号);公司代码全库为 '0'
+                qr = "0@" + woNo + "@" + (1000 + Math.max(1, line));
+            }
+            if (qr.isEmpty()) throw new IllegalArgumentException("打印内容为空:请提供二维码内容或工单号");
+
+            // 🔴 2026-11-01 后端兜底出图。
+            //
+            // 正常路径是**前端**用 qrcode 库渲好 dataURL 随任务送上来(与工单打印同一份算法)。
+            // 但现场一定会有"客户端是旧版"的情况 —— 旧 APK、浏览器缓存了旧 chunk —— 那时
+            // `二维码图` 为空,打出来就是一张没有码的标签(用户实测报障:PDF 里没二维码)。
+            // ⇒ 这里用 ZXing(pom 里已有,报表 QRCode 在用)自己补一张,**任何客户端都能出图**。
+            if (qrImg.isEmpty()) qrImg = qrDataUrl(qr);
+        }
 
         Set<String> targetNames = new LinkedHashSet<>();
         for (Station s : targets) targetNames.add(s.name());

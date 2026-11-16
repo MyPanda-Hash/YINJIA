@@ -3,14 +3,13 @@
  *
  * 钉住三件事:
  *  ① kind → 面板/打印类型/标题 的对应(其他退料与生产退料**同面板不同 kind**,最容易串);
- *  ② 二维码的「对应关系」:`YJSLIP:KIND:DOCNO` 能原样解析回来,别的东西(物料码/工单码)不许误认;
- *  ③ 载荷字段:标题、单号、部门、日期、二维码内容、明细(原样透传,不二次翻译键名)。
+ *  ② 纸面**不打二维码**(2026-11-16 用户口径「二维码也不用打了」)⇒ 载荷里没有 二维码内容;
+ *  ③ 载荷其余字段:标题、单号、部门、日期、明细(原样透传,不二次翻译键名)。
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  SLIP_KINDS, SLIP_QR_PREFIX, isSlipKind, panelOfKind, typeOfKind, titleOfKind,
-  slipQrText, parseSlipQr, buildSlipPayload,
+  SLIP_KINDS, isSlipKind, panelOfKind, typeOfKind, titleOfKind, buildSlipPayload,
 } from './slipPrint.js'
 
 test('三种报表 → 面板 / 打印类型 / 标题', () => {
@@ -36,35 +35,18 @@ test('三种报表 → 面板 / 打印类型 / 标题', () => {
   assert.equal(isSlipKind('NOPE'), false)
 })
 
-test('二维码内容 ↔ 解析 往返一致', () => {
-  for (const kind of ['OTHER_PICK', 'OTHER_RET', 'MAT_RET']) {
-    const text = slipQrText(kind, 'OO-2026-11-0005')
-    assert.equal(text, `${SLIP_QR_PREFIX}:${kind}:OO-2026-11-0005`)
-    assert.deepEqual(parseSlipQr(text), { kind, docNo: 'OO-2026-11-0005' })
-  }
-  // 参数不全 ⇒ 不出码(宁可没有码,也不要出一个扫了没用的码)
-  assert.equal(slipQrText('OTHER_PICK', ''), '')
-  assert.equal(slipQrText('NOPE', 'OO-1'), '')
-  assert.equal(slipQrText('', 'OO-1'), '')
+test('载荷:不带二维码(纸上不打码)', () => {
+  const p = buildSlipPayload({
+    kind: 'OTHER_PICK',
+    docNo: 'OO-2026-11-0005',
+    data: { 单据日期: '2026-11-16', 部门: '甲班', 明细: [] },
+  })
+  // 关键:没有 二维码内容 ⇒ 打印代理不贴码、浏览器打印层连码框都不画
+  assert.equal(p['二维码内容'], undefined)
+  assert.equal('二维码内容' in p, false)
 })
 
-test('解析:只认自己的前缀,不误认物料码与工单码', () => {
-  // 物料条码(存货编码|批号)/ 公司代码式 —— 都必须当成"不是单据码"
-  assert.equal(parseSlipQr('YJ-KBL-012|PC0000'), null)
-  assert.equal(parseSlipQr('0@GD-2026-11-0010@1001'), null, '工单二维码不能被当单据码')
-  // 前缀对但内容不对
-  assert.equal(parseSlipQr('YJSLIP:OTHER_PICK'), null, '缺单号')
-  assert.equal(parseSlipQr('YJSLIP::OO-1'), null, '缺 kind')
-  assert.equal(parseSlipQr('YJSLIP:PICK:OO-1'), null, '不认识的 kind')
-  assert.equal(parseSlipQr('XXX:OTHER_PICK:OO-1'), null, '前缀不对')
-  assert.equal(parseSlipQr(''), null)
-  assert.equal(parseSlipQr(null), null)
-  // 大小写/空白容错(扫码枪偶尔带空格,前缀大小写也可能被输入法改)
-  assert.deepEqual(parseSlipQr('  yjslip:other_pick:OO-2026-11-0005  '),
-    { kind: 'OTHER_PICK', docNo: 'OO-2026-11-0005' })
-})
-
-test('载荷:标题/单号/部门/日期/二维码内容齐,明细原样透传', () => {
+test('载荷:标题/单号/部门/日期齐,明细原样透传', () => {
   const rows = [{ 材料名称: 'PP棉', 规格: '45*16*109', 单位: '支', 请领数量: 0, 实发数量: 3, 备注: 'PC0000 / 恒亿仓' }]
   const p = buildSlipPayload({
     kind: 'OTHER_RET',
@@ -75,7 +57,6 @@ test('载荷:标题/单号/部门/日期/二维码内容齐,明细原样透传',
   assert.equal(p.领料单号, 'TL-2026-11-0007')
   assert.equal(p.领料部门, '系统管理员')
   assert.equal(p.打印日期, '2026-11-16', '纸面日期用单据日期,补打印隔几天也不会显示成打印当天')
-  assert.equal(p.二维码内容, 'YJSLIP:OTHER_RET:TL-2026-11-0007')
   assert.deepEqual(p.明细, rows, '明细必须原样透传(键是代理要的那一套,不能二次翻译)')
 
   // 后端没给日期时用调用方给的今天;都没有就留空(不瞎写)

@@ -15,7 +15,7 @@
 import request from '@core/request'
 import { printInPage } from '@core/panel/printChannel'
 import { pickSlipHtml } from './print-formats'
-import { queueToPrintStation, qrDataUrl } from './printStation'
+import { queueToPrintStation } from './printStation'
 import { buildSlipPayload, typeOfKind, panelOfKind, isSlipKind } from './slipPrint'
 
 /**
@@ -37,15 +37,17 @@ export async function fetchSlipData({ kind, docNo } = {}) {
 /**
  * 本机打印(浏览器打印层):与打印代理同一份版式(pickSlipHtml),只是没有代理时用。
  *
+ * <p>⚠ 不传二维码(这三个类型纸上不打码,见 slipPrint.buildSlipPayload 注释);
+ * pickSlipHtml 收到空码就**连框都不画**。
+ *
  * @param {object} payload 与入队同一个载荷
  * @param {object} [opts] 透传给 printInPage(afterprint 回调等)
  * @returns {Promise<boolean>} 是否真的调起了打印层
  */
 export async function printSlipLocal(payload, opts = {}) {
   const p = payload || {}
-  const qr = await qrDataUrl(p['二维码内容'])
   const title = String(p['标题'] || '').trim() || '领料单'
-  return printInPage(title, pickSlipHtml(p, qr), opts)
+  return printInPage(title, pickSlipHtml(p, ''), opts)
 }
 
 /**

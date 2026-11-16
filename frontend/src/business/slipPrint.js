@@ -14,19 +14,15 @@
  *   <tr><td>MAT_RET</td><td>MATERIAL_RET 生产退料单</td><td>MAT_RET_SLIP</td><td>生产退料单</td></tr>
  * </table>
  * ⚠ 其他退料 与 生产退料 **落的是同一张面板**(MATERIAL_RET),只能靠 kind 区分标题与打印类型 ——
- * 所以 kind 必须跟着二维码一起走(见 {@link slipQrText}),不能事后从单据上猜。
+ * 所以 kind 必须跟到位,不能事后从单据上猜。
  *
- * <h3>二维码 = 单据与纸面的「对应关系」</h3>
- * 内容形如 `YJSLIP:OTHER_PICK:OO-2026-11-0005` —— 扫一下就知道**这张纸是哪张单、哪种报表**,
- * 手机端据此直接补打印同一张(不用再让人凭记忆输单号)。
- * 与工单二维码(`0@工单号@1001`)刻意用不同的前缀:两者的解析分支完全不同,
- * 混在一起迟早会把工单码当单号去查库。
+ * <h3>纸面不打二维码(2026-11-16 第三轮)</h3>
+ * 用户口径:「二维码也不用打了」。这几张单的码原本只用来"扫一下补打印",
+ * 而补打印已改成**查单号** ⇒ 纸上的码没了用处,留着只是占位置。
+ * 生产领料单(PICK_SLIP)的码是**工单码**,现场还要继续扫,不受影响。
  *
  * <p>本文件**没有任何 import** —— 全是可单测的纯函数;真正取数/入队/调打印层在 slipPrintFlow.js。
  */
-
-/** 二维码前缀(改它 = 已印出去的纸全部扫不出来,别改) */
-export const SLIP_QR_PREFIX = 'YJSLIP'
 
 /** kind → 口径(面板 / 打印类型 / 标题) */
 export const SLIP_KINDS = {
@@ -56,51 +52,16 @@ export function titleOfKind(kind) {
 }
 
 /**
- * 二维码内容。
- *
- * @param {string} kind OTHER_PICK|OTHER_RET|MAT_RET
- * @param {string} docNo 单号
- * @returns {string} `YJSLIP:KIND:DOCNO`;参数不全返回空串(宁可不出码,也不要出一个扫了没用的码)
- */
-export function slipQrText(kind, docNo) {
-  const k = String(kind || '').trim()
-  const no = String(docNo || '').trim()
-  if (!isSlipKind(k) || !no) return ''
-  return `${SLIP_QR_PREFIX}:${k}:${no}`
-}
-
-/**
- * 解析扫到的码。
- *
- * <p>只认 {@link SLIP_QR_PREFIX} 开头、且 kind 合法的串;单号本身可能带 `:`?
- * 不会(号池格式为 `前缀-年月-流水`),但仍按**第一个冒号后整段**取,避免以后号里出现冒号被截断。
- *
- * @param {string} raw 扫码枪/手工输入的原串
- * @returns {{ kind: string, docNo: string } | null}
- */
-export function parseSlipQr(raw) {
-  const text = String(raw == null ? '' : raw).trim()
-  if (!text) return null
-  const idx = text.indexOf(':')
-  if (idx < 0) return null
-  if (text.slice(0, idx).trim().toUpperCase() !== SLIP_QR_PREFIX) return null
-  const rest = text.slice(idx + 1)
-  const sep = rest.indexOf(':')
-  if (sep < 0) return null
-  const kind = rest.slice(0, sep).trim().toUpperCase()
-  const docNo = rest.slice(sep + 1).trim()
-  if (!isSlipKind(kind) || !docNo) return null
-  return { kind, docNo }
-}
-
-/**
  * 把后端 `/px/slip/rows` 的返回拼成打印载荷(给 queueToPrintStation / 本机打印层共用)。
  *
  * <p>明细**原样透传**:后端已按代理要的键({材料名称/规格/单位/请领数量/实发数量/备注})返回,
  * 前端再翻译一遍只会多一处口径分叉。
  *
+ * <p>⚠ **不带 {@code 二维码内容}**:这三张单纸上不打码(2026-11-16 用户口径),
+ * 载荷里不给码 ⇒ 代理不贴码、浏览器打印层也不画二维码框。
+ *
  * @param {{ kind:string, docNo:string, data?:object, today?:string }} p
- * @returns {object} { 标题, 领料单号, 领料部门, 打印日期, 二维码内容, 明细 }
+ * @returns {object} { 标题, 领料单号, 领料部门, 打印日期, 明细 }
  */
 export function buildSlipPayload({ kind, docNo, data, today } = {}) {
   const d = data || {}
@@ -113,7 +74,6 @@ export function buildSlipPayload({ kind, docNo, data, today } = {}) {
     领料部门: String(d['部门'] || '').trim(),
     // 纸面「日期」用**单据日期**(补打印常常隔天才打,印成打印当天会让人以为单据日期错了)
     打印日期: String(d['单据日期'] || today || '').trim(),
-    二维码内容: slipQrText(k, no),
     明细: Array.isArray(d['明细']) ? d['明细'] : [],
   }
 }

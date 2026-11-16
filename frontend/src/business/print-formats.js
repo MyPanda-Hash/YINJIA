@@ -591,7 +591,9 @@ export function pickSlipHtml(payload, qr = '') {
     }
     cards.push('<div class="card">'
       + '<div class="hd">'
-      + `<div class="qr">${qr ? `<img src="${qr}"/>` : ''}</div>`
+      // 2026-11-16:没有再传码就**连框都不画** —— 以前空码也渲染一个 24mm 的方框,
+      //   纸上是个莫名其妙的黑框(用户口径「二维码也不用打了」)。
+      + (qr ? `<div class="qr"><img src="${qr}"/></div>` : '')
       + '<div class="hm">'
       + `<div class="no">No ${esc(outNo || '-')}</div>`
       + `<div class="t">${esc(title)}</div>`

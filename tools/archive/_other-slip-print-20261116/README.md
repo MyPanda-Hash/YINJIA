@@ -179,3 +179,40 @@ ego-browser nodejs -e "await import('file:///C:/Users/Lenovo/ego/start-system-20
 > 注:纸上的 `YJSLIP` 二维码仍照打(它是单据身份,和三种报表一一对应),
 > 但手机端不再靠它补打印 —— 现场直接敲单号更快。
 
+---
+
+# 第四轮(同日):纸上不打二维码
+
+用户口径:
+
+> 「二维码也不用打了」
+
+## 改了四处(缺一处就还会印出来)
+
+| 层 | 改动 |
+|---|---|
+| 前端载荷 `slipPrint.buildSlipPayload` | 不再给 `二维码内容` |
+| 浏览器打印 `print-formats.pickSlipHtml` | 没有码就**连 24mm 的码框都不画**(以前空码也画个黑框) |
+| 浏览器打印 `slipPrintFlow.printSlipLocal` | 不再生成二维码图(`qrDataUrl` 回到 printStation 内部,不再对外导出) |
+| 后端入队 `PrintStationController.enqueue` | 新增 `NO_QR_TYPES`(三个 SLIP 类型):**不校验二维码内容**,并把内容/图清空 |
+
+**生产领料单(PICK_SLIP)不受影响** —— 它的码是**工单码**,现场要继续扫它领料/报工。
+代理端本来就有 `$QrImage` 判空(空 = 退回纯文字版),不用改。
+
+顺手删掉已成死代码的 `slipQrText` / `parseSlipQr` / `SLIP_QR_PREFIX`
+(纸面没码、手机端也不再解析;留着只会让人以为还有这条链路)。
+
+## 实测
+
+| 项 | 结果 |
+|---|---|
+| 载荷 | 键 = 标题/领料单号/领料部门/打印日期/明细,`二维码内容` 不存在 |
+| 纸面 HTML | 不含 `class="qr"`、不含 `<img>` |
+| 渲染截图 | 抬头只剩标题 + No 单号,右侧无码(见下图) |
+| 入队(新类型 + 无码) | 正常走到「没有可用的打印电脑」,**不再报「打印内容为空」** |
+| 入队(生产领料单) | 原有校验保持不变 |
+
+![无二维码的纸面](round-34-slip-no-qr.png)
+
+单测 `node --test`:1861 项全 PASS(`slipPrint.test.js` 增一条「载荷不带二维码」)。
+
