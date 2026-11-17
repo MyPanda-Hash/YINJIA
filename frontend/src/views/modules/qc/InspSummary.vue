@@ -92,7 +92,7 @@
           </template>
           <el-table :data="senders" v-loading="loading" border stripe size="small" row-key="送样人"
                     class="iss-table" :empty-text="emptyText">
-            <el-table-column type="expand">
+            <el-table-column type="expand" width="56" :label="tt('展开')">
               <template #default="{ row }">
                 <div class="iss-expand">
                   <div class="iss-expand-title">{{ tt('该送样人的委托单') }}</div>
@@ -140,7 +140,7 @@
           </template>
           <el-table :data="docs" v-loading="loading" border stripe size="small" row-key="单据编号"
                     class="iss-table" :empty-text="emptyText">
-            <el-table-column type="expand">
+            <el-table-column type="expand" width="56" :label="tt('展开')">
               <template #default="{ row }">
                 <div class="iss-expand">
                   <div class="iss-expand-title">
@@ -233,7 +233,12 @@ const senders = ref([])
 const docs = ref([])
 
 const hasData = computed(() => senders.value.length > 0 || docs.value.length > 0)
-const emptyText = computed(() => (loading.value ? tt('加载中…') : tt('暂无数据')))
+const emptyText = computed(() => {
+  if (loading.value) return tt('加载中…')
+  const [s, e] = range.value || []
+  // 空态带上当前区间:用户看到 0 行时先能确认「查的是哪一段」,不用去猜为什么刚审的单不在这
+  return s && e ? `${tt('当前时间范围内没有送样记录')}（${s} ~ ${e}）` : tt('暂无数据')
+})
 const canExport = computed(() => canDo({ isAdmin: user.isAdmin, pagePerms: user.pagePerms }, PANEL, 'export'))
 
 function pad(n) {

@@ -6338,6 +6338,7 @@ export default {
     '导出 Excel': 'Export Excel',
     '单号 / 样品 / 检测项目': 'Doc no. / sample / test item',
     '统计口径：检验委托单的「单据日期」；默认不含已作废/已中止的单': 'Basis: the commission "Doc date"; void or stopped orders are excluded by default',
+    '当前时间范围内没有送样记录': 'No sample submissions in this date range',
     '人': 'people',
     '单': 'orders',
     '项': 'items',
