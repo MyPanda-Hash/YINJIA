@@ -864,6 +864,8 @@ public class ButtonService {
                 // 新建默认值(2026-10-29 用户口径「密级/文件使用范围默认保密、银嘉内部,可以换」):
                 // 只补没有值的列 ⇒ 用户手改过的不会被抢回默认值。
                 putHeadDefaults(def, table, cols);
+                // 送样人默认(2026-11-17):检验委托单「联系人」= 送样人,新单直接带入当前登录人姓名
+                putSenderDefault(def, table, cols, user);
                 // 单表式单据的明细「行序」:空白草稿也占一行,写 1 而不是让列默认值 0 落地
                 // (2026-11-04,组装物料清单 ASM_BOM;见 assignNewLineSeq 注释)。
                 // 纯排序/展示口径:唯一索引只要求同单内不重复,先占 1 是为了让用户随后「新增数据」的
@@ -917,6 +919,8 @@ public class ButtonService {
                     && (head.get(preCol2) == null || String.valueOf(head.get(preCol2)).isBlank())) {
                 head.put(preCol2, realNameOf(user));
             }
+            // 送样人默认(2026-11-17):同空白草稿分支 —— 检验委托单「联系人」带入当前登录人姓名
+            putSenderDefaultInHead(def, head, user);
         }
         // 规格书两级分发封锁(2026-09-12):①防绕过——载荷编号命中的是已下发产品(而非已有单据)
         // 时要求总负责人/admin(手动以产品码建单的唯一向量);②分配单仅 责任人∪总负责人∪管理员 可保存。
@@ -1177,6 +1181,54 @@ public class ButtonService {
             if (cur != null && !String.valueOf(cur).trim().isEmpty()) continue;  // 已有值不覆盖
             cols.put(col, val);
         }
+    }
+
+    /**
+     * 送样人默认值 = 当前登录人的**真实姓名**(2026-11-17 用户口径:
+     * 「送样人进行选择填入嘛,直接带入有账号的人的姓名」)。
+     *
+     * <p>检验委托单的「联系人」格就是**送样人** —— 纸面标黄「拉选填」,下拉里是所有有账号的人
+     * (字典取自 yj_user.real_name,见 migrate-insp-commission-sender-20261117.sql),新建单据时
+     * 默认就把当前登录人姓名填进去,不用手打。
+     *
+     * <p>口径与「责任人」预填一致:**只在新建时补空值**;已有值(用户改过/历史单)一律不覆盖;
+     * 后台线程(user=system)没有登录人,留空。
+     */
+    private static final java.util.Map<String, String> SENDER_DEFAULT_COL =
+            java.util.Map.of("INSP_COMMISSION", "联系人");
+
+    /** 新建草稿分支用:目标是**物理列名**键的 cols */
+    private void putSenderDefault(PanelRegistry.PanelDef def, String table, Map<String, Object> cols, String user) {
+        if (def == null || cols == null || !sendersPanel(def.code())) return;
+        String col = SENDER_DEFAULT_COL.get(def.code());
+        if (table != null && !tableCols(table).contains(col)) return;
+        Object cur = cols.get(col);
+        if (cur != null && !String.valueOf(cur).trim().isEmpty()) return;
+        String name = senderNameOf(user);
+        if (!name.isEmpty()) cols.put(col, name);
+    }
+
+    /** 正常保存(新单带明细)分支用:目标是**字段 label(数据键)** 键的 head */
+    private void putSenderDefaultInHead(PanelRegistry.PanelDef def, Map<String, Object> head, String user) {
+        if (def == null || head == null || !sendersPanel(def.code())) return;
+        String col = SENDER_DEFAULT_COL.get(def.code());
+        PanelRegistry.FieldDef f = def.byCol(col);
+        if (f == null) return;
+        Object cur = head.get(f.label());
+        if (cur != null && !String.valueOf(cur).trim().isEmpty()) return;
+        String name = senderNameOf(user);
+        if (!name.isEmpty()) head.put(f.label(), name);
+    }
+
+    private static boolean sendersPanel(String code) {
+        return code != null && SENDER_DEFAULT_COL.containsKey(code);
+    }
+
+    /** 当前登录人的姓名(后台线程/空用户 → 空串,表示"不填") */
+    private String senderNameOf(String user) {
+        if (user == null || user.isBlank() || "system".equals(user)) return "";
+        String name = realNameOf(user);
+        return name == null ? "" : name.trim();
     }
 
     /**

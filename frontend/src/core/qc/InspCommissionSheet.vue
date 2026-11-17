@@ -146,8 +146,23 @@
               {{ tt(c.title || c.key) }}<span v-if="isRequired(c.key)" class="ic-req">*</span>
             </th>
             <td class="ic-cell">
+              <!-- 联系人(=送样人):纸样「拉选填」⇒ 有账号的人名下拉,可搜索;老姓名仍可手输 -->
+              <el-select
+                v-if="canEdit(c.key) && c.select"
+                :model-value="headVal(c.key)"
+                size="small"
+                filterable
+                allow-create
+                default-first-option
+                clearable
+                class="ic-input ic-select-inline"
+                :placeholder="tt(c.title || c.key)"
+                @update:model-value="(v) => setHead(c.key, v)"
+              >
+                <el-option v-for="o in optionsOf(c.key)" :key="o" :label="o" :value="o" />
+              </el-select>
               <el-input
-                v-if="canEdit(c.key)"
+                v-else-if="canEdit(c.key)"
                 :model-value="headVal(c.key)"
                 size="small"
                 class="ic-input"
@@ -538,9 +553,13 @@ const SAMPLE_KINDS = ['滤芯', '水样', '电气类']
  *   联系人      | 值 | 联系电话（手机） | 值 | E-mail | 值
  *   样品名称    | 值 | 商标            | 值 | 样品数量 | 值
  * ⚠ E-mail 那格纸面列头印「E-mail」,但数据键仍是 yj_field.label「邮箱」(§3.3)。
+ *
+ * 2026-11-17 用户口径:「送样人进行选择填入嘛,直接带入有账号的人的姓名」
+ *   ⇒ 联系人 = **送样人**,纸面「拉选填」= 可搜索的人员下拉(选项 = 有账号的人名,由后端下发
+ *   field.options);`select: true` 表示该格用下拉渲染,其余格仍是无边框输入。
  */
 const SIX_CELL_ROWS = [
-  [{ key: '联系人' }, { key: '联系电话（手机）' }, { key: '邮箱', title: 'E-mail' }],
+  [{ key: '联系人', select: true }, { key: '联系电话（手机）' }, { key: '邮箱', title: 'E-mail' }],
   [{ key: '样品名称' }, { key: '商标' }, { key: '样品数量' }],
 ]
 
@@ -774,6 +793,18 @@ function isRequired(key) {
   const f = (props.fields || []).find((x) => (x.dataName || x.name || x.code) === key)
   if (!f) return false
   return f.isRequired === true || f.required === true || Number(f.required) === 1
+}
+
+/**
+ * 该字段的下拉候选(2026-11-17:联系人=送样人,候选 = 有账号的人名)。
+ * 选项由后端按 `yj_field.dict_sql` 下发(dataSchema.fields[].options,可能带 label/value 包装);
+ * 取不到就返回空数组 —— 下拉仍可手输(allow-create),不会因为字典挂了填不了字。
+ */
+function optionsOf(key) {
+  const f = (props.fields || []).find((x) => (x.dataName || x.name || x.code) === key)
+  const raw = Array.isArray(f?.options) ? f.options : []
+  return raw.map((o) => (o && typeof o === 'object' ? (o.value ?? o.label ?? '') : o))
+    .filter((v) => v !== '' && v != null)
 }
 
 /** 表头取值 */
@@ -1053,12 +1084,23 @@ watch(
   background: transparent;
   padding: 0 2px;
 }
+/* 联系人(送样人)下拉:与纸面其它输入框同观感 —— 透明底 + 一条下划线,别长成网页控件 */
+.ic-select-inline {
+  width: 100%;
+}
+.ic-select-inline :deep(.el-select__wrapper) {
+  box-shadow: none !important;
+  border-bottom: 1px solid #8a8a8a;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 2px;
+  min-height: 22px;
+}
 .ic-meta-no {
   flex: 1 1 auto;
   padding-left: 15.9%;
   white-space: nowrap;
-}
-.ic-meta-no-label {
+}.ic-meta-no-label {
   font-weight: 700;
 }
 .ic-meta-no-val {

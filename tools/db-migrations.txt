@@ -4922,3 +4922,18 @@ migrate-insp-commission-rev-20261117.sql
 # 2026-11-17 检验委托单必填项(用户截图:红色 * = 必填):联系人/样品名称/样品数量/样品型号规格/检验类别
 #   五格 yj_field.required 0→1;纸面按 isRequired 渲染红 *;两账套已执行;幂等
 migrate-insp-commission-required-20261117.sql
+
+# 2026-11-17 补登记(并行会话带入但未登记,本地已执行 2026-11-17):销售退货单/生产退料单 + 生产领料退料明细表 + 扫码混料与混料批号 + 打印任务缓存。
+#   依赖顺序:return-docs(建 4 表 + 6 面板) → return-fields-layout(补字段布局) → pick-two-docs(生产领料拆两单/退料授权)
+#   → prod-ret-list(领料改名明细表 + 新增退料明细表) → mix-scan(扫码混料面板+下架两个扫码入口) → mix-batch(混料批号/纸表)
+#   ⚠ print-task-cache 早已登记在本清单(11-16),此处不重复;幂等;需两账套
+migrate-return-docs-20261113.sql
+migrate-return-fields-layout-20261113.sql
+migrate-pick-two-docs-20261116.sql
+migrate-prod-ret-list-20261116.sql
+migrate-mix-scan-20261118.sql
+migrate-mix-batch-20261118.sql
+
+# 2026-11-17 检验委托单「联系人」= 送样人(用户截图「拉选填」):data_type→下拉框,字典=yj_user 有账号人员姓名;
+#   新建单据默认带入当前登录人姓名(ButtonService.putSenderDefault/…InHead);两账套已执行;幂等
+migrate-insp-commission-sender-20261117.sql
