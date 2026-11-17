@@ -6324,6 +6324,7 @@ export default {
     '第 {n} 个仓库子行还没填仓库或数量': 'Warehouse sub-row {n} is missing a warehouse or qty',
     '该行各仓库数量合计不能超过可入库数量': 'The total per line cannot exceed the receivable qty',
     '该行还剩 {n} 没有分配，且原行没有仓库，请分完或先给原行选仓库': 'Line still has {n} unallocated and no warehouse on the original line; allocate it all or pick a warehouse for the line first',
+    '合并回一行': 'Merge back into one line',
   },
 
 }

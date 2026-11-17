@@ -289,10 +289,21 @@ public class PxController {
     }
 
     /**
+     * 这张采购入库单每行的拆分组锚点([{id, 源行id}])。
+     * 弹窗靠它把"从同一行分出来的几行"缩进到一起;源行id 是内部标记、不是面板字段,故单独给一条只读查询。
+     */
+    @GetMapping("/purIn/groups")
+    public ApiResult<List<Map<String, Object>>> purInGroups(@RequestParam String docNo) {
+        perm.requirePanelView("PURCHASE_IN");
+        return ApiResult.ok(purInSplit.groups(docNo));
+    }
+
+    /**
      * 「多仓库入库」弹窗一次提交多行(2026-11-17 用户口径:工具栏一颗按钮 → 和生单一样的界面,
      * 每行可下拉展开成多个仓库子行,各子行合计不超过该行可入库数量)。
      *
      * <p>一个事务包住全部行:任一行不合法整批回滚,不会出现"前两行改了、第三行报错"的半成品。
+     * 每条只带 **1 个仓库** = 合并回一行(回退);带 2 个以上 = 拆分/改分配。
      */
     @PostMapping("/purIn/multiWh")
     @SuppressWarnings("unchecked")

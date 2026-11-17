@@ -92,9 +92,12 @@
             </template>
           </template>
         </el-table-column>
-        <el-table-column :label="tt('操作')" width="70" align="center">
+        <el-table-column :label="tt('操作')" width="120" align="center">
           <template #default="{ row }">
-            <el-icon v-if="row.kind === 'alloc'" class="pmw-del" :title="tt('删除')" @click="removeAlloc(row.L, row.i)"><Delete /></el-icon>
+            <!-- 回退:把这一组仓库子行合并回一行(确定后服务端把子行合回父行) -->
+            <el-button v-if="row.kind === 'line' && row.L.allocs.length >= 2" link type="primary" size="small"
+                       @click="mergeBack(row.L)">{{ tt('合并回一行') }}</el-button>
+            <el-icon v-else-if="row.kind === 'alloc'" class="pmw-del" :title="tt('删除')" @click="removeAlloc(row.L, row.i)"><Delete /></el-icon>
           </template>
         </el-table-column>
         <template #empty>{{ tt('这张单没有可拆分的明细行') }}</template>
@@ -153,16 +156,24 @@ const fmt = (v) => {
   return Number.isInteger(n) ? String(n) : String(Math.round(n * 10000) / 10000)
 }
 
-/** 该行可入库数量 = 实收数量(拆分的上限) */
-const maxOf = (L) => numOr0(L?.row?.['实收数量'])
+/** 该行可入库数量 = 整组行实收数量合计(拆过的行要把子行算进来;没拆过就是本行) */
+const maxOf = (L) => (L?.groupRows || (L?.row ? [L.row] : [])).reduce((s, r) => s + numOr0(r['实收数量']), 0)
 const allocatedOf = (L) => (L?.allocs || []).reduce((s, a) => s + Math.max(0, numOr0(a['数量'])), 0)
 const remainingOf = (L) => Math.round((maxOf(L) - allocatedOf(L)) * 10000) / 10000
 const hasId = (L) => L && L.row && L.row.id !== undefined && L.row.id !== null && L.row.id !== ''
+/** 这一组是不是"已经拆过"(有子行)—— 决定要不要显示「合并回一行」 */
+const isGrouped = (L) => (L?.groupRows || []).length > 1
 
-/** 要拆的行:填了 ≥2 个仓库子行(只填一个仓库 = 不拆,按普通单选处理,不在这里提交) */
-const splitLines = computed(() => lines.filter((L) => (L.allocs || []).length >= 2))
+/**
+ * 要提交的行:
+ *  · 填了 ≥2 个仓库子行 ⇒ 拆行(或改分配);
+ *  · 已经拆过、现在只剩 1 个仓库子行 ⇒ **合并回一行**(回退)。
+ * 其它(没动过的行)不提交,避免把别人的行改坏。
+ */
+const needsApply = (L) => (L?.allocs || []).length >= 2 || ((L?.allocs || []).length === 1 && isGrouped(L))
+const splitLines = computed(() => lines.filter(needsApply))
 const splitLineCount = computed(() => splitLines.value.length)
-const willSplitRows = computed(() => splitLines.value.reduce((s, L) => s + L.allocs.length, 0))
+const willSplitRows = computed(() => splitLines.value.reduce((s, L) => s + Math.max(1, L.allocs.length), 0))
 
 /** 平铺成表格数据:一行明细 + 它下面的 N 个仓库子行 */
 const flat = computed(() => {
@@ -181,13 +192,17 @@ const problem = computed(() => {
   for (const L of lines) {
     const list = L.allocs || []
     if (!list.length) continue
-    if (list.length === 1) return tt('同一行要拆至少两个仓库：再点一次 ▾')
+    // 已经拆过、只留一个仓库 = 合并回一行(回退),不要求"至少两个"
+    const merging = list.length === 1 && isGrouped(L)
+    if (list.length === 1 && !isGrouped(L)) return tt('同一行要拆至少两个仓库：再点一次 ▾')
     if (!hasId(L)) return tt('请先保存单据，再拆分仓库')
     const bad = list.findIndex((a) => !String(a['仓库'] || '').trim() || numOr0(a['数量']) <= 0)
     if (bad >= 0) return tt('第 {n} 个仓库子行还没填仓库或数量').replace('{n}', String(bad + 1))
-    if (remainingOf(L) < 0) return tt('该行各仓库数量合计不能超过可入库数量')
-    if (remainingOf(L) > 0 && !String(L.row['仓库'] || '').trim()) {
-      return tt('该行还剩 {n} 没有分配，且原行没有仓库，请分完或先给原行选仓库').replace('{n}', fmt(remainingOf(L)))
+    if (!merging) {
+      if (remainingOf(L) < 0) return tt('该行各仓库数量合计不能超过可入库数量')
+      if (remainingOf(L) > 0 && !String(L.row['仓库'] || '').trim()) {
+        return tt('该行还剩 {n} 没有分配，且原行没有仓库，请分完或先给原行选仓库').replace('{n}', fmt(remainingOf(L)))
+      }
     }
   }
   return ''
@@ -195,12 +210,49 @@ const problem = computed(() => {
 
 const canSubmit = computed(() => !saving.value && splitLineCount.value > 0 && !problem.value)
 
+/**
+ * 打开时把"拆过的行"按 [源行id] 归组:**父行 + 缩进子行**(2026-11-17 用户口径
+ * 「从那一行分出来的,进去的时候缩进还在」)。没拆过的行原样一条。
+ */
 async function onOpen() {
+  // 先取"拆分组锚点"(源行id 不是面板字段,通用取数带不出来):id → 组id
+  const gidOf = new Map()
+  try {
+    const list = await engine.purInWhGroups(props.docNo)
+    for (const g of list || []) {
+      const gid = Number(g['源行id'] || 0)
+      if (gid) gidOf.set(String(g.id), gid)
+    }
+  } catch (e) {
+    // 取不到就按"没拆过"展示:不影响拆行本身
+  }
+  const rows = props.rows || []
+  const groups = new Map()
+  for (const r of rows) {
+    const gid = gidOf.get(String(r?.id)) || 0
+    if (!gid) continue
+    if (!groups.has(gid)) groups.set(gid, [])
+    groups.get(gid).push(r)
+  }
   lines.splice(0, lines.length)
-  for (const [i, r] of (props.rows || []).entries()) {
-    // 只把有数量、有 id 的行做成可拆列表(没落库的新行拆不了)
+  for (const [i, r] of rows.entries()) {
     if (!r) continue
-    lines.push({ key: String(r.id || 'new' + i), seq: i + 1, row: r, allocs: [] })
+    const gid = gidOf.get(String(r.id)) || 0
+    // 子行:归到它那一组里,不单独成行(这样"缩进"才在)
+    if (gid && gid !== Number(r.id)) continue
+    const groupRows = gid ? (groups.get(gid) || [r]) : [r]
+    if (groupRows.length > 1) {
+      // 父行在前,其余按 id 排序,保证每次打开顺序一致
+      groupRows.sort((a, b) => Number(a.id) - Number(b.id))
+    }
+    const allocs = groupRows.length > 1
+      ? groupRows.map((g) => ({
+          仓库: String(g['仓库'] || ''),
+          仓位编码: String(g['仓位编码'] || ''),
+          数量: numOr0(g['实收数量']),
+        }))
+      : []
+    lines.push({ key: String(gid || r.id || 'new' + i), seq: i + 1, row: r, allocs, groupRows })
   }
   try {
     const src = await loadWhBinSources(engine)
@@ -227,6 +279,16 @@ function addAlloc(L) {
 
 function removeAlloc(L, index) {
   L.allocs.splice(index, 1)
+}
+
+/** 「合并回一行」= 回退:只留第一个仓库子行(数量取整组合计),确定后服务端把子行合回父行 */
+function mergeBack(L) {
+  const first = L.allocs[0] || {}
+  L.allocs.splice(0, L.allocs.length, {
+    仓库: String(first['仓库'] || L.row['仓库'] || ''),
+    仓位编码: String(first['仓位编码'] || L.row['仓位编码'] || ''),
+    数量: maxOf(L),
+  })
 }
 
 const close = () => emit('update:modelValue', false)

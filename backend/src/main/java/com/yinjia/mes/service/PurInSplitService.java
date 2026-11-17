@@ -74,11 +74,13 @@ public class PurInSplitService {
             "UPDATE " + LINE_TABLE + " SET [仓库] = ?, [仓库编码] = ?, [仓位编码] = ?, [仓位名称] = ?,"
                     + " [实收数量] = ?, [实收数量2] = ?, [金额] = ?, [含税金额] = ?, [费用金额] = ?,"
                     + " [费用调整] = ?, [送检数量] = ?, [现存量] = ?, [现存量说明] = ?,"
-                    + " [asp_user1] = ?, [asp_time1] = ? WHERE id = ?";
+                    + " [源行id] = ?, [asp_user1] = ?, [asp_time1] = ? WHERE id = ?";
     private static final int[] LINE_OVERRIDE_TYPES = {
             Types.NVARCHAR, Types.NVARCHAR, Types.NVARCHAR, Types.NVARCHAR,
             Types.DECIMAL, Types.DECIMAL, Types.DECIMAL, Types.DECIMAL, Types.DECIMAL,
             Types.DECIMAL, Types.DECIMAL, Types.DECIMAL, Types.NVARCHAR,
+            // 源行id:拆分组锚点(同组行都记原始行 id,父行 = 原行自己)—— 2026-11-17 用户口径「回退 + 缩进」
+            Types.INTEGER,
             Types.NVARCHAR, Types.TIMESTAMP, Types.BIGINT,
     };
 
@@ -99,7 +101,10 @@ public class PurInSplitService {
     @Transactional
     @SuppressWarnings("unchecked")
     public Map<String, Object> splitMulti(String docNo, List<Map<String, Object>> lines, String user) {
+        String no = docNo == null ? "" : docNo.trim();
+        if (no.isEmpty()) throw new IllegalStateException("缺少单据编号");
         if (lines == null || lines.isEmpty()) throw new IllegalStateException("没有要拆分的明细行");
+        requireDraftDoc(no);
         int rowCount = 0;
         List<Object> done = new ArrayList<>();
         for (Map<String, Object> l : lines) {
@@ -110,8 +115,21 @@ public class PurInSplitService {
                     if (o instanceof Map<?, ?> m) allocs.add(new LinkedHashMap<>((Map<String, Object>) m));
                 }
             }
+            // 只给了一个仓库 = **合并回一行**(回退):把子行合回父行,不再拆
+            // (2026-11-17 用户口径「这个操作是要可以回退的」)
+            if (allocs.size() < 2) {
+                mergeChildren(no, lineId, user);
+                rowCount += 1;
+                Map<String, Object> one = new LinkedHashMap<>();
+                one.put("docNo", no);
+                one.put("lineId", lineId);
+                one.put("rows", 1);
+                one.put("merged", true);
+                done.add(one);
+                continue;
+            }
             // self-invocation:同处一个事务(外层 @Transactional 已开启,inner 不再新建)
-            Map<String, Object> one = split(docNo, lineId, allocs, user);
+            Map<String, Object> one = split(no, lineId, allocs, user);
             rowCount += ((Number) one.get("rows")).intValue();
             done.add(one);
         }
@@ -138,7 +156,69 @@ public class PurInSplitService {
         if (no.isEmpty()) throw new IllegalStateException("缺少单据编号");
         if (lineId <= 0) throw new IllegalStateException("缺少要拆分的明细行");
 
-        // ① 单头守卫:必须草稿、必须未转ERP(转过的再拆,金蝶那张单对不上)
+        // ① 单头守卫(草稿 / 未转ERP / 未作废 / 未在删除申请中)
+        requireDraftDoc(no);
+
+        // ③ 先把这一组"合回一行"(有子行时):再拆一次 = 合并 + 重新分配,
+        //    这样"回退"(减到只剩一个仓库)和"改分配"都是同一条路 —— 幂等,不产生孤儿行。
+        mergeChildren(no, lineId, user);
+
+        // ③ 先把这一组"合回一行"(有子行时):再拆一次 = 合并 + 重新分配,
+        //    这样"回退"(减到只剩一个仓库)和"改分配"都是同一条路 —— 幂等,不产生孤儿行。
+        mergeChildren(no, lineId, user);
+
+        // ④ 原始行(双条件:行必须属于这张单;已作废的不算)—— 合并后数量已是整组合计
+        Map<String, Object> row;
+        try {
+            row = jdbc.queryForMap("SELECT * FROM " + LINE_TABLE
+                    + " WHERE id = ? AND 单据编号 = ? AND ISNULL(asp_cancel, 'N') <> 'Y'", lineId, no);
+        } catch (EmptyResultDataAccessException e) {
+            throw new IllegalStateException("明细行不存在或已作废(可能已被别人删掉),请刷新后重试");
+        }
+        // 拆分组锚点:已经拆过的沿用原锚点,没拆过的以本行 id 为锚点
+        long groupId = row.get("源行id") instanceof Number g ? g.longValue() : lineId;
+
+        // ⑤ 校验分配清单,并把仓库/仓位解析成档案里的编码与名称
+        List<Map<String, Object>> parts = normalizeAllocs(allocs, row);
+        BigDecimal totalQty = num(row.get("实收数量"));
+
+        // ⑥ 金额族按数量占比分摊(尾差落最后一行,保证合计不变)
+        Map<String, List<BigDecimal>> split = new LinkedHashMap<>();
+        for (String col : new String[]{"金额", "含税金额", "费用金额", "费用调整", "送检数量"}) {
+            split.put(col, allocate(row.get(col), parts, totalQty));
+        }
+
+        // ⑦ 落库:第一行就地改,其余行先「原样复制」再改要变的列
+        List<Long> lineIds = new ArrayList<>();
+        for (int i = 0; i < parts.size(); i++) {
+            Map<String, Object> target = new LinkedHashMap<>(row);
+            applyPart(target, row, parts.get(i), split, i, groupId);
+            target.put("asp_user1", user);
+            target.put("asp_time1", new java.sql.Timestamp(System.currentTimeMillis()));
+            long targetId = i == 0 ? lineId : duplicateRow(lineId);
+            updateOverrides(targetId, target);
+            lineIds.add(targetId);
+        }
+
+        // ⑧ 占用链跟着拆:原链改数量,其余各复制一条(来源行号/来源件号原样)
+        replicateLinks(no, lineId, lineIds, parts, user);
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("docNo", no);
+        out.put("lineId", lineId);
+        out.put("rows", lineIds.size());
+        out.put("lineIds", lineIds);
+        out.put("total", totalQty);
+        return out;
+    }
+
+    /**
+     * 单头守卫:必须是**草稿**、**未转ERP**、**未作废**、**不在删除申请中**的单。
+     *
+     * <p>注意「作废」不在单头字段里:bd_purchase_in.单据状态 对已作废的单**仍写着草稿**,
+     * 真正的状态在 yj_doc_status(2026-11-17 实测踩到:一张已作废的单照样能被拆)。
+     */
+    private void requireDraftDoc(String no) {
         Map<String, Object> head;
         try {
             head = jdbc.queryForMap("SELECT 单据状态, 是否已转ERP FROM " + HEAD_TABLE + " WHERE 单据编号 = ?", no);
@@ -154,8 +234,6 @@ public class PurInSplitService {
             throw new IllegalStateException("该单据已转ERP,拆分会让 MES 与金蝶两侧不一致,不能拆;"
                     + "确需调整请先在金蝶侧处理,或作废后重开");
         }
-        // ② 真正的状态在 yj_doc_status:单头 单据状态 还写着「草稿」的单,可能已经被作废/在删除申请中
-        //    (2026-11-17 实测踩到:一张已作废的单照样能被拆 —— 只看单头字段是不够的)
         Map<String, Object> st = Map.of();
         try {
             st = jdbc.queryForMap("SELECT ISNULL(canceled, 'N') AS canceled, ISNULL(deleting, 'N') AS deleting"
@@ -169,48 +247,89 @@ public class PurInSplitService {
         if ("Y".equalsIgnoreCase(str(st.get("deleting")))) {
             throw new IllegalStateException("该单据已提交删除申请,不能拆分");
         }
+    }
 
-        // ③ 原始行(双条件:行必须属于这张单;已作废的不算)
-        Map<String, Object> row;
+    /**
+     * 这张单每行的「拆分组锚点」({id, 源行id})。
+     *
+     * <p>为什么单独给一个小接口:拆分组标记 {@code 源行id} **不是面板字段**(不进 yj_field),
+     * 通用取数只回注册过的标签列 ⇒ 弹窗拿不到它,就没法把"从同一行分出来的几行"缩进到一起。
+     * 与其为一个内部标记去登记 yj_field(会牵动采购链四单字段基线),不如给一条 3 列的只读查询。
+     */
+    public List<Map<String, Object>> groups(String docNo) {
+        String no = docNo == null ? "" : docNo.trim();
+        if (no.isEmpty()) throw new IllegalStateException("缺少单据编号");
+        return jdbc.queryForList("SELECT id, ISNULL([源行id], 0) AS [源行id] FROM " + LINE_TABLE
+                + " WHERE [单据编号] = ? AND ISNULL(asp_cancel, 'N') <> 'Y' ORDER BY id", no);
+    }
+
+    /**
+     * 把一组子行合回父行 —— 「回退」与「重新分配」的第一步(2026-11-17 用户口径
+     * 「这个操作是要可以回退的,而且从那一行分出来的,进去的时候缩进还在」)。
+     *
+     * <p>没有子行时 = 空操作(第一次拆那一行的正常路径)。
+     * <ul>
+     *   <li>数量/金额族求和写回父行(子行原来是按占比分摊出去的,合回来合计一分不差);</li>
+     *   <li>子行**软删**(asp_cancel='Y' + asp_user2/time2 留痕),不做物理删 —— 出过纸/对过账的单还查得到;</li>
+     *   <li>占用链:子行的 ACTIVE 链置 RELEASED,父行的链数量改成合计数(来源行总占用不变)。</li>
+     * </ul>
+     */
+    private void mergeChildren(String docNo, long parentId, String user) {
+        List<Map<String, Object>> children = jdbc.queryForList(
+                "SELECT id, [实收数量], [金额], [含税金额], [费用金额], [费用调整], [送检数量] FROM " + LINE_TABLE
+                        + " WHERE [单据编号] = ? AND [源行id] = ? AND id <> ? AND ISNULL(asp_cancel, 'N') <> 'Y'",
+                docNo, parentId, parentId);
+        if (children.isEmpty()) return;
+        // ⚠ 父行自己的量/金额必须算进来:只加子行会把父行那份吞掉
+        // (2026-11-17 实测踩到:6 + 4 合并后父行变成 4,数量凭空少了一半)
+        Map<String, Object> parent;
         try {
-            row = jdbc.queryForMap("SELECT * FROM " + LINE_TABLE
-                    + " WHERE id = ? AND 单据编号 = ? AND ISNULL(asp_cancel, 'N') <> 'Y'", lineId, no);
+            parent = jdbc.queryForMap("SELECT [实收数量], [金额], [含税金额], [费用金额], [费用调整], [送检数量]"
+                    + " FROM " + LINE_TABLE + " WHERE id = ? AND [单据编号] = ? AND ISNULL(asp_cancel, 'N') <> 'Y'",
+                    parentId, docNo);
         } catch (EmptyResultDataAccessException e) {
-            throw new IllegalStateException("明细行不存在或已作废(可能已被别人删掉),请刷新后重试");
+            return; // 父行没了(别人删了)就什么都不动
         }
-
-        // ④ 校验分配清单,并把仓库/仓位解析成档案里的编码与名称
-        List<Map<String, Object>> parts = normalizeAllocs(allocs, row);
-        BigDecimal totalQty = num(row.get("实收数量"));
-
-        // ⑤ 金额族按数量占比分摊(尾差落最后一行,保证合计不变)
-        Map<String, List<BigDecimal>> split = new LinkedHashMap<>();
-        for (String col : new String[]{"金额", "含税金额", "费用金额", "费用调整", "送检数量"}) {
-            split.put(col, allocate(row.get(col), parts, totalQty));
+        List<Map<String, Object>> all = new ArrayList<>();
+        all.add(parent);
+        all.addAll(children);
+        BigDecimal qty = BigDecimal.ZERO;
+        for (Map<String, Object> r : all) qty = qty.add(num(r.get("实收数量")));
+        jdbc.update("UPDATE " + LINE_TABLE + " SET [实收数量] = ?, [金额] = ?, [含税金额] = ?, [费用金额] = ?,"
+                        + " [费用调整] = ?, [送检数量] = ?, [现存量] = NULL, [现存量说明] = NULL,"
+                        + " [asp_user1] = ?, [asp_time1] = ? WHERE id = ? AND [单据编号] = ?",
+                new Object[]{
+                        qty, sumOrNull(all, "金额"), sumOrNull(all, "含税金额"),
+                        sumOrNull(all, "费用金额"), sumOrNull(all, "费用调整"),
+                        sumOrNull(all, "送检数量"), user, new java.sql.Timestamp(System.currentTimeMillis()),
+                        parentId, docNo,
+                },
+                new int[]{Types.DECIMAL, Types.DECIMAL, Types.DECIMAL, Types.DECIMAL, Types.DECIMAL,
+                        Types.DECIMAL, Types.NVARCHAR, Types.TIMESTAMP, Types.BIGINT, Types.NVARCHAR});
+        for (Map<String, Object> c : children) {
+            long childId = ((Number) c.get("id")).longValue();
+            jdbc.update("UPDATE " + LINE_TABLE + " SET [asp_cancel] = 'Y', [asp_user2] = ?, [asp_time2] = SYSDATETIME()"
+                    + " WHERE id = ? AND [单据编号] = ?", user, childId, docNo);
+            jdbc.update("UPDATE form_flow_link SET [link_status] = 'RELEASED', [release_time] = SYSDATETIME()"
+                    + " WHERE target_panel_code = ? AND target_form_no = ? AND target_line_key = ?"
+                    + " AND link_status = 'ACTIVE'", PANEL, docNo, docNo + "#" + childId);
         }
+        // 父行的链恢复成整组数量(下面 split 的 replicateLinks 会再按新分配重写)
+        jdbc.update("UPDATE form_flow_link SET [linked_quantity] = ? WHERE target_panel_code = ?"
+                        + " AND target_form_no = ? AND target_line_key = ? AND link_status = 'ACTIVE'",
+                new Object[]{qty, PANEL, docNo, docNo + "#" + parentId},
+                new int[]{Types.DECIMAL, Types.NVARCHAR, Types.NVARCHAR, Types.NVARCHAR});
+    }
 
-        // ⑥ 落库:第一行就地改,其余行先「原样复制」再改要变的列
-        List<Long> lineIds = new ArrayList<>();
-        for (int i = 0; i < parts.size(); i++) {
-            Map<String, Object> target = new LinkedHashMap<>(row);
-            applyPart(target, row, parts.get(i), split, i);
-            target.put("asp_user1", user);
-            target.put("asp_time1", new java.sql.Timestamp(System.currentTimeMillis()));
-            long targetId = i == 0 ? lineId : duplicateRow(lineId);
-            updateOverrides(targetId, target);
-            lineIds.add(targetId);
+    /** 一组行里某一列的合计;全为 NULL 时返回 NULL(不把"没有成本"变成 0) */
+    private static BigDecimal sumOrNull(List<Map<String, Object>> rows, String col) {
+        BigDecimal sum = null;
+        for (Map<String, Object> r : rows) {
+            Object v = r.get(col);
+            if (v == null) continue;
+            sum = (sum == null ? BigDecimal.ZERO : sum).add(num(v));
         }
-
-        // ⑦ 占用链跟着拆:原链改数量,其余各复制一条(来源行号/来源件号原样)
-        replicateLinks(no, lineId, lineIds, parts, user);
-
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("docNo", no);
-        out.put("lineId", lineId);
-        out.put("rows", lineIds.size());
-        out.put("lineIds", lineIds);
-        out.put("total", totalQty);
-        return out;
+        return sum == null ? null : sum.setScale(SCALE, RoundingMode.HALF_UP);
     }
 
     /**
@@ -311,7 +430,7 @@ public class PurInSplitService {
 
     /** 把一条分配落到目标行上(数量、仓库、仓位、分摊后的金额族;现存量清空由界面重刷) */
     private void applyPart(Map<String, Object> target, Map<String, Object> row, Map<String, Object> p,
-                           Map<String, List<BigDecimal>> split, int index) {
+                           Map<String, List<BigDecimal>> split, int index, long groupId) {
         BigDecimal qty = (BigDecimal) p.get("数量");
         target.put("仓库", p.get("仓库"));
         target.put("仓库编码", p.get("仓库编码"));
@@ -326,6 +445,8 @@ public class PurInSplitService {
         target.put("费用金额", split.get("费用金额").get(index));
         target.put("费用调整", split.get("费用调整").get(index));
         target.put("送检数量", split.get("送检数量").get(index));
+        // 拆分组锚点:组内所有行(含原行)都记原始行 id ⇒ 弹窗再打开时按它缩进、按它合并回一行(回退)
+        target.put("源行id", groupId);
         // 现存量是"打开单子时按库存状况表刷出来"的展示列,拆完不猜:清空,由界面重新刷
         target.put("现存量", null);
         target.put("现存量说明", null);
@@ -337,6 +458,7 @@ public class PurInSplitService {
                 target.get("仓库"), target.get("仓库编码"), target.get("仓位编码"), target.get("仓位名称"),
                 target.get("实收数量"), target.get("实收数量2"), target.get("金额"), target.get("含税金额"),
                 target.get("费用金额"), target.get("费用调整"), target.get("送检数量"), null, null,
+                target.get("源行id"),
                 target.get("asp_user1"), target.get("asp_time1"), lineId,
         };
         jdbc.update(LINE_OVERRIDE_SQL, args, LINE_OVERRIDE_TYPES);

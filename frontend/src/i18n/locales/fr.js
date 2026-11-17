@@ -3056,6 +3056,7 @@ export default {
     '第 {n} 个仓库子行还没填仓库或数量': 'La sous-ligne entrepôt {n} n’a pas d’entrepôt ou de quantité',
     '该行各仓库数量合计不能超过可入库数量': 'La somme par ligne ne peut pas dépasser la quantité réceptionnable',
     '该行还剩 {n} 没有分配，且原行没有仓库，请分完或先给原行选仓库': 'La ligne a {n} non affecté et aucune ligne d’origine avec entrepôt ; affectez tout ou choisissez d’abord un entrepôt',
+    '合并回一行': 'Refusionner en une ligne',
   },
 
 }

@@ -38,6 +38,8 @@ const REQUIRED_METHODS = [
   'splitPurInLine',
   // 采购入库单「多仓库入库」弹窗:一次提交多行(整批一个事务)
   'splitPurInMultiWh',
+  // 拆分组锚点(弹窗按它缩进/合并回一行)
+  'purInWhGroups',
 ]
 
 /**

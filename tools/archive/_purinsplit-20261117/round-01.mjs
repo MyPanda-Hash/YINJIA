@@ -1,49 +1,52 @@
-const task = await taskSpace('purin-whpick-20261117')
+const task = await taskSpace('purin-whgroup')
 const page = task.page('p1')
 
-await page.goto('http://localhost:5173/#/panelx/form/PURCHASE_IN?code=PI-2026-11-0008', { timeout: 60000 })
-await page.reload({ timeout: 60000 })
+await page.goto('http://localhost:5173/#/panelx/list/PURCHASE_IN', { timeout: 60000 })
 await page.waitForTimeout(9000)
 
 try {
   const w = await page.cdp('Browser.getWindowForTarget', {})
   if (w && w.windowId) await task.cdp('Browser.setWindowBounds', { windowId: w.windowId, bounds: { windowState: 'normal' } })
-  await page.waitForTimeout(500)
 } catch (e) { console.log('restore skip: ' + e.message) }
 
-const before = await page.evaluate(() => {
-  const vis = (el) => !!(el.offsetParent || el.getClientRects().length)
-  const rows = [...document.querySelectorAll('.detail .el-table__body-wrapper tr.el-table__row')].filter(vis)
-  const cell = rows[0]?.querySelector('.ref-cell')
-  return {
-    rowCount: rows.length,
-    firstRow: (rows[0]?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80),
-    refCellTitle: cell?.getAttribute('title'),
-    splitIcon: !!document.querySelector('.detail .split'),
-  }
+// 选中单据
+const picked = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  if (location.hash.includes('login')) return 'login'
+  const inp = [...document.querySelectorAll('input')].find((i) => (i.placeholder || '').includes('模糊搜索'))
+  if (!inp) return 'no-search'
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+  setter.call(inp, 'PI-2026-11-0008')
+  inp.dispatchEvent(new Event('input', { bubbles: true }))
+  ;[...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '查找')?.click()
+  await sleep(4000)
+  const tr = [...document.querySelectorAll('.dsr-grid tr')].find((r) => (r.textContent || '').includes('PI-2026-11-0008'))
+  if (!tr) return 'no-row'
+  tr.click()
+  await sleep(4000)
+  return 'ok'
 })
-console.log('BEFORE=' + JSON.stringify(before, null, 2))
+console.log('pick=' + picked)
 
-// 点第一行的「仓库」格子(参照格) —— 应该弹多选仓库弹窗
-const opened = await page.evaluate(async () => {
+// 开弹窗 → 第 1 行点 ▾ 两次,分两个仓库
+const res = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const vis = (el) => !!(el.offsetParent || el.getClientRects().length)
-  const rows = [...document.querySelectorAll('.detail .el-table__body-wrapper tr.el-table__row')].filter(vis)
-  const tr = rows[0]
-  // 「仓库」列:按表头文字定位列序,再点该行的参照格
-  const heads = [...document.querySelectorAll('.detail .el-table__header-wrapper th')].map((th) => (th.textContent || '').trim())
-  const idx = heads.findIndex((h) => h === '仓库')
-  const cells = [...tr.querySelectorAll('td')]
-  const target = cells[idx]?.querySelector('.ref-cell')
-  if (!target) return 'no-cell:' + JSON.stringify(heads)
-  target.click()
-  await sleep(2500)
+  const btn = [...document.querySelectorAll('.tools .tb-main')].filter(vis).find((b) => (b.textContent || '').trim() === '多仓库入库')
+  if (!btn) return 'no-button'
+  btn.click()
+  await sleep(2600)
   const dlg = [...document.querySelectorAll('.el-dialog')].filter(vis).pop()
+  const carets = [...dlg.querySelectorAll('.pmw-caret')].filter(vis)
+  carets[0]?.click()
+  await sleep(500)
+  carets[0]?.click()
+  await sleep(600)
+  const allocs = [...dlg.querySelectorAll('tr.pmw-alloc-row')].filter(vis)
   return {
-    title: dlg ? (dlg.querySelector('.el-dialog__title')?.textContent || '').trim() : null,
-    items: dlg ? [...dlg.querySelectorAll('.pwp-item')].length : 0,
-    firstItems: dlg ? [...dlg.querySelectorAll('.pwp-item')].slice(0, 5).map((d) => (d.textContent || '').replace(/\s+/g, ' ').trim()) : [],
+    lines: [...dlg.querySelectorAll('.el-table__body-wrapper tr:not(.pmw-alloc-row)')].filter(vis).length,
+    allocs: allocs.map((a) => (a.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 30)),
   }
 })
-console.log('DIALOG=' + JSON.stringify(opened, null, 2))
-await page.screenshot({ path: 'C:/Users/Lenovo/ego/purin-whpick-20261117/g1-dialog.png' })
+console.log('OPEN=' + JSON.stringify(res))
+await page.screenshot({ path: 'C:/Users/Lenovo/ego/purin-whgroup/g1-open.png' })

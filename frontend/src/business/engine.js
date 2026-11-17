@@ -777,6 +777,15 @@ export async function splitPurInMultiWh({ docNo, lines }) {
   return unwrapStrict(await request.post('/px/purIn/multiWh', { docNo, lines: lines || [] }))
 }
 
+/**
+ * 采购入库单每行的拆分组锚点 [{id, 源行id}](2026-11-17):
+ * 弹窗靠它把"从同一行分出来的几行"缩进到一起、并支持合并回一行。
+ * 源行id 是内部标记、不是面板字段,通用取数不会带出来,故单独查。
+ */
+export async function purInWhGroups(docNo) {
+  return unwrap(await request.get('/px/purIn/groups', { params: { docNo } }))
+}
+
 // ==================== 统一生单对话框(2026-10-31 用户口径) ====================
 /**
  * 生单预览:勾选的来源单据(一张 = 原「生单」,多张 = 「批量生单」)各自的明细行。

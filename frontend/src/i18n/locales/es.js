@@ -3055,6 +3055,7 @@ export default {
     '第 {n} 个仓库子行还没填仓库或数量': 'La subfila de almacén {n} no tiene almacén o cantidad',
     '该行各仓库数量合计不能超过可入库数量': 'La suma por línea no puede superar la cantidad recepcionable',
     '该行还剩 {n} 没有分配，且原行没有仓库，请分完或先给原行选仓库': 'La línea tiene {n} sin asignar y la línea original no tiene almacén; asígnelo todo o elija un almacén primero',
+    '合并回一行': 'Unir en una línea',
   },
 
 }

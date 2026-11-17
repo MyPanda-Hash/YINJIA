@@ -3060,6 +3060,7 @@ export default {
     '第 {n} 个仓库子行还没填仓库或数量': 'Dòng kho con {n} chưa có kho hoặc số lượng',
     '该行各仓库数量合计不能超过可入库数量': 'Tổng theo dòng không được vượt số lượng có thể nhập',
     '该行还剩 {n} 没有分配，且原行没有仓库，请分完或先给原行选仓库': 'Dòng còn {n} chưa phân bổ và dòng gốc chưa có kho; hãy phân bổ hết hoặc chọn kho trước',
+    '合并回一行': 'Gộp lại một dòng',
   },
 
 }

@@ -120,6 +120,31 @@ test('② 弹窗:每行 ▾ 加一行仓库子行,合计不超过可入库数量
   assert.ok(/:disabled="!canSubmit"/.test(dlg), '校验不过时不许提交')
 })
 
+test('② 回退 + 缩进:按 [源行id] 归组,拆过的行再打开还是"父行 + 缩进的子行",并能合并回一行', () => {
+  const dlg = src('./../views/PurInMultiWhDialog.vue')
+  assert.ok(/purInWhGroups\(/.test(dlg), '打开时先取拆分组锚点(源行id 不是面板字段,通用取数带不出来)')
+  assert.ok(/groups\.get\(gid\)/.test(dlg), '按组id 把同组行归到一起')
+  assert.ok(/gid !== Number\(r\.id\)\) continue/.test(dlg), '子行不能单独成行(否则缩进就没了)')
+  assert.ok(/groupRows/.test(dlg), '每行要带整组行,可入库数量按整组合计算')
+  assert.ok(/mergeBack\(/.test(dlg) && /合并回一行/.test(dlg), '要有「合并回一行」(回退)入口')
+  assert.ok(/isGrouped\(/.test(dlg) && /needsApply/.test(dlg), '拆过的行只留一个仓库 = 合并回一行,也要提交')
+  // 服务端:组锚点查询 + 合并 = 子行软删 + 父行数量/金额合回 + 占用链回流
+  const svc = src('./../../../../backend/src/main/java/com/yinjia/mes/service/PurInSplitService.java')
+  assert.ok(/public List<Map<String, Object>> groups\(/.test(svc), '服务端要能按单据返回组锚点')
+  assert.ok(/mergeChildren\(/.test(svc) && /asp_cancel\] = 'Y'/.test(svc), '合并要把子行软删(不物理删)')
+  assert.ok(/target_line_key/.test(svc) && /\[link_status\] = 'RELEASED'/.test(svc),
+    '合并要把子行的占用链释放')
+  assert.ok(/allocs\.size\(\) < 2/.test(svc), '只给一个仓库 = 走合并(回退),不再要求"至少两个仓库"')
+  assert.ok(/\[源行id\]/.test(svc), '拆行要写组锚点')
+  const ctrl = src('./../../../../backend/src/main/java/com/yinjia/mes/controller/PxController.java')
+  assert.ok(/@GetMapping\("\/purIn\/groups"\)/.test(ctrl), '控制器要有组锚点查询')
+  const engine = src('./../../business/engine.js')
+  assert.ok(/purInWhGroups/.test(engine) && /'\/px\/purIn\/groups'/.test(engine), '引擎要打 /px/purIn/groups')
+  const mig = src('./../../../../tools/migrate-pur-in-wh-group-20261117.sql')
+  assert.ok(/COL_LENGTH\('dbo\.bl_purchase_in', N'源行id'\)/.test(mig) && /MS_Description/.test(mig),
+    '迁移要幂等加列并写中文注明')
+})
+
 test('③ 服务端:整批一个事务、来源行号/批次号原样、占用链一起拆', () => {
   const engine = src('./../../business/engine.js')
   assert.ok(/splitPurInMultiWh/.test(engine) && /'\/px\/purIn\/multiWh'/.test(engine), '引擎要打 purIn/multiWh')

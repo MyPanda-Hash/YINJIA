@@ -1,75 +1,76 @@
-const task = await taskSpace('purin-whpick-20261117')
+const task = await taskSpace('purin-whgroup')
 const page = task.page('p1')
 
-// 1) 登录测试库
-await page.goto('http://localhost:5173/#/login', { timeout: 60000 })
-await page.waitForTimeout(2500)
-await page.evaluate(async () => {
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-  const sel = [...document.querySelectorAll('.el-select')].find((s) => (s.textContent || '').includes('YINJIA-MES'))
-  sel?.querySelector('.el-select__wrapper, input')?.click()
-  await sleep(600)
-  const target = [...document.querySelectorAll('.el-select-dropdown__item')].find((o) => (o.textContent || '').includes('测试库'))
-  target?.click()
-  await sleep(300)
-  const setVal = (el, v) => {
-    const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
-    s.call(el, v)
-    el.dispatchEvent(new Event('input', { bubbles: true }))
-    el.dispatchEvent(new Event('change', { bubbles: true }))
-  }
-  const ins = [...document.querySelectorAll('input')]
-  setVal(ins.find((i) => (i.placeholder || '').includes('登录账号')), 'admin')
-  setVal(ins.find((i) => (i.placeholder || '').includes('登录密码')), '123456')
-  ;[...document.querySelectorAll('button')].find((b) => (b.textContent || '').includes('进入系统'))?.click()
-})
-await page.waitForTimeout(7000)
-
-// 2) 直接打开单据
-await page.goto('http://localhost:5173/#/panelx/form/PURCHASE_IN?code=PI-2026-11-0008', { timeout: 60000 })
-await page.waitForTimeout(7000)
+// 硬刷新,别让页面拿着上一轮的旧数据
+await page.goto('http://localhost:5173/#/panelx/list/PURCHASE_IN', { timeout: 60000 })
+await page.reload({ timeout: 60000 })
+await page.waitForTimeout(9000)
 try {
   const w = await page.cdp('Browser.getWindowForTarget', {})
   if (w && w.windowId) await task.cdp('Browser.setWindowBounds', { windowId: w.windowId, bounds: { windowState: 'normal' } })
 } catch (e) { console.log('restore skip: ' + e.message) }
 
-// 3) 点仓库格 → 勾两仓 → 平均分配 → 确定(一次 evaluate 内完成,避免会话中途过期)
-const out = await page.evaluate(async () => {
+const prep = await page.evaluate(async () => {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const vis = (el) => !!(el.offsetParent || el.getClientRects().length)
-  const rows0 = [...document.querySelectorAll('.detail .el-table__body-wrapper tr.el-table__row')].filter(vis)
-  if (!rows0.length) return { err: 'no-detail-row', hash: location.hash }
-  const heads = [...document.querySelectorAll('.detail .el-table__header-wrapper th')].map((th) => (th.textContent || '').trim())
-  const idx = heads.indexOf('仓库')
-  rows0[0].querySelectorAll('td')[idx]?.querySelector('.ref-cell')?.click()
-  await sleep(2600)
-  const dlg = () => [...document.querySelectorAll('.el-dialog')].filter(vis).pop()
-  const items = [...dlg().querySelectorAll('.pwp-item')]
-  const pick = (name) => {
-    const it = items.find((d) => (d.querySelector('.pwp-name')?.textContent || '').trim() === name)
-    it?.querySelector('.el-checkbox')?.click()
-  }
-  pick('恒亿仓')
-  await sleep(250)
-  pick('成品B仓')
-  await sleep(350)
-  const evenBtn = [...dlg().querySelectorAll('button')].find((b) => (b.textContent || '').includes('平均分配'))
-  evenBtn?.click()
-  await sleep(500)
-  const sumText = (dlg().querySelector('.pwp-sum')?.textContent || '').replace(/\s+/g, ' ').trim()
-  const hint = (dlg().querySelector('.pwp-hint')?.textContent || '').trim()
-  const okBtn = [...dlg().querySelectorAll('.el-dialog__footer button')].find((b) => (b.textContent || '').trim() === '确定')
-  const disabled = okBtn?.disabled
-  const qtys = [...dlg().querySelectorAll('.el-input-number input')].map((i) => i.value).filter((v) => v && v !== '')
-  if (!disabled) { okBtn.click() }
-  await sleep(7000)
-  const rows1 = [...document.querySelectorAll('.detail .el-table__body-wrapper tr.el-table__row')].filter(vis)
-  return {
-    sumText, hint, disabled, qtys,
-    msg: [...document.querySelectorAll('.el-message')].filter(vis).map((m) => (m.textContent || '').trim()),
-    rowCount: rows1.length,
-    rows: rows1.map((tr) => (tr.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 70)),
-  }
+  if (location.hash.includes('login')) return 'login'
+  const inp = [...document.querySelectorAll('input')].find((i) => (i.placeholder || '').includes('模糊搜索'))
+  if (!inp) return 'no-search'
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+  setter.call(inp, 'PI-2026-11-0008')
+  inp.dispatchEvent(new Event('input', { bubbles: true }))
+  ;[...document.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === '查找')?.click()
+  await sleep(4500)
+  const tr = [...document.querySelectorAll('.dsr-grid tr')].find((r) => (r.textContent || '').includes('PI-2026-11-0008'))
+  if (!tr) return 'no-row'
+  tr.click()
+  await sleep(4500)
+  const btn = [...document.querySelectorAll('.tools .tb-main')].filter(vis).find((b) => (b.textContent || '').trim() === '多仓库入库')
+  if (!btn) return 'no-button'
+  btn.click()
+  await sleep(3500)
+  const dlg = [...document.querySelectorAll('.el-dialog')].filter(vis).pop()
+  if (!dlg) return 'no-dialog'
+  const lines = [...dlg.querySelectorAll('.el-table__body-wrapper tr:not(.pmw-alloc-row)')].filter(vis)
+  return { first: (lines[0]?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60), lineCount: lines.length }
 })
-console.log(JSON.stringify(out, null, 2))
-await page.screenshot({ path: 'C:/Users/Lenovo/ego/purin-whpick-20261117/g6-after-split.png' })
+console.log('PREP=' + JSON.stringify(prep))
+
+// 第 1 行加两行:D仓 6 / C仓 4
+const r1 = await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const vis = (el) => !!(el.offsetParent || el.getClientRects().length)
+  const dlg = [...document.querySelectorAll('.el-dialog')].filter(vis).pop()
+  const carets = [...dlg.querySelectorAll('.pmw-caret')].filter(vis)
+  carets[0].click(); await sleep(600); carets[0].click(); await sleep(800)
+  const a = [...dlg.querySelectorAll('tr.pmw-alloc-row')].filter(vis)
+  const setQty = (el, v) => {
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    setter.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); el.blur()
+  }
+  setQty(a[0].querySelector('.el-input-number input'), '6')
+  await sleep(400)
+  a[1].querySelector('.el-select .el-select__wrapper')?.click()
+  await sleep(900)
+  const boxes = [...document.querySelectorAll('.el-select-dropdown')].filter((d) => d.offsetParent)
+  const items = boxes.length ? [...boxes[boxes.length - 1].querySelectorAll('.el-select-dropdown__item')] : []
+  const hit = items.find((i) => (i.textContent || '').trim() === 'C仓')
+  hit?.click(); await sleep(400)
+  setQty(a[1].querySelector('.el-input-number input'), '4')
+  await sleep(500)
+  const foot = (dlg.querySelector('.pmw-foot')?.textContent || '').replace(/\s+/g, ' ').trim()
+  const ok = [...dlg.querySelectorAll('.el-dialog__footer button')].find((b) => (b.textContent || '').trim() === '确定')
+  return { allocs: a.length, foot, disabled: ok?.disabled, picked: !!hit }
+})
+console.log('R1=' + JSON.stringify(r1))
+
+if (!r1.disabled) {
+  await page.evaluate(() => {
+    const vis = (el) => !!(el.offsetParent || el.getClientRects().length)
+    const dlg = [...document.querySelectorAll('.el-dialog')].filter(vis).pop()
+    ;[...dlg.querySelectorAll('.el-dialog__footer button')].find((b) => (b.textContent || '').trim() === '确定')?.click()
+  })
+  await page.waitForTimeout(8000)
+}
+await page.screenshot({ path: 'C:/Users/Lenovo/ego/purin-whgroup/g7-after-split.png' })
+console.log('split done')
