@@ -45,12 +45,16 @@ test('项目管理组:立项申请 → 项目实施计划 → 项目进度查询
   assert.ok(!group('rdProject').children.some((c) => c.code === 'rdProductFlow'), '不挂菜单项')
 })
 
-test('测试记录组下挂数据记录表 8 张与实验室使用记录表 4 张', () => {
+test('测试记录组下挂数据记录表 9 张（8 张记录表 + 特殊数据记录表）与实验室使用记录表 4 张', () => {
   const test1 = group('rdTest')
   assert.deepEqual((test1.children || []).map((c) => c.code), ['rdData', 'rdLab'])
   const data = test1.children.find((c) => c.code === 'rdData')
   const lab = test1.children.find((c) => c.code === 'rdLab')
-  assert.equal((data.children || []).length, 8)
+  // 2026-11-17 用户口径：「在数据记录表列下边…新设计一个面板，可以上传一些比较特殊的数据记录表」
+  //   ⇒ 8 → 9（第 9 个是「特殊数据记录表」/rd/extraRecFile，页面级视图，不是 PanelxList 引擎面板）
+  assert.equal((data.children || []).length, 9)
+  assert.ok((data.children || []).some((c) => c.code === 'rdExtraRecFile'), '特殊数据记录表必须挂在数据记录表下')
+  assert.equal((data.children || []).filter((c) => c.code !== 'rdExtraRecFile').length, 8, '原有 8 张记录表一个不少')
   assert.equal((lab.children || []).length, 4)
   // 2026-09-30:RD_DOM_TEST 由「内部委托测试申请单」升级为**一张单三个页签**的「测试申请单」
   // (面板编码不变 ⇒ 权限行/单据表/单据编号前缀全沿用);菜单名必须跟着改,否则用户找不到。
@@ -231,8 +235,11 @@ test('研发管理 26 个面板一个不少(含新增 项目流程管控 与两�
   const codes = collect(rd).filter(Boolean)
   // 2026-11-12:叶子项 26 → 27（新增「产品文件流程管控」页面入口，panelCode 复用 RD_PROD_DOCLIST）
   //   ⇒ **面板仍是 26 张**，叶子项 27。这里两个数都钉住，避免"多一个入口"被误当成"多一张面板"。
-  assert.equal(codes.length, 27, '叶子项 27 个（含产品文件流程管控页面）')
-  assert.equal(new Set(codes).size, 26, '去重后仍是 26 张面板')
+  // 2026-11-17:叶子项 27 → 28、面板 26 → 27（新增「特殊数据记录表」RD_EXTRA_REC_FILE，
+  //   挂在「数据记录表」下；它是页面级视图 + 独立表，**算一张真面板**，与该面板的权限矩阵同名）。
+  assert.equal(codes.length, 28, '叶子项 28 个（含产品文件流程管控页面 + 特殊数据记录表）')
+  assert.equal(new Set(codes).size, 27, '去重后 27 张面板')
+  assert.ok(codes.includes('RD_EXTRA_REC_FILE'), '特殊数据记录表必须登记面板码（权限矩阵同源）')
   assert.ok(codes.includes('PROJECT_FLOW'), '项目流程管控必须挂在研发管理下')
   // 2026-10-30:X烧结工艺清单(RD_X_SINTER)是 RD_MOLD_PROC 页面内的第二个 Tab,
   // 由 @core/views/MoldProcPanel.vue 承载 ⇒ **不占菜单项**,这里也不该出现。

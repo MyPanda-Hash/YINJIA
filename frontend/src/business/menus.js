@@ -50,6 +50,12 @@ export const menuTree = [
               { code: 'rdRoProtect', title: 'RO保护', path: '/panelx/list/RD_RO_PROTECT', panelCode: 'RD_RO_PROTECT', icon: 'Umbrella' },
               { code: 'rdSoak', title: '浸泡安全', path: '/panelx/list/RD_SOAK', panelCode: 'RD_SOAK', icon: 'Coffee' },
               { code: 'rdDropPrec', title: '压降、精度', path: '/panelx/list/RD_DROP_PREC', panelCode: 'RD_DROP_PREC', icon: 'Bottom' },
+              // 2026-11-17 用户口径:「在数据记录表列下边使用设计库新设计一个面板,可以上传一些比较特殊
+              //   的数据记录表进行保存,也可以点击预览这些文件,删除需要管理员审批…所有人只要能看这个面板
+              //   就可以查看这些上传的数据记录表」。⚠ 它是**页面级视图**(路径 /rd/extraRecFile),
+              //   不是 PanelxList 引擎面板 —— 上传/预览/删除审批都由专属页面 + /api/extra-rec-file 承担。
+              //   panelCode 仍登记 RD_EXTRA_REC_FILE:权限矩阵与后端 requirePanelView 同源(能看才进得来)。
+              { code: 'rdExtraRecFile', title: '特殊数据记录表', path: '/rd/extraRecFile', panelCode: 'RD_EXTRA_REC_FILE', icon: 'Files' },
             ],
           },
           {

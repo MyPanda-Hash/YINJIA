@@ -96,6 +96,9 @@ const routes = [
       { path: 'erp/integConfig', component: () => import('@/views/erp/ErpIntegConfig.vue'), meta: { title: 'ERP集成配置清单', code: 'erpIntegCfg', panelCode: 'ERP_INTEG' } },
       // 共享文件库(研发管理·全公司共享资料):panelCode=RD_SHARE_FILE 带权限,故不进 flatMenus 自动路由,显式注册
       { path: 'rd/shareFile', component: () => import('@/views/rd/ShareFileCenter.vue'), meta: { title: '共享文件库', code: 'rdShareFile' } },
+      // 特殊数据记录表(2026-11-17 用户口径):「数据记录表」下的上传类面板 —— 上传/预览/删除审批。
+      // 与共享文件库同一形态(页面级视图,非 PanelxList 引擎面板);权限走 panelCode RD_EXTRA_REC_FILE。
+      { path: 'rd/extraRecFile', component: () => import('@/views/rd/ExtraRecFileCenter.vue'), meta: { title: '特殊数据记录表', code: 'rdExtraRecFile', panelCode: 'RD_EXTRA_REC_FILE' } },
       // 项目流程管控(研发管理·项目管理,2026-10-20):按立项单号查流程走到哪一步。
       // 页面级虚拟面板 PROJECT_FLOW(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由,显式注册。
       { path: 'rd/projectFlow', component: () => import('@/views/rd/ProjectFlow.vue'), meta: { title: '项目流程管控', code: 'rdFlow', panelCode: 'PROJECT_FLOW' } },

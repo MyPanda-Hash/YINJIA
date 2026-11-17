@@ -4913,3 +4913,6 @@ migrate-sample-insp-module-20261116.sql
 #   现在按配置派单、落库,代理回来第一次 /pending 按 id 顺序补打;默认保留 3 天 = 72 小时(print.cache_hours,用户口径「补打印保留3天」)。
 #   含中文注明(表+15 列)、pk/ix 命名与末尾自检(关键列 5/5、索引 1/1、注明 ≥15)。两账套已执行
 migrate-print-task-cache-20261116.sql
+
+# 2026-11-17 「特殊数据记录表」上传类面板(用户口径:数据记录表下新增,全员可传,删除走单独待审批列表)
+migrate-rd-extra-record-file-20261117.sql
