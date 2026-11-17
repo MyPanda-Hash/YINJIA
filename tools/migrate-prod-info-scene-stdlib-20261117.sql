@@ -68,9 +68,15 @@ ELSE IF OBJECT_ID('yj_translation') IS NULL PRINT N'[prod-scene] 本库无 yj_tr
 GO
 
 /* ---------- ④ 自检 ---------- */
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = N'RD_PROD_INFO' AND label = N'应用场景'
-               AND data_type = N'标准库' AND dict_sql = N'prod.scene')
-    RAISERROR(N'[prod-scene] 自检失败：应用场景 未改成标准库', 16, 1);
+-- 自检分三种情况（两账套 schema 不同步，不能一刀切 RAISERROR）：
+--   · 字段存在但没改成功 → 报错（真故障）；
+--   · 字段压根不存在（测试库这一版没有该面板字段）→ 只提示，不中断链；
+--   · 改成功 → 通过。
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = N'RD_PROD_INFO' AND label = N'应用场景')
+    PRINT N'[prod-scene] 本库无 RD_PROD_INFO.应用场景 字段，跳过（schema 滞后）';
+ELSE IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = N'RD_PROD_INFO' AND label = N'应用场景'
+                    AND data_type = N'标准库' AND dict_sql = N'prod.scene')
+    RAISERROR(N'[prod-scene] 自检失败：应用场景 存在但未改成标准库', 16, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_std_lib WHERE lib_code = N'prod.scene')
     PRINT N'[prod-scene] 提示：prod.scene 暂无条目（库里历史上没有应用场景取值），需业务侧在界面新增';
 ELSE PRINT N'[prod-scene] 自检通过。';
