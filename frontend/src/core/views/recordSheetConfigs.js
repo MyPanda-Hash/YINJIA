@@ -1599,7 +1599,10 @@ export const recordSheetConfigs = {
         //   原来是各占一整行(vspan:3),现在合成一对:左「产品形态」下拉、右「应用场景」文本。
         { pairs: [
           { label: '产品形态', key: '产品形态', type: 'select' },
-          { label: '应用场景', key: '应用场景', type: 'text' },
+          // 2026-11-17（1117问题 #7）：应用场景改成标准库下拉（元数据已 data_type=标准库/prod.scene，
+          //   见 migrate-prod-info-scene-stdlib-20261117.sql）。此处 type 必须同步改 select，
+          //   否则渲染层按 text 出纯输入框、标准库维护入口不出现（实测踩到）。
+          { label: '应用场景', key: '应用场景', type: 'select' },
         ]},
       ]},
       // 二、规格与尺寸:产品整体尺寸一行 + 炭棒尺寸一行(各整行,值区 vspan 3)

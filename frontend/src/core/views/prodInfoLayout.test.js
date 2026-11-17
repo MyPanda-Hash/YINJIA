@@ -38,8 +38,11 @@ test('基本信息区行序与目标版式一致（客户名仍是单格，不�
 
 test('应用场景改成标准库（可维护），并种入历史取值', () => {
   assert.match(mig, /data_type = N'标准库', dict_sql = N'prod\.scene'/, '字段要改标准库')
-  assert.match(mig, /INSERT INTO yj_std_lib[\s\S]*N'prod\.scene'/, '要把历史取值种进库')
-  assert.match(mig, /NOT EXISTS \(SELECT 1 FROM yj_std_lib l WHERE l\.lib_code = N'prod\.scene'/, '幂等')
+  // 种库走**动态 SQL**（sp_executesql）：两账套 schema 不同步，测试库没有 [应用场景] 列，
+  //   而 IF COL_LENGTH(...) 包不住批编译期的列名解析（实测 207），所以整段拼串执行。
+  assert.match(mig, /EXEC sp_executesql @seedSql/, '种库必须是动态 SQL')
+  assert.match(mig, /INSERT INTO yj_std_lib[\s\S]*prod\.scene/, '要把历史取值种进库')
+  assert.match(mig, /IF COL_LENGTH\('rd_prod_info_head', N'应用场景'\) IS NOT NULL/, '缺列要跳过')
 })
 
 test('BOM 表默认生成一行（面板级 seedRows）', () => {
@@ -58,4 +61,13 @@ test('尺寸行按「外径±公差 / 内径±公差 / 长度±公差」写', ()
   assert.match(overall.ph, /长度±公差/)
   const rod = size.rows[1].pairs[0]
   assert.deepEqual(rod.cells.map((c) => c.ph), ['外径±公差mm', '内径±公差mm', '长度±公差'])
+})
+
+test('应用场景的 config.type 必须是 select（配合元数据的标准库）', () => {
+  // 元数据改成标准库还不够：渲染层按 config 的 type 决定出输入框还是下拉，
+  // 写 'text' 时标准库维护入口不会出现（2026-11-17 实测踩到，截图里该格是空白框）。
+  const basic = (cfg.sections || []).find((s) => s.bar === '一、产品基本信息')
+  const pair = basic.rows.flatMap((r) => r.pairs || []).find((p) => p.key === '应用场景')
+  assert.ok(pair, '缺应用场景')
+  assert.equal(pair.type, 'select', '应用场景必须按 select 渲染')
 })
