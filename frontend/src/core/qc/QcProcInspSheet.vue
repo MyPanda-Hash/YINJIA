@@ -983,16 +983,29 @@ async function saveOptManager() {
 /** 空表提示行要跨的列数(3 项目列 + 每批 2 列 + 操作列) */
 const colspanAll = computed(() => 3 + batches.value.length * 2 + (props.editable ? 1 : 0))
 
-/** 列宽(百分比 ⇒ 屏幕与打印同一套,打印不会因为列多被裁):
- *  检验项目 11% / 检验方法 12% / 检验要求 32%(批次多时收到 26%/20%) / 每批两列平分余量 / 操作 3.5%。 */
+/**
+ * 列宽(百分比 ⇒ 屏幕与打印同一套,打印不会因为列多被裁)。
+ *
+ * 【2026-11-17 用户口径】「把检验方法列调宽,检验要求调小」——截图里检验方法列只有 ~139px,
+ * 一段「将炭棒水平放置在水压平压板上…」被压成 7 行、字号挤成一团;而检验要求列 322px 里
+ * 多数是「≥48g」「目视」这种短句,wch 也印证同一方向(导出侧 qcProcInspExport.js:
+ * 检验项目 14 / 检验方法 40 / 检验要求 34 —— 方法本来就该比要求宽)。
+ *
+ * 口径:**检验方法 20% / 检验要求 20%(批次多时三者同比收)** / 检验项目 10%,
+ * 批次列照旧平分余量。两者等宽 = 方法拿到要求让出的那部分,不再被压成一行一个字。
+ *   · 旧值 检验方法 12% / 检验要求 32%(n≤2) —— 方法比要求窄 20 个百分点,是这次报障的根因;
+ *   · 检验项目 11%→10%:它是「*外观」「*整休尺寸(内PP棉)」这类短标签,让 1 个百分点给方法;
+ *   · 批次多时(n≥3)要求列同步收窄(26%/20% → 20%/16%),不把批次列挤到放不下输入框。
+ */
 const colWidths = computed(() => {
   const n = Math.max(batches.value.length, 1)
   const opPct = props.editable ? 3.5 : 0
-  const reqPct = n <= 2 ? 32 : n === 3 ? 26 : 20
-  const fixedPct = 11 + 12
-  const pairTotal = Math.max(100 - fixedPct - reqPct - opPct, n * 6)
+  const itemPct = 9           // 检验项目(短标签「*外观」「≥48g」这类)
+  const mtdPct = 30           // 检验方法(长文本,本次调宽:12% → 30%)
+  const reqPct = n <= 2 ? 14 : n === 3 ? 13 : 12   // 检验要求(短句居多,本次调小:32% → 14%)
+  const pairTotal = Math.max(100 - itemPct - mtdPct - reqPct - opPct, n * 6)
   const pairPct = pairTotal / n
-  const out = ['11%', '12%', (100 - fixedPct - opPct - pairTotal).toFixed(2) + '%']
+  const out = [itemPct + '%', mtdPct + '%', (100 - itemPct - mtdPct - opPct - pairTotal).toFixed(2) + '%']
   for (let i = 0; i < n; i++) {
     // 每个批次两列各占一半:批次号列要放得下「批次号」小标签 + 改名输入框 + 删除 ×
     out.push((pairPct * 0.5).toFixed(2) + '%', (pairPct * 0.5).toFixed(2) + '%')
