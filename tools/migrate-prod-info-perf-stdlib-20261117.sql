@@ -20,13 +20,14 @@ IF OBJECT_ID('yj_std_lib') IS NULL RAISERROR(N'[prod-perf] 缺 yj_std_lib', 16, 
 GO
 
 /* ---------- ① 种入历史取值（动态 SQL） ---------- */
-IF COL_LENGTH('rd_prod_info_head', N'主要性能描述') IS NOT NULL
+-- ⚠ 物理列名是「特殊性能描述」不是「主要性能描述」（实测 yj_field: label 主要性能描述 → col 特殊性能描述）
+IF COL_LENGTH('rd_prod_info_head', N'特殊性能描述') IS NOT NULL
 BEGIN
     DECLARE @seed nvarchar(max) = N'
         ;WITH src AS (
-            SELECT DISTINCT LTRIM(RTRIM([主要性能描述])) AS v
+            SELECT DISTINCT LTRIM(RTRIM([特殊性能描述])) AS v
               FROM rd_prod_info_head
-             WHERE ISNULL([主要性能描述], N'''') <> N''''
+             WHERE ISNULL([特殊性能描述], N'''') <> N''''
                AND ISNULL(asp_cancel, ''N'') <> ''Y''
         )
         INSERT INTO yj_std_lib (lib_code, item_code, content, seq, enabled, asp_user1, asp_time1)
@@ -38,7 +39,7 @@ BEGIN
     EXEC sp_executesql @seed;
     PRINT N'[prod-perf] 历史取值已种入 prod.perf = ' + CAST(@@ROWCOUNT AS nvarchar(10));
 END
-ELSE PRINT N'[prod-perf] 本库无 rd_prod_info_head.[主要性能描述] 列，跳过种入';
+ELSE PRINT N'[prod-perf] 本库无 rd_prod_info_head.[特殊性能描述] 列，跳过种入';
 GO
 
 /* ---------- ② 字段改标准库 ---------- */
