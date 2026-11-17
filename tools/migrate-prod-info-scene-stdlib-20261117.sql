@@ -25,19 +25,26 @@ IF OBJECT_ID('yj_std_lib') IS NULL
 GO
 
 /* ---------- ① 把历史取值种进标准库 ---------- */
-;WITH src AS (
-    SELECT DISTINCT LTRIM(RTRIM([应用场景])) AS v
-      FROM rd_prod_info_head
-     WHERE ISNULL([应用场景], N'') <> N''
-       AND ISNULL(asp_cancel, 'N') <> 'Y'
-)
-INSERT INTO yj_std_lib (lib_code, item_code, content, seq, enabled, asp_user1, asp_time1)
-SELECT N'prod.scene', s.v, s.v,
-       ISNULL((SELECT MAX(seq) FROM yj_std_lib WHERE lib_code = N'prod.scene'), 0) + 1,
-       1, N'migrate', GETDATE()
-  FROM src s
- WHERE NOT EXISTS (SELECT 1 FROM yj_std_lib l WHERE l.lib_code = N'prod.scene' AND l.content = s.v);
-PRINT N'[prod-scene] 历史取值已种入 prod.scene = ' + CAST(@@ROWCOUNT AS nvarchar(10));
+-- ⚠ 必须判列存在：两账套 schema 不同步 —— 正式库 rd_prod_info_head 有 [应用场景]，
+--   测试库这一版**没有该列**（实测），硬写会 207 让整条链在测试库中断。
+--   缺列时跳过种入（字段侧照改，界面照样能手工新增条目）。
+IF COL_LENGTH('rd_prod_info_head', N'应用场景') IS NOT NULL
+BEGIN
+    ;WITH src AS (
+        SELECT DISTINCT LTRIM(RTRIM([应用场景])) AS v
+          FROM rd_prod_info_head
+         WHERE ISNULL([应用场景], N'') <> N''
+           AND ISNULL(asp_cancel, 'N') <> 'Y'
+    )
+    INSERT INTO yj_std_lib (lib_code, item_code, content, seq, enabled, asp_user1, asp_time1)
+    SELECT N'prod.scene', s.v, s.v,
+           ISNULL((SELECT MAX(seq) FROM yj_std_lib WHERE lib_code = N'prod.scene'), 0) + 1,
+           1, N'migrate', GETDATE()
+      FROM src s
+     WHERE NOT EXISTS (SELECT 1 FROM yj_std_lib l WHERE l.lib_code = N'prod.scene' AND l.content = s.v);
+    PRINT N'[prod-scene] 历史取值已种入 prod.scene = ' + CAST(@@ROWCOUNT AS nvarchar(10));
+END
+ELSE PRINT N'[prod-scene] 本库无 rd_prod_info_head.[应用场景] 列，跳过种入';
 GO
 
 /* ---------- ② 字段改标准库 ---------- */
@@ -49,9 +56,11 @@ PRINT N'[prod-scene] 字段已改标准库 = ' + CAST(@@ROWCOUNT AS nvarchar(10)
 GO
 
 /* ---------- ③ 译名（库编码展示用；AGENTS 要求新增 i18n） ---------- */
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope = N'lib' AND ref_key = N'prod.scene' AND locale = 'en')
+IF OBJECT_ID('yj_translation') IS NOT NULL
+   AND NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope = N'lib' AND ref_key = N'prod.scene' AND locale = 'en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source)
     VALUES (N'lib', N'prod.scene', 'en', N'Application Scenario', N'manual');
+ELSE IF OBJECT_ID('yj_translation') IS NULL PRINT N'[prod-scene] 本库无 yj_translation 表，跳过译名';
 GO
 
 /* ---------- ④ 自检 ---------- */
