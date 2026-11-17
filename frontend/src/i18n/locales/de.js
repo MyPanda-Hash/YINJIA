@@ -3029,6 +3029,23 @@ export default {
     '确定清空打印缓存吗?清空后这些单子不再补打': 'Den gesamten Druckcache leeren? Diese Belege werden nicht mehr gedruckt',
     // 2026-11-17 客户口径:未勾选的明细行置灰且不能填(四个打印/生单弹窗同一句)
     '未勾选的明细行置灰、不能填写': 'Nicht ausgewählte Zeilen sind ausgegraut und können nicht bearbeitet werden',
+    // 2026-11-17 采购入库单「一行拆多个仓库」(草稿态)
+    '拆分仓库': 'Auf Lager aufteilen',
+    '采购订单行号': 'Bestellposition',
+    '拆成多行后：来源采购订单行号与批次号保持不变；各仓库数量合计必须等于实收数量': 'Nach dem Aufteilen bleiben Bestellposition und Charge unverändert; die Mengen je Lager müssen der Zugangsmenge entsprechen',
+    '增加一行': 'Zeile hinzufügen',
+    '已分配合计': 'Zugewiesene Summe',
+    '差额': 'Differenz',
+    '至少要分到两个仓库': 'Mindestens auf zwei Lager aufteilen',
+    '第 {n} 行没有选仓库': 'Zeile {n}: kein Lager gewählt',
+    '第 {n} 行数量必须大于 0': 'Zeile {n}: Menge muss größer als 0 sein',
+    '各仓库数量合计必须等于实收数量': 'Die Mengen je Lager müssen der Zugangsmenge entsprechen',
+    '确定拆分': 'Aufteilen',
+    '拆分失败': 'Aufteilen fehlgeschlagen',
+    '拆分成功，已拆成 {n} 行': 'Aufgeteilt in {n} Zeilen',
+    '仓库档案读取失败，请刷新后重试': 'Lagerstammdaten konnten nicht geladen werden; bitte aktualisieren',
+    '拆分仓库（一行分多个仓库存放）': 'Auf Lager aufteilen (eine Zeile auf mehrere)',
+    '请先保存单据，再拆分仓库': 'Bitte zuerst speichern, dann aufteilen',
   },
 
 }

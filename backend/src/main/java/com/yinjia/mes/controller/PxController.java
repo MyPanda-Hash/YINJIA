@@ -65,6 +65,8 @@ public class PxController {
     private final com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate;
     /** 角色字段视图(2026-11-13):同一面板各角色看到不同字段,只存显隐,不碰 yj_field */
     private final com.yinjia.mes.service.PanelFieldViewService fieldView;
+    /** 采购入库单「一行拆多个仓库」(2026-11-17 客户口径):只在草稿、未转ERP 时可用 */
+    private final com.yinjia.mes.service.PurInSplitService purInSplit;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PxController.class);
 
@@ -83,7 +85,8 @@ public class PxController {
                         com.yinjia.mes.service.QueryService queryService,
                         com.yinjia.mes.service.RdProjectFlowService rdFlow,
                         com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate,
-                        com.yinjia.mes.service.PanelFieldViewService fieldView) {
+                        com.yinjia.mes.service.PanelFieldViewService fieldView,
+                        com.yinjia.mes.service.PurInSplitService purInSplit) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -103,6 +106,7 @@ public class PxController {
         this.rdFlow = rdFlow;
         this.qcRecvGenerate = qcRecvGenerate;
         this.fieldView = fieldView;
+        this.purInSplit = purInSplit;
     }
 
     // 2026-11-18:原「工单扫码领料」的四个端点(/woPick/lines|bom|scanLog|attachDoc|scanLogs)已随页面下架，
@@ -257,6 +261,31 @@ public class PxController {
         // 同上:供应商可作废自己打出来的码(预约量释放回余量)
         requireMaterialLabelAccessByLabelDoc(docNo);
         return ApiResult.ok(puLabel.voidDoc(docNo, currentUser()));
+    }
+
+    // ============ 采购入库单:一行明细拆成多个仓库存放(2026-11-17 客户口径) ============
+    /**
+     * 把**一行**采购入库明细按仓库拆成多行(每行一个仓库 + 各仓数量,合计 = 该行实收数量)。
+     *
+     * <p>为什么单独一个端点而不是走通用保存:拆行要**同时**做三件事(复制物理行、按占比分摊金额、
+     * 把占用链 {@code form_flow_link} 一起拆),通用保存只管行本身,做不了后两件;
+     * 而且必须是**一个事务**里做完 —— 半张单(行拆了、链没拆)会让「已入库量」永久对不上。
+     *
+     * <p>守卫(服务端):只有草稿、未转ERP 的单据可拆;仓库必须存在于 bs_wh;各仓数量合计必须等于
+     * 该行实收数量。前端只负责收集分配清单,口径以这里为准。
+     */
+    @PostMapping("/purIn/split")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> purInSplit(@RequestBody Map<String, Object> body) {
+        String docNo = String.valueOf(body.getOrDefault("docNo", ""));
+        long lineId = body.get("lineId") instanceof Number n ? n.longValue() : 0L;
+        List<Map<String, Object>> allocs = new java.util.ArrayList<>();
+        if (body.get("allocs") instanceof List<?> l) {
+            for (Object o : l) if (o instanceof Map<?, ?> m) allocs.add(new LinkedHashMap<>((Map<String, Object>) m));
+        }
+        // 与「修改」同一把权限词(拆行就是改这张单的明细)
+        perm.requireButton("PURCHASE_IN", "修改");
+        return ApiResult.ok(purInSplit.split(docNo, lineId, allocs, currentUser()));
     }
 
     // ============ 采购订单报表打印记录(2026-11-07) ============

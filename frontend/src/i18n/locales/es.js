@@ -3029,6 +3029,23 @@ export default {
     '确定清空打印缓存吗?清空后这些单子不再补打': '¿Vaciar toda la caché? Estos documentos no se imprimirán',
     // 2026-11-17 客户口径:未勾选的明细行置灰且不能填(四个打印/生单弹窗同一句)
     '未勾选的明细行置灰、不能填写': 'Las líneas no marcadas se muestran en gris y no se pueden editar',
+    // 2026-11-17 采购入库单「一行拆多个仓库」(草稿态)
+    '拆分仓库': 'Dividir entre almacenes',
+    '采购订单行号': 'N.º de línea del pedido',
+    '拆成多行后：来源采购订单行号与批次号保持不变；各仓库数量合计必须等于实收数量': 'Tras dividir, el n.º de línea del pedido y el lote no cambian; la suma por almacén debe igualar la cantidad recibida',
+    '增加一行': 'Añadir línea',
+    '已分配合计': 'Total asignado',
+    '差额': 'Diferencia',
+    '至少要分到两个仓库': 'Debe dividirse al menos en dos almacenes',
+    '第 {n} 行没有选仓库': 'Fila {n}: no se eligió almacén',
+    '第 {n} 行数量必须大于 0': 'Fila {n}: la cantidad debe ser mayor que 0',
+    '各仓库数量合计必须等于实收数量': 'La suma por almacén debe igualar la cantidad recibida',
+    '确定拆分': 'Dividir',
+    '拆分失败': 'Error al dividir',
+    '拆分成功，已拆成 {n} 行': 'División realizada: {n} filas',
+    '仓库档案读取失败，请刷新后重试': 'No se pudo leer el maestro de almacenes; actualice y reintente',
+    '拆分仓库（一行分多个仓库存放）': 'Dividir entre almacenes (una línea en varios)',
+    '请先保存单据，再拆分仓库': 'Guarde primero el documento y luego divida',
   },
 
 }

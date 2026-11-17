@@ -34,6 +34,8 @@ const REQUIRED_METHODS = [
   'puPrintDetail',
   'puPrintBuyerContacts',
   'puPrintBuyerContactAdd',
+  // 采购入库单「一行拆多个仓库」(2026-11-17 客户口径):服务端事务里复制行 + 分摊金额 + 拆占用链
+  'splitPurInLine',
 ]
 
 /**

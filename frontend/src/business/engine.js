@@ -759,6 +759,15 @@ export async function batchFlowSaveOverRatio(overRatio) {
   return unwrap(await request.post('/px/batchFlow/overRatio', { overRatio }))
 }
 
+/* ── 采购入库单「一行拆多个仓库」(2026-11-17 客户口径) ──
+ * 用户原话:「采购入库单在草稿状态下要可以实现一个明细划分多个仓库来存放」+
+ * 「来源采购订单行号和上游的行号不变」;数量口径「各仓库合计 = 该行实收数量」。
+ * 服务端在一个事务里做三件事:复制物理行(原样带上 源单行号/批次号)、按数量占比分摊金额、
+ * 把占用链 form_flow_link 一起拆 —— 前端只提交分配清单,口径以服务端为准。 */
+export async function splitPurInLine({ docNo, lineId, allocs }) {
+  return unwrapStrict(await request.post('/px/purIn/split', { docNo, lineId, allocs: allocs || [] }))
+}
+
 // ==================== 统一生单对话框(2026-10-31 用户口径) ====================
 /**
  * 生单预览:勾选的来源单据(一张 = 原「生单」,多张 = 「批量生单」)各自的明细行。

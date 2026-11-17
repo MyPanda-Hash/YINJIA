@@ -3029,6 +3029,23 @@ export default {
     '确定清空打印缓存吗?清空后这些单子不再补打': 'Vider tout le cache ? Ces documents ne seront plus imprimés',
     // 2026-11-17 客户口径:未勾选的明细行置灰且不能填(四个打印/生单弹窗同一句)
     '未勾选的明细行置灰、不能填写': 'Les lignes non cochées sont grisées et non modifiables',
+    // 2026-11-17 采购入库单「一行拆多个仓库」(草稿态)
+    '拆分仓库': 'Répartir entre entrepôts',
+    '采购订单行号': 'N° de ligne de commande',
+    '拆成多行后：来源采购订单行号与批次号保持不变；各仓库数量合计必须等于实收数量': 'Après division, le n° de ligne de commande et le lot restent inchangés ; la somme par entrepôt doit égaler la quantité reçue',
+    '增加一行': 'Ajouter une ligne',
+    '已分配合计': 'Total réparti',
+    '差额': 'Écart',
+    '至少要分到两个仓库': 'Répartir au moins sur deux entrepôts',
+    '第 {n} 行没有选仓库': 'Ligne {n} : aucun entrepôt sélectionné',
+    '第 {n} 行数量必须大于 0': 'Ligne {n} : la quantité doit être supérieure à 0',
+    '各仓库数量合计必须等于实收数量': 'La somme par entrepôt doit égaler la quantité reçue',
+    '确定拆分': 'Répartir',
+    '拆分失败': 'Échec de la répartition',
+    '拆分成功，已拆成 {n} 行': 'Répartition effectuée : {n} lignes',
+    '仓库档案读取失败，请刷新后重试': 'Échec de lecture du référentiel entrepôts ; actualisez et réessayez',
+    '拆分仓库（一行分多个仓库存放）': 'Répartir entre entrepôts (une ligne sur plusieurs)',
+    '请先保存单据，再拆分仓库': 'Enregistrez d\'abord le document, puis répartissez',
   },
 
 }

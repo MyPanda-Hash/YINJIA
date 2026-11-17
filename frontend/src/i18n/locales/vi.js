@@ -3034,6 +3034,23 @@ export default {
     '确定清空打印缓存吗?清空后这些单子不再补打': 'Xóa toàn bộ bộ đệm in? Các phiếu này sẽ không được in bù',
     // 2026-11-17 客户口径:未勾选的明细行置灰且不能填(四个打印/生单弹窗同一句)
     '未勾选的明细行置灰、不能填写': 'Các dòng không được chọn sẽ bị làm mờ và không thể nhập',
+    // 2026-11-17 采购入库单「一行拆多个仓库」(草稿态)
+    '拆分仓库': 'Tách theo kho',
+    '采购订单行号': 'Số dòng đơn mua',
+    '拆成多行后：来源采购订单行号与批次号保持不变；各仓库数量合计必须等于实收数量': 'Sau khi tách, số dòng đơn mua và số lô không đổi; tổng số lượng theo kho phải bằng số lượng nhận',
+    '增加一行': 'Thêm dòng',
+    '已分配合计': 'Tổng đã phân bổ',
+    '差额': 'Chênh lệch',
+    '至少要分到两个仓库': 'Phải chia vào ít nhất hai kho',
+    '第 {n} 行没有选仓库': 'Dòng {n}: chưa chọn kho',
+    '第 {n} 行数量必须大于 0': 'Dòng {n}: số lượng phải lớn hơn 0',
+    '各仓库数量合计必须等于实收数量': 'Tổng số lượng theo kho phải bằng số lượng nhận',
+    '确定拆分': 'Tách',
+    '拆分失败': 'Tách thất bại',
+    '拆分成功，已拆成 {n} 行': 'Đã tách thành {n} dòng',
+    '仓库档案读取失败，请刷新后重试': 'Không đọc được danh mục kho, vui lòng tải lại trang',
+    '拆分仓库（一行分多个仓库存放）': 'Tách theo kho (một dòng sang nhiều kho)',
+    '请先保存单据，再拆分仓库': 'Hãy lưu chứng từ trước rồi mới tách',
   },
 
 }
