@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { apiLogin, apiGetUserInfo } from '@/business/api'
 import { pickCurrentFactory } from '@core/auth/factory'
+import { useTabsStore } from '@/stores/tabs'
 
 export const useUserStore = defineStore('user', {
   state: () => {
@@ -75,6 +76,15 @@ export const useUserStore = defineStore('user', {
       localStorage.setItem('mes_token', res.token)
       localStorage.setItem('mes_user', JSON.stringify(res.user))
       localStorage.setItem('mes_login_date', today)
+      // 换账号必须清页签（2026-11-17 用户报障）：
+      //   「使用一个账号打开一些面板的时候，中途退出，切换账号进来的时候还是在对应的面板」。
+      //   根因不是路由（登出确实回 #/login、登录确实 replace('/dashboard')），而是
+      //   **pinia 的页签 store 活在内存里**：登出只清了 token/userInfo，tabs 与 active 原样留着，
+      //   PortalLayout 重新挂载后 TabsBar 仍渲染上一个账号的面板页签、并把 active 指回那一页。
+      //   closeAll() = 只留 affix（我的桌面）+ active='/dashboard'，正是换账号要的干净状态。
+      //   ⚠ 登出与登录**两处都清**：登出清是为了不留痕；登录清是为了兜住
+      //   「401 被动登出 / 直接改 localStorage / 另一个标签页登录」这些没走 logout() 的路径。
+      try { useTabsStore().closeAll() } catch { /* 无 pinia 实例（单测）时忽略 */ }
       // 账套以**登录响应**为准(后端把令牌声明里的 factory 一并返回):
       // 顶栏/桌面显示的名字必须等于"正在被查询的那个库",不能由可陈旧的缓存说了算。
       // 账套清单可能还没加载(直接调 API 登录的场景),先记 code,名字由 fetchFactories 补齐。
@@ -190,6 +200,9 @@ export const useUserStore = defineStore('user', {
       this.supplierPanelPerms = {}
       localStorage.removeItem('mes_token')
       localStorage.removeItem('mes_user')
+      // 页签一并清空（同 login() 的注释）：否则同一浏览器里换账号会继承上一个账号的页签与 active，
+      // 表现就是「切换账号进来还停在原来那个面板」。
+      try { useTabsStore().closeAll() } catch { /* 无 pinia 实例（单测）时忽略 */ }
     },
 
   },
