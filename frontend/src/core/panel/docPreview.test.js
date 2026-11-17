@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
   PREVIEW_COMPACT_CAP, PREVIEW_FIELDS, PREVIEW_SKIP, PREVIEW_VALUE_CAP,
-  previewLineText, previewSummaryOf,
+  filterApprovalPreview, previewLineText, previewSummaryOf,
 } from './docPreview.js'
 
 /**
@@ -150,4 +150,48 @@ test('预览态必须替换操作栏（按钮不渲染），返回后恢复', ()
   assert.match(vue, /canPreviewSide \? openSidePreview\(\) : openDocPreview\(\)/,
     '按钮要按面板分派：这两个面板走右栏预览，其余走原逻辑')
   assert.ok(vue.includes('closeSidePreview'), '缺返回函数')
+})
+
+/* ═══ 2026-11-17 用户口径:立项申请「单据预览」改成全屏 · 按申请立项人筛选 ═══
+ *
+ * 用户原话:「点击单据预览就根据申请立项人进行一个筛选全屏展示这些属于自己申请的单据的明细,
+ *   设计要好看,使用设计库进行设计,要留一个返回按钮,点击对应单据要有一个跳转按钮,可以直接跳转到对应单据」。
+ *
+ * 钉住的是**筛选口径**(纯函数,页面只负责画):
+ *   ① 默认「只看我申请的」= 申请立项人 === 当前登录人姓名;
+ *   ② 可切到「全部」(管理员/代查场景),切换后不过滤;
+ *   ③ 姓名比较忽略首尾空白与大小写;申请立项人为空的单**不算我的**;
+ *   ④ 关键字搜索在筛选结果内再收窄(单号/客户名/申请立项人)。
+ */
+
+const APR_ROWS = [
+  { 单据编号: 'LXA-1', 单据日期: '2026-11-17', 申请立项人: '张莉', 客户名: '青岛伊可普', 单据状态: '审批中' },
+  { 单据编号: 'LXA-2', 单据日期: '2026-11-16', 申请立项人: '李梓维', 客户名: '天津远致', 单据状态: '已归档' },
+  { 单据编号: 'LXA-3', 单据日期: '2026-11-13', 申请立项人: '张莉', 客户名: '深圳鼎百汇', 单据状态: '草稿' },
+  { 单据编号: 'LXA-4', 单据日期: '2026-11-13', 申请立项人: '', 客户名: '没有申请人', 单据状态: '草稿' },
+  { 单据编号: 'LXA-5', 单据日期: '2026-11-03', 申请立项人: ' 张莉 ', 客户名: '大咖国际', 单据状态: '审批中' },
+]
+
+test('⑱ 默认只列「我申请的」:申请立项人 = 当前登录人(忽略首尾空白)', () => {
+  const mine = filterApprovalPreview(APR_ROWS, { me: '张莉', scope: 'mine' })
+  assert.deepEqual(mine.map((r) => r['单据编号']), ['LXA-1', 'LXA-3', 'LXA-5'], '只留张莉申请的(含带空格的那张)')
+  assert.ok(!mine.some((r) => r['单据编号'] === 'LXA-4'), '申请立项人为空的单不算我的')
+  assert.ok(mine.every((r) => String(r['申请立项人'] || '').trim() === '张莉'))
+})
+
+test('⑲ 切到「全部」时不过滤(管理员/代查场景)', () => {
+  const all = filterApprovalPreview(APR_ROWS, { me: '张莉', scope: 'all' })
+  assert.equal(all.length, 5, '全部 = 一条不丢')
+})
+
+test('⑳ 关键字在筛选结果内再收窄(单号/客户名/申请立项人)', () => {
+  assert.deepEqual(filterApprovalPreview(APR_ROWS, { me: '张莉', scope: 'mine', keyword: 'lxa-3' }).map((r) => r['单据编号']), ['LXA-3'], '单号大小写无关')
+  assert.deepEqual(filterApprovalPreview(APR_ROWS, { me: '张莉', scope: 'mine', keyword: '深圳' }).map((r) => r['单据编号']), ['LXA-3'], '客户名可搜')
+  assert.deepEqual(filterApprovalPreview(APR_ROWS, { me: '张莉', scope: 'mine', keyword: '李梓维' }).map((r) => r['单据编号']), [], '范围外的人不会被关键字带出来')
+})
+
+test('㉑ 当前登录人为空时不能误判成「全都不是我的」以外的结果', () => {
+  // 拿不到姓名(未登录/匿名)时,「只看我的」应为空 —— 而不是把所有人的单都当自己的
+  assert.deepEqual(filterApprovalPreview(APR_ROWS, { me: '', scope: 'mine' }), [])
+  assert.equal(filterApprovalPreview(APR_ROWS, { me: '   ', scope: 'mine' }).length, 0)
 })

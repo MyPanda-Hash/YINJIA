@@ -5305,6 +5305,17 @@ export default {
     '填写人': 'Filled by',
     '流程管控': 'Flow Control',
     '处理人': 'Handled by',
+    /* ── 立项申请全屏单据预览(2026-11-17 用户口径) ── */
+    '只看我申请的': 'Only mine',
+    '当前登录人': 'Signed in as',
+    '搜索单据编号 / 客户名 / 申请立项人': 'Search document no. / customer / applicant',
+    '你还没有申请过立项': 'You have not submitted any project application yet',
+    '单据的「申请立项人」要填你本人姓名，才会出现在这里': 'A document only shows here when its applicant is your own name',
+    '换个关键字，或切到「全部」看看': 'Try another keyword, or switch to All',
+    '查看全部单据': 'View all documents',
+    '清空筛选': 'Clear filters',
+    '项目立项申请 · 按申请立项人筛选': 'Project applications · filtered by applicant',
+    '没有符合条件的单据': 'No document matches',
     // 2026-11-17:展开行不再显示处理人姓名,改为显示「最后操作时间」
     '最后操作时间': 'Last action time',
     '没有查看产品进度数据的权限（需要「项目进度查询」或「产品文件列表」的查看权）':

@@ -103,3 +103,46 @@ export function previewLineText(summary) {
   const items = Array.isArray(summary?.items) ? summary.items : []
   return items.map((x) => String(x?.value ?? '')).filter(Boolean).join(' · ')
 }
+
+/* ===== 立项申请「单据预览」的筛选口径 · 2026-11-17 =====
+ *
+ * 用户口径：「点击单据预览就根据申请立项人进行一个筛选全屏展示这些属于自己申请的单据的明细」。
+ * 纯函数，页面只负责画 —— 与同文件其它口径一致。
+ */
+
+export const APPLICANT_KEY = '申请立项人'
+
+/** 归一化：去首尾空白 + 转小写（中文不受影响） */
+function norm(v) {
+  return v === undefined || v === null ? '' : String(v).trim().toLowerCase()
+}
+
+/** 范围：mine = 申请立项人 === 当前登录人；all = 不过滤 */
+export function inApplicantScope(row, me, scope) {
+  if (scope === 'all') return true
+  const meName = norm(me)
+  if (!meName) return false
+  const owner = norm(row && row[APPLICANT_KEY])
+  return !!owner && owner === meName
+}
+
+/**
+ * 立项申请单据预览的筛选：范围（我的/全部）→ 关键字。
+ *  - mine：申请立项人 === 当前登录人（去首尾空白）；申请人为空的单不算任何人的；
+ *  - 登录人姓名为空时 mine 返回空（绝不退化成全量）；
+ *  - all：不按人过滤（管理员/代查）；
+ *  - 关键字在筛选结果内再收窄：单号 / 客户名 / 申请立项人，大小写无关。
+ */
+export function filterApprovalPreview(rows, opts) {
+  const o = opts || {}
+  const me = o.me || ''
+  const scope = o.scope || 'mine'
+  const kw = norm(o.keyword || '')
+  const list = Array.isArray(rows) ? rows : []
+  return list.filter(function (r) {
+    if (!inApplicantScope(r, me, scope)) return false
+    if (!kw) return true
+    const hay = [r && r['单据编号'], r && r['客户名'], r && r[APPLICANT_KEY]].map(norm).join(' ')
+    return hay.indexOf(kw) >= 0
+  })
+}
