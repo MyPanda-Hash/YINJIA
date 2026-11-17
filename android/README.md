@@ -1,7 +1,7 @@
 # 银嘉 MES · 安卓壳(`android/`)
 
-> **日期**:2026-10-20(2026-11-17 出 1.0.14)
-> **产物**:`android/dist/yinjia-mes-1.0.14.apk`(自签名,可直接侧载 / 覆盖升级)
+> **日期**:2026-10-20(2026-11-17 出 1.0.14,同日整站重打 1.0.15)
+> **产物**:`android/dist/yinjia-mes-1.0.15.apk`(自签名,可直接侧载 / 覆盖升级)
 > **不依赖 Gradle / Android Studio**:用 SDK 的 `aapt2 / javac / d8 / apksigner` 四步手搓出包,
 > 离线、几十秒、可重复构建(本机没有 Gradle,也没有装 Studio)。
 
@@ -10,9 +10,10 @@
 | 项 | 值 |
 |---|---|
 | 包名 | `com.yinjia.mes.app`(**永不改**;改了就是另一个 App,旧图标/旧数据都不跟着走) |
-| 本版 | `versionName=1.0.14`、`versionCode=15`(上一版 1.0.13 = 14;1.0.9~1.0.12 = 10/11/12) |
+| 本版 | `versionName=1.0.15`、`versionCode=16`(上一版 1.0.14 = 15;1.0.13 = 14;1.0.9~1.0.12 = 10/11/12) |
 | 签名证书 | `CN=Yinjia MES Debug`(仓库内 `android/debug.keystore`,SHA-256 `b455080b…9cbc`) |
 | 覆盖升级 | 与旧版 **同一把钥匙 + versionCode 更大** ⇒ 手机上直接装新 APK 就是「更新」,不用卸载 |
+| 1.0.15 内容 | **整站前端重打(原生壳代码未改)**:采购入库单「多仓库入库」按钮与明细分配界面、同一行明细拆多个仓库存放、仓库改多选弹窗、列表页内联表单同样可用;批量生单/合单生单弹窗表头总全选;连同 1.0.14 的手机端登录页默认服务器地址一起在包内 |
 | 1.0.14 内容 | **接口号默认 = 服务器的 IP:端口**(用户口径「手机端的登录界面的配置默认为服务器的 ip 和端口」):`MainActivity.DEFAULT_BASE` 由占位地址 `192.168.1.10` 改为线上服务器 `http://36.140.66.163:8090`,`getBase()` 未设置时返回该默认值 ⇒ **首装不再强制弹「接口地址」框、直接进登录页**;登录页在壳里多一行**只读**的「服务器地址 http://36.140.66.163:8090(默认)」,改地址仍点顶部「设置」 |
 | 1.0.13 内容 | **整站前端重打(原生壳代码未改)**:含 1.0.12 之后 287 个提交 / 163 个前端源文件的全部更新
 (生产工单草稿箱与新增整页编制、品质管理「样品检验」、出货检验表观审批流、产成品入库多批次与检验门禁、
@@ -104,8 +105,8 @@ SDK 位置探测见 `android/sdk.ps1`:`ANDROID_HOME` → `ANDROID_SDK_ROOT` →
 `%LOCALAPPDATA%\Android\Sdk` → **各盘根目录的 `\SDK` / `\Android\Sdk` / `\android-sdk` 等**
 (本机 SDK 就在 `E:\SDK`,不必再手工设环境变量)。
 
-**手机安装 / 升级**:把 `android/dist/yinjia-mes-1.0.14.apk` 拷到手机点安装(需允许「安装未知应用」)。
-手机上已装旧版的**直接装这个就是升级**(同包名同签名、versionCode 15>14);装完可从「我的桌面 → 设置」里
+**手机安装 / 升级**:把 `android/dist/yinjia-mes-1.0.15.apk` 拷到手机点安装(需允许「安装未知应用」)。
+手机上已装旧版的**直接装这个就是升级**(同包名同签名、versionCode 16>15);装完可从「我的桌面 → 设置」里
 看到壳版本,或看 APK 文件名核对。
 
 > 出包前先 `cd frontend && npm run build`(脚本会自己把 `frontend/dist` 收进 `assets/www`,
@@ -334,9 +335,41 @@ SDK 位置探测见 `android/sdk.ps1`:`ANDROID_HOME` → `ANDROID_SDK_ROOT` →
 | 真机 | `adb devices` 为空 ⇒ **仍未真机验证** |
 
 - **仍未真机验证**:手机插上后跑 `powershell -ExecutionPolicy Bypass -File android\install.ps1` 覆盖安装即可
-  (脚本按 `LastWriteTime` 取 `dist\` 下最新 APK,即 1.0.14)。
+  (脚本按 `LastWriteTime` 取 `dist\` 下最新 APK,即 1.0.15)。
 - **踩坑提醒(本轮再踩一次)**:`android/build.ps1` 与 `install.ps1` **必须保持 UTF-8 带 BOM**;
   用会丢 BOM 的编辑器/工具改完后,Windows PowerShell 5.1 会把中文注释按 ANSI 解析,
   直接报 `Unexpected token ')' in expression or statement`(语法错误位置还指在无关行上,极易误判)。
   改完用 `[System.IO.File]::ReadAllBytes(path)[0..2]` 核对 `EF BB BF`。
+
+---
+
+## 11. 2026-11-17:整站重打 **1.0.15**(APK 内前端追到最新源码)
+
+> 用户口径:「重新打包 apk,确保是最新的状态」—— 1.0.14 出包在后,前端又落了好几轮改动,
+> 手机里装的是缺功能的旧界面(整包嵌入模式:前端改了不重打 APK 就不生效)。
+
+- **做法**:`cd frontend && npm run build`(全新构建,`dist` 命中 **179 个文件**)→
+  `powershell -ExecutionPolicy Bypass -File android\build.ps1`(脚本第 1 步把 `frontend/dist` 整份收进
+  `assets/www`)。**原生壳代码一行未改**(Java/资源/Manifest 均未动),所以扫描、拍照、接口号逻辑与 1.0.14 完全一致;
+  本版只换包里的网页与版本号。`versionName=1.0.15`、`versionCode=16`(上一版 15 ⇒ 可覆盖升级)。
+- **本版带上的前端改动**(1.0.14 之后):采购入库单「多仓库入库」按钮与明细分配界面(列表页内联表单同样可用)、
+  一行明细拆多个仓库存放、仓库改多选弹窗、批量生单/合单生单弹窗表头总全选;以及 1.0.14 那轮的手机端
+  登录页默认服务器地址(`http://36.140.66.163:8090`)。
+- **验证(不需要手机的部分全绿)**:
+
+| 项 | 结果 |
+|---|---|
+| 前端构建 | `npm run build` 成功(`✓ built in 1m 10s`,`dist` 179 个文件),主 chunk `index-C3fzy9Ph.js` |
+| 包信息 | `com.yinjia.mes.app`、`versionCode=16`、`versionName=1.0.15`、`minSdk 24`、`targetSdk 34`、label「银嘉MES」、launcher `MainActivity` |
+| 签名/对齐 | `apksigner verify` 通过(`CN=Yinjia MES Debug`,SHA-256 `b455080b…9cbc` = 与 1.0.14 **同一把钥匙**);`zipalign -c 4` **Verification succesful** |
+| 体积/指纹 | `dist/yinjia-mes-1.0.15.apk` **2.84 MB**(2,904,051 字节),SHA-256 `DFC7F722…53445AC1` |
+| 前端资源 | APK 内 `assets/www/` **179 个文件**,与 `frontend/dist` **逐文件 SHA-256 全等(0 失配 / 0 缺失)**;**0 个反斜杠条目**;包内 `index.html` 主 chunk = `index-C3fzy9Ph.js`(与 dist 一致) |
+| 新功能在包内 | `PanelxList-BADM9cVa.js` / `PanelxForm-Bl-hrrv9.js` 含「多仓库入库」文案,`index-CPksl9sA.js` 含「服务器地址」⇒ 本版确实是新前端 |
+| dex | `classes.dex` 494,500 字节(壳代码未改,与 1.0.14 同类) |
+| 真机 | `adb devices` 为空 ⇒ **仍未真机验证** |
+
+- **BOM 踩坑(本轮复现并修复)**:编辑 `build.ps1` 时 UTF-8 BOM 被工具抹掉,`powershell -File` 直接
+  `Unexpected token ')' in expression or statement`(报在第 35 行,真因是第 34 行中文注释被按 ANSI 读)。
+  已把文件写回 **UTF-8 with BOM** 并复验 `Parser::ParseFile` = **0 errors** 后才出包。
+  ⇒ **以后任何工具改完 `android/*.ps1`,先查前三字节 `EF BB BF`,再出包。**
 
