@@ -3164,6 +3164,8 @@ export default {
     // 2026-11-06 样品二级目录（研发管理）
     '样品': 'Samples',
     '外部-开发样品': 'External - Dev Sample',
+    // 2026-11-17 Excel #14：复制外部开发样品单 → 非开发样品申请单
+    '外部-非开发样品': 'External - Non-Dev Sample',
     '内部-开发样品': 'Internal - Dev Sample',
     '（外部）': 'External',
     '（内部）': 'Internal',

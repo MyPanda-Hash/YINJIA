@@ -36,6 +36,12 @@ export const menuTree = [
         code: 'rdSample', title: '样品', icon: 'Box', children: [
           { code: 'rdSampleExt', title: '外部-开发样品', path: '/panelx/list/RD_SAMPLE_EXT', panelCode: 'RD_SAMPLE_EXT', icon: 'DocumentAdd', operationName: '申请样品' },
           { code: 'rdSampleInt', title: '内部-开发样品', path: '/panelx/list/RD_SAMPLE_INT', panelCode: 'RD_SAMPLE_INT', icon: 'Document', operationName: '申请样品' },
+          // 非开发样品申请单（2026-11-17 Excel #14）：
+          //   「复制一份样品-外部开发样品单页面及入口，将名称改为外部-非开发样品申请单。
+          //    1. 审批流程要求 销售有权限录单（刘磊或王光珍审核）
+          //    2. 其他人有查阅权限但不能修改内容」
+          //   版式复用外部开发样品单（见 PanelxList.docSheetConfig），只是面板码/表/前缀独立。
+          { code: 'rdSampleNonDev', title: '外部-非开发样品', path: '/panelx/list/RD_SAMPLE_ND', panelCode: 'RD_SAMPLE_ND', icon: 'DocumentAdd', operationName: '申请样品' },
         ],
       },
       {

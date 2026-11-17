@@ -4916,3 +4916,5 @@ migrate-print-task-cache-20261116.sql
 
 # 2026-11-17 「特殊数据记录表」上传类面板(用户口径:数据记录表下新增,全员可传,删除走单独待审批列表)
 migrate-rd-extra-record-file-20261117.sql
+# 2026-11-17 Excel #14：新增「外部-非开发样品申请单」面板（复制外部开发样品单；销售录单、刘磊/王光珍审核、其他人只读）
+migrate-sample-nondev-20261117.sql

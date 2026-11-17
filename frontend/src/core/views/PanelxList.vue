@@ -2957,7 +2957,7 @@ const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', '
   //   和外部单底部的新增样品一样，而不是表格类的面板」）⇒ 两张单都走 DocSheet；
   //   内部单的行源改成明细（见 docSheetConfigs.sampleIntSheetCfg 与
   //   tools/migrate-sample-int-paper-rows-20261106.sql）。上一版 archive 数据面板做法已撤销。
-  'RD_SAMPLE_EXT', 'RD_SAMPLE_INT',
+  'RD_SAMPLE_EXT', 'RD_SAMPLE_INT', 'RD_SAMPLE_ND',
   // 检验委托单(INSP_COMMISSION,2026-11-15 用户口径「检验委托单为主要实际单据,需要这个单据完成形式
   // 实现为图片中的」):纸面由 InspCommissionSheet 接管(委托检验合同 YJ-QP-701-1-01 (00)),
   // 「检验类别」从送样登记表的检测目录勾选带入。不列进来会退回「表头字段平铺 + 明细表格」的数据页。
@@ -3005,7 +3005,9 @@ const isChangeInitiator = computed(() => user.isAdmin === true
   || (!!user.realName && String(cur.value?.['申请人'] ?? '') === String(user.realName)))
 const docSheetConfig = computed(() => {
   // 2026-11-06 样品二级目录两张单（各自版式，见 docSheetConfigs 的 sampleExt/IntSheetCfg）
-  if (panelCode.value === 'RD_SAMPLE_EXT') return sampleExtSheetCfg
+  // 非开发样品申请单（2026-11-17 Excel #14）：用户口径「复制一份样品-外部开发样品单页面及入口」
+  //   ⇒ 纸面版式**逐字复用** sampleExtSheetCfg，不另写一套。
+  if (panelCode.value === 'RD_SAMPLE_EXT' || panelCode.value === 'RD_SAMPLE_ND') return sampleExtSheetCfg
   if (panelCode.value === 'RD_SAMPLE_INT') return sampleIntSheetCfg
   return qcSheetCfgs[panelCode.value] || (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg)
 })

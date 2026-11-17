@@ -206,6 +206,8 @@ table:rd_ro_protect_detail   # RO保护测试行表
 table:rd_ro_protect_head   # RO保护测试头表
 table:rd_sample_no_detail   # 样品编号表明细(客户项目代号/样品编号/项目名称/子项目/项目负责人/项目编号/炭棒尺寸)
 table:rd_sample_no_head   # 样品编号表(产品开发样品编号):样品编号=客户项目代号+项目编号(确定性拼接,38样例验证)
+table:rd_sample_nondev_detail   # （外部）非开发样品申请单-明细(2026-11-17 Excel #14;结构复制自 rd_sample_ext_detail)
+table:rd_sample_nondev_head   # （外部）非开发样品申请单-头(2026-11-17 Excel #14「复制外部开发样品单、改为非开发样品」;销售录单、刘磊/王光珍审核、其他人只读;版式复用 RD_SAMPLE_EXT)
 table:rd_scale_detail   # 阻垢性能测试行表
 table:rd_scale_head   # 阻垢性能测试头表
 table:rd_sinter_tolerance   # 烧结尺寸表:烧结车间模具对应的炭棒内外径与公差对照(配方计算按车间+型号带出尺寸)
