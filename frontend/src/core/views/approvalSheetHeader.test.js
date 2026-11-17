@@ -54,3 +54,15 @@ test('信息表顺序：文件管理人 / 密级 / 文件使用范围 / 立项�
       ['文件管理人', '密级', '文件使用范围', '立项编号'])
   }
 })
+
+test('右上角文件编号是黑色，不是红色（用户 2026-11-17 口径）', () => {
+  // 用户：「立项申请和项目实施计划的文件编号是红色的，改为黑色」
+  //   原 `.as-docno-static{color:#b00}`（照产品文件那批受控编号的红字观感）⇒ 改 #333。
+  // ⚠ 只改这两张文书：`.as-docno*` 只存在于 DocSheet，产品文件的红色编号（RecordSheetPanels）
+  //   不受影响 —— 别为了这条去动产品文件的样式。
+  const at = sheet.indexOf('.as-docno-static {')
+  assert.ok(at > 0, '缺 .as-docno-static 样式')
+  const block = sheet.slice(at, sheet.indexOf('}', at))
+  assert.match(block, /color:\s*#333/, '文件编号应为黑色 #333')
+  assert.doesNotMatch(block, /#b00|red|#f00/i, '不应再是红字')
+})
