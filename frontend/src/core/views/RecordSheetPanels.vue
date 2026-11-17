@@ -589,7 +589,12 @@
                且克隆块仍排在所有 sections 之后 ⇒ 表格照样落在末尾。 -->
     <div v-for="(dt, di) in cfg.dataTables" v-show="pageOf(dt) === activePage" :key="'dt' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
       <div class="rsp-dt-table">
-        <table class="rs-t rs-dt" :class="{ 'rsp-design-t': dt.design }" :style="{ width: (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : effPlain ? plainW(dt) : gridW) + 'px' }">
+        <!-- ⚠ 表格宽度必须与下面 colgroup **同一个口径**（dtTableW = 含 span 的列宽和 × design/dtFillK）。
+             2026-11-17 生产缺陷：这里原写 dtW(dt)（不乘 dtFillK），而 colgroup 乘了
+             ⇒ 一旦「字段管理」给该表加过列（碱性实测 +2 列 width=120），
+             colgroup 缩到纸宽 1183、table 的 width 仍是 1540，下方「3.测试数据」整条比纸宽出去
+             （用户口径「下面的那些填写数据的列比上边的超出来」）。改后两条口径同源，加列不再撑破纸面。 -->
+        <table class="rs-t rs-dt" :class="{ 'rsp-design-t': dt.design }" :style="{ width: (dtOwnsWidth(dt) ? dtTableW(dt) : effPlain ? plainW(dt) : gridW) + 'px' }">
           <colgroup>
             <template v-if="effPlain || dtOwnsWidth(dt)">
               <!-- ⚠ span 必须写进 <col>：`样品信息` 这类 span:3 的列，若只生成一个不带 span 的 <col>，
