@@ -983,26 +983,29 @@ async function saveOptManager() {
 /** 空表提示行要跨的列数(3 项目列 + 每批 2 列 + 操作列) */
 const colspanAll = computed(() => 3 + batches.value.length * 2 + (props.editable ? 1 : 0))
 
-/** 列宽(百分比 ⇒ 屏幕与打印同一套,打印不会因为列多被裁):
- *  检验项目 11% / 检验方法 26%(批次 3 个时 22%、4 个以上 20%) /
- *  检验要求 18%(批次 3 个时 14%、4 个以上 12%) / 每批两列平分余量 / 操作 3.5%。
+/**
+ * 列宽(百分比 ⇒ 屏幕与打印同一套,打印不会因为列多被裁)。
  *
- *  2026-11-17 用户口径(出货检验功能 + 出货检验表观两张单同一套纸面):
- *  「检验方法的宽度大一些,检验要求的宽度小一些」——
- *  原来 方法 12% / 要求 32%,方法那列是整段操作步骤(动辄 5~8 行折行),
- *  要求那列多半只是一句判定值(高度 50cm、>50kgf、≥99%),宽度给反了。
- *  现在 方法 26% / 要求 18%(批次多时同比例收窄),批次列拿到的余量口径不变。 */
+ * 【2026-11-17 用户口径】「把检验方法列调宽,检验要求调小」——截图里检验方法列只有 ~139px,
+ * 一段「将炭棒水平放置在水压平压板上…」被压成 7 行、字号挤成一团;而检验要求列 322px 里
+ * 多数是「≥48g」「目视」这种短句,wch 也印证同一方向(导出侧 qcProcInspExport.js:
+ * 检验项目 14 / 检验方法 40 / 检验要求 34 —— 方法本来就该比要求宽)。
+ *
+ * 口径:**检验方法 30% / 检验要求 14%(批次 3 个时 13%、4 个以上 12%)** / 检验项目 9%,
+ * 批次列照旧平分余量。方法拿到要求让出的绝大部分宽度,不再被压成一行一个字。
+ *   · 旧值 检验方法 12% / 检验要求 32%(n≤2) —— 方法比要求窄 20 个百分点,是这次报障的根因;
+ *   · 检验项目 11%→9%:它是「*外观」「*整休尺寸(内PP棉)」这类短标签,让出宽度给方法;
+ *   · 批次多时(n≥3)要求列同步收紧,不把批次列挤到放不下输入框。
+ */
 const colWidths = computed(() => {
   const n = Math.max(batches.value.length, 1)
   const opPct = props.editable ? 3.5 : 0
-  // 检验方法永远比检验要求宽(两者都随批次数量收窄,保持 26:18 / 22:14 / 20:12)
-  const mtdPct = n <= 2 ? 26 : n === 3 ? 22 : 20
-  const reqPct = n <= 2 ? 18 : n === 3 ? 14 : 12
-  const fixedPct = 11 + mtdPct
-  // 每批两列至少留 6%(合计);批次极多时靠 .qr-grid 的 min-width + 横向滚动兜住,不把要求列算成负数
-  const pairTotal = Math.max(100 - fixedPct - reqPct - opPct, n * 6)
+  const itemPct = 9           // 检验项目(短标签「*外观」「≥48g」这类)
+  const mtdPct = 30           // 检验方法(长文本,本次调宽:12% → 30%)
+  const reqPct = n <= 2 ? 14 : n === 3 ? 13 : 12   // 检验要求(短句居多,本次调小:32% → 14%)
+  const pairTotal = Math.max(100 - itemPct - mtdPct - reqPct - opPct, n * 6)
   const pairPct = pairTotal / n
-  const out = ['11%', mtdPct + '%', reqPct + '%']
+  const out = [itemPct + '%', mtdPct + '%', (100 - itemPct - mtdPct - opPct - pairTotal).toFixed(2) + '%']
   for (let i = 0; i < n; i++) {
     // 每个批次两列各占一半:批次号列要放得下「批次号」小标签 + 改名输入框 + 删除 ×
     out.push((pairPct * 0.5).toFixed(2) + '%', (pairPct * 0.5).toFixed(2) + '%')

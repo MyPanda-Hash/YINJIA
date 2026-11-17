@@ -314,7 +314,7 @@
                 </td>
               </template>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(pair.key) }" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
-                <div v-if="editable && isRefKey(pair.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(pair.key)">
+                <div v-if="editable && isRefKey(pair.key)" class="rs-ref-ctl" :class="{ 'has-dev': devStatus && devKey === pair.key }" :title="tt('点击选择')" @click="openProdRef(pair.key)">
                   <span class="rs-ref-text">{{ head[pair.key] || tt('点击选择') }}</span>
                   <span v-if="devStatus && devKey === pair.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
                   <el-icon class="rs-ref-ico"><Search /></el-icon>
@@ -589,7 +589,12 @@
                且克隆块仍排在所有 sections 之后 ⇒ 表格照样落在末尾。 -->
     <div v-for="(dt, di) in cfg.dataTables" v-show="pageOf(dt) === activePage" :key="'dt' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
       <div class="rsp-dt-table">
-        <table class="rs-t rs-dt" :class="{ 'rsp-design-t': dt.design }" :style="{ width: (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : effPlain ? plainW(dt) : gridW) + 'px' }">
+        <!-- ⚠ 表格宽度必须与下面 colgroup **同一个口径**（dtTableW = 含 span 的列宽和 × design/dtFillK）。
+             2026-11-17 生产缺陷：这里原写 dtW(dt)（不乘 dtFillK），而 colgroup 乘了
+             ⇒ 一旦「字段管理」给该表加过列（碱性实测 +2 列 width=120），
+             colgroup 缩到纸宽 1183、table 的 width 仍是 1540，下方「3.测试数据」整条比纸宽出去
+             （用户口径「下面的那些填写数据的列比上边的超出来」）。改后两条口径同源，加列不再撑破纸面。 -->
+        <table class="rs-t rs-dt" :class="{ 'rsp-design-t': dt.design }" :style="{ width: (dtOwnsWidth(dt) ? dtTableW(dt) : effPlain ? plainW(dt) : gridW) + 'px' }">
           <colgroup>
             <template v-if="effPlain || dtOwnsWidth(dt)">
               <!-- ⚠ span 必须写进 <col>：`样品信息` 这类 span:3 的列，若只生成一个不带 span 的 <col>，
@@ -923,7 +928,7 @@
                   @input="emit('dirty')"
                   @change="onDetailTextCommit(row, c.key)"
                 />
-                <span v-else class="rs-txt rsp-cell" :title="isLockedCell(dt, row, c) ? tt('非本部门栏目（只读）') : ''">{{ cellText(cellKind(c), row[c.key]) || ' / ' }}</span>
+                <span v-else class="rs-txt rsp-cell" :title="isLockedCell(dt, row, c) ? tt('非本部门栏目（只读）') : ''">{{ readCellText(c, row[c.key]) || ' / ' }}</span>
               </td>
               <td v-if="editable && !dt.fixedRows" class="rs-td-op"><span class="rs-op-add" :title="tt('在本行下方插入一行')" @click="addRow(dt, row)">＋</span><span class="rs-op-del" @click="removeRow(row)">×</span></td>
             </tr>
@@ -2130,6 +2135,34 @@ function stdLibOf(key) {
 function cellKind(c) {
   const f = (props.fields || []).find((x) => (x.dataName || x.code) === c?.key)
   return cellKindOf(f?.dataType)
+}
+
+/**
+ * 只读态要不要给这一格补 `%`（2026-11-17 用户口径，Excel #10「没有百分比号」）。
+ *
+ * <p>用户截图里 X烧结配方表的「添加比例%」列印出来是 `23` / `30` / `45`，
+ * 红字标了「没有百分比号」—— 列名带 % 但**值不带**，看起来像普通数字。</p>
+ *
+ * <p>为什么按列名判而不按 dataType：这三个字段在 yj_field 里都是 `文本`
+ * （`设计添加量` / `添加比例` / `单支含量g`，实测），拿不到数值/百分比语义；
+ * 而列名本身已经把单位写进去了（「添加比例%」），跟着列名走最稳、也不用改库。</p>
+ *
+ * <p>只在**只读态**补：编辑态是输入框，塞个 % 进去会污染用户输入。</p>
+ */
+function needsPercentSuffix(c) {
+  const label = String(c?.label ?? '')
+  if (!label.includes('%')) return false
+  const v = String(c?.key ?? '')
+  // 排除「单支含量g」这类虽然同表但单位是克的列（列名里没有 %，上面已挡）
+  return v === '添加比例' || label.endsWith('%')
+}
+
+/** 只读态的格文本：数值列补单位（目前只有百分比） */
+function readCellText(c, v) {
+  const text = cellText(cellKind(c), v)
+  if (!text) return ''
+  if (!needsPercentSuffix(c)) return text
+  return String(text).trim().endsWith('%') ? String(text) : String(text).trim() + '%'
 }
 
 /** 日期/时间控件回值 → 写回行(区间合成文本),并置脏交给父级保存 */

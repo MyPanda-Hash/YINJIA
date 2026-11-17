@@ -145,7 +145,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
@@ -234,8 +234,24 @@ async function load() {
 onMounted(() => {
   syncWidth()
   window.addEventListener('resize', syncWidth)
-  load()
 })
+
+/**
+ * 取数挂在 **onActivated** 而不是 onMounted（2026-11-17 用户报障）。
+ *
+ * <p>用户原话：「为什么立项申请的单据已经删除了，这个流程管控还有被删除单据的流程追踪」。</p>
+ *
+ * <p>根因不在过滤（服务端 `RdProjectFlowService` 早就排掉了 `asp_cancel='Y'` 和
+ * `yj_doc_status.canceled='Y'` 的单）—— 在于**页面从不重新取数**：
+ * PortalLayout 用 `<keep-alive :max="20">` 按页签缓存组件实例，`onMounted` 一辈子只跑一次。
+ * 于是在「立项申请」页签把单作废/删除后，切回本页签看到的还是**删除前那一刻的快照**，
+ * 看起来就像"删除的单还在追踪"。</p>
+ *
+ * <p>本页是**只读监控页**（按单号看流程走到哪一步），每次切回来都该是当下的实况
+ * ⇒ 挂 onActivated（keep-alive 组件每次重新激活都会调用，首次挂载也会触发，
+ * 所以首次进页面同样有数据，不需要再在 onMounted 里补一次 `load()`，否则首屏会请求两遍）。</p>
+ */
+onActivated(() => load())
 
 onBeforeUnmount(() => window.removeEventListener('resize', syncWidth))
 </script>

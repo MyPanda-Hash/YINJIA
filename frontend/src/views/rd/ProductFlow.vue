@@ -40,8 +40,8 @@
         <template #prefix><el-icon><Search /></el-icon></template>
       </el-input>
       <el-checkbox v-model="onlyOpen">{{ tt('只看未完成') }}</el-checkbox>
-      <el-button type="primary" :loading="loading" @click="load">{{ tt('刷新') }}</el-button>
-      <span class="pfl-tip">{{ tt('展开行看 5 步时间轴') }}</span>
+      <el-button type="primary" :loading="loading" @click="load">{{ tt('查询') }}</el-button>
+      <span class="pfl-tip">{{ tt('展开行可看 5 步时间轴') }}</span>
     </div>
 
     <section v-if="denied" class="pfl-card pfl-denied">
@@ -55,49 +55,88 @@
       </div>
       <el-table
         :data="shown"
-        row-key="产品编号"
+        :row-key="rowKeyOf"
         size="small"
         border
         class="pfl-table"
         :empty-text="tt('没有符合条件的产品')"
       >
+        <!-- 展开行 = 5 步时间轴 + 单据信息区。
+             2026-11-17 用户口径「格式可以按照项目流程管控的格式进行参考设计」⇒ 与 ProjectFlow
+             的展开行同构:① 一句话状态;② 每步「序号 + 环节名 + 状态标签 + 时间」;
+             ③ 底部 dl 单据信息五项。 -->
         <el-table-column type="expand">
           <template #default="{ row }">
             <div class="pfl-flow">
-              <p class="pfl-headline" :class="nextOf(row) ? 'is-stuck' : 'is-done'">
-                {{ nextOf(row) ? tt('卡在') + '：' + tt(nextOf(row).label) : tt('5 步已全部完成') }}
+              <p class="pfl-headline" :class="currentOf(row) ? 'is-stuck' : 'is-done'">
+                {{ flowText(row) }}
               </p>
               <ol class="pfl-steps">
                 <li v-for="(st, i) in stepsOf(row)" :key="st.key + i" class="pfl-step" :class="'is-' + st.tone">
                   <span class="pfl-step-idx">{{ i + 1 }}</span>
                   <div class="pfl-step-body">
-                    <span class="pfl-step-name">{{ tt(st.label) }}</span>
-                    <span class="pfl-step-no">{{ st.docNo || '—' }}</span>
-                    <!-- 处理人（2026-11-11）:产品信息表=填写并提交审批的人;规格书=二级负责人;
-                         成型/组装/出货=签核后分发的负责人。空着只显示"—",不编造 -->
-                    <span class="pfl-step-owner" :title="tt('处理人')">{{ tt('处理人') }}<b>{{ st.owner || '—' }}</b></span>
+                    <div class="pfl-step-row">
+                      <span class="pfl-step-name">{{ tt(st.label) }}</span>
+                      <!-- 状态标签:与项目流程管控的 el-tag 同款(三档统一说法,不再吐「草稿」原文) -->
+                      <el-tag size="small" :type="tagTypeOf(st.tone)" effect="plain">{{ tt(stateLabel(st)) }}</el-tag>
+                      <span v-if="st.docNo" class="pfl-step-no">{{ st.docNo }}</span>
+                      <!-- 最后操作时间(2026-11-17 取代原来的「处理人」;取不到显示「-」,不编造) -->
+                      <span class="pfl-step-at" :title="tt('最后操作时间')">{{ st.at || '-' }}</span>
+                    </div>
+                    <p v-if="st.reaudited" class="pfl-step-detail">{{ tt('曾经审核又被弃审，需重走这一步') }}</p>
                   </div>
-                  <span class="pfl-step-state">{{ tt(st.state || (st.tone === 'none' ? '未开始' : '')) }}</span>
-                  <span v-if="st.reaudited" class="pfl-step-flag">{{ tt('待重走') }}</span>
                 </li>
               </ol>
+              <!-- 单据信息区(与 ProjectFlow 的 pf-meta 同构:label/value 成对,空值显示 -) -->
+              <dl class="pfl-meta">
+                <div v-for="m in metaOf(row)" :key="m.label">
+                  <dt>{{ tt(m.label) }}</dt>
+                  <dd>{{ m.value }}</dd>
+                </div>
+              </dl>
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="产品编号" :label="tt('产品编号')" width="132" />
-        <el-table-column prop="产品名称" :label="tt('产品名称')" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="立项文档编号" :label="tt('立项文档编号')" width="160" show-overflow-tooltip />
-        <el-table-column :label="tt('进度')" width="96" align="right">
+        <!-- 产品编号为空(新建的产品信息表还没填)时显示「—」:行照常出现,但一眼看出"这单还没编号" -->
+        <!-- 窄屏(min-width 定宽会横向溢出):改用 min-width 让它按比例收缩,1440 仍是 132px 观感 -->
+        <el-table-column :label="tt('产品编号')" :width="wide ? 132 : undefined" :min-width="wide ? undefined : 110">
+          <template #default="{ row }">{{ row['产品编号'] || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="产品名称" :label="tt('产品名称')" :min-width="wide ? 180 : 140" show-overflow-tooltip />
+        <el-table-column :label="tt('立项文档编号')" :width="wide ? 160 : undefined" :min-width="wide ? undefined : 120" show-overflow-tooltip>
+          <template #default="{ row }">{{ row['立项文档编号'] || '-' }}</template>
+        </el-table-column>
+        <!-- 「当前环节」列(2026-11-17 对齐项目流程管控):显示成 `3/5 成型工艺清单`,
+             不再只在展开行里才说卡在哪;全完成显示「已完成」。 -->
+        <el-table-column :label="tt('当前环节')" :min-width="wide ? 190 : 150">
           <template #default="{ row }">
-            <span class="pfl-num">{{ progressOf(row) }}</span>
+            <span v-if="!currentOf(row)" class="pfl-chip is-done">{{ tt('已完成') }}</span>
+            <span v-else class="pfl-cur">
+              <span class="pfl-cur-no">{{ currentOf(row).text }}</span>
+              <span class="pfl-cur-name">{{ tt(currentOf(row).step.label) }}</span>
+            </span>
           </template>
         </el-table-column>
-        <el-table-column :label="tt('状态')" width="132">
+        <!-- 「进度」= 分数 + 进度条(与项目流程管控同款 el-progress),比纯文本分数更好扫 -->
+        <el-table-column v-if="wide" :label="tt('进度')" width="130">
+          <template #default="{ row }">
+            <div class="pfl-progress">
+              <span class="pfl-num">{{ progressOf(row) }}</span>
+              <el-progress
+                :percentage="progressPctOf(row)"
+                :show-text="false"
+                :stroke-width="6"
+                :color="progressPctOf(row) === 100 ? '#1f8a5b' : '#537786'"
+              />
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column :label="tt('状态')" :width="wide ? 132 : undefined" :min-width="wide ? undefined : 100">
           <template #default="{ row }">
             <span class="pfl-chip" :class="'is-' + statusToneOf(row)">{{ tt(statusTextOf(row)) }}</span>
           </template>
         </el-table-column>
-        <el-table-column :label="tt('下一步')" min-width="180" show-overflow-tooltip>
+        <el-table-column v-if="wide" :label="tt('下一步')" min-width="180" show-overflow-tooltip>
           <template #default="{ row }">
             <span v-if="nextOf(row)">{{ tt(nextOf(row).label) }}</span>
             <span v-else class="pfl-done">{{ tt('已完成') }}</span>
@@ -109,12 +148,13 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { tt } from '@/i18n'
 import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import {
-  STEP_STATE, filterFlowRows, flowKpisOf, flowStatusOf, flowStepsOf, nextStepOf,
+  STEP_STATE, currentStepOf, docMetaOf, filterFlowRows, flowKpisOf, flowStatusOf, flowStepsOf,
+  nextStepOf, stateLabelOf,
 } from '@/core/prod/productFlow'
 
 const rows = ref([])
@@ -122,6 +162,19 @@ const loading = ref(false)
 const denied = ref(false)
 const keyword = ref('')
 const onlyOpen = ref(false)
+/**
+ * 宽屏才显示「进度 / 下一步」两列(参考项目流程管控的 `wide` 做法)。
+ *
+ * <p>阈值 1200(不是参考实现那个 768):本表 7 列定宽合计 1104px,再加左侧菜单约 200px,
+ * 768~1100 这一段窗口会横向溢出(实测 853 视口下 table 内部宽 1152 ⇒ 整页 docScrollW 968 > 853)。
+ * 收到 4 列后合计 654px,853 也装得下。</p>
+ */
+const wide = ref(true)
+const WIDE_MIN = 1200
+
+function syncWidth() {
+  wide.value = typeof window === 'undefined' ? true : window.innerWidth >= WIDE_MIN
+}
 
 const shown = computed(() => filterFlowRows(rows.value, keyword.value, onlyOpen.value))
 
@@ -135,14 +188,50 @@ const kpiCards = computed(() => {
   ]
 })
 
+/**
+ * 行键:优先产品编号;新建未填编号的单退回单据编号。
+ * ⚠ 不能再写死 row-key="产品编号" —— 2026-11-17 起列表会含"还没填产品编号"的新单,
+ * 空键在 el-table 里会互相撞车(同一 key 的多行共用一个展开态,展开一行另一行跟着动)。
+ */
+function rowKeyOf(row) {
+  const code = String(row?.['产品编号'] || '').trim()
+  return code || ('NO:' + String(row?.['单据编号'] || ''))
+}
+
 function stepsOf(row) { return flowStepsOf(row) }
 function nextOf(row) { return nextStepOf(flowStepsOf(row)) }
+
+/** 「当前环节」:第几步 + 环节名(全部完成返回 null) */
+function currentOf(row) { return currentStepOf(flowStepsOf(row)) }
+/** 展开行底部「单据信息」五项(label/value 成对,纯函数产出) */
+function metaOf(row) { return docMetaOf(row) }
+/** 状态文案三档(已完成/进行中/未开始) —— 不再显示「草稿」这种单据状态原文 */
+function stateLabel(st) { return stateLabelOf(st) }
+/** el-tag 的 type 映射(与项目流程管控的 tagType 同款) */
+function tagTypeOf(tone) {
+  if (tone === STEP_STATE.done) return 'success'
+  if (tone === STEP_STATE.doing) return 'warning'
+  return 'info'
+}
+/** 一句话状态:与项目流程管控的 flowText 同款(卡在 + 环节名 / 全部完成) */
+function flowText(row) {
+  const cur = currentOf(row)
+  if (!cur) return `${tt('全部完成')}（${progressOf(row)}）`
+  return `${tt('卡在：')}${tt(cur.step.label)}`
+}
 
 /** 进度 = 已完成的步骤数 / 5（产品信息表也算一步） */
 function progressOf(row) {
   const steps = flowStepsOf(row)
   const done = steps.filter((s) => s.tone === STEP_STATE.done).length
   return `${done}/${steps.length}`
+}
+/** 进度百分比(el-progress 用) */
+function progressPctOf(row) {
+  const steps = flowStepsOf(row)
+  if (!steps.length) return 0
+  const done = steps.filter((s) => s.tone === STEP_STATE.done).length
+  return Math.round((done / steps.length) * 100)
 }
 
 /** 整包状态：与 KPI 同一个函数（core/prod/productFlow.flowStatusOf），不在这里另判一次 */
@@ -158,7 +247,13 @@ async function load() {
   try {
     const res = await request.get('/px/rdDevOverview')
     const list = (res && res.data && res.data.products) || []
-    rows.value = list.filter((r) => String(r?.['产品编号'] || '').trim() !== '')
+    // ⚠ 2026-11-17 用户口径「新增的产品信息应该放最上面，不要放下面」:
+    //   原来这里把「产品编号为空」的行整条丢掉 —— 而新建的产品信息表恰恰**还没填产品编号**,
+    //   于是"刚建的那张"永远不出现在列表里,用户看到的就是"新单跑到下面去了/根本找不到"。
+    //   现在保留:只要**有单据编号**就说明这张单真实存在,列表照样列出来
+    //   (产品编号列显示「—」,提示它还没填)。产品编号才是"开发包身份",
+    //   没有它的单不该冒充成一个开发包,所以仍然过滤 —— 过滤条件改成"两者都空才算脏行"。
+    rows.value = list.filter((r) => String(r?.['单据编号'] || '').trim() !== '' || String(r?.['产品编号'] || '').trim() !== '')
   } catch (e) {
     rows.value = []
     denied.value = true
@@ -166,7 +261,12 @@ async function load() {
     loading.value = false
   }
 }
-onMounted(load)
+onMounted(() => {
+  syncWidth()
+  window.addEventListener('resize', syncWidth)
+  load()
+})
+onBeforeUnmount(() => window.removeEventListener('resize', syncWidth))
 </script>
 
 <style scoped>
@@ -204,6 +304,18 @@ onMounted(load)
 .pfl-chip.is-doing { color: #1e5a8a; background: #eff6fd; border-color: #cfe2f5; }
 .pfl-chip.is-none { color: #8a97a5; background: #f5f7fa; border-color: #e4e8ee; }
 
+/* 「当前环节」列:第几步徽标 + 环节名(与项目流程管控的 .pf-cur 同款) */
+.pfl-cur { display: inline-flex; gap: 6px; align-items: baseline; min-width: 0; }
+.pfl-cur-no {
+  flex: none; padding: 0 6px; font-size: 11px; line-height: 18px;
+  font-variant-numeric: tabular-nums; color: #a0641a;
+  border: 1px solid rgba(160, 100, 26, 0.4); border-radius: 9px;
+}
+.pfl-cur-name { font-weight: 600; color: #1f2d3d; }
+/* 「进度」列:分数 + 进度条同行,数字等宽好扫 */
+.pfl-progress { display: flex; gap: 6px; align-items: center; }
+.pfl-progress :deep(.el-progress) { flex: 1; margin: 0; }
+
 /* 展开区 = 5 步时间轴（左竖线 + 圆点，与项目流程管控同款） */
 .pfl-flow { padding: 12px 16px 8px 40px; background: #fafbfc; }
 .pfl-headline { margin: 0 0 12px; font-size: 13px; }
@@ -218,17 +330,38 @@ onMounted(load)
 }
 .pfl-step.is-done .pfl-step-idx { border-color: #2f6f4e; color: #2f6f4e; }
 .pfl-step.is-doing .pfl-step-idx { border-color: #1e5a8a; color: #1e5a8a; }
-.pfl-step-body { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.pfl-step-name { font-weight: 500; color: #1f2d3d; }
-.pfl-step-no { font-size: 12px; color: #8a97a5; }
-.pfl-step-owner { font-size: 12px; color: #8a97a5; }
-.pfl-step-owner b { margin-left: 4px; font-weight: 500; color: #1f2d3d; }
-.pfl-step-state { margin-left: auto; font-size: 12px; color: #5c6b7a; }
-.pfl-step-flag { margin-left: 8px; padding: 0 6px; line-height: 18px; border-radius: 9px; background: #fdf3e7; color: #a0641a; font-size: 11px; }
+/* 每一步一行:环节名 + 状态标签 + 单号 + 时间,空间不够自动换行(与 ProjectFlow 的 .pf-step-row 同款) */
+.pfl-step-body { min-width: 0; flex: 1; }
+.pfl-step-row { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.pfl-step-name { font-weight: 600; color: #1f2d3d; }
+.pfl-step-no { font-size: 12px; color: #8a97a5; font-variant-numeric: tabular-nums; }
+/* 最后操作时间(2026-11-17 取代原来的「处理人」):等宽数字,竖排时逐行对齐好扫 */
+.pfl-step-at { font-size: 12px; color: #5b6b7c; font-variant-numeric: tabular-nums; }
+.pfl-step-detail { margin: 2px 0 0; font-size: 12px; line-height: 1.5; color: #a0641a; }
+
+/* 展开行底部「单据信息」区(与 ProjectFlow 的 .pf-meta 同构:虚线分隔 + 横排 label/value) */
+.pfl-meta {
+  display: flex; flex-wrap: wrap; gap: 6px 24px;
+  margin: 10px 0 0; padding-top: 8px; border-top: 1px dashed #e4e8ee;
+}
+.pfl-meta div { display: flex; gap: 6px; min-width: 0; }
+.pfl-meta dt { font-size: 12px; color: #8a97a5; white-space: nowrap; }
+.pfl-meta dd { margin: 0; font-size: 12px; color: #5c6b7a; }
 
 @media (max-width: 1100px) {
   .pfl-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pfl-head { flex-direction: column; align-items: flex-start; }
   .pfl-source { text-align: left; max-width: none; }
+}
+
+/* 窄屏(≤768):表格只留 4 列(见脚本里的 wide);展开行若不限宽,
+   整句会被 el-table 的内部虚拟宽度撑着、在可视区右缘被裁掉 —— 与项目流程管控同一条兜底。 */
+@media (max-width: 1200px) {
+  .pfl-bar { flex-wrap: wrap; }
+  .pfl-search { width: 100%; max-width: 320px; }
+}
+@media (max-width: 768px) {
+  .pfl-flow { padding-left: 8px; max-width: calc(100vw - 56px); }
+  .pfl-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>

@@ -4959,3 +4959,12 @@ migrate-jjf-twolevel-20261117.sql
 #   RD_INSP_PLAN.检测频率 的 dict_sql 指过去;共用库 INSP_FREQ 原样保留(制程/首件/组装成品检验单照旧);
 #   两账套已执行;幂等
 migrate-insp-freq-oqc-20261117.sql
+
+# 2026-11-17 「特殊数据记录表」上传类面板(用户口径:数据记录表下新增,全员可传,删除走单独待审批列表)
+migrate-rd-extra-record-file-20261117.sql
+# 2026-11-17 Excel #14：新增「外部-非开发样品申请单」面板（复制外部开发样品单；销售录单、刘磊/王光珍审核、其他人只读）
+migrate-sample-nondev-20261117.sql
+# 2026-11-17 Excel #7：生产模具表 PROD_MOLD 补齐角色权限行（实测缺 文件负责人 + 2 个自动化角色）
+migrate-prod-mold-perms-20261117.sql
+# 2026-11-17：补 RD_SAMPLE_INT / QC_FIRST_INSP / RD_SAMPLE_EXT 三个面板的角色权限行（全员可查阅+新增自己那行）
+migrate-role-perms-20261117.sql

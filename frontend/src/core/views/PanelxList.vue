@@ -2528,6 +2528,18 @@
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
     <!-- 字段管理(动态字段/备用列池):绑定/停用自定义字段(入口按「自定义字段」权限显隐) -->
     <FieldManagerDialog v-model="fieldMgrVisible" :panel-code="panelCode" @done="cfgCache = null; load()" />
+    <!-- 立项申请 · 全屏单据预览(2026-11-17 用户口径):按申请立项人筛「我申请的」+ 返回 + 跳转。
+         组件内部 Teleport 到 body,故挂在根级任意位置都不影响布局。 -->
+    <ApprovalPreviewOverlay
+      :visible="approvalPreviewOpen"
+      :rows="list || []"
+      :me="myApplicantName"
+      :owner-key="previewOwnerKey"
+      :subject="previewSubject"
+      :panel-code="String(panelCode || '')"
+      @close="approvalPreviewOpen = false"
+      @jump="jumpToApprovalDoc"
+    />
     <!-- 检验项目/检验方案(2026-10-09 **合并口径**):三类工序检验单(成型/切炭/组装成品)工具栏**唯一**入口 ——
          同一个弹窗两用:上=方案表、下=该方案的项目表(可勾选);①勾选后「带入明细」把项目写进当前单据
          (表区=检验项目,再按现有模板填实测/判定);②表头的新增/编辑/停用就地维护标准本身
@@ -2852,6 +2864,8 @@ import NewVoucherDialog from './NewVoucherDialog.vue'
 import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
 import SelectVoucherDialog from './SelectVoucherDialog.vue'
 import DocSelectRail from './DocSelectRail.vue'
+/** 立项申请的全屏单据预览（2026-11-17）：按申请立项人筛选 + 返回 + 跳转 */
+import ApprovalPreviewOverlay from './ApprovalPreviewOverlay.vue'
 import DocSheet from './DocSheet.vue'
 import FileAttachCell from './FileAttachCell.vue'
 // 标注笔/橡皮擦:纸面(RecordSheetPanels 里的 AnnotatedText)通过 provide/inject 拿状态,
@@ -2951,7 +2965,7 @@ const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', '
   //   和外部单底部的新增样品一样，而不是表格类的面板」）⇒ 两张单都走 DocSheet；
   //   内部单的行源改成明细（见 docSheetConfigs.sampleIntSheetCfg 与
   //   tools/migrate-sample-int-paper-rows-20261106.sql）。上一版 archive 数据面板做法已撤销。
-  'RD_SAMPLE_EXT', 'RD_SAMPLE_INT',
+  'RD_SAMPLE_EXT', 'RD_SAMPLE_INT', 'RD_SAMPLE_ND',
   // 检验委托单(INSP_COMMISSION,2026-11-15 用户口径「检验委托单为主要实际单据,需要这个单据完成形式
   // 实现为图片中的」):纸面由 InspCommissionSheet 接管(委托检验合同 YJ-QP-701-1-01 (00)),
   // 「检验类别」从送样登记表的检测目录勾选带入。不列进来会退回「表头字段平铺 + 明细表格」的数据页。
@@ -2997,10 +3011,28 @@ const changeSigners = computed(() => String(cur.value?.['会签人'] ?? '')
 const iAmChangeSigner = computed(() => changeSigners.value.includes(String(user.account || user.userName || '')))
 const isChangeInitiator = computed(() => user.isAdmin === true
   || (!!user.realName && String(cur.value?.['申请人'] ?? '') === String(user.realName)))
+/** 内部样品单的月份标题前缀：`2026年11月内部`（优先单号里的年月，退回当前月） */
+const sampleMonthTitle = computed(() => {
+  const no = String(cur.value?.['单据编号'] || curDocNo.value || '')
+  const m = no.match(/(\d{4})-(\d{2})-/)
+  const now = new Date()
+  const y = m ? m[1] : String(now.getFullYear())
+  const mo = m ? String(Number(m[2])) : String(now.getMonth() + 1)
+  return `${y}年${mo}月内部`
+})
 const docSheetConfig = computed(() => {
   // 2026-11-06 样品二级目录两张单（各自版式，见 docSheetConfigs 的 sampleExt/IntSheetCfg）
-  if (panelCode.value === 'RD_SAMPLE_EXT') return sampleExtSheetCfg
-  if (panelCode.value === 'RD_SAMPLE_INT') return sampleIntSheetCfg
+  // 非开发样品申请单（2026-11-17 Excel #14）：用户口径「复制一份样品-外部开发样品单页面及入口」
+  //   ⇒ 纸面版式**逐字复用** sampleExtSheetCfg，不另写一套。
+  if (panelCode.value === 'RD_SAMPLE_EXT' || panelCode.value === 'RD_SAMPLE_ND') return sampleExtSheetCfg
+  // 2026-11-17 用户口径（Excel #4 第 3 条）：
+  //   「新增单据时默认填充 ****年**月 内部（开发样品申请单） 表名称」
+  //   ⇒ 标题前半段按**这张单所属月份**动态生成（A1 是每月一张单，所以标题也跟着月度走）。
+  //   月份优先从单号 SPN-YYYY-MM-NNNN 取（头表 单据日期 常为空，实测 SPN-2026-11-0004/0005 都是 null），
+  //   取不到再落到当前月 —— 新建未保存时就是当前月，符合"新增时默认填充"。
+  if (panelCode.value === 'RD_SAMPLE_INT') {
+    return { ...sampleIntSheetCfg, titlePart1: sampleMonthTitle.value }
+  }
   return qcSheetCfgs[panelCode.value] || (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg)
 })
 
@@ -4946,6 +4978,28 @@ const previewKw = ref('')
  */
 const PREVIEW_SIDE_PANELS = new Set(['RD_PROD_INFO', 'RD_APPROVAL'])
 const canPreviewSide = computed(() => PREVIEW_SIDE_PANELS.has(String(panelCode.value)))
+/**
+ * 走**全屏**单据预览的面板（2026-11-17 用户口径，目前只有立项申请）。
+ *
+ * <p>用户原话：「点击单据预览就根据申请立项人进行一个筛选全屏展示这些属于自己申请的单据的明细，
+ * 设计要好看，使用设计库进行设计，要留一个返回按钮，点击对应单据要有一个跳转按钮，
+ * 可以直接跳转到对应单据」。</p>
+ *
+ * <p>与右栏那个 176px 的窄预览是**两回事**：立项申请的字段多（背景/机型/规格/目标/等级…），
+ * 挤在侧栏里根本看不清，所以单独开全屏浮层（组件 ApprovalPreviewOverlay）。
+ * 其余面板（RD_PROD_INFO 等）继续走原来的右栏 DocSelectRail，行为逐字不变。</p>
+ */
+// 2026-11-17 用户口径：立项申请 + 产品信息表共用同一套「全屏单据预览」（左状态树 + 多条件查询栏）
+const FULL_PREVIEW_PANELS = new Set(['RD_APPROVAL', 'RD_PROD_INFO'])
+const canFullPreview = computed(() => FULL_PREVIEW_PANELS.has(String(panelCode.value)))
+/** 全屏预览浮层是否打开 */
+const approvalPreviewOpen = ref(false)
+/** 当前登录人姓名（用于「只看我申请的」判据） */
+const myApplicantName = computed(() => String(user.realName || '').trim())
+/** 全屏预览的「归属人」字段：立项申请看申请立项人；产品信息表没有该列，看编辑人（=制单人姓名） */
+const previewOwnerKey = computed(() => (String(panelCode.value) === 'RD_APPROVAL' ? '申请立项人' : '编辑人'))
+/** 全屏预览副标题里的面板名 */
+const previewSubject = computed(() => tt(String(panelName.value || '')))
 /** 右栏是否处于「单据预览」态 */
 const previewInSide = ref(false)
 /**
@@ -4953,6 +5007,8 @@ const previewInSide = ref(false)
  * 但**不走 previewMode** —— previewMode 是"把左栏/整页切走"的老预览态，这里只替换右栏内容。
  */
 async function openSidePreview() {
+  // 2026-11-17：立项申请走**全屏浮层**（按申请立项人筛选 + 可跳转），不进右栏窄预览。
+  if (canFullPreview.value) { await openApprovalPreview(); return }
   if (canPreviewSide.value && previewInSide.value) { closeSidePreview(); return }
   previewKw.value = ''
   previewInSide.value = true
@@ -4963,6 +5019,31 @@ async function openSidePreview() {
   curIdx.value = 0
   await load()
 }
+/**
+ * 打开立项申请的全屏单据预览（2026-11-17）。
+ * 取数：与右栏预览同一口径 —— pageSize 拉到 200 一次取全、客户端筛选（不额外造接口）。
+ */
+async function openApprovalPreview() {
+  if (previewPrevPageSize === null) previewPrevPageSize = query.pageSize
+  query.pageSize = 200
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+  approvalPreviewOpen.value = true
+}
+
+/**
+ * 浮层里点「跳转」= 回到本面板并定位到那张单（?focus=单号）。
+ * ⚠ 用 focus 而不是 docNo：本面板走列表式定位（applyDocNoQuery 那条是 RD_SPEC_DOC 的深链口径），
+ *   与 gotoDocNo / 派发后的跳转保持同一套写法。
+ */
+function jumpToApprovalDoc(row) {
+  const no = String(row?.['单据编号'] || '').trim()
+  approvalPreviewOpen.value = false
+  if (!no) return
+  router.push({ path: '/panelx/list/RD_APPROVAL', query: { focus: no } })
+}
+
 /** 返回：恢复右侧操作栏（操作按钮原样回来） */
 function closeSidePreview() {
   previewInSide.value = false
@@ -9427,6 +9508,13 @@ async function exportSheetExcel() {
     // 无合计、空白行全在），用户报的「炭棒配方管控清单-设计添加量导出错误」就是它。
     // 版式口径在 RecordSheetPanels.exportRecipeExcel + core/mold/recipeExport.js。
     RD_MOLD_PROC: 'exportRecipeExcel',
+    // 2026-11-17（Excel #10「工艺单-X烧结 · 配方计算导出异常」）：
+    // X烧结与烧结工艺清单**共用同一个配方表导出器**（RecordSheetPanels.exportRecipeExcel
+    // 按 dt.recipeCalc / filterVal='配方表' 找表，两个面板都配了 recipeCalc），
+    // 但映射表当初只登记了 RD_MOLD_PROC ⇒ X烧结一直在走「通用导出」，
+    // 于是用户看到的还是老毛病（小数位不对、空行全在、没有合计）。
+    // 这是"专属导出写好了却没接上"的典型漏接，补这一行即可。
+    RD_X_SINTER: 'exportRecipeExcel',
   }[panelCode.value]
   if (catalogExporter) {
     const sheet = approvalSheetRef.value

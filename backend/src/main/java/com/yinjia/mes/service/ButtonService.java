@@ -185,6 +185,13 @@ public class ButtonService {
             //   归档后**免申请、免再审批**的直接修改:进入修改态(留痕开始) → 保存修改(落库+再归档+diff收尾)。
             case "修改单据" -> openDirectModify(def, formData);
             case "保存修改" -> saveDirectModify(def, formData);
+            // 内部开发样品申请单「整单归档」(2026-11-17 Excel #4 用户口径):
+            //   「每月进行点击归档按钮对该单据进行归档，归档后所有人不得修改（除管理员撤销归档）」
+            //   归档 = markArchived（archived='Y'）⇒ 状态变「已归档」⇒ draftEditable 为假，
+            //   行级编辑（applySampleIntRowRules 只在草稿路径生效）随之全部关闭。
+            //   撤销 = 管理员专属，archived='N' 回到草稿，全月的人都能继续在自己行上补录。
+            case "归档" -> archiveSampleMonth(def, formData);
+            case "撤销归档" -> unarchiveSampleMonth(def, formData);
             // 产品变更申请单:会签子流程(发起人勾「需会签」+选会签人 → 全部通过才进审核,2026-09-21)
             case "提交会签" -> submitSignoff(def, formData);
             case "会签通过" -> signoffApprove(def, formData);
@@ -579,6 +586,128 @@ public class ButtonService {
      * <p>为什么在落库前**改写 items** 而不是拒绝整单:一张单里有多人各自的行,一个人保存时如果用整单校验,
      * 别人的行会把整单打回;这里改成"只动自己的行,别人的行原样回写",既保住内容也保住行不被缺席软删。</p>
      */
+    /**
+     * 内部开发样品申请单「整单归档」（2026-11-17 用户口径，Excel #4）。
+     *
+     * <p>用户原话：「每月进行点击归档按钮对该单据进行归档，归档后所有人不得修改
+     * （除管理员撤销归档）」。</p>
+     *
+     * <p>为什么放在按钮层而不是保存时自动流转：这张单是**月内共享**的 ——
+     * 一个月一张总单，各人在下面加自己的行。若保存即归档，第一个保存的人就把全月锁死了。
+     * 故归档必须是**显式动作**，由文档管理员在月末点。</p>
+     *
+     * @return { 编号, 状态, 归档:true }
+     */
+    private Map<String, Object> archiveSampleMonth(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!"RD_SAMPLE_INT".equals(def.code()))
+            throw new IllegalArgumentException("该面板不支持归档操作：" + def.code());
+        String no = docNoOf(formData, def);
+        if (no == null || no.isBlank()) throw new IllegalArgumentException("缺少单据编号");
+        ensureSampleMonthDoc(def, no);
+        // 已归档再点 = 幂等返回，不报错（用户连点两次不该看到红字）
+        String cur = sampleArchivedFlag(def, no);
+        if (!"Y".equals(cur)) markArchived(def.code(), no, currentUserName());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("编号", no);
+        out.put("状态", "已归档");
+        out.put("归档", true);
+        return out;
+    }
+
+    /**
+     * 撤销归档（管理员专属）。
+     *
+     * <p>用户口径：「归档后所有人不得修改（**除管理员撤销归档**）」。
+     * 撤销后 archived='N'，状态回到「草稿」，全月的人又能各自补录自己的行。</p>
+     */
+    private Map<String, Object> unarchiveSampleMonth(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!"RD_SAMPLE_INT".equals(def.code()))
+            throw new IllegalArgumentException("该面板不支持撤销归档：" + def.code());
+        if (!isAdminUser(currentUserName()))
+            throw new org.springframework.security.access.AccessDeniedException("撤销归档仅管理员可操作");
+        String no = docNoOf(formData, def);
+        if (no == null || no.isBlank()) throw new IllegalArgumentException("缺少单据编号");
+        ensureSampleMonthDoc(def, no);
+        // ⚠ 必须**连 shr/shsj 一起清**：markArchived 归档时会写 shr（文控口径：归档即视为审核），
+        //   若只清 archived，状态会退到「已审核」—— 而"已审核"同样是锁定态（draftEditable=false），
+        //   用户撤销归档后仍然加不了行，等于没撤销（2026-11-17 实测踩到）。
+        //   本单的语义是「月内共享草稿 → 月末归档」，没有独立审核环节 ⇒ 撤销即回草稿。
+        jdbc.update("UPDATE yj_doc_status SET archived = 'N', archived_at = NULL, "
+                + "shr = NULL, shsj = NULL, update_at = GETDATE() "
+                + "WHERE panel_code = ? AND doc_no = ?", def.code(), no);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("编号", no);
+        out.put("状态", "草稿");
+        out.put("归档", false);
+        return out;
+    }
+
+    /** 从 formData 取单号（兼容 head / 顶层 / 编号 三种拿法） */
+    private String docNoOf(Map<String, Object> formData, PanelRegistry.PanelDef def) {
+        if (formData == null) return null;
+        Object v = formData.get(def.groupCol());
+        if (v == null || String.valueOf(v).isBlank()) v = formData.get("单据编号");
+        if (v == null || String.valueOf(v).isBlank()) v = formData.get("编号");
+        return v == null ? null : String.valueOf(v).trim();
+    }
+
+    /** 单据状态标签（复用归档位即可：已归档 / 已审核 / 草稿）——仅用于「新增」复用时的回显 */
+    private String sampleStatusLabelOf(PanelRegistry.PanelDef def, String no) {
+        try {
+            java.util.List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT ISNULL(archived,'N') AS a, shr FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
+                    def.code(), no);
+            if (rows.isEmpty()) return "草稿";
+            Map<String, Object> r = rows.get(0);
+            if ("Y".equals(blankSafe(r.get("a")))) return "已归档";
+            if (r.get("shr") != null && !blankSafe(r.get("shr")).isEmpty()) return "已审核";
+            return "草稿";
+        } catch (Exception e) {
+            return "草稿";
+        }
+    }
+
+    /** 该单是否已归档（yj_doc_status.archived） */
+    private String sampleArchivedFlag(PanelRegistry.PanelDef def, String no) {
+        java.util.List<String> rows = jdbc.queryForList(
+                "SELECT ISNULL(archived,'N') FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
+                String.class, def.code(), no);
+        return rows.isEmpty() ? "N" : rows.get(0);
+    }
+
+    /** 单号必须真实存在于头表，否则拒绝（防跨面板/伪造单号调用） */
+    private void ensureSampleMonthDoc(PanelRegistry.PanelDef def, String no) {
+        Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM " + def.headTable()
+                + " WHERE " + def.groupCol() + " = ? AND ISNULL(asp_cancel,'N') <> 'Y'", Integer.class, no);
+        if (n == null || n == 0) throw new IllegalArgumentException("单据不存在：" + no);
+    }
+
+    /**
+     * A1「每月一张单」：找当月那张内部样品单，找到就复用，不新建。
+     *
+     * <p>用户口径（2026-11-17 Excel #4）：「按每月1张申请单，每个人在下面进行新增」。</p>
+     *
+     * <p>判据用**单号里的年月**（`SPN-YYYY-MM-NNNN`）而不是「单据日期」：
+     * 实测头表 单据日期 常为 null（SPN-2026-11-0004/0005 都是空），拿它筛会漏。
+     * 单号由 formNoService 按 prefix+年月生成，所以它才是可靠的月份键。</p>
+     *
+     * <p>已归档的当月单也会被复用 —— 复用是为了让用户继续看到那张单，
+     * 而不是给他建第二张；归档态下他改不了内容，只能请管理员撤销归档。
+     * 这比"归档后又悄悄建一张"更符合"每月一张"的口径。</p>
+     *
+     * @return 当月单号；没有则 null
+     */
+    private String findSampleMonthDoc(PanelRegistry.PanelDef def) {
+        String ym = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
+        String prefix = def.prefix() == null ? "" : def.prefix();
+        java.util.List<String> rows = jdbc.queryForList(
+                "SELECT TOP 1 " + def.groupCol() + " FROM " + def.headTable()
+                        + " WHERE " + def.groupCol() + " LIKE ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " ORDER BY id DESC",
+                String.class, prefix + "-" + ym + "-%");
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
     private java.util.Set<String> applySampleIntRowRules(PanelRegistry.PanelDef def, List<Map<String, Object>> items,
                                                     String no, String actor) {
         java.util.Set<String> none = java.util.Set.of();
@@ -820,6 +949,20 @@ public class ButtonService {
         //   · 已存在且申请人是别人:整行按库里的原值回写(不改、也不软删——行级状态不互通);
         //   · 有 edit_others 词(组织架构里勾了「改他人行」)/管理员:以上限制全部放开。
         java.util.Set<String> protectRowIds = applySampleIntRowRules(def, items, no, user);
+        // ── A1「每月一张单」（2026-11-17 用户口径，Excel #4）─────────────────────
+        //   用户原话：「按每月1张申请单，每个人在下面进行新增」。
+        //   点「新增」时先看当月那张单在不在：
+        //     · 在  → **直接把它交给前端打开**（不新建、不写任何数据）；
+        //     · 不在 → 落下去走原来的建单分支（单号 SPN-YYYY-MM-NNNN）。
+        //   为什么复用而不是"每月自动建一张"：空单会出现在列表里、也会被人当草稿删掉；
+        //   按需复用既保证"一个月就一张"，又不会凭空多出一堆空单。
+        //   ⚠ 只在**空表单的新建**（items 为空且非 markSaved）时复用；带数据进来的是保存，不能拦。
+        if (no == null && items.isEmpty() && !markSaved && "RD_SAMPLE_INT".equals(def.code())) {
+            String month = findSampleMonthDoc(def);
+            if (month != null && !month.isBlank()) {
+                return result(month, sampleStatusLabelOf(def, month));
+            }
+        }
         if (no == null) {
             if (items.isEmpty()) {
                 // directAdd 语义:空表单 -> 建一张空白草稿单(头行式写头表,单表式写一行占位行)
@@ -4220,7 +4363,12 @@ public class ButtonService {
      * </ul>
      */
     public static final java.util.Set<String> SINGLE_LEVEL_INSP_PANELS =
-            java.util.Set.of("QC_FIRST_INSP", "QC_PROC_INSP", "QC_ASM_INSP");
+            // QC_LINE_PATROL（成型车间巡线记录表）2026-11-17 追加：用户口径（Excel #13）
+            //   「无审批流（要求程志/李光从账户写报表提交 → 刘磊账户审核）」
+            //   该表此前纸头「审核人」只读、注释写"本期不做审批流" ⇒ 现在按单级审批接上：
+            //   提交审批 → 审批通过(一次) → 已审核 → 弃审 → 草稿。
+            //   编制格 = 巡线人员（业务值，可手填；提交审批时为空才兜底写提交人）。
+            java.util.Set.of("QC_FIRST_INSP", "QC_PROC_INSP", "QC_ASM_INSP", "QC_LINE_PATROL");
 
     /** 单级审批面板的「编制」格列名(检验人业务值,可手填) */
     private static final Map<String, String> SINGLE_LEVEL_PREPARER = Map.of(
@@ -4228,7 +4376,9 @@ public class ButtonService {
             // 2026-11-13 用户口径「为当前的出货检验表观增加审批流程」:出货检验表观(原组装成品检验单)
             // 与出货检验功能同形 —— 提交审批 → 审批通过(一次) → 已审核 → 弃审 → 草稿;
             // 表尾「检验人」= 编制(业务值,可手填,提交审批时为空才兜底写提交人)。
-            "QC_ASM_INSP", "检验员");
+            "QC_ASM_INSP", "检验员",
+            // 巡线记录表的「编制」= 巡线人员（纸面最后一列，业务值）
+            "QC_LINE_PATROL", "巡线人员");
 
     /** 该面板的「编制」格是否可手改(= 预填型);非此类返回空串 */
     private String preparerEditableColOf(String panelCode) {
@@ -7364,6 +7514,43 @@ public class ButtonService {
         return result(no, "会签中");
     }
 
+    /**
+     * 会签通过 → 在该会签人所属部门的纸面行上盖「签字 + 日期」（2026-11-17 用户口径 A）。
+     *
+     * <p>用户原话：「会签人员直接会签人签名后直接显示对应部门以及签名信息到表格」+
+     * 追问确认「点通过即在该部门行写"签字+日期"，内容留空（或写"/"）」。</p>
+     *
+     * <p>映射口径与填写门禁**同一套**（{@link #changeDeptsOf}：
+     * `yj_user.dept_id → yj_change_dept.部门`），不另造规则：
+     * · 一个账号可能映射到多个部门（如 9/12 都是品质部）⇒ 这些部门行**都盖**；
+     * · 映射里查不到部门（账号没配 dept_id）⇒ **静默跳过**，不影响会签本身
+     *   —— 会签是流程动作，盖章只是纸面留痕，不能因缺映射把人卡住；
+     * · 只写 签字/日期 两列，「变更后内容」保持原样（没给意见就是空）。</p>
+     *
+     * <p>幂等：只更新 `签字` 为空或就是本人的行，重复签不会刷掉别人的签名。
+     * 一票否决（驳回）不走这里 —— 驳回本来就不该留签名。</p>
+     */
+    private void stampSignoffDeptRow(PanelRegistry.PanelDef def, String no, String user) {
+        try {
+            java.util.Set<String> depts = changeDeptsOf(user);
+            if (depts.isEmpty()) return;
+            String signer = realNameOf(user);
+            String today = LocalDate.now().toString();
+            for (String dept : depts) {
+                if (dept == null || dept.isBlank()) continue;
+                jdbc.update("UPDATE " + def.lineTable() + " SET 签字 = ?, 日期 = ? "
+                                + " WHERE " + def.groupCol() + " = ? AND 部门 = ? "
+                                + "   AND ISNULL(表区, N'') = ? AND ISNULL(asp_cancel,'N') <> 'Y' "
+                                + "   AND (ISNULL(签字, N'') = N'' OR 签字 = ?)",
+                        signer, today, no, dept, CHANGE_DEPT_SECTION, signer);
+            }
+        } catch (Exception e) {
+            // 盖章失败不得拖垮会签（会签已落库）；只在日志里留痕
+            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
+                    .warn("会签部门行盖章失败 panel={} no={} user={}: {}", def.code(), no, user, e.toString());
+        }
+    }
+
     /** 会签通过(仅本单会签人):全部签完 → **自动**转审批中(用户口径:会签通过才进审核) */
     private Map<String, Object> signoffApprove(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String no = requireNo(formData);
@@ -7375,6 +7562,14 @@ public class ButtonService {
                         + "WHERE panel_code = ? AND form_no = ? AND action = 'SIGNOFF' AND result = 'PENDING' AND operator = ?",
                 opinion.isEmpty() ? null : opinion, CHANGE_PANEL, no, user);
         if (n == 0) throw new IllegalStateException("会签已处理，请刷新后查看");
+        // 🔴 会签即盖章（2026-11-17 用户口径 A）：
+        //   「点通过即在该部门行写"签字+日期",内容留空(或写"/")」
+        //   此前只有 stampSignature 那条路（**填了「变更后内容」并保存**才盖章）——
+        //   会签人只点「会签通过」不填内容时，纸面「三、部门评审意见」里他那一行
+        //   永远停在「/ /」（用户截图即此状）。这里补上"签了就算"的通道。
+        //   ⚠ 只写 签字/日期 两列：不动「变更后内容」（用户没给意见就让它空着，
+        //     尊重实际输入，也让 stampSignature 的"内容变了才盖章"口径不被污染）。
+        stampSignoffDeptRow(def, no, user);
         if (signoffPending(no).isEmpty()) {
             // 全部通过:转审批中(走提交内核——刻意跳过发起人校验,最后一位会签人通常不是发起人)
             doSubmitApproval(def, no, opinion);

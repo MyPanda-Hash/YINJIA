@@ -103,3 +103,142 @@ export function previewLineText(summary) {
   const items = Array.isArray(summary?.items) ? summary.items : []
   return items.map((x) => String(x?.value ?? '')).filter(Boolean).join(' · ')
 }
+
+/* ===== 立项申请「单据预览」的筛选口径 · 2026-11-17 =====
+ *
+ * 用户口径：「点击单据预览就根据申请立项人进行一个筛选全屏展示这些属于自己申请的单据的明细」。
+ * 纯函数，页面只负责画 —— 与同文件其它口径一致。
+ */
+
+export const APPLICANT_KEY = '申请立项人'
+
+/** 归一化：去首尾空白 + 转小写（中文不受影响） */
+function norm(v) {
+  return v === undefined || v === null ? '' : String(v).trim().toLowerCase()
+}
+
+/**
+ * 范围：mine = 该单的「归属人」=== 当前登录人；all = 不过滤。
+ *
+ * @param {string} [ownerKey] 归属人字段名。缺省 = 「申请立项人」（立项申请）；
+ *   产品信息表传 `'编辑人'`（它没有"申请立项人"这一列，制单人存在「编辑人」里）。
+ *   2026-11-17：产品信息表接入同一套全屏预览时参数化，避免把两套判据写死。
+ */
+export function inApplicantScope(row, me, scope, ownerKey = APPLICANT_KEY) {
+  if (scope === 'all') return true
+  const meName = norm(me)
+  if (!meName) return false
+  const owner = norm(row && row[ownerKey])
+  return !!owner && owner === meName
+}
+
+/**
+ * 立项申请单据预览的筛选：范围（我的/全部）→ 关键字。
+ *  - mine：申请立项人 === 当前登录人（去首尾空白）；申请人为空的单不算任何人的；
+ *  - 登录人姓名为空时 mine 返回空（绝不退化成全量）；
+ *  - all：不按人过滤（管理员/代查）；
+ *  - 关键字在筛选结果内再收窄：单号 / 客户名 / 申请立项人，大小写无关。
+ */
+export function filterApprovalPreview(rows, opts) {
+  const o = opts || {}
+  const me = o.me || ''
+  const scope = o.scope || 'mine'
+  const kw = norm(o.keyword || '')
+  // 2026-11-17 新增三个条件（用户口径：参考金蝶「商品列表」的顶部查询栏）
+  const status = norm(o.status || '')     // 单据状态：'' = 不限
+  const grade = norm(o.grade || '')       // 项目等级：'' = 不限
+  const from = norm(o.dateFrom || '')     // 单据日期 >= from（yyyy-MM-dd，字符串比较即可）
+  const to = norm(o.dateTo || '')         // 单据日期 <= to
+  const ownerKey = o.ownerKey || APPLICANT_KEY
+  const list = Array.isArray(rows) ? rows : []
+  return list.filter(function (r) {
+    if (!inApplicantScope(r, me, scope, ownerKey)) return false
+    if (status && norm(r && r['单据状态']) !== status) return false
+    if (grade && norm(r && r['项目等级']) !== grade) return false
+    if (from || to) {
+      const d = norm(r && r['单据日期'])
+      if (!d) return false                      // 没日期的行在"按日期筛"时不参与
+      if (from && d < from) return false
+      if (to && d > to) return false
+    }
+    if (!kw) return true
+    const hay = [r && r['单据编号'], r && r['客户名'], r && r[ownerKey], r && r['产品名称']].map(norm).join(' ')
+    return hay.indexOf(kw) >= 0
+  })
+}
+
+/**
+ * 「单据预览」全屏表格的**列配置**（2026-11-17 用户口径）。
+ *
+ * <p>用户原话：「因为现在的单据编号是固定的，所以应该是展示其他的一些比较重点的字段」。</p>
+ *
+ * <p>问题：产品信息表的纸面右上角印的是**受控表单编号**（YJ-QR-152，逐页常量，见
+ * recordSheetConfigs 的 docNoStatic），拿它当"找单的第一列"没有区分度；
+ * 而且同名列下有的行是真实流水号（PI-2026-11-0006），语义本身是混的。
+ * ⇒ 每类单据按自己的**业务识别字段**排前面，单号退到后面（仍保留，便于对账）。</p>
+ *
+ * <p>`kind` 只有两档：`text` 普通左对齐 / `num` 右对齐+等宽（等级、数量类）。</p>
+ *
+ * @type {Record<string, Array<{key: string, label: string, width?: number, minWidth?: number, kind?: string}>>}
+ */
+export const PREVIEW_TABLE_COLUMNS = {
+  // 立项申请：客户 + 项目等级 + 申请人 是"找这张单"的三条线索（沿用卡片时代的登记口径）
+  RD_APPROVAL: [
+    { key: '单据编号', label: '单据编号', minWidth: 160 },
+    { key: '单据日期', label: '单据日期', width: 110 },
+    { key: '客户名', label: '客户名', minWidth: 200 },
+    { key: '项目等级', label: '项目等级', width: 90, kind: 'num' },
+    { key: '申请立项人', label: '申请立项人', width: 120 },
+  ],
+  // 产品信息表：产品编号 / 产品名称 / 客户名称 才是识别字段；单据编号排最后（它可能是固定表单号）
+  RD_PROD_INFO: [
+    { key: '产品编号', label: '产品编号', minWidth: 130 },
+    { key: '产品名称', label: '产品名称', minWidth: 200 },
+    { key: '客户名称', label: '客户名称', minWidth: 180 },
+    { key: '产品管控等级', label: '产品管控等级', width: 120 },
+    { key: '编辑人', label: '编辑人', width: 120 },
+    { key: '单据日期', label: '单据日期', width: 110 },
+    { key: '单据编号', label: '单据编号', minWidth: 140 },
+  ],
+}
+
+/** 取某面板的列配置；没登记的面板退回「单号/日期/归属人」的最小集 */
+export function previewColumnsOf(panelCode, ownerKey) {
+  const cols = PREVIEW_TABLE_COLUMNS[String(panelCode || '')]
+  if (Array.isArray(cols) && cols.length) return cols
+  return [
+    { key: '单据编号', label: '单据编号', minWidth: 160 },
+    { key: '单据日期', label: '单据日期', width: 110 },
+    { key: ownerKey || APPLICANT_KEY, label: ownerKey || APPLICANT_KEY, width: 130 },
+  ]
+}
+
+/**
+ * 左侧「分类树」的节点 = 该面板里出现过的**单据状态**（按固定业务顺序，不按字符串排）。
+ *
+ * <p>用户口径（2026-11-17）：「左侧树按单据状态分」（参考金蝶的「商品类别」树）。</p>
+ *
+ * <p>为什么固定顺序：草稿 → 审批中 → 已审核 → 已归档 是业务推进顺序，
+ * 字典序排会变成「已归档、已审核、审批中、草稿」，读起来是倒的。</p>
+ *
+ * @returns {{ key: string, label: string, count: number }[]} count = 该状态的单据数，
+ *   只返回**有数据**的状态（空节点不画，避免满屏 0）；最前面固定一个「全部」。
+ */
+export function approvalStatusTree(rows) {
+  const ORDER = ['草稿', '修改中', '审批中', '待二级审批', '已审核', '已归档', '已作废']
+  const list = Array.isArray(rows) ? rows : []
+  const cnt = new Map()
+  for (const r of list) {
+    const k = String(r && r['单据状态'] || '').trim() || '未标注'
+    cnt.set(k, (cnt.get(k) || 0) + 1)
+  }
+  const keys = [...cnt.keys()].sort(function (a, b) {
+    const ia = ORDER.indexOf(a); const ib = ORDER.indexOf(b)
+    if (ia >= 0 && ib >= 0) return ia - ib
+    if (ia >= 0) return -1
+    if (ib >= 0) return 1
+    return a.localeCompare(b)
+  })
+  return [{ key: '', label: '全部', count: list.length }]
+    .concat(keys.map(function (k) { return { key: k, label: k, count: cnt.get(k) } }))
+}

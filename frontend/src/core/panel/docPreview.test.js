@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
   PREVIEW_COMPACT_CAP, PREVIEW_FIELDS, PREVIEW_SKIP, PREVIEW_VALUE_CAP,
-  previewLineText, previewSummaryOf,
+  approvalStatusTree, filterApprovalPreview, previewColumnsOf, previewLineText, previewSummaryOf,
 } from './docPreview.js'
 
 /**
@@ -150,4 +150,121 @@ test('预览态必须替换操作栏（按钮不渲染），返回后恢复', ()
   assert.match(vue, /canPreviewSide \? openSidePreview\(\) : openDocPreview\(\)/,
     '按钮要按面板分派：这两个面板走右栏预览，其余走原逻辑')
   assert.ok(vue.includes('closeSidePreview'), '缺返回函数')
+})
+
+/* ═══ 2026-11-17 用户口径:立项申请「单据预览」改成全屏 · 按申请立项人筛选 ═══
+ *
+ * 用户原话:「点击单据预览就根据申请立项人进行一个筛选全屏展示这些属于自己申请的单据的明细,
+ *   设计要好看,使用设计库进行设计,要留一个返回按钮,点击对应单据要有一个跳转按钮,可以直接跳转到对应单据」。
+ *
+ * 钉住的是**筛选口径**(纯函数,页面只负责画):
+ *   ① 默认「只看我申请的」= 申请立项人 === 当前登录人姓名;
+ *   ② 可切到「全部」(管理员/代查场景),切换后不过滤;
+ *   ③ 姓名比较忽略首尾空白与大小写;申请立项人为空的单**不算我的**;
+ *   ④ 关键字搜索在筛选结果内再收窄(单号/客户名/申请立项人)。
+ */
+
+const APR_ROWS = [
+  { 单据编号: 'LXA-1', 单据日期: '2026-11-17', 申请立项人: '张莉', 客户名: '青岛伊可普', 单据状态: '审批中' },
+  { 单据编号: 'LXA-2', 单据日期: '2026-11-16', 申请立项人: '李梓维', 客户名: '天津远致', 单据状态: '已归档' },
+  { 单据编号: 'LXA-3', 单据日期: '2026-11-13', 申请立项人: '张莉', 客户名: '深圳鼎百汇', 单据状态: '草稿' },
+  { 单据编号: 'LXA-4', 单据日期: '2026-11-13', 申请立项人: '', 客户名: '没有申请人', 单据状态: '草稿' },
+  { 单据编号: 'LXA-5', 单据日期: '2026-11-03', 申请立项人: ' 张莉 ', 客户名: '大咖国际', 单据状态: '审批中' },
+]
+
+test('⑱ 默认只列「我申请的」:申请立项人 = 当前登录人(忽略首尾空白)', () => {
+  const mine = filterApprovalPreview(APR_ROWS, { me: '张莉', scope: 'mine' })
+  assert.deepEqual(mine.map((r) => r['单据编号']), ['LXA-1', 'LXA-3', 'LXA-5'], '只留张莉申请的(含带空格的那张)')
+  assert.ok(!mine.some((r) => r['单据编号'] === 'LXA-4'), '申请立项人为空的单不算我的')
+  assert.ok(mine.every((r) => String(r['申请立项人'] || '').trim() === '张莉'))
+})
+
+test('⑲ 切到「全部」时不过滤(管理员/代查场景)', () => {
+  const all = filterApprovalPreview(APR_ROWS, { me: '张莉', scope: 'all' })
+  assert.equal(all.length, 5, '全部 = 一条不丢')
+})
+
+test('⑳ 关键字在筛选结果内再收窄(单号/客户名/申请立项人)', () => {
+  assert.deepEqual(filterApprovalPreview(APR_ROWS, { me: '张莉', scope: 'mine', keyword: 'lxa-3' }).map((r) => r['单据编号']), ['LXA-3'], '单号大小写无关')
+  assert.deepEqual(filterApprovalPreview(APR_ROWS, { me: '张莉', scope: 'mine', keyword: '深圳' }).map((r) => r['单据编号']), ['LXA-3'], '客户名可搜')
+  assert.deepEqual(filterApprovalPreview(APR_ROWS, { me: '张莉', scope: 'mine', keyword: '李梓维' }).map((r) => r['单据编号']), [], '范围外的人不会被关键字带出来')
+})
+
+test('㉑ 当前登录人为空时不能误判成「全都不是我的」以外的结果', () => {
+  // 拿不到姓名(未登录/匿名)时,「只看我的」应为空 —— 而不是把所有人的单都当自己的
+  assert.deepEqual(filterApprovalPreview(APR_ROWS, { me: '', scope: 'mine' }), [])
+  assert.equal(filterApprovalPreview(APR_ROWS, { me: '   ', scope: 'mine' }).length, 0)
+})
+
+/* ── 2026-11-17：参考金蝶「商品列表」升级预览（左状态树 + 多条件查询栏）── */
+test('filterApprovalPreview 支持 状态 / 等级 / 日期区间 三个新条件', () => {
+  const rows = [
+    { 单据编号: 'A-1', 申请立项人: '张三', 单据状态: '草稿', 项目等级: 'A', 单据日期: '2026-11-01' },
+    { 单据编号: 'A-2', 申请立项人: '张三', 单据状态: '已归档', 项目等级: 'B', 单据日期: '2026-11-10' },
+    { 单据编号: 'A-3', 申请立项人: '李四', 单据状态: '草稿', 项目等级: 'A', 单据日期: '2026-11-20' },
+  ]
+  const base = { me: '张三', scope: 'all' }
+  assert.equal(filterApprovalPreview(rows, base).length, 3)
+  // 状态
+  assert.deepEqual(filterApprovalPreview(rows, { ...base, status: '草稿' }).map((r) => r.单据编号), ['A-1', 'A-3'])
+  // 等级
+  assert.deepEqual(filterApprovalPreview(rows, { ...base, grade: 'A' }).map((r) => r.单据编号), ['A-1', 'A-3'])
+  // 日期区间（含边界）
+  assert.deepEqual(filterApprovalPreview(rows, { ...base, dateFrom: '2026-11-05', dateTo: '2026-11-15' }).map((r) => r.单据编号), ['A-2'])
+  assert.deepEqual(filterApprovalPreview(rows, { ...base, dateTo: '2026-11-01' }).map((r) => r.单据编号), ['A-1'], '只给结束日也要生效')
+  // 三个条件 AND
+  assert.deepEqual(filterApprovalPreview(rows, { ...base, status: '草稿', grade: 'A', dateFrom: '2026-11-15' }).map((r) => r.单据编号), ['A-3'])
+  // 没日期的行在按日期筛时不参与（不能当 0 通过）
+  assert.deepEqual(filterApprovalPreview([{ 单据编号: 'X', 单据状态: '草稿' }], { ...base, dateFrom: '2026-01-01' }).length, 0)
+})
+
+test('approvalStatusTree：按业务顺序排、只出有数据的状态、首项固定「全部」', () => {
+  const rows = [
+    { 单据状态: '已归档' }, { 单据状态: '草稿' }, { 单据状态: '草稿' }, { 单据状态: '审批中' },
+  ]
+  const tree = approvalStatusTree(rows)
+  assert.equal(tree[0].key, '')
+  assert.equal(tree[0].label, '全部')
+  assert.equal(tree[0].count, 4)
+  // 业务顺序：草稿 → 审批中 → 已归档（不是字典序）
+  assert.deepEqual(tree.slice(1).map((n) => n.label), ['草稿', '审批中', '已归档'])
+  assert.deepEqual(tree.slice(1).map((n) => n.count), [2, 1, 1])
+  // 空数据时只有「全部 0」
+  assert.deepEqual(approvalStatusTree([]), [{ key: '', label: '全部', count: 0 }])
+})
+
+test('产品信息表复用同一套预览：归属人字段可参数化为「编辑人」', () => {
+  const rows = [
+    { 单据编号: 'P-1', 编辑人: '张三' },
+    { 单据编号: 'P-2', 编辑人: '李四' },
+  ]
+  // 用 申请立项人 判据 → 一条都不匹配（产品信息表没这列）
+  assert.equal(filterApprovalPreview(rows, { me: '张三', scope: 'mine' }).length, 0)
+  // 传 ownerKey='编辑人' → 命中张三那张
+  assert.deepEqual(
+    filterApprovalPreview(rows, { me: '张三', scope: 'mine', ownerKey: '编辑人' }).map((r) => r.单据编号),
+    ['P-1'])
+})
+
+/* ── 2026-11-17：表格列按面板配置（「单据编号是固定的，应展示重点字段」）── */
+test('产品信息表的预览列以业务字段为主，单据编号退到最后', () => {
+  const cols = previewColumnsOf('RD_PROD_INFO', '编辑人')
+  const keys = cols.map((c) => c.key)
+  // 业务识别字段必须在前
+  assert.equal(keys[0], '产品编号', '产品编号是最有区分度的识别字段')
+  assert.ok(keys.includes('产品名称') && keys.includes('客户名称'))
+  // 单据编号不能在首位（它可能是 YJ-QR-152 这类固定表单编号）
+  assert.notEqual(keys[0], '单据编号', '单据编号不能当第一列')
+  assert.equal(keys[keys.length - 1], '单据编号', '单据编号退到最后一列（仍保留，便于对账）')
+})
+
+test('立项申请沿用客户/等级/申请人三条找单线索', () => {
+  const keys = previewColumnsOf('RD_APPROVAL', '申请立项人').map((c) => c.key)
+  assert.deepEqual(keys, ['单据编号', '单据日期', '客户名', '项目等级', '申请立项人'])
+})
+
+test('未登记的面板退回最小集（单号/日期/归属人），不会渲染出空表头', () => {
+  const cols = previewColumnsOf('SOME_UNKNOWN', '编辑人')
+  assert.deepEqual(cols.map((c) => c.key), ['单据编号', '单据日期', '编辑人'])
+  assert.ok(cols.length > 0)
 })

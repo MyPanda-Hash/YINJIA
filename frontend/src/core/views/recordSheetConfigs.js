@@ -383,9 +383,14 @@ const RD_MOLD_PROC_SEC0 = [
           { key: '内径mm', span: 2 },
           { key: '内径公差', span: 3 },
         ]},
+        // 2026-11-17 Excel #6「密度管控-管控要求下面的内容显示不完全」（截图中红箭头指向该格，
+        //   显示成 `*密度下限外0…` 被截断）。
+        //   根因：本行 span 只用了 11 列，**后 2 列（85+128=213px）空着没用**，
+        //   而「管控要求」只有 span2≈173px —— 装不进一个标准库下拉的完整文本。
+        //   改 span 2→4（≈355px），整行 1+4+4+4=13 列正好铺满，下限/上限各 4 列不变。
         { grid: [
           { label: '密度管控', rowspan: 2 },
-          { label: '管控要求', span: 2 },
+          { label: '管控要求', span: 4 },
           { label: '实际密度管控下限', span: 4 },
           { label: '实际密度管控上限', span: 4 },
         ]},
@@ -398,7 +403,9 @@ const RD_MOLD_PROC_SEC0 = [
           //   (新增/编辑/停用走 StdLibManager,不用找开发)。
           //   ⚠ 旁边两格「实际密度管控下限/上限」**故意不动**:用户口径「两个区域不变动」,
           //     它们仍是手填的密度值,计算只吃这两格(core/mold/recipeSheet.js paramsFromHead)。
-          { key: '密度管控要求', span: 2, ph: '密度范围：~', type: 'select' },
+          // span 与上方标签格「管控要求」一致（2→4，2026-11-17 Excel #6）：
+          //   标签 2 列而值 4 列会错位；两边同宽才不会出现"标签在左、输入框跑到别处"。
+          { key: '密度管控要求', span: 4, ph: '密度范围：~', type: 'select' },
           { key: '实际密度管控下限', span: 4 },
           { key: '实际密度管控上限', span: 4 },
         ]},
@@ -489,21 +496,33 @@ const RD_MOLD_FORMULA = {
       //   合计不能当一列普通数字相加(用户 2026-11-11 口径「设计添加量的和只需要计算 % 的就行,
       //   这个最终的数值一定是 100%」)⇒ 交给 core/mold/recipeExport.designTotalText 只加 % 行。
       //   其余列仍走 sumTotals 那套「位数跟明细走」。
-      { page: 1, bar: '配方表', autoSeqBar: true, totalCols: true, designTotal: '设计添加量', recipeCalc: true, blankRows: 10, filterKey: '表区', filterVal: '配方表', cols: [
-          { key: '序号', label: 'No.' },
+      // 2026-11-17 用户口径（Excel #9 打印截图，红字标注）：
+      //  · 「行距太大」—— 该表没给 rowH，行高被内容撑开（截图里一行 ≈ 100px+）。
+      //    给 rowH 43（与同面板其它页一致），行距立回纸面正常值；
+      //  · 「列宽太窄」—— 设计添加量按 grid 只分到 41px，而 `5.70%` 需要 ~52px，
+      //    于是数字被压成竖排（5/7/0/% 四行）。靠 span 调不动（grid 是固定 13 列），
+      //    改由 dataTable 的 cols 显式给 w（覆盖 span 兜底宽度），并让「物料名称」让出 17px 平账。
+      { page: 1, bar: '配方表', autoSeqBar: true, totalCols: true, designTotal: '设计添加量', recipeCalc: true, blankRows: 10, rowH: 43, filterKey: '表区', filterVal: '配方表', cols: [
+          { key: '序号', label: 'No.', w: 81 },
           // 物料种类:普通文本格(2026-10-16 用户口径)。原来这里是 type:'select' 的下拉 —— 页 2 这格
           // 没有"筛选候选"的职责(候选筛选在配方计算弹窗里),而"防写出引擎认不出的词"改由手填物料编号
           // 带出档案类别来承担(见 invCarry.pickInvKind;引擎认不出的类别一律不补)。
-          { key: '物料种类', label: '物料种类', span: 2 },
+          // ⚠ 本表一旦有列带 w，wideSheetNarrow.test 就要求**所有可见列 w 之和 = 780**
+          //   （colgroup 不能比章节宽/窄）。故这里逐列给足，替掉原来的 span 兜底。
+          { key: '物料种类', label: '物料种类', span: 2, w: 127 },
           // 物料编号:商品档案**远程模糊筛选下拉**(2026-10-16 用户口径:「输入 Y 或者 003 时
           // 模糊搜索到含这些数字字母的」,例 YJ-LL-003)。type='inv-code' 由 RecordSheetPanels 渲染成
           // el-select(remote + filterable + allow-create):打字才联网、候选封顶 50、档案里没有的编码照旧能手打;
           // 选中后仍走 onDetailTextCommit 把 物料名称/物料种类 一并带出。口径见 core/panel/invCarry.js。
-          { key: '物料编号', label: '物料编号', span: 4, type: 'inv-code' },
-          { key: '物料名称', label: '物料名称', span: 3 },
-          { key: '实际添加比例', label: '实际添加\n比例%' },
-          { key: '单支物料含量', label: '单支\n物料含量g' },
-          { key: '设计添加量', label: '设计添加\n量' },
+          { key: '物料编号', label: '物料编号', span: 4, w: 181, type: 'inv-code' },
+          { key: '物料名称', label: '物料名称', span: 3, w: 164 },
+          // 2026-11-17：三列都显式给宽（原来只靠 span 分 grid 余量，设计添加量只剩 41px）
+          //   58px 可容 `100.00%`（最长）；单支含量给 66px 容 `77.04`；比例给 91px 不变。
+          { key: '实际添加比例', label: '实际添加\n比例%', w: 91 },
+          { key: '单支物料含量', label: '单支\n物料含量g', w: 66 },
+          // 70px：容得下最长值 `100.00%`（7 字符 ≈49px）+ 内边距 + 居中余量。
+          // 2026-11-17 Excel #8 截图里这一列只有 41px ⇒ `5.70%` 被压成 5/7./0/0/% 五竖行。
+          { key: '设计添加量', label: '设计添加\n量', w: 70 },
         ]},
     ],
     tailSections: [
@@ -930,7 +949,16 @@ export const recordSheetConfigs = {
       { label: '文件使用范围', key: '文件使用范围', type: 'select' },
     ],
     // 页 0 网格 = 设计 sheet「内部1」B..Q 十六列(列宽取设计!cols,日期/申请人/紧急程度按可用性微调)
-    grid: [46, 90, 80, 178, 88, 88, 74, 240, 120, 110, 120, 110, 80, 90, 90, 103],
+    // ⚠ 2026-11-17 用户口径「这个的列宽有问题」——样品信息组三列与真实内容严重不匹配:
+    //   尺寸/配方/密度 原 88/88/74px,而生产数据里 尺寸最长 9 字、配方最长 71 字、
+    //   密度最长 48 字且带换行(密度0.65-0.67 / 敲5% / 190℃ 65min …)。
+    //   88px 放 71 字 = 每行 4~5 个字,列表里被截成一条缝。
+    //   现把宽度从**富余列**挪过来(合计仍 1707 = 设计纸宽,不撑破纸张):
+    //     配方 88→200(+112)、密度 74→140(+66)、尺寸 88→90(+2);
+    //     方法 240→220、背景/目的 178→150、标准 120→100、组装方式 120→100、
+    //     目标 110→95、样品处理 110→95、备注 103→91、日期/期望/预计 90→80、申请人/紧急程度 80→70。
+    //   钉子:recordSheetConfigs.testapply.test.js ⑯⑰。
+    grid: [46, 80, 70, 150, 90, 200, 140, 220, 100, 95, 100, 95, 70, 80, 80, 91],
     // 报告头三段跨度合计 = 16:大标题 B2:L4 = 11 列 | 标签 M | 值 N..Q(文件管理人/密级/文件使用范围 3 行)
     // 第 1 行「公司名 | 编号」按设计 merges 显式切分:B1:E1 = 4 列 / 空 F..M = 8 列 / 编号 N1:Q1 = 4 列
     head: { title: 11, infoLabel: 1, infoValue: 4, noSpan: 4, noGapSpan: 8, docnoPrefix: false },
@@ -939,7 +967,8 @@ export const recordSheetConfigs = {
         title: '内部委托-测试申请单',
         staticTitle: '内部委托-测试申请单',
         docNoStatic: 'YJ-RIR001',
-        grid: [46, 90, 80, 178, 88, 88, 74, 240, 120, 110, 120, 110, 80, 90, 90, 103],
+        // 与面板级 grid 同一份(样品信息三列 2026-11-17 加宽,合计仍 1707;理由见面板级那段注释)
+        grid: [46, 80, 70, 150, 90, 200, 140, 220, 100, 95, 100, 95, 70, 80, 80, 91],
         head: { title: 11, infoLabel: 1, infoValue: 4, noSpan: 4, noGapSpan: 8, docnoPrefix: false },
         showHead: true,
       },

@@ -101,7 +101,9 @@ public class RdDevProductService {
                         + " FROM rd_prod_info_head h WHERE ISNULL(h.asp_cancel,'N') <> 'Y'"
                         + " AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = 'RD_PROD_INFO'"
                         + " AND s.doc_no = h.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')"
-                        + " ORDER BY h.id");
+                        // 2026-11-17 用户口径「新增的产品信息应该放最上面，不要放下面」:
+                        //   按 id 倒序 ⇒ 最新建的那张产品信息表排第一行(旧口径 ORDER BY h.id 升序,新单沉底)
+                        + " ORDER BY h.id DESC");
         for (Map<String, Object> pi : pis) {
             String no = str(pi.get("no"));
             String code = str(pi.get("code"));
@@ -118,6 +120,8 @@ public class RdDevProductService {
             if (l2Owner == null) l2Owner = str(pi.get("duty"));
             one.put("填写人", filler == null ? "" : filler);
             one.put("二级负责人", l2Owner == null ? "" : l2Owner);
+            // 产品信息表这一步的最后操作时间(与 4 个文件节点同一口径,见 lastActionAt)
+            one.put("at", lastActionAt("RD_PROD_INFO", no));
             Map<String, String> owners = devTaskOwners();
             List<Map<String, Object>> nodes = new ArrayList<>();
             int done = 0;
@@ -177,7 +181,7 @@ public class RdDevProductService {
         }
     }
 
-    /** 某个产品在某个文件面板上的节点:单号/状态/是否完成/是否反审核待重走 */
+    /** 某个产品在某个文件面板上的节点:单号/状态/是否完成/是否反审核待重走/最后操作时间 */
     private Map<String, Object> nodeOf(String panelCode, String label, String productCode) {
         Map<String, Object> n = new LinkedHashMap<>();
         n.put("panel", panelCode);
@@ -186,6 +190,9 @@ public class RdDevProductService {
         n.put("state", "未开始");
         n.put("done", false);
         n.put("reaudited", false);
+        // 最后操作时间(2026-11-17 用户口径「每个都显示处理的日期，比如我是 2026年11月17日13:31分操作的」)。
+        // 取不到就是空串,前端显示「—」,不编造时间。
+        n.put("at", "");
         if (productCode == null || productCode.isBlank()) return n;
         // ⚠ 这里入参是**原始产品编号**(产品信息表/rd_dev_task 侧),而本层查的是 head 表 ——
         //   烧结工艺清单(RD_MOLD_PROC)存的是 `原值-tb`。只认一种形态 ⇒ 该类节点永远显示「未开始」,
@@ -208,10 +215,54 @@ public class RdDevProductService {
             n.put("state", st);
             n.put("done", "已归档".equals(st) || "已审核".equals(st) || "已生效".equals(st));
             n.put("reaudited", !Boolean.TRUE.equals(n.get("done")) && hasUnaudit(panelCode, no));
+            n.put("at", lastActionAt(panelCode, no));
         } catch (Exception ignore) {
             // 面板/表缺失等一律退化成「未开始」,不因一个节点把整份概览打挂
         }
         return n;
+    }
+
+    /**
+     * 该单**最后一次操作**的时间(2026-11-17 用户口径「每个都显示处理的日期」)。
+     *
+     * <p>取数顺序(先准后粗,取到就返回):</p>
+     * <ol>
+     *   <li>{@code yj_form_approval.create_time} 的 MAX —— 审批/提交/弃审每一步都留痕,
+     *       是"我几点几分操作的"最准的一条;</li>
+     *   <li>退回 {@code yj_doc_status}:审核时间 shsj > 归档时间 archived_at > 通用 update_at
+     *       (保存/提交/审批都会刷新它)。</li>
+     * </ol>
+     * <p>两者都取不到(如单据刚建还没落状态行)返回空串,前端显示「—」,不编造时间。</p>
+     *
+     * @return "yyyy-MM-dd HH:mm" 或空串
+     */
+    private String lastActionAt(String panelCode, String no) {
+        if (panelCode == null || no == null || no.isBlank()) return "";
+        try {
+            List<java.sql.Timestamp> ts = jdbc.queryForList(
+                    "SELECT MAX(create_time) FROM yj_form_approval WHERE panel_code = ? AND form_no = ?",
+                    java.sql.Timestamp.class, panelCode, no);
+            if (!ts.isEmpty() && ts.get(0) != null) return fmt(ts.get(0));
+        } catch (Exception ignore) { /* 留痕表缺列/缺表 ⇒ 退回状态表 */ }
+        try {
+            List<Map<String, Object>> rs = jdbc.queryForList(
+                    "SELECT shsj, archived_at, update_at FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
+                    panelCode, no);
+            if (!rs.isEmpty()) {
+                Map<String, Object> r = rs.get(0);
+                for (String k : new String[]{"shsj", "archived_at", "update_at"}) {
+                    Object v = r.get(k);
+                    if (v instanceof java.sql.Timestamp t) return fmt(t);
+                    if (v instanceof java.time.LocalDateTime d) return fmt(java.sql.Timestamp.valueOf(d));
+                }
+            }
+        } catch (Exception ignore) { /* 状态表取不到 ⇒ 空串 */ }
+        return "";
+    }
+
+    /** 时间统一成 yyyy-MM-dd HH:mm(用户举例就是这个粒度:「2026年11月17日13:31分」) */
+    private static String fmt(java.sql.Timestamp t) {
+        return new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(t);
     }
 
     /** 该单是否有「弃审」留痕(有 = 曾经审过又被反审核,现处于未完成态 ⇒ 需要重走)。
