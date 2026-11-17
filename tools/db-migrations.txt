@@ -4988,3 +4988,5 @@ migrate-datarec-auditor-from-shr-20261117.sql
 migrate-mold-proc-auditor-20261117.sql
 # 2026-11-17 核验补漏（产品信息表 行22）：主要性能描述改标准库
 migrate-prod-info-perf-stdlib-20261117.sql
+# 2026-11-18 出货检验计划：表单管理人默认改崔晓云（存量按旧默认冯敏的改成崔晓云）
+migrate-insp-plan-manager-20261118.sql

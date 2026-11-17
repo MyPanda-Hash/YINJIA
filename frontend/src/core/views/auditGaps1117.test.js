@@ -47,3 +47,15 @@ test('② 主要性能描述按标准库渲染 + 元数据迁移', () => {
   assert.match(perfMig, /EXEC sp_executesql @seed/, '种库必须动态 SQL（两账套 schema 不同步）')
   assert.match(perfMig, /prod\.perf/, '库编码')
 })
+
+test('③ 出货检验计划存量按旧默认冯敏→崔晓云（只改等于旧默认的行）', () => {
+  // 生产实测分布：管理人 空 8 张 / 冯敏 4 张 ⇒ 只把「冯敏」这 4 张改掉：
+  //   · 空值不动（用户说的是"默认写"，不是"凭空补"）；
+  //   · 人工改成别人的不动（那是人为指定）。
+  // ⚠ 物理列是「管理人」不是「表单管理人」（label 同名陷阱，实测踩过）。
+  const mig = readFileSync(
+    new URL('../../../../tools/migrate-insp-plan-manager-20261118.sql', import.meta.url), 'utf8')
+  assert.match(mig, /SET \[管理人\] = N'崔晓云'/, '要改「管理人」列')
+  assert.match(mig, /WHERE \[管理人\] = N'冯敏'/, '只改仍等于旧默认的行')
+  assert.doesNotMatch(mig, /SET \[表单管理人\]/, '不得写死 label 同名列（会列名无效）')
+})
