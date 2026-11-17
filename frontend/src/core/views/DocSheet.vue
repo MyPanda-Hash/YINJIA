@@ -704,8 +704,13 @@
                     </div>
                   </div>
                 </div>
-                <!-- 完成按钮:五行最下边;附「申请终止」(阶段处终止,二级审批;无在途/已落实终止时可用) -->
-                <div v-if="canStageComplete && head[ph.key + '_计划内容']" class="as-phase-footer">
+                <!-- 完成按钮:五行最下边;附「申请终止」(阶段处终止,二级审批;无在途/已落实终止时可用)
+                     ⚠ 判据必须用 hasPhaseContent(5 字段任一非空)，不能只认「计划内容」（2026-11-17 用户报障
+                     「有人反应说找不到终止按钮这些了」）。原写法 `head[ph.key + '_计划内容']` 要求**恰好这一格**
+                     非空：生产实测 LXB-2026-11-0001 的阶段 2/3 填了「计划开始/计划完成」但「计划内容」留空
+                     ⇒ 完成 + 申请终止 两颗按钮**整条消失**，而且界面上没有任何提示，用户只能报"按钮不见了"。
+                     同文件第 634 行的 data-filled 早就在用 hasPhaseContent —— 两处口径本就该一致。 -->
+                <div v-if="canStageComplete && hasPhaseContent(head, ph.num)" class="as-phase-footer">
                   <el-button v-if="!head[ph.key + '_实际完成']" type="success" size="small" :loading="stageLoading === ph.num" @click.stop="doStageComplete(ph.num)">
                     {{ tt('完成') }}
                   </el-button>
