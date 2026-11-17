@@ -27,7 +27,9 @@ test('必填缺失走弹窗（ElMessageBox），且列出条目而不是合并�
 })
 
 test('校验失败仍要高亮所有缺失格（翻页 + rs-focus）', () => {
-  assert.match(list, /focusMissingFields\(missing\.map\(\(m\) => m\.key\)\)/, '要一次性高亮全部缺失项')
+  // 2026-11-17：入参从「数据键数组」改成「缺失项对象数组」—— 明细缺项要带 tabKey/row，
+  // 才能在无纸面组件的单据卡片布局里定点到「第几行的哪一格」（详见 missingRequiredHighlight.test.js）
+  assert.match(list, /focusMissingFields\(missing\)/, '要一次性高亮全部缺失项')
   const sheet = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
   assert.match(sheet, /async function focusFields\(/, 'RecordSheetPanels 要暴露 focusFields')
   assert.match(sheet, /\.rs-focus \{[\s\S]{0,120}outline: 2px solid #f56c6c/, '高亮样式要在')

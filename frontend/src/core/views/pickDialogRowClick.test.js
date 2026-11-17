@@ -88,10 +88,20 @@ test('⑥ 纸面必填红星去掉，但必填属性/校验逻辑一个都不动
   assert.match(sheet, /rs-field-blink|rsFieldBlink/, '校验定位闪烁（必填缺失时跳转提示）必须保留')
 })
 
-test('⑦ 其它面板的红星一并去掉（同一个用户口径，别只改纸面这一处）', () => {
-  // 查询弹窗 / 列表表头 / 检验记录 / 物料标签：都不再画红星
-  assert.doesNotMatch(list.slice(list.indexOf('.field label.req')), /content:\s*'\*'/, 'PanelxList 查询弹窗红星去掉')
-  assert.doesNotMatch(list.slice(list.indexOf('.col-hdr-text.req')), /content:\s*'\*'/, 'PanelxList 表头红星去掉')
+test('⑦ 其余面板红星保持去掉；单据卡片表头与明细列头按 2026-11-17 口径放回', () => {
+  // 2026-11-17 用户报障:「必填项在原来的工艺路线中没有体现为必填,且点击保存后并没高亮提示是
+  // 那个数据行」。2026-11-13 那条「把必填项的红点标识去掉」是针对**弹窗**(参照选择那几个)说的,
+  // 落地时连单据卡片表头与明细列头一起清掉了 —— 于是用户看不出哪些格必填,只有点保存被弹窗拦下。
+  // ⇒ 只把「单据卡片表头 label」「明细列头」这两处放回红星;弹窗内的红星仍然不画。
+  const headReqCss = list.slice(list.indexOf('.field label.req::before'))
+  assert.match(headReqCss.slice(0, 160), /content:\s*'\*'/,
+    'PanelxList 单据卡片表头要画红星(2026-11-17 放回)')
+  const colReqCss = list.slice(list.indexOf('.col-hdr-text.req::before'))
+  assert.match(colReqCss.slice(0, 160), /content:\s*'\*'/,
+    'PanelxList 明细列头要画红星(2026-11-17 放回)')
+  // 查询弹窗仍是「只留必填属性、不画红星」(2026-11-13 口径不撤)
+  assert.doesNotMatch(list, /class="req-star"/, 'PanelxList 查询弹窗红星仍是去掉状态')
+  // 纸面/检验记录/物料标签：红星照旧不画
   assert.doesNotMatch(qcSheet, /class="qr-req"/, 'QcInspRecSheet 红星 span 去掉')
   assert.doesNotMatch(labelDlg.slice(labelDlg.indexOf('.mlq-req')), /content:\s*'\*'/, 'MaterialLabelDialog 红星去掉')
   // ⚠ 但必填**属性**仍在：QcInspRecSheet 的 isRequired 判据不能跟着删

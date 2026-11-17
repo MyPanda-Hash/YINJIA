@@ -1069,7 +1069,13 @@
         />
         <div class="doc-rail-main">
           <div class="fields header-fields udl-fields" :class="{ 'is-draft': draftEditable }">
-      <div class="field" v-for="field in headerEditFields" :key="headerFieldKey(field)">
+      <!-- data-code + field-blink:保存时缺必填的表头字段由本组件自己点亮(2026-11-17 用户报障
+           「点击保存后并没高亮提示是那个数据行」—— 本布局没有纸面 sheet 组件,原来只有 sheet 才有高亮) -->
+      <div
+        class="field" v-for="field in headerEditFields" :key="headerFieldKey(field)"
+        :data-code="headerFieldKey(field)"
+        :class="{ 'field-blink': isMissingHintHead(headerFieldKey(field)) }"
+      >
         <label :class="{ req: field.isRequired }">{{ headerFieldLabel(field) }}<span
           v-if="printBatchLockReason(field)" class="field-lock-badge" :title="printBatchLockReason(field)"
         >{{ tt('已按材料码批次号锁定') }}</span></label>
@@ -1314,7 +1320,7 @@
               trigger="click"
               @command="(cmd) => onAddDetailCommand(cmd, b)"
             >
-              <el-button size="small" type="primary" :icon="Plus">
+              <el-button size="small" type="primary" :icon="Plus" :class="{ 'btn-blink': isMissingHintTab(b) }">
                 {{ tt('新增数据') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
               </el-button>
               <template #dropdown>
@@ -1324,7 +1330,7 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <el-button v-else-if="detailEditable(b)" size="small" type="primary" :icon="Plus" @click="addInlineDetailRow(b)">{{ tt('新增数据') }}</el-button>
+            <el-button v-else-if="detailEditable(b)" size="small" type="primary" :icon="Plus" :class="{ 'btn-blink': isMissingHintTab(b) }" @click="addInlineDetailRow(b)">{{ tt('新增数据') }}</el-button>
             <span class="dt-ic" v-for="ic in b.isMain ? iconA : iconB" :key="ic" @click="onIcon(ic, b)">{{ tt(ic) }}</span>
           </span>
         </div>
@@ -1367,6 +1373,7 @@
               size="small"
               :show-summary="false"
               :row-class-name="(o) => rowCls(o, b)"
+              :cell-class-name="(o) => missingCellCls(o)"
               @selection-change="(r) => (delSel = r)"
               @row-contextmenu="(row, col, ev) => onCtx(ev, row, b)"
               @cell-dblclick="(row, col, cell, ev) => onDetailCellDblclick(row, col, cell, ev, b)"
@@ -1443,6 +1450,7 @@
           :summary-method="(p) => sumMethodFor(b, p)"
           :sum-text="tt('合计')"
           :row-class-name="(o) => rowCls(o, b)"
+          :cell-class-name="(o) => missingCellCls(o)"
           @selection-change="(r) => (delSel = r)"
           @row-contextmenu="(row, col, ev) => onCtx(ev, row, b)"
           @cell-dblclick="(row, col, cell, ev) => onDetailCellDblclick(row, col, ev, b)"
@@ -2779,7 +2787,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, onActivated, watch, nextTick, markRaw, toRaw, provide } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, onActivated, watch, nextTick, markRaw, shallowRef, toRaw, provide } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Filter, Plus, Search, WarningFilled, ArrowDown } from '@element-plus/icons-vue'
@@ -7967,6 +7975,9 @@ const isApproved = computed(() => cur.value && APPROVED_STATUS_VALUES.includes(c
 
 function rowCls({ row }, b) {
   if (row._placeholder) return 'ph-row'
+  // 缺必填的行整行描边(2026-11-17):用户口径「没高亮提示是那个数据行」——
+  // 单元格闪色之外再给整行一个红边,长表格里一眼能扫到是第几行
+  if (isMissingHintRow(row)) return 'row-missing-hint'
   if (b && b.id === 'A' && row['产品编码'] && row['产品编码'] === selectedProduct.value) return 'prod-selected'
   if (APPROVED_STATUS_VALUES.includes(row['审批状态'])) return 'row-approved'
   return ['产品编码', '材料编码', '存货编码', '存货名称', '产品名称', '材料名称'].some((k) => row[k] === '合计') ? 'sum-row' : ''
@@ -10825,23 +10836,130 @@ function emptyFieldValue(value) {
 function focusMissingField(key) {
   if (!key) return
   try { approvalSheetRef.value?.focusField?.(key) } catch { /* 定位失败不影响校验 */ }
+  // 无纸面 sheet 的布局(单据卡片/网格)自己点亮(2026-11-17)——
+  // 后端拒收时也会走到这里(ButtonService「X不能为空」),同样要能看出是哪一格
+  if (!approvalSheetRef.value) applyHintByFieldName(key)
+}
+
+/**
+ * 只拿得到一个**字段名**时(典型:后端报错文案里反解出来的键)尽量点亮:
+ * 表头字段直接亮那一栏;明细字段则把该列**空着的行**全亮出来。
+ * @returns {boolean} 是否点亮了任何东西
+ */
+function applyHintByFieldName(key) {
+  if (!key) return false
+  if ((headerFields.value || []).some((f) => headerFieldKey(f) === key)) {
+    applyMissingHint([{ key }])
+    return true
+  }
+  const hits = []
+  for (const tab of cfgCache.value?.detail?.tabs || []) {
+    if (!(tab.fields || []).some((f) => f.dataName === key)) continue
+    for (const row of cur.value?.detail?.[tab.key] || []) {
+      if (row && emptyFieldValue(row[key])) hits.push({ key, tabKey: tab.key, row })
+    }
+  }
+  if (!hits.length) return false
+  applyMissingHint(hits)
+  return true
 }
 
 /**
  * 一次高亮**多个**缺必填的格(2026-11-06 用户口径:「所有的必填项在保存提交审批的时候要有高亮
  * 提示哪一个还没有填写」)。原先只定位第一个缺失项 —— 用户补完一个又冒下一个,来回试好几轮。
  * 与 focusMissingField 同款:可选链 + try,定位失败绝不改变校验结果。
- * @param {string[]} keys 缺必填的数据键(顺序即提示顺序)
+ * @param {Array<{key:string,tabKey?:string,row?:object}>|string[]} items 缺必填项(顺序即提示顺序)
  */
-function focusMissingFields(keys) {
-  const list = (keys || []).filter(Boolean)
+function focusMissingFields(items) {
+  const list = (items || []).filter(Boolean)
   if (!list.length) return
+  const keys = list.map((it) => (typeof it === 'string' ? it : it.key)).filter(Boolean)
+  if (!keys.length) return
+  // ① 文书面板(RecordSheetPanels / DocSheet / 各纸面 sheet)自带 focusFields/focusField
   try {
     const sheet = approvalSheetRef.value
-    if (sheet?.focusFields) sheet.focusFields(list)
-    else sheet?.focusField?.(list[0])
+    if (sheet?.focusFields) sheet.focusFields(keys)
+    else sheet?.focusField?.(keys[0])
   } catch { /* 定位失败不影响校验 */ }
+  // ② 单据卡片 / 网格布局(工艺路线等基础资料与绝大多数单据)没有纸面 sheet 组件 ⇒ 本组件自己点亮。
+  //    2026-11-17 用户报障:「必填项没有体现为必填,且点击保存后并没高亮提示是那个数据行」——
+  //    弹窗里写着"已用高亮标出",而这套布局一条高亮都没有(高亮只实现在纸面组件里)。
+  applyMissingHint(list)
 }
+
+/* ═══ 缺必填的「本组件自绘高亮」(2026-11-17)═════════════════════════════════════
+   两处落点:
+     · 表头字段条 `.field`          → class `field-blink`(键 = 表头字段数据键)
+     · 明细表格单元格 / 整行         → `cell-blink` / `row-missing-hint`(键 = 行对象 + 字段数据键)
+   用**行对象身份**(WeakMap)而不是行号:表里还混着 `_placeholder` 空行(工艺路线末行恒有一个),
+   行号与 cur.detail 的下标并不一一对应;排序/筛选后行号更不可靠。
+   高亮是**持续**的(补齐前一直亮,配合弹窗「已用高亮标出,请补齐后再提交」的口径),
+   校验通过或换单据时清掉。 */
+const missingHintHead = shallowRef(null)   // Set<string> 表头缺必填的数据键
+// 明细行是 markRaw 过的对象 ⇒ 必须用 WeakMap 按**对象身份**记,且用 shallowRef 保持它是原生
+// WeakMap(ref 会把集合包成 Proxy,代理后的 get 用原始对象做键容易落空)
+const missingHintRows = shallowRef(null)   // WeakMap<明细行对象, Set<string>> 缺必填的格
+// 整表级「请至少添加一行」:键是页签键 —— 没有具体格子可亮,改成闪该页签的「新增数据」按钮
+const missingHintTabs = shallowRef(null)   // Set<string> 缺行的页签键
+
+function isMissingHintTab(b) {
+  const key = b ? activeTab(b).key : ''
+  return !!key && !!missingHintTabs.value && missingHintTabs.value.has(key)
+}
+
+function isMissingHintHead(key) {
+  return !!key && !!missingHintHead.value && missingHintHead.value.has(key)
+}
+
+function missingCellCls({ row, column }) {
+  const set = row ? missingHintRows.value?.get?.(row) : null
+  if (!set) return ''
+  const prop = column?.property
+  return prop && set.has(prop) ? 'cell-blink' : ''
+}
+
+function isMissingHintRow(row) {
+  return !!row && !!missingHintRows.value?.get?.(row)
+}
+
+function clearMissingHint() {
+  missingHintHead.value = null
+  missingHintRows.value = null
+  missingHintTabs.value = null
+}
+
+/** 把缺失清单落成高亮状态,并把第一个高亮点滚到视野中央(翻页后目标常在视野外)。 */
+function applyMissingHint(items) {
+  const head = new Set()
+  const tabs = new Set()
+  const rows = new WeakMap()
+  for (const it of items || []) {
+    if (!it || !it.key) continue
+    if (it.row) {
+      const set = rows.get(it.row) || new Set()
+      set.add(it.key)
+      rows.set(it.row, set)
+    } else if (it.tabKey) {
+      // 「请至少添加一行明细」:没有格子可亮,闪该页签的「新增数据」按钮
+      tabs.add(it.tabKey)
+    } else {
+      head.add(it.key)
+    }
+  }
+  missingHintHead.value = head.size ? head : null
+  missingHintTabs.value = tabs.size ? tabs : null
+  missingHintRows.value = rows
+  nextTick(() => {
+    try {
+      // 明细优先(表头字段条总在最上面,明细行才可能被翻页/滚动甩出视野)
+      const el = document.querySelector('.cell-blink') || document.querySelector('.field-blink')
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    } catch { /* 滚动失败不影响校验 */ }
+  })
+}
+
+// 换单据就清高亮:表头数据键(如「工艺路线名称」)各张单同名,不清会把高亮亮到另一张单上
+watch(curDocNo, () => clearMissingHint())
 
 /**
  * 唯一键查重(2026-10-16,起点需求:工序档案「相同工序编码不允许出现重复」)。
@@ -10921,9 +11039,11 @@ function promptMissingRequired(pre, fallbackText) {
 }
 
 function validateInlineDraft() {
-  /** 缺失项:{key(数据键), text(人话)} —— 明细页签整表必填时 key 是页签键 */
+  /** 缺失项:{key(数据键), text(人话), tabKey/row(明细行所在页签与行对象,供高亮定位)} */
   const missing = []
   lastMissingRequired = missing
+  // 每次校验先清旧高亮:补掉的格子要灭,换单据后不留上一条单据的残留高亮
+  clearMissingHint()
   for (const field of headerFields.value) {
     const key = headerFieldKey(field)
     if (field.isRequired && emptyFieldValue(cur.value[key])) {
@@ -10955,18 +11075,19 @@ function validateInlineDraft() {
       nonEmpty++
       for (const field of tab.fields || []) {
         if (field.isRequired && emptyFieldValue(row[field.dataName])) {
-          missing.push({ key: field.dataName, text: `${tabName}第 ${index + 1} 行${field.dataName}不能为空` })
+          // tabKey + row 让高亮能精确落到「第几行的哪一格」,而不是只报一个字段名
+          missing.push({ key: field.dataName, tabKey: tab.key, row, text: `${tabName}第 ${index + 1} 行${field.dataName}不能为空` })
           rowMissing = true
         }
       }
     }
     if (tab.isRequired && nonEmpty === 0 && !rowMissing) {
-      missing.push({ key: tab.key, text: `请至少添加一行${tabName}` })
+      missing.push({ key: tab.key, tabKey: tab.key, text: `请至少添加一行${tabName}` })
     }
   }
   if (!missing.length) return ''
   // 一次把**所有**缺失格点亮(翻到第一个缺失项所在页;其它页的格回到那页时仍在高亮期)
-  focusMissingFields(missing.map((m) => m.key))
+  focusMissingFields(missing)
   // 提示文案:一项直说;多项列前 5 条 + 总数 —— 弹窗窄,不铺整串
   if (missing.length === 1) return missing[0].text
   const shown = missing.slice(0, 5).map((m) => m.text).join('、')
@@ -14452,11 +14573,41 @@ onUnmounted(() => {
   color: #444;
   white-space: nowrap;
 }
-/* 必填红星(2026-11-13 用户口径「把必填项的红点标识去掉，保留必填项的属性就行」):
-   只去掉**视觉**，`.req` / `.req-label` 类名与 required 判据照旧（校验/必填提示不受影响）。 */
-.field label.req {
+/* 必填标识(2026-11-17 用户报障「必填项在原来的工艺路线中没有体现为必填」)。
+   沿革:2026-11-06 给必填项打了红星 → 2026-11-13 用户口径「把必填项的红点标识去掉,保留必填项的
+   属性就行」把**全系统 7 处**红星一起清掉了 —— 但那条口径是针对**弹窗**(参照选择/客户名称那几个)
+   说的,连单据卡片表头与明细列头一起清,结果是用户看不出哪些格必填,只有点保存时被弹窗拦下。
+   ⇒ 现在只在**单据卡片表头 label + 明细列头**这两处恢复红星;各弹窗组件里没有下面这两条规则,
+     弹窗内的红星仍然保持去掉。
+   要再全部去掉:删掉下面两个 `::before` 块即可 —— `.req` 类名与 required 必填判据不受影响。 */
+.field label.req::before {
+  content: '*';
+  color: #ff0033;
+  margin-right: 2px;
 }
-.col-hdr-text.req {
+.col-hdr-text.req::before {
+  content: '*';
+  color: #ff0033;
+  margin-right: 2px;
+  font-weight: bold;
+}
+/* 保存时缺必填的表头字段闪烁(2026-11-17):与 PanelxForm / DocSheet / RecordSheetPanels 的
+   .field-blink 同一观感(scoped 样式不跨组件继承,这里必须单独定义)。 */
+.field-blink {
+  animation: pxlFieldBlink 1.1s ease-in-out 2;
+  border-radius: 4px;
+}
+@keyframes pxlFieldBlink {
+  0%, 100% { background: transparent; }
+  50% { background: var(--el-color-warning-light-7, #fdf6ec); box-shadow: 0 0 0 2px var(--el-color-warning-light-5, #f5dab1); }
+}
+/* 「请至少添加一行明细」时闪该页签的「新增数据」按钮(没有格子可亮,给个明确的落点) */
+.btn-blink {
+  animation: pxlBtnBlink 1.1s ease-in-out 2;
+}
+@keyframes pxlBtnBlink {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 0 3px rgba(255, 0, 51, 0.45); }
 }
 .field :deep(.el-input),
 .field :deep(.el-select),
@@ -15192,6 +15343,22 @@ onUnmounted(() => {
   color: #c0c4cc;
 }
 :deep(.el-table .row-approved td) { background: #f0fdf4 !important; }
+/* 缺必填的明细行/格(2026-11-17 用户报障「点击保存后并没高亮提示是那个数据行」)。
+   整行淡红底 + 左起红边(扫一眼就知道是第几行),具体缺的那一格再闪烁两次。
+   ⚠ el-table 的 tr/td 由子组件渲染、拿不到本组件的 scoped 属性 ⇒ 必须走 :deep。 */
+:deep(.el-table .row-missing-hint > td.el-table__cell) {
+  background: #fff5f5 !important;
+}
+:deep(.el-table .row-missing-hint > td.el-table__cell:first-child) {
+  box-shadow: inset 3px 0 0 #ff0033;
+}
+:deep(.el-table .cell-blink) {
+  animation: pxlCellBlink 1.1s ease-in-out 2;
+}
+@keyframes pxlCellBlink {
+  0%, 100% { background: transparent; }
+  50% { background: #ffe9ec; box-shadow: inset 0 0 0 2px #ff0033; }
+}
 .main-grid { margin-bottom: 10px; }
 .main-grid .dt-head { margin-bottom: 4px; }
 .main-grid .dt-head .dt-tab.on { cursor: default; }
