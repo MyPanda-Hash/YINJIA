@@ -49,6 +49,14 @@ import java.util.Map;
  * </ol>
  * 原来那道「成型完成才放行」的门禁对制程检验单、组装成品检验单仍然有效。</p>
  *
+ * <p><b>🔴 2026-11-12 口径(首件检验单=每天一个生产批次)</b>:用户原话「按每天一个生产批次吧,
+ * 就是每天的第一个工序报工一次后就产生。」⇒
+ * <ol>
+ *   <li>自动出单:成型**当天首笔报工**即出,**一天一张**(见 {@code QcInspAutoService.build} ①);</li>
+ *   <li>本控制器的人工准入与幂等同步改成**按天**:今天还没有存活首件单的行才列出/才允许建单,
+ *       昨天出过单不影响今天;{@code 单据日期} = 今天(与自动出单按报工日期同一维度)。</li>
+ * </ol></p>
+ *
  * <p>权限:锚 QC_FIRST_INSP 可见性(按钮只下发到这张单)。</p>
  */
 @RestController
@@ -91,13 +99,14 @@ public class QcFirstInspController {
     }
 
     /**
-     * 可选的生产工单行(2026-10-20 用户口径,规则见类注释):
+     * 可选的生产工单行(2026-10-20 用户口径,2026-11-12 改为「按天」):
      * <ol>
      *   <li>未作废、**未结案**({@link com.yinjia.mes.service.PlangClose})、**未完工**
      *       ({@link com.yinjia.mes.service.PlangDone});</li>
-     *   <li>该「工单号 + 工单行号」**还没有存活的首件检验单** —— 已被选过的不再出现。</li>
+     *   <li>该「工单号 + 工单行号」**今天还没有存活的首件检验单** —— 今天已出过单的不再出现;
+     *       昨天出过单不影响今天再建一张(2026-11-12 口径:**每天一个生产批次、一天一张**)。</li>
      * </ol>
-     * 刻意**不要求**「已排产入线 / 成型已排」,也不再判「成型已报工」:首件检验是脱模后马上做的,
+     * 刻意**不要求**「已排产入线 / 成型已报」,也不再判「成型已报工」:首件检验是脱模后马上做的,
      * 那一刻成型报工往往还没录(这正是 2026-10-19 那道门禁把现场卡死的原因,见 {@link WoInspGate#gated})。
      */
     @GetMapping("/woLines")
@@ -108,16 +117,20 @@ public class QcFirstInspController {
         String kw = keyword == null ? "" : keyword.trim();
         int size = Math.max(1, Math.min(200, pageSize));
         int page = Math.max(1, pageNo);
+        // 「今天」= 应用本地日期(与 fromWoLine 写单据日期同一把墙钟;Docker 里 SQL Server 是 UTC,不能用 GETDATE)
+        String today = LocalDate.now().toString();
 
-        // 准入(2026-10-20):未作废 + 未结案 + 未完工 + 本行还没有存活的首件检验单。
+        // 准入(2026-10-20 + 2026-11-12):未作废 + 未结案 + 未完工 + 本行**今天**还没有存活的首件检验单。
         // 判据复用 PlangClose / PlangDone 两个唯一口径类,不在这里另写一份表达式。
         StringBuilder where = new StringBuilder(" WHERE ISNULL(p.asp_cancel,'N')<>'Y'"
                 + " AND " + com.yinjia.mes.service.PlangClose.notClosed("p")
                 + " AND " + com.yinjia.mes.service.PlangDone.notDone("p")
                 + " AND NOT EXISTS (SELECT 1 FROM dbo." + HEAD_TABLE + " h"
                 + "                 WHERE h.[工单号]=p.pl_no AND h.[工单行号]=p.pl_xc"
-                + "                   AND ISNULL(h.asp_cancel,'N')<>'Y')");
+                + "                   AND ISNULL(h.asp_cancel,'N')<>'Y'"
+                + "                   AND h.[单据日期] = CAST(? AS date))");
         List<Object> args = new ArrayList<>();
+        args.add(today);
         if (!kw.isEmpty()) {
             where.append(" AND (p.pl_no LIKE ? OR ISNULL(p.dm,'') LIKE ? OR ISNULL(p.mc,'') LIKE ?)");
             String like = "%" + kw + "%";
@@ -178,8 +191,8 @@ public class QcFirstInspController {
      * <p><b>准入(2026-10-20)</b>:未作废 + 未结案 + **未完工**才能建;已完工的行直接拒(与列表同口径)。
      * 不再要求「成型已报工」。</p>
      *
-     * <p>幂等:同一 (工单号, 工单行号) 已有存活首件检验单 ⇒ 直接返回那张,不重复建单
-     * (列表已把这种行滤掉,这里只兜直连接口)。</p>
+     * <p>幂等(2026-11-12 起**按天**):同一 (工单号, 工单行号, 单据日期=今天) 已有存活首件检验单 ⇒ 直接返回那张;
+     * 昨天出过单不影响今天再建(每天一个生产批次,首件检验单一天一张)。</p>
      */
     @PostMapping("/fromWoLine")
     @Transactional
@@ -209,14 +222,15 @@ public class QcFirstInspController {
         WoInspGateGuard.Decision d = gate.enforce(PANEL, woNo, xc, body, clientIp(request));
         if (!d.allowed()) return ApiResult.error(d.code(), d.error());
 
-        // 幂等:已有存活单直接返回
+        // 幂等(2026-11-12 按天):本行**今天**已有存活单直接返回;昨天的不算,今天会各自出一张
+        String today = LocalDate.now().toString();
         List<String> exist = jdbc.queryForList(
                 "SELECT TOP 1 [单据编号] FROM dbo." + HEAD_TABLE
                         + " WHERE [工单号]=? AND [工单行号]=? AND ISNULL(asp_cancel,'N')<>'Y'"
-                        + " ORDER BY id DESC", String.class, woNo, xc);
+                        + "   AND [单据日期] = CAST(? AS date)"
+                        + " ORDER BY id DESC", String.class, woNo, xc, today);
         if (!exist.isEmpty()) return ApiResult.ok(created(exist.get(0), true));
 
-        String today = LocalDate.now().toString();
         String productCode = str(line.get("dm"));
         FirstInspItems.Result items = FirstInspItems.load(jdbc, productCode);
 

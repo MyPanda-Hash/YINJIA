@@ -330,8 +330,16 @@ export function fieldOptions(field) {
 
 // ==================== SQL 后端接口 ====================
 
+/**
+ * 面板配置。
+ *
+ * 2026-11-13 角色字段视图:默认带 `view=role`,由后端在 yj_field 之上叠"本角色显示/隐藏"。
+ * 界面设置里把视图切成「系统整体」时,这里改发 `view=system` —— 只是不叠覆盖,数据一行不动。
+ * 直接读 localStorage 而不是拿 pinia store:本模块被大量非组件代码调用,担不起"store 还没装好"。
+ */
 export async function getPanelConfig(panelCode) {
-  return normalizeApprovalConfig(unwrap(await request.get('/px/getPanelConfig', { params: { panelCode } })))
+  const view = localStorage.getItem('mes_field_scope') === 'system' ? 'system' : 'role'
+  return normalizeApprovalConfig(unwrap(await request.get('/px/getPanelConfig', { params: { panelCode, view } })))
 }
 
 export async function getPermMatrix(panelCode) {
@@ -536,6 +544,23 @@ export async function deleteForms({ panelCode, rowCodes }) {
   return unwrap(await request.post('/px/deleteForms', { panelCode, rowCodes }))
 }
 
+/**
+ * 下拉字段「选项库」自动增项(2026-11-11 用户口径:处理意见「选择库可自动增加处理意见」)。
+ * 纸面 el-select(allow-create)里手输的新值通过它落进 yj_field.dict_sql,以后所有人下拉都能选到。
+ * 后端只做加法、只认 VALUES 字面量形态;返回 false = 不需要/不允许追加(前端静默)。
+ */
+export async function appendFieldOption({ panelCode, label, option }) {
+  return unwrap(await request.post('/px/appendFieldOption', { panelCode, label, option }))
+}
+
+/**
+ * 下拉字段「选项库」**整体维护**(2026-11-11 用户口径:处理意见「能不能增加按钮或者弹窗?弹窗形式更好维护」)。
+ * 提交整份选项清单(可增/删/改名/排序),写回 `yj_field.dict_sql`;需要该面板的「自定义字段」权。
+ */
+export async function saveFieldOptions({ panelCode, label, options }) {
+  return unwrap(await request.post('/px/saveFieldOptions', { panelCode, label, options }))
+}
+
 /** 表格列自定义:保存排序/栏名/显隐 */
 export async function saveColumnPrefs({ panelCode, columns }) {
   return unwrap(await request.post('/px/saveColumnPrefs', { panelCode, columns }))
@@ -544,6 +569,41 @@ export async function saveColumnPrefs({ panelCode, columns }) {
 /** 表头调整:保存表头字段的排序/栏名/显隐(hidden+visible 同开同关) */
 export async function saveHeaderPrefs({ panelCode, columns }) {
   return unwrap(await request.post('/px/saveHeaderPrefs', { panelCode, columns }))
+}
+
+// ==================== 角色字段视图(2026-11-13,两层:系统整体 → 角色) ====================
+// 口径:原「表格调整 / 表头调整」照旧写 yj_field(系统整体);这一组只写"本角色显示/隐藏",
+// 同一角色所有账号看到的一样,不细分个人;顺序与栏名仍由整体决定。
+// 三态:行存在=本角色显式设定,行不存在=跟随系统整体(与整体相同会被自动删行)。
+
+/** 对话框数据源:本角色在该面板表头/明细逐行的 shown/baseShown/overridden/required */
+export async function getFieldView(panelCode) {
+  return unwrap(await request.get('/px/fieldView', { params: { panelCode } }))
+}
+
+/** 保存本角色视图(显隐 + 角色内序号):place = header | detail;columns = [{label, visible, seq}] */
+export async function saveRoleFieldView({ panelCode, place, columns }) {
+  return unwrap(await request.post('/px/saveRoleFieldView', { panelCode, place, columns }))
+}
+
+/** 恢复继承:清掉本角色在该面板的覆盖(panelCode 传空 = 全部面板) */
+export async function resetRoleFieldView({ panelCode } = {}) {
+  return unwrap(await request.post('/px/resetRoleFieldView', { panelCode: panelCode || '' }))
+}
+
+/** 角色模板 · 从系统整体一键复制到本角色(把整体的显隐与顺序落成显式视图) */
+export async function copyRoleFieldViewFromSystem({ panelCode, roleCode }) {
+  return unwrap(await request.post('/px/copyRoleFieldViewFromSystem', { panelCode, roleCode: roleCode || '' }))
+}
+
+/** 角色模板 · 把本角色的视图套用到另一个角色(仅管理员) */
+export async function copyRoleFieldViewToRole({ panelCode, roleCode }) {
+  return unwrap(await request.post('/px/copyRoleFieldViewToRole', { panelCode, roleCode: roleCode || '' }))
+}
+
+/** 可套用的角色清单 */
+export async function fieldViewRoles(panelCode) {
+  return unwrap(await request.get('/px/fieldViewRoles', { params: { panelCode } }))
 }
 
 // ==================== 动态字段(备用列池;规格 docs/design/动态字段扩展-备用列池-V1.0.md) ====================
@@ -686,6 +746,14 @@ export async function puPrintBuyerContactAdd(payload) {
   return unwrapStrict(await request.post('/px/puPrint/buyerContacts', payload || {}))
 }
 
+/**
+ * 整份保存需方联系人名单(2026-11-11 用户口径「没有删除按钮吗,输错了怎么办」):
+ * 管理弹窗里改名 / 删掉 / 新增后一次提交,服务端清洗(去空/去重/上限 12 条)后覆盖系统参数,返回整份名单。
+ */
+export async function puPrintBuyerContactSave(contacts) {
+  return unwrapStrict(await request.put('/px/puPrint/buyerContacts', { contacts: contacts || [] }))
+}
+
 /** 保存「收料超送比例」(生单对话框改动即自动保存):落系统参数 receive_over_ratio,传 0~1 小数 */
 export async function batchFlowSaveOverRatio(overRatio) {
   return unwrap(await request.post('/px/batchFlow/overRatio', { overRatio }))
@@ -708,6 +776,16 @@ export async function pushFlowLines({ panelCode, action, sourceNos }) {
 /** 生单:按「勾选的行 + 本次数量」逐张生成(单张/多张同一入口),返回 { 生成:[], 失败:[] } */
 export async function pushFlowGenerate({ panelCode, action, docs, overRatio }) {
   return unwrapStrict(await request.post('/px/push/generate', { panelCode, action, docs, overRatio }))
+}
+
+/**
+ * **合单生单**(2026-11-13 用户口径):多张**同一供应商**的采购订单 → **一张**送料暂收单。
+ *
+ * 与 {@link pushFlowGenerate} 的入参完全一致(docs 结构相同、仓库/仓位按行带),区别只在后端:
+ * generate 逐张各出一张目标单,merge 把所有行并进同一张。故前端两个对话框可以共用同一份行契约。
+ */
+export async function pushFlowMerge({ panelCode, action, docs, batchNo }) {
+  return unwrapStrict(await request.post('/px/push/merge', { panelCode, action, docs, batchNo }))
 }
 
 

@@ -1,0 +1,13 @@
+﻿import { readFileSync } from "node:fs";
+import { fetchAppToken, kingdeeTryGet } from "../../../deploy/kingdee-client.mjs";
+const cfg = JSON.parse(readFileSync(new URL("../../../deploy/push/config.json", import.meta.url), "utf8"));
+const sbx = { ...cfg.kingdee, outerInstanceId: cfg.kingdee.sandboxInstanceId };
+const { token } = await fetchAppToken(sbx);
+const l = await kingdeeTryGet(sbx, token, "/jdy/v2/scm/sal_in_bound", { page: "1", page_size: "50" });
+const hit = (l.data?.rows || []).find(r => r.bill_no === "XSTH-20261113-00001");
+console.log("list row keys:", Object.keys(hit || {}).join(","));
+console.log("list customer:", hit?.customer_name, hit?.customer_number, hit?.customer_id);
+const d = await kingdeeTryGet(sbx, token, "/jdy/v2/scm/sal_in_bound_detail", { id: hit.id });
+const data = d.data || {};
+console.log("detail customer_id=", data.customer_id, "settle_customer_name=", data.settle_customer_name, "customer_name=", data.customer_name);
+console.log("detail keys sample:", Object.keys(data).filter(k=>k.includes("customer")||k.includes("settle")).join(","));

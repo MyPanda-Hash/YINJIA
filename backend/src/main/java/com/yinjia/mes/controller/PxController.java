@@ -4,6 +4,7 @@ import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.panel.PanelRuntimeService;
 import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.DevTaskService;
+import com.yinjia.mes.service.InvOptionRank;
 import com.yinjia.mes.service.PanelConfigService;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.PanelRegistry;
@@ -14,6 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.LinkedHashMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -55,15 +57,14 @@ public class PxController {
     private final com.yinjia.mes.service.QueryService queryService;
     /** 研发「项目流程管控」只读取数(2026-10-20) */
     private final com.yinjia.mes.service.RdProjectFlowService rdFlow;
-    /** 工单扫码领料取数(2026-10-21):工单行 plang + BOM mate,两张表都不是注册面板 */
-    private final com.yinjia.mes.service.WorkOrderPickService woPick;
-    /** 工单扫码领料的逐笔留痕(2026-10-21):扫了哪些料/各多少/什么时候 */
-    private final com.yinjia.mes.service.WoPickScanLogService woPickLog;
+    /** 工单扫码领料取数(2026-10-21)已随页面下架(2026-11-18),由「扫码混料」MixScanController 接替 */
     /**
      * 统一生单对话框里"自己算行"的那个动作(2026-10-31):
      * 送料暂收单按商品档案分流({@link com.yinjia.mes.panel.QcRecvGenerateHandler}),见 generateByAction。
      */
     private final com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate;
+    /** 角色字段视图(2026-11-13):同一面板各角色看到不同字段,只存显隐,不碰 yj_field */
+    private final com.yinjia.mes.service.PanelFieldViewService fieldView;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PxController.class);
 
@@ -81,9 +82,8 @@ public class PxController {
                         com.yinjia.mes.service.BarcodeLabelService barcodeLabel,
                         com.yinjia.mes.service.QueryService queryService,
                         com.yinjia.mes.service.RdProjectFlowService rdFlow,
-                        com.yinjia.mes.service.WorkOrderPickService woPick,
-                        com.yinjia.mes.service.WoPickScanLogService woPickLog,
-                        com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate) {
+                        com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate,
+                        com.yinjia.mes.service.PanelFieldViewService fieldView) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -101,106 +101,12 @@ public class PxController {
         this.barcodeLabel = barcodeLabel;
         this.queryService = queryService;
         this.rdFlow = rdFlow;
-        this.woPick = woPick;
-        this.woPickLog = woPickLog;
         this.qcRecvGenerate = qcRecvGenerate;
+        this.fieldView = fieldView;
     }
 
-    // ============ 工单扫码领料取数(2026-10-21,手机端) ============
-    /**
-     * 按工单码取工单行。
-     *
-     * <p>前端扫工单二维码(格式 {@code 公司代码@工单号@(1000+行号)},见 print-formats.woQrText)
-     * 后调本端点拿工单内容(产品/产线/排产数量)。工单落在 {@code plang},它不是注册面板,
-     * 走不了 {@code queryFormDataList},故单列一个只读端点。
-     *
-     * @param orderNo 工单号(必填)
-     * @param lineNo  工单行号;不传或 &lt;=0 表示整单全部行
-     */
-    @GetMapping("/woPick/lines")
-    public Map<String, Object> woPickLines(@RequestParam String orderNo,
-                                           @RequestParam(required = false) Integer lineNo) {
-        perm.requirePanelView(com.yinjia.mes.service.PagePanelRegistry.WORK_ORDER_PICK);
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("list", woPick.workOrderLines(orderNo, lineNo == null ? 0 : lineNo));
-        return out;
-    }
-
-    /**
-     * 按产品编码取 BOM 明细(该工单要领哪些料)。
-     *
-     * <p>数据源 = {@code mate}(WLBOM 物料清单面板的底层表)。
-     * 返回空列表表示该产品还没录 BOM —— 前端提示去「物料清单」面板录入,
-     * 而不是静默显示空清单(2026-10-21 实测:金蝶侧 BOM 接口 count=0,
-     * MES 自建 bs_bom 已下架,mate 只剩 T382 一个产品 ⇒ 必须先补数据)。
-     *
-     * @param productCode 产品编码
-     */
-    @GetMapping("/woPick/bom")
-    public Map<String, Object> woPickBom(@RequestParam String productCode) {
-        perm.requirePanelView(com.yinjia.mes.service.PagePanelRegistry.WORK_ORDER_PICK);
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("list", woPick.bomOf(productCode));
-        return out;
-    }
-
-    /**
-     * 扫码留痕:记一笔「谁、何时、哪张工单哪一行、扫了哪个物料、多少数量、秤读数」。
-     *
-     * <p>用户口径(2026-10-21):「要监控 App 使用情况,因为这个取数上报的要能看到他们的操作情况」
-     * + 「还要记『扫了哪些料、各多少、什么时候』」。
-     *
-     * <p>前端每完成一次扫码(含「取秤」按行记量)调一次;提交时再调 {@code /woPick/attachDoc}
-     * 把领料单号补上。写入失败不影响作业(服务内部吞异常只打日志)。
-     *
-     * <p>请求体字段:woNo / woLine / productCode / materialCode / materialName / qty / unit /
-     * scaleValue / scaleDevice / scaleAt / scanType / scanSource / clientType / clientInfo / remark
-     */
-    @PostMapping("/woPick/scanLog")
-    public ApiResult<Void> woPickScanLog(@RequestBody Map<String, Object> body, HttpServletRequest request) {
-        perm.requirePanelView(com.yinjia.mes.service.PagePanelRegistry.WORK_ORDER_PICK);
-        String user = currentUser();
-        woPickLog.record(body, user, clientIp(request));
-        return ApiResult.ok(null);
-    }
-
-    /**
-     * 整单提交后,把本次作业扫过的行补上领料单号(按单据回查)。
-     *
-     * @param body docNo / woNo / woLine
-     */
-    @PostMapping("/woPick/attachDoc")
-    public Map<String, Object> woPickAttachDoc(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView(com.yinjia.mes.service.PagePanelRegistry.WORK_ORDER_PICK);
-        String docNo = String.valueOf(body.getOrDefault("docNo", ""));
-        String woNo = String.valueOf(body.getOrDefault("woNo", ""));
-        int woLine = body.get("woLine") instanceof Number n ? n.intValue() : 0;
-        int n = woPickLog.attachDocNo(docNo, woNo, woLine, currentUser());
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("updated", n);
-        return out;
-    }
-
-    /**
-     * 扫码流水查询(「扫码领料记录」面板数据源)。
-     *
-     * @param woNo 工单号(模糊)
-     * @param user 操作人(模糊)
-     * @param materialCode 物料编码/名称(模糊)
-     * @param start 起始日期 yyyy-MM-dd
-     * @param end 结束日期 yyyy-MM-dd
-     */
-    @GetMapping("/woPick/scanLogs")
-    public Map<String, Object> woPickScanLogs(@RequestParam(required = false) String woNo,
-                                              @RequestParam(required = false) String user,
-                                              @RequestParam(required = false) String materialCode,
-                                              @RequestParam(required = false) String start,
-                                              @RequestParam(required = false) String end,
-                                              @RequestParam(defaultValue = "1") int page,
-                                              @RequestParam(defaultValue = "50") int size) {
-        perm.requirePanelView(com.yinjia.mes.service.PagePanelRegistry.WORK_ORDER_PICK);
-        return woPickLog.query(woNo, user, materialCode, start, end, page, size);
-    }
+    // 2026-11-18:原「工单扫码领料」的四个端点(/woPick/lines|bom|scanLog|attachDoc|scanLogs)已随页面下架，
+    //   取数与留痕改由「手机扫码 → 扫码混料」承担(见 MixScanController + MixScanService)。
 
     // ============ 条码标签打印留痕(材料 / 半成品 / 成品条码面板,2026-10-18) ============
     /**
@@ -440,6 +346,29 @@ public class PxController {
         String name = body.get("姓名") == null ? "" : String.valueOf(body.get("姓名"));
         String phone = body.get("联系方式") == null ? "" : String.valueOf(body.get("联系方式"));
         return ApiResult.ok(puPrint.addBuyerContact(name, phone, currentUser()));
+    }
+
+    /**
+     * 整份保存需方联系人候选(2026-11-11 用户口径「没有删除按钮吗,输错了怎么办」):
+     * 管理弹窗里改名/删掉/新增后一次提交,服务端清洗(去空/去重/上限)后覆盖参数。
+     */
+    @PutMapping("/puPrint/buyerContacts")
+    @SuppressWarnings("unchecked")
+    public ApiResult<List<Map<String, Object>>> puPrintBuyerContactSave(@RequestBody Map<String, Object> body) {
+        // 与新增同一权限口径:改的是公司级名单,要「修改」权
+        perm.requireButton("PU_ORDER", "修改");
+        Object raw = body == null ? null : body.get("contacts");
+        List<Map<String, Object>> items = new java.util.ArrayList<>();
+        if (raw instanceof List<?> l) {
+            for (Object o : l) {
+                if (!(o instanceof Map<?, ?> m)) continue;
+                Map<String, Object> mm = new LinkedHashMap<>();
+                mm.put("姓名", m.get("姓名"));
+                mm.put("联系方式", m.get("联系方式"));
+                items.add(mm);
+            }
+        }
+        return ApiResult.ok(puPrint.saveBuyerContacts(items, currentUser()));
     }
 
     /**
@@ -881,7 +810,13 @@ public class PxController {
         if (kind != null && !kind.isBlank()) cond.put("所属类别", kind.trim());
         // 档案模式(INV 是档案面板)会忽略 pageSize 全量返回 ⇒ 靠 condition 收窄到一个类别,
         // 与前端原调用(queryFormDataList + condition{所属类别})行为完全一致。
-        return ApiResult.ok(queryService.queryFormDataList("INV", keyword, cond, 1, 5000));
+        Map<String, Object> raw = queryService.queryFormDataList("INV", keyword, cond, 1, 5000);
+        // 范围筛选 + 命中优先级排序(2026-11-13 用户口径「模糊搜索要做一个范围筛选,符合输入的数字的在前面」):
+        // 上面那条查询对 INV 的**全部 75 列**做 %kw% OR、排序只有 t.id DESC ⇒ 规格型号含 123 的
+        // Y-S-T(硫酸氧钛 123334-00-9)会排到编码/名称含 123 的 SP00013 前面(用户截图)。
+        // 规则在 service(见 {@link InvOptionRank}),这里只转发;响应形状原样保留({totalSize, list[…]})。
+        // keyword 为空 ⇒ 不筛不排不截断(配方计算器「该类别全部物料」的既有行为不变)。
+        return ApiResult.ok(InvOptionRank.rankResult(raw, keyword));
     }
 
     /** 选单来源查询(已审核 + 占用过滤,对齐 T+ SelectVoucher)。
@@ -959,6 +894,7 @@ public class PxController {
         String sourceNo = String.valueOf(body.getOrDefault("sourceNo", ""));
         if (!targetPanel.isBlank()) perm.requireButton(targetPanel, "保存");
         Map<String, Double> qtyByLine = null;
+        Map<String, Map<String, Object>> whBinByLine = new java.util.LinkedHashMap<>();
         Object raw = body.get("lines");
         if (raw instanceof List<?> list && !list.isEmpty()) {
             qtyByLine = new java.util.LinkedHashMap<>();
@@ -968,6 +904,8 @@ public class PxController {
                 Object qty = m.get("qty");
                 if (key == null) continue;
                 qtyByLine.put(String.valueOf(key), qty == null ? 0d : Double.parseDouble(String.valueOf(qty)));
+                Map<String, Object> wb = whBinOfLine(m);
+                if (!wb.isEmpty()) whBinByLine.put(String.valueOf(key), wb);
             }
         }
         // 材料码隔离行(行键 `...#行id@打印行id`)的批次号由后端按行自取,前端不需要另传
@@ -976,7 +914,8 @@ public class PxController {
                 qtyByLine,
                 body.get("overRatio") == null || String.valueOf(body.get("overRatio")).isBlank() ? null
                         : Double.parseDouble(String.valueOf(body.get("overRatio"))),
-                body.get("batchNo") == null ? null : String.valueOf(body.get("batchNo")));
+                body.get("batchNo") == null ? null : String.valueOf(body.get("batchNo")),
+                whBinByLine.isEmpty() ? null : whBinByLine);
         return ApiResult.ok(res);
     }
 
@@ -1033,6 +972,8 @@ public class PxController {
                 String sourceNo = String.valueOf(m.get("sourceNo") == null ? "" : m.get("sourceNo"));
                 if (sourceNo.isBlank()) continue;
                 Map<String, Double> qtyByLine = new java.util.LinkedHashMap<>();
+                // 行级「仓库 / 仓位」预填(2026-11-13 用户口径「生单可以选仓库和仓位,可以每行不一样」)
+                Map<String, Map<String, Object>> whBinByLine = new java.util.LinkedHashMap<>();
                 Object rawLines = m.get("lines");
                 if (rawLines instanceof List<?> lineList) {
                     for (Object lo : lineList) {
@@ -1041,6 +982,8 @@ public class PxController {
                         if (key == null) continue;
                         qtyByLine.put(String.valueOf(key), lm.get("qty") == null ? 0d
                                 : Double.parseDouble(String.valueOf(lm.get("qty"))));
+                        Map<String, Object> wb = whBinOfLine(lm);
+                        if (!wb.isEmpty()) whBinByLine.put(String.valueOf(key), wb);
                     }
                 }
                 Map<String, Object> row = new java.util.LinkedHashMap<>();
@@ -1048,7 +991,8 @@ public class PxController {
                 try {
                     Map<String, Object> res = generateByAction(sourcePanel, action, sourceNo, user,
                             qtyByLine.isEmpty() ? null : qtyByLine,
-                            m.get("batchNo") == null ? null : String.valueOf(m.get("batchNo")));
+                            m.get("batchNo") == null ? null : String.valueOf(m.get("batchNo")),
+                            whBinByLine.isEmpty() ? null : whBinByLine);
                     row.put("编号", res.get("编号"));
                     row.put("面板", res.getOrDefault("gotoPanel", target));
                     row.put("批次号", res.get("批次号"));
@@ -1073,6 +1017,42 @@ public class PxController {
         recordUsage(sourcePanel, action,
                 made.stream().map(r -> String.valueOf(r.get("编号"))).collect(java.util.stream.Collectors.joining(",")),
                 request);
+        return ApiResult.ok(out);
+    }
+
+    /**
+     * **合单生单**(2026-11-13 用户口径):多张**同一供应商**的采购订单 → **一张**送料暂收单。
+     *
+     * <p>请求体:{@code {panelCode, action, batchNo?, docs:[{sourceNo, lines:[{lineKey, qty, 仓库/仓位...}]}]}}
+     * —— docs 结构与 {@code /push/generate} 完全一致(前端复用同一份行契约与仓库/仓位预填),
+     * 区别只在于后端把**所有 docs 的行并进同一张目标单**,而不是逐张各出一张。
+     *
+     * <p>行号语义见 {@code PushGenerateHandler.generateMerged} 的类注释:行级「采购单号」= 合单**前**的订单号,
+     * 「采购订单行号」= 合单**前**的订单行号;占用/反查用的 source_line_key 是合单**后**的暂收行 id。
+     */
+    @PostMapping("/push/merge")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> pushMerge(@RequestBody Map<String, Object> body, HttpServletRequest request) {
+        String sourcePanel = String.valueOf(body.getOrDefault("panelCode", ""));
+        String action = String.valueOf(body.getOrDefault("action", ""));
+        String target = configService.pushTarget(sourcePanel, action);
+        if (target == null) throw new IllegalArgumentException("该动作没有可用的生单目标:" + action);
+        perm.requirePanelView(sourcePanel);
+        perm.requireButton(target, "保存");
+        String user = SecurityContextHolder.getContext().getAuthentication() == null
+                ? "system" : SecurityContextHolder.getContext().getAuthentication().getName();
+        List<Map<String, Object>> docs = new java.util.ArrayList<>();
+        Object rawDocs = body.get("docs");
+        if (rawDocs instanceof List<?> list) {
+            for (Object o : list) {
+                if (o instanceof Map<?, ?> m) docs.add((Map<String, Object>) m);
+            }
+        }
+        Map<String, Object> res = pushGenerateHandler.generateMerged(sourcePanel, action, docs,
+                body.get("batchNo") == null ? null : String.valueOf(body.get("batchNo")), user);
+        Map<String, Object> out = new java.util.LinkedHashMap<>(res);
+        out.put("targetPanel", target);
+        recordUsage(sourcePanel, action, String.valueOf(res.get("编号")), request);
         return ApiResult.ok(out);
     }
 
@@ -1101,12 +1081,30 @@ public class PxController {
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> generateByAction(String sourcePanel, String action, String sourceNo, String user,
-                                                 Map<String, Double> qtyByLine, String batchNo) {
+                                                 Map<String, Double> qtyByLine, String batchNo,
+                                                 Map<String, Map<String, Object>> whBinByLine) {
         if (com.yinjia.mes.panel.QcRecvGenerateHandler.PANEL.equals(sourcePanel)
                 && com.yinjia.mes.panel.QcRecvGenerateHandler.ACTION.equals(action)) {
             return qcRecvGenerate.generateSelected(sourceNo, user, qtyByLine);
         }
-        return pushGenerateHandler.generateOne(sourcePanel, action, sourceNo, user, qtyByLine, batchNo);
+        return pushGenerateHandler.generateOne(sourcePanel, action, sourceNo, user, qtyByLine, batchNo, whBinByLine);
+    }
+
+    /**
+     * 生单请求里某一行的「仓库 / 仓位」预填(2026-11-13 用户口径:生单时就能按行选仓库仓位)。
+     *
+     * <p>键与 {@code PushGenerateHandler.WHBIN_KEYS} 同口径;空值不进 map(避免把"没选"当成"清空")。
+     */
+    private static Map<String, Object> whBinOfLine(Map<?, ?> line) {
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        for (String k : new String[]{"仓库", "仓库编码", "仓库id", "仓库启用仓位管理", "仓位", "仓位id", "仓位名称"}) {
+            Object v = line.get(k);
+            if (v == null) continue;
+            String s = String.valueOf(v).trim();
+            if (s.isEmpty()) continue;
+            out.put(k, s);
+        }
+        return out;
     }
 
     /** 报表栏目设置读取(报表表头筛选与排序补丁) */    @GetMapping("/reportColumnSettings")
@@ -1127,10 +1125,13 @@ public class PxController {
     }
 
     @GetMapping("/getPanelConfig")
-    public ApiResult<Map<String, Object>> getPanelConfig(@RequestParam String panelCode) {
+    public ApiResult<Map<String, Object>> getPanelConfig(@RequestParam String panelCode,
+                                                        @RequestParam(required = false) String view) {
         // 面板元数据(字段/参照绑定)不是人人可取:按读放行集合(可见 ∪ 参照目标 ∪ 同模块)校验,2026-09-22 补
         perm.requirePanelRead(panelCode);
-        return ApiResult.ok(service.getPanelConfig(panelCode));
+        // view=system ⇒ 不叠角色字段视图(界面设置"字段视图=系统整体"时用);缺省=本角色(2026-11-13)
+        boolean roleView = !"system".equalsIgnoreCase(view);
+        return ApiResult.ok(configService.getPanelConfig(panelCode, roleView));
     }
 
     @GetMapping("/getPermMatrix")
@@ -1368,6 +1369,48 @@ public class PxController {
         return request.getRemoteAddr();
     }
 
+    /**
+     * 下拉字段「选项库」自动增项(2026-11-11 用户口径:处理意见「选择库可自动增加处理意见」)。
+     *
+     * <p>前端纸面把「处理意见」做成 el-select(allow-create)后,用户手输一个新意见时调本接口,
+     * 把新值追加进该字段的选项库(`yj_field.dict_sql`),以后所有人在下拉里都能直接选。
+     * 只做加法、只认 VALUES 字面量形态的 dict_sql(判据与实现见
+     * {@link com.yinjia.mes.service.PanelConfigService#appendDropdownOption})。
+     * 返回值 false = 不需要/不允许追加(例如已存在、字段不是下拉框),前端静默即可。
+     */
+    @PostMapping("/appendFieldOption")
+    public ApiResult<Boolean> appendFieldOption(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        String label = String.valueOf(body.getOrDefault("label", ""));
+        String option = String.valueOf(body.getOrDefault("option", ""));
+        perm.requirePanelRead(panelCode);
+        return ApiResult.ok(configService.appendDropdownOption(panelCode, label, option));
+    }
+
+    /**
+     * 下拉字段「选项库」**整体维护**(2026-11-11 用户口径:「能不能增加按钮或者弹窗?弹窗形式更好维护」)。
+     *
+     * <p>纸面「⚙ 维护选项」弹窗提交整份清单(可增/删/改名/排序),写回该字段的 `yj_field.dict_sql`。
+     * 边界/校验见 {@link com.yinjia.mes.service.PanelConfigService#saveDropdownOptions}。
+     * 权限:要求该面板的「自定义字段」权(与管理字段选项同源,`perm.requireFieldConfig`)——
+     * 选项库是全系统共用的,不能谁都能改。
+     *
+     * @return true = 已保存;false = 拒绝(无 VALUES 形态 / 清单不合法)
+     */
+    @PostMapping("/saveFieldOptions")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Boolean> saveFieldOptions(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        String label = String.valueOf(body.getOrDefault("label", ""));
+        perm.requireFieldConfig(panelCode);
+        List<String> options = new java.util.ArrayList<>();
+        Object raw = body.get("options");
+        if (raw instanceof List<?> list) {
+            for (Object o : list) options.add(o == null ? null : String.valueOf(o));
+        }
+        return ApiResult.ok(configService.saveDropdownOptions(panelCode, label, options));
+    }
+
     /** 表格列自定义:保存排序/栏名/显隐 */
     @PostMapping("/saveColumnPrefs")
     @SuppressWarnings("unchecked")
@@ -1388,6 +1431,66 @@ public class PxController {
         List<Map<String, Object>> columns = (List<Map<String, Object>>) body.getOrDefault("columns", List.of());
         configService.saveHeaderPrefs(panelCode, columns);
         return ApiResult.ok(null);
+    }
+
+    // ---------- 角色字段视图(2026-11-13,两层:系统整体 → 角色) ----------
+    // 口径:原「表格调整/表头调整」照旧写 yj_field(系统整体,功能不变);
+    // 这里只在其上盖一层"本角色显示/隐藏",同一角色所有账号看到的一样,不细分个人。
+    // 三态:行存在=本角色显式设定,行不存在=跟随系统整体。
+
+    /** 对话框回显:本角色在该面板的表头/明细逐行"显示或隐藏" + 本角色一共定制过几个面板 */
+    @GetMapping("/fieldView")
+    public ApiResult<Map<String, Object>> fieldView(@RequestParam String panelCode) {
+        perm.requirePanelRead(panelCode);
+        return ApiResult.ok(fieldView.dialogOf(panelCode));
+    }
+
+    /** 保存角色视图(只存显隐;与系统整体相同的项自动恢复继承;必填字段跳过并回报) */
+    @PostMapping("/saveRoleFieldView")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> saveRoleFieldView(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        perm.requirePanelRead(panelCode);
+        String place = String.valueOf(body.getOrDefault("place", ""));
+        List<Map<String, Object>> columns = (List<Map<String, Object>>) body.getOrDefault("columns", List.of());
+        return ApiResult.ok(fieldView.saveRoleView(panelCode, place, columns));
+    }
+
+    /** 恢复继承:清掉本角色在该面板(panelCode 为空 = 全部面板)的显隐/序号覆盖 */
+    @PostMapping("/resetRoleFieldView")
+    public ApiResult<Map<String, Object>> resetRoleFieldView(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        if (!panelCode.isBlank()) perm.requirePanelRead(panelCode);
+        int removed = fieldView.resetRoleView(panelCode);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("removed", removed);
+        out.put("panelCount", fieldView.rolePanelCount(fieldView.currentRoleCode()));
+        return ApiResult.ok(out);
+    }
+
+    /** 角色模板 · 从系统整体一键复制到本角色(或管理员指定的角色) */
+    @PostMapping("/copyRoleFieldViewFromSystem")
+    public ApiResult<Map<String, Object>> copyRoleFieldViewFromSystem(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        perm.requirePanelRead(panelCode);
+        String targetRole = String.valueOf(body.getOrDefault("roleCode", ""));
+        return ApiResult.ok(fieldView.copyFromSystem(panelCode, targetRole));
+    }
+
+    /** 角色模板 · 把本角色的视图套用到另一个角色(仅管理员) */
+    @PostMapping("/copyRoleFieldViewToRole")
+    public ApiResult<Map<String, Object>> copyRoleFieldViewToRole(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        perm.requirePanelRead(panelCode);
+        String toRole = String.valueOf(body.getOrDefault("roleCode", ""));
+        return ApiResult.ok(fieldView.copyToRole(panelCode, toRole));
+    }
+
+    /** 可套用的角色清单(套用弹窗的下拉) */
+    @GetMapping("/fieldViewRoles")
+    public ApiResult<List<Map<String, Object>>> fieldViewRoles(@RequestParam String panelCode) {
+        perm.requirePanelRead(panelCode);
+        return ApiResult.ok(fieldView.roleList());
     }
 
     /**

@@ -4599,8 +4599,30 @@ migrate-lab-mobile-row-photo-20261109.sql
 # 2026-11-09 实验室「测试项目」标准库补齐服务器上的 4 条历史遗留条目(item_code=默认、名字写在 content 里;启用 2 条 NSF 42-余氯/NSF 42氯胺)
 migrate-lab-testitem-legacy-20261109.sql
 
+# 2026-11-11 采购入库单表头最末尾加「来源」+「来源单号」(用户口径「采购入库单在表头最末尾,
+#   加一个来源(可能是直接暂收来的,可能是检验单来的,也可能是特采来的)和显示对应的单据编号」):
+#   ① 已有但 2026-09-21 被下线的两行复活:`来源单据` 正名为 `来源`(物理列不动),
+#      两行 place=header / visible=1 / hidden=0 / editable=0(自动带出,只读),seq 挪到 900/910(表头末尾);
+#   ② 历史回填:按 form_flow_link 的来源面板回填 来源 / 来源单号(只填空值);
+#   ③ 译名:来源 补 en + 8 语言(yj_translation + yj_field.label_en)。
+#   代码侧同批改为**按列名反查标签**写值(ButtonService/PushGenerateHandler),否则改名后写不进去。
+#   幂等(窄条件 UPDATE + 行数守卫 + 只填空值),两账套均执行。
+migrate-purchase-in-source-20261111.sql
+
 # 2026-11-10 库存数量以金蝶真实账套为准:kucun 加[金蝶数量/差异数量(计算列)/金蝶同步时间] + 新增 erp_stock_snapshot(逐键快照)与 erp_stock_sync_log(同步日志) + 库存状况面板3字段 + en/ja/ko/zh-TW 译名
 migrate-erp-stock-sync-20261110.sql
+
+# 2026-11-10 产品文件列表承载单据兜底补种（PDL-0001 丢失导致面板空白）
+migrate-rd-prod-doclist-shell-reseed-20261110.sql
+
+# 2026-11-11 工序按量流转:台账状态按「上一道已审完工量」口径一次性对账重算(零 DDL;幂等;两账套)
+migrate-wo-process-line-qty-20261111.sql
+
+# 2026-11-11 切炭直销(裁切双出口)下线:删 WO_REPORT/WO_REPORT_LIST 的「直销数量」字段行 + 译名(物理列保留:0 非零数据/0 代码引用)
+migrate-drop-dualout-direct-sale-20261111.sql
+
+# 2026-11-11 出货检验功能记录表(图2)落库:qc_proc_insp_detail+ 内部批次 / qc_proc_insp_head + 内部批次清单 · 表单审核人 + yj_field 三行 + 总结论/处理方式改下拉 + QC_ASM_INSP 改名出货检验表观
+migrate-qc-proc-insp-batch-table-20261111.sql
 
 # 2026-11-11 材料码打印加「每箱数量」:bl_pu_label 加 [每箱数量] decimal(18,4) NULL(可空 ⇒ 历史行卡面回退印本次打印数量)
 #   用户口径「材料码多加一个每箱数量打印,每箱数量才等于标识卡上的数量」+ 确认「用 B(仍一行一张卡,卡面数量印每箱数量,
@@ -4665,16 +4687,6 @@ migrate-qc-insp-rec-foot-required-20261111.sql
 #   ③ 历史值不动(老单上的「特采」/整段文字照原值回显,前端 allow-create)。
 #   幂等;两账套均执行。前端同批给「检验结论」标签加 ⧉ 标准库维护入口。
 migrate-qc-insp-rec-verdict-stdlib-20261111.sql
-
-# 2026-11-11 采购入库单表头最末尾加「来源」+「来源单号」(用户口径「采购入库单在表头最末尾,
-#   加一个来源(可能是直接暂收来的,可能是检验单来的,也可能是特采来的)和显示对应的单据编号」):
-#   ① 已有但 2026-09-21 被下线的两行复活:`来源单据` 正名为 `来源`(物理列不动),
-#      两行 place=header / visible=1 / hidden=0 / editable=0(自动带出,只读),seq 挪到 900/910(表头末尾);
-#   ② 历史回填:按 form_flow_link 的来源面板回填 来源 / 来源单号(只填空值);
-#   ③ 译名:来源 补 en + 8 语言(yj_translation + yj_field.label_en)。
-#   代码侧同批改为**按列名反查标签**写值(ButtonService/PushGenerateHandler),否则改名后写不进去。
-#   幂等(窄条件 UPDATE + 行数守卫 + 只填空值),两账套均执行。
-migrate-purchase-in-source-20261111.sql
 
 # 2026-11-11 采购入库单「来源 / 来源单号」:字段 → 隐藏列 + 界面提示(用户口径第二轮:
 #   「不要做成字段,做成个按钮或者是提示就行」):
@@ -4770,6 +4782,42 @@ migrate-qc-insp-rec-method-col-20261111.sql
 #   只动 yj_field 的 label/seq/visible/hidden,视图与物理列一个字节不改。幂等;两账套均执行。
 migrate-qc-insp-rec-detail-cols-20261111.sql
 
+# 2026-11-11 样品申请单「可见全部单据」(view_all)授给文件负责人/研发审核/管理员（刘磊口径）
+migrate-sample-view-all-20261111.sql
+
+# 2026-11-11 样品单「进度描述」列（外部头表 / 内部明细，行级；不受归档约束）
+migrate-sample-progress-desc-20261111.sql
+
+# 2026-11-11 出货检验计划表新增「修订记录」页签所需的 [表区] 物理分块列 + yj_field 登记
+migrate-insp-plan-revision-page-20261111.sql
+
+# 2026-11-11 产品信息表三格（一级/二级审核人、产品负责人）置只读 + 一级审核人空值补陈秀丽
+migrate-prodinfo-approver-cells-20261111.sql
+
+# 2026-11-11 烧结工艺清单「密度管控·管控要求」接入标准库（lib=mold.density，可自行维护）
+migrate-mold-density-stdlib-20261111.sql
+
+# 2026-11-11 配方表「设计添加量」存量行补单位（粉料/胶粉 % ，颗粒/折算 g/支）+ 2 位小数
+migrate-mold-recipe-design-unit-20261111.sql
+
+# 2026-11-11 产品变更申请表：批准人/批准签字/批准日期（备用2/3/4，审批通过时回填、纸面只读）
+migrate-rd-change-approval-sign-20261111.sql
+
+# 2026-11-11 产品信息表历史单据「一级审核人」统一为陈秀丽（只改这一列，幂等）
+migrate-prodinfo-l1-approver-backfill-20261111.sql
+
+# 2026-11-12 出货检验表观(QC_ASM_INSP,原组装成品检验单)接图2 表样:qc_asm_insp_* 加 内部批次 / 内部批次清单 / 表单审核人 + yj_field 三行 + 总结论·处理方式改下拉 + 4 个字段标签译名(面板显示名/代号/底表/前缀 ZJ 不动)
+migrate-qc-asm-insp-batch-table-20261112.sql
+
+# 2026-11-12 出货检验表观(QC_ASM_INSP)与产成品入库解绑:合格数量 必填→非必填(零DDL;审核不再生成入库单,存量入库单不动)
+migrate-qc-asm-insp-unlink-finish-in-20261112.sql
+
+# 2026-11-12 产成品入库单关联出货检验功能单/表观单(阶段1:落两个表头参照字段+10语种译名,零业务门禁)
+migrate-finish-in-insp-link-20261112.sql
+
+# 2026-11-12 工单工序台账按「工单行id」收口:① 工单号 回正(行id→plang.pl_no) ② 按 ProcessFlow 同口径按行id 对账重算整行台账 状态/实际生产线/落实时间 ③ 自检 工单号漂移=0·状态漂移=0(零DDL;幂等;两账套)
+migrate-wo-ledger-rowid-align-20261112.sql
+
 # 2026-11-12 检验数据记录明细表:四个行号**恢复分列**(用户口径「这个的来料检验行号不一定和送料暂收的
 #   行号对应,因为有部分物料是免检的,这个要做好区分」)：
 #   ① 上一版把四组行号合并成「行号」(只留检验单行号)—— 用户指出不成立:免检物料不走检验单,
@@ -4800,35 +4848,68 @@ migrate-qc-insp-rec-detail-tail-20261112.sql
 #   本脚本只做两件事:① 按「已授 QC_INSP / QC_RECV 可见」的角色等价补授 QC_FLOW(view,query);
 #   ② yj_translation 面板名 10 语言。页面级面板**不往 yj_panel 插行**。幂等。两账套均执行。
 migrate-qc-flow-monitor-20261112.sql
+
 # 2026-11-12 采购链「现存量」贯通:来料检验/暂收退回/特采单补隐藏字段(hidden=1 visible=0)+ 存量回填;
 #   用户口径:「采购订单的现存量……需要从采购订单→送料暂收单→采购入库全流程都有这个信息(中间可能有检验,退料,特采),可以隐藏但要保留字段全流程存在」。
 #   值口径:金蝶采购订单行 inv_qty = 制单时库存快照(非实时),见 deploy/金蝶采购订单现存量口径.md。两账套均执行。
 migrate-po-stock-fullchain-20261112.sql
+
 # 2026-11-12 送料暂收单「现存量」取消隐藏(用户口径「送料暂收别隐藏」):
 #   QC_RECV 现存量 → visible=1 hidden=0 editable=0(列在备注之后、表格最末尾,不打乱既有 22 列);
 #   来料检验/暂收退回/特采三站保持隐藏。两账套均执行。
 migrate-qc-recv-stock-visible-20261112.sql
+
 # 2026-11-12 清理 3 张非金蝶来源的采购订单(PO-2026-08-0001/0002、PO-2026-10-0001):
 #   用户口径「不是从金蝶来的删除掉」;头/行/状态/批注/修改留痕/分批预约一并删,yj_usage_log 保留。
 #   三道守卫(外部数据ID 必须为空、无下游引用、头数≤3);库内无此三单时整段跳过(测试库属此情形)。两账套均执行。
 migrate-cleanup-non-kingdee-po-20261112.sql
-# 2026-11-10 产品文件列表承载单据兜底补种（PDL-0001 丢失导致面板空白）
-migrate-rd-prod-doclist-shell-reseed-20261110.sql
-# 2026-11-11 样品申请单「可见全部单据」(view_all)授给文件负责人/研发审核/管理员（刘磊口径）
-migrate-sample-view-all-20261111.sql
-# 2026-11-11 样品单「进度描述」列（外部头表 / 内部明细，行级；不受归档约束）
-migrate-sample-progress-desc-20261111.sql
-# 2026-11-11 出货检验计划表新增「修订记录」页签所需的 [表区] 物理分块列 + yj_field 登记
-migrate-insp-plan-revision-page-20261111.sql
-# 2026-11-11 产品信息表三格（一级/二级审核人、产品负责人）置只读 + 一级审核人空值补陈秀丽
-migrate-prodinfo-approver-cells-20261111.sql
-# 2026-11-11 烧结工艺清单「密度管控·管控要求」接入标准库（lib=mold.density，可自行维护）
-migrate-mold-density-stdlib-20261111.sql
-# 2026-11-11 配方表「设计添加量」存量行补单位（粉料/胶粉 % ，颗粒/折算 g/支）+ 2 位小数
-migrate-mold-recipe-design-unit-20261111.sql
-# 2026-11-11 产品变更申请表：批准人/批准签字/批准日期（备用2/3/4，审批通过时回填、纸面只读）
-migrate-rd-change-approval-sign-20261111.sql
-# 2026-11-11 产品信息表历史单据「一级审核人」统一为陈秀丽（只改这一列，幂等）
-migrate-prodinfo-l1-approver-backfill-20261111.sql
+
 # 2026-11-12 产品信息表一/二区字段置必填（项目编号/项目名称豁免；三区"至少一行"走 tab.isRequired）
 migrate-prodinfo-required-20261112.sql
+
+# 2026-11-13 报工记录查询区参照字段「输入即查」:yj_panel.config 声明 queryInputRef=true + 后端参照字段 _fuzzy 模糊过滤 + 前端可输入联想(零DDL;幂等;两账套)
+migrate-wo-report-list-query-input-20261113.sql
+
+# 2026-11-13 生产工单「新增生产工单」(含临时工单):新表 wo_bom 工单物料清单 + 生产工单页面动作词 create(新增)授权(不动旧表;幂等;两账套)
+migrate-wo-bom-20261113.sql
+
+# 2026-11-13 生产工单「保存草稿 + 整页编制 + 草稿箱」(方案 A):新表 wo_draft_head/wo_draft_line 编制草稿(不写 plang;提交时生成正式工单);幂等;两账套
+migrate-wo-draft-20261113.sql
+
+# 2026-11-13 生产工单「删除工单」(第二轮):页面动作词 del(删除)授权,给已有 create 的角色补授(零DDL;幂等;两账套)
+migrate-wo-list-del-perm-20261113.sql
+
+# 2026-11-13 采购链仓库仓位随生单预填:暂收/检验行补仓位编码/名称/id 列 + 显示仓库列(QC_RECV/QC_INSP)
+migrate-gen-wh-bin-prefill-20261113.sql
+
+# 2026-11-13 合单生单:检验/退回/入库行补「采购单号」(行级来源采购订单号,合单后逐行溯源 + 转ERP 行级 src_bill_no)
+migrate-merge-gen-20261113.sql
+
+# 2026-11-13 角色字段视图:新建 yj_field_view(同一面板各角色显示/隐藏哪些字段;只存显隐,不碰 yj_field)
+migrate-role-field-view-20261113.sql
+
+# 2026-11-13 角色字段视图加序号:yj_field_view.seq(角色内位置 1..n,只对勾选=显示的字段有值)
+migrate-role-field-view-seq-20261113.sql
+
+# 2026-11-13 采购订单明细「单价」「仓库」改为非必填(只改 yj_field.required,两行;不碰表结构)
+migrate-pu-order-price-wh-not-required-20261113.sql
+
+# 2026-11-13 采购入库明细「单价」改为非必填(「仓库」保持必填,脚本内含断言;只改 yj_field.required 一行)
+migrate-purchase-in-price-not-required-20261113.sql
+
+# 2026-11-14 商品档案「是否过程检验」开关(bs_inv 加 bit 列默认否 + yj_field INV 一行 + 10 语种译名;默认否,受控「首件检验单/出货检验单功能/出货检验表观」三张单是否随报工自动生成;手工新增不受影响;幂等;两账套)
+migrate-inv-process-inspection-20261114.sql
+
+# 2026-11-14 成型车间巡线记录表「巡线检验」QC_LINE_PATROL:新表 qc_line_patrol_head/12列 + qc_line_patrol_detail/32列(一行=纸面一个记录块) + 面板 + 头 5/明细 25 字段 + 全角色授权(照抄 QC_OQC_REPORT) + 面板与 21 个新标签 en 译名;幂等;两账套
+migrate-qc-line-patrol-20261114.sql
+
+# 2026-11-15 品质管理 → 新增目录「样品检验」:送样登记表 SAMPLE_REG(archive,新表 qc_sample_reg + 44 行内部检测目录种子) + 检验委托单 INSP_COMMISSION(doc,新表 qc_insp_commission_head/_detail,前缀 WT,头 32/行 10 字段,纸面「检验类别」从目录带入);角色授权照 QC_INSP + 面板与 44 个新标签 en 译名;幂等;两账套
+migrate-sample-insp-20261115.sql
+
+# 2026-11-16 「样品检验」提升为一级模块:两张面板 yj_panel.module_group 品质管理→样品检验(导航顺序由 menus.js 决定;权限矩阵分组口径对齐);面板码/字段/表/授权不动;幂等;两账套
+migrate-sample-insp-module-20261116.sql
+# 2026-11-16 自动打印·打印缓存(离线补打):建表 yj_print_task(任务载荷 JSON 整条落库 + targets/delivered 逗号站点名 + 状态机)
+#   背景:代理掉线期间手机点的打印以前当场丢(目标只算在线站点)且队列只在内存(服务端重启即清空);
+#   现在按配置派单、落库,代理回来第一次 /pending 按 id 顺序补打;默认保留 3 天 = 72 小时(print.cache_hours,用户口径「补打印保留3天」)。
+#   含中文注明(表+15 列)、pk/ix 命名与末尾自检(关键列 5/5、索引 1/1、注明 ≥15)。两账套已执行
+migrate-print-task-cache-20261116.sql

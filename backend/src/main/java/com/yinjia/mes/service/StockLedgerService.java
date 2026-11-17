@@ -83,7 +83,10 @@ public class StockLedgerService {
     public static boolean postsStock(String panelCode) {
         return switch (panelCode) {
             case "PURCHASE_IN", "FINISH_IN", "OTHER_IN", "MATERIAL_OUT", "SALE_OUT", "OTHER_OUT",
-                 "TRANSFER", "STOCKTAKE" -> true;
+                 "TRANSFER", "STOCKTAKE",
+                 // 2026-11-13:生产退料单(MATERIAL_RET)接入记账 —— 手机扫码退料现在落这张单
+                 // (原落其他入库单,别的单据类型记不了 MES 的退料台账)。
+                 "MATERIAL_RET" -> true;
             default -> false;
         };
     }
@@ -110,7 +113,9 @@ public class StockLedgerService {
 
     private void apply(String panelCode, String no, String user, boolean forward) {
         boolean inbound = switch (panelCode) {
-            case "PURCHASE_IN", "FINISH_IN", "OTHER_IN" -> true; // 2026-10-14 恢复 其他入库
+            case "PURCHASE_IN", "FINISH_IN", "OTHER_IN",
+                 // 2026-11-13:生产退料单是**入库**(料从车间退回仓库),与材料出库单方向相反
+                 "MATERIAL_RET" -> true; // 2026-10-14 恢复 其他入库
             default -> false; // MATERIAL_OUT, SALE_OUT, OTHER_OUT
         };
         List<Map<String, Object>> rows = loadRows(panelCode, no);
@@ -774,6 +779,15 @@ public class StockLedgerService {
                             + " ISNULL(l.[金额], l.[单价] * l.[数量]) AS 金额,"
                             + " N'材料出库单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], NULL AS [经手人]"
                             + " FROM bl_material_out l LEFT JOIN bd_material_out h ON h.[单据编号] = l.[单据编号]"
+                            + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
+            // 2026-11-13:生产退料单(MATERIAL_RET)—— 行结构与材料出库单同族(材料编码/材料名称/仓库/批号/数量)，
+            // 但方向是**入库**且带单价 ⇒ 金额按单据金额、没有就 单价×数量(与「其他入库」同口径)。
+            case "MATERIAL_RET" -> jdbc.queryForList(
+                    "SELECT l.[材料编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price,"
+                            + " l.id AS rid, l.[材料名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
+                            + " ISNULL(l.[金额], ISNULL(l.[单价], 0) * l.[数量]) AS 金额,"
+                            + " N'生产退料单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], NULL AS [经手人]"
+                            + " FROM bl_material_ret l LEFT JOIN bd_material_ret h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
             // 防御:postsStock 之外的面板不记账,给了也不该走到这里(真走到 → apply 会抛「无明细行」)
             default -> List.of();

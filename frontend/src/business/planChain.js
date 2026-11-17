@@ -19,6 +19,16 @@
  *     改开工时若晚于本道完工,完工拉到开工日(原行为,顺带把自动调平提示出来)。
  *     `isPlanDateInverted` / `invertedPlanRows` 供弹窗提交前硬校验(任何路径漏过去也拦得住)。
  *
+ * 🔴 2026-11-11 用户口径(工序路线排线截图:成型 11-11~11-13,切炭/组装却 11-01~11-01):
+ *   「校验需要增加实现下方的工序页不能比上方的工序小的实现」——
+ *   即**后道工序的日期不得早于前道工序**:后道开工 ≥ 前道完工(后道完工随之 ≥ 前道完工)。
+ *   根因:改日期的级联只往**下**传(上道改了下道跟着动),改**下道**自己的日期时没人管它跟
+ *   上道的关系 ⇒ 手工把切炭开工改成 11-01 也照收。现在:
+ *     · 改开工:cascadeStart 先按「≥ 上道完工」夹一道,再管本道开工≤完工;
+ *     · 改完工:cascadeDue 先按「≥ 上道完工」夹一道,再把本道开工拉到完工以内;
+ *     · 提交前 planDateProblems 把「本道倒挂」和「下道早于上道」两类一起拦下;
+ *     · 后端 preplanManual 对客户端明确给出却早于上道完工的日期直接 400。
+ *
  * 数据键中文(与 routeSteps / preplanManual 的 步骤 一致),日期串统一 `YYYY-MM-DD`。
  */
 
@@ -48,6 +58,40 @@ export function invertedPlanRows(rows) {
   return (rows || [])
     .map((row, index) => ({ row, index }))
     .filter((x) => isPlanDateInverted(x.row))
+}
+
+/** 上一道工序的计划完工日(第一道/空链 ⇒ '') */
+function prevDueOf(rows, index) {
+  const prev = index > 0 ? (rows || [])[index - 1] : null
+  return prev ? ymd(prev['计划完工日期']) : ''
+}
+
+/**
+ * 提交前硬校验:一次列出**两类**问题(2026-11-11 起)。
+ * <ul>
+ *   <li>{@code kind:'inverted'} 本道日期倒挂(开工晚于本道完工);</li>
+ *   <li>{@code kind:'order'} **下道工序早于上道工序**(后道开工早于前道完工)——
+ *       用户口径「下方的工序页不能比上方的工序小」。</li>
+ * </ul>
+ * @param {Array<object>} rows 工序行(按工序顺序)
+ * @returns {Array<{index:number,row:object,prevRow:(object|null),kind:string,prevDue?:string}>}
+ */
+export function planDateProblems(rows) {
+  const list = rows || []
+  const out = []
+  for (let i = 0; i < list.length; i++) {
+    const row = list[i]
+    const prevRow = i > 0 ? list[i - 1] : null
+    if (isPlanDateInverted(row)) out.push({ index: i, row, prevRow, kind: 'inverted' })
+    if (prevRow) {
+      const prevDue = ymd(prevRow['计划完工日期'])
+      const start = ymd(row['计划开工日期'])
+      if (prevDue && start && start < prevDue) {
+        out.push({ index: i, row, prevRow, kind: 'order', prevDue })
+      }
+    }
+  }
+  return out
 }
 
 /** 今天(本地时区,`YYYY-MM-DD`) */
@@ -91,51 +135,74 @@ function durationOf(row) {
  *
  * <p>2026-11-09 校验:改后的完工日若**早于本道开工日**,先把本道开工日降到完工日
  * (开工不得晚于完工 —— 用户报障「开工 11-09 / 完工 11-03」就是漏了这一步),再往下传链。
+ * <p>2026-11-11 校验:改后的完工日若**早于上道工序的完工日**,先夹到上道完工日
+ * (用户口径「下方的工序不能比上方的工序小」)。
  *
  * @param {Array<object>} rows 工序行(就地修改)
  * @param {number} index 改了哪一道
  * @param {string} value 新的计划完工日期(YYYY-MM-DD;空 ⇒ 不动)
- * @returns {string|null} 被自动调平的开工日(没调平 ⇒ null,调用方据此提示)
+ * @returns {{start: (string|null), due: (string|null)}} 被自动调平的字段值(没动 ⇒ null,调用方据此提示)
  */
 export function cascadeDue(rows, index, value) {
   const list = rows || []
   const r = list[index]
-  if (!r || !value) return null
-  const due = ymd(value)
+  const fixed = { start: null, due: null }
+  if (!r || !value) return fixed
+  let due = ymd(value)
+  const prevDue = prevDueOf(list, index)
+  if (prevDue && due && due < prevDue) {      // 下道完工不得早于上道完工 ⇒ 夹到上道完工日
+    due = prevDue
+    r['计划完工日期'] = due
+    fixed.due = due
+  }
   const start = ymd(r['计划开工日期'])
-  let fixedStart = null
   if (start && due && start > due) {          // 本道日期倒挂 ⇒ 开工跟到完工日
     r['计划开工日期'] = due
-    fixedStart = due
+    fixed.start = due
   }
   const next = list[index + 1]
-  if (!next) return fixedStart
+  if (!next) return fixed
   const dur = durationOf(next)
   next['计划开工日期'] = due
   next['计划完工日期'] = addDays(due, dur)
   cascadeDue(list, index + 1, next['计划完工日期'])
-  return fixedStart
+  return fixed
 }
 
 /**
- * 改某道的**计划开工日期**:开工晚于本道完工 ⇒ 完工拉到开工日,并继续沿链下传
- * (避免提交时「开工晚于完工」被后端拒)。
+ * 改某道的**计划开工日期**:
+ * <ul>
+ *   <li>2026-11-11:早于**上道工序的完工日** ⇒ 先夹到上道完工日
+ *       (用户口径「下方的工序不能比上方的工序小」);</li>
+ *   <li>2026-11-09:开工晚于本道完工 ⇒ 完工拉到开工日,并继续沿链下传
+ *       (避免提交时「开工晚于完工」被后端拒)。</li>
+ * </ul>
  *
  * @param {Array<object>} rows 工序行(就地修改)
  * @param {number} index 改了哪一道
  * @param {string} value 新的计划开工日期(YYYY-MM-DD;空 ⇒ 不动)
- * @returns {string|null} 被自动顺延的完工日(没动 ⇒ null,调用方据此提示)
+ * @returns {{start: (string|null), due: (string|null)}} 被自动调平的字段值(没动 ⇒ null,调用方据此提示)
  */
 export function cascadeStart(rows, index, value) {
-  const r = (rows || [])[index]
-  if (!r) return null
-  const start = ymd(value)
-  if (!start) return null
+  const list = rows || []
+  const r = list[index]
+  const fixed = { start: null, due: null }
+  if (!r) return fixed
+  let start = ymd(value)
+  if (!start) return fixed
+  const prevDue = prevDueOf(list, index)
+  if (prevDue && start < prevDue) {           // 下道开工不得早于上道完工
+    start = prevDue
+    r['计划开工日期'] = start
+    fixed.start = start
+  }
   const due = ymd(r['计划完工日期'])
-  if (!due || start <= due) return null
-  r['计划完工日期'] = start
-  cascadeDue(rows, index, start)
-  return start
+  if (due && start > due) {                   // 开工晚于本道完工 ⇒ 完工顺延并下传
+    r['计划完工日期'] = start
+    fixed.due = start
+    cascadeDue(list, index, start)
+  }
+  return fixed
 }
 
 /**

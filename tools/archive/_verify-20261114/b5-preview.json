@@ -1,0 +1,39 @@
+{
+ "widths": {
+  "sheet": {
+   "offsetWidth": 900,
+   "scrollWidth": 899,
+   "clientWidth": 899,
+   "cls": "lp-sheet is-editing"
+  },
+  "scroll": {
+   "offsetWidth": 875,
+   "scrollWidth": 1196,
+   "clientWidth": 875,
+   "cls": "lp-grid-scroll"
+  },
+  "grid": {
+   "offsetWidth": 1194,
+   "scrollWidth": 1196,
+   "clientWidth": 1194,
+   "cls": "lp-grid"
+  },
+  "viewport": 974
+ },
+ "beforeTabs": 1,
+ "dlg": {
+  "title": "导出报表",
+  "items": [
+   "📄导出 PDF按当前单据的纸张版式生成（与「打印」同一份渲染，所见即所得）",
+   "🖨打印预览按当前单据的纸张版式生成（与「打印」同一份渲染，所见即所得）",
+   "📊导出 Excel（.xlsx）报表数据行 + 页眉信息，可在 Excel 里直接编辑"
+  ]
+ },
+ "tabs": [
+  {
+   "label": "p1",
+   "url": "http://localhost:5173/#/panelx/list/QC_LINE_PATROL",
+   "title": "成型车间巡线记录表 · YINJIA-MES"
+  }
+ ]
+}

@@ -1,0 +1,86 @@
+[
+  {
+    "label": "采购入库单",
+    "panel": "PURCHASE_IN",
+    "bill_no": "CGRK-20261113-03700",
+    "bill_date": "2026-11-13",
+    "status": "C",
+    "headKeys": 92,
+    "headFilled": 45,
+    "lineKeys": 83,
+    "lineFilled": 54,
+    "lineRows": 1
+  },
+  {
+    "label": "销售出库单",
+    "panel": "SALE_OUT",
+    "bill_no": "XSCK-20261114-00009",
+    "bill_date": "2026-11-14",
+    "status": "Z",
+    "headKeys": 93,
+    "headFilled": 55,
+    "lineKeys": 109,
+    "lineFilled": 69,
+    "lineRows": 1
+  },
+  {
+    "label": "生产领料单",
+    "panel": "MATERIAL_OUT",
+    "bill_no": "SCLL-20261113-00007",
+    "bill_date": "2026-11-13",
+    "status": "C",
+    "headKeys": 32,
+    "headFilled": 27,
+    "lineKeys": 74,
+    "lineFilled": 38,
+    "lineRows": 3
+  },
+  {
+    "label": "产品入库单",
+    "panel": "FINISH_IN",
+    "bill_no": "CPRK-20261113-00001",
+    "bill_date": "2026-11-13",
+    "status": "C",
+    "headKeys": 30,
+    "headFilled": 25,
+    "lineKeys": 78,
+    "lineFilled": 40,
+    "lineRows": 1
+  },
+  {
+    "label": "其他入库单",
+    "panel": "OTHER_IN",
+    "bill_no": "QTRK-20261111-00098",
+    "bill_date": "2026-11-11",
+    "status": "Z",
+    "headKeys": 48,
+    "headFilled": 19,
+    "lineKeys": 73,
+    "lineFilled": 38,
+    "lineRows": 1
+  },
+  {
+    "label": "其他出库单",
+    "panel": "OTHER_OUT",
+    "bill_no": "QTCK-20261113-01223",
+    "bill_date": "2026-11-13",
+    "status": "C",
+    "headKeys": 45,
+    "headFilled": 26,
+    "lineKeys": 73,
+    "lineFilled": 38,
+    "lineRows": 1
+  },
+  {
+    "label": "采购退货单",
+    "panel": "QC_RETURN",
+    "bill_no": "CGTH-20261112-00119",
+    "bill_date": "2026-11-12",
+    "status": "C",
+    "headKeys": 56,
+    "headFilled": 36,
+    "lineKeys": 80,
+    "lineFilled": 46,
+    "lineRows": 6
+  }
+]

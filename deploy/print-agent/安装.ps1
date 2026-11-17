@@ -167,17 +167,6 @@ if ($DryRun) {
 }
 
 # ── ③ 写配置 + 开机自启(参数一起写进去) ─────────────────────────
-function Quote([string]$s) { if (-not $s) { return '""' }; return '"' + ($s -replace '"', '') + '"' }
-$argParts = @(
-    '-ExecutionPolicy Bypass -WindowStyle Hidden -File', (Quote $agent),
-    '-Port', "$Port", '-Mode', $Mode,
-    '-Server', (Quote $Server),
-    '-User', (Quote $User),
-    '-Pass', (Quote $Pass),
-    '-Factory', (Quote $Factory),
-    '-Station', (Quote $Station)
-)
-if ($Printer) { $argParts += @('-Printer', (Quote $Printer)) }
 # 只传 -File:参数全在 print-agent.config.json(避免打印机名/站点名带空格被拆开)
 $cmd = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "' + $agent + '"'
 
@@ -226,6 +215,38 @@ if (Test-AgentAlive) {
             else { Say '       同目录还没有 agent.log —— 说明脚本连第一行都没跑起来(权限/杀毒拦截?)' 'Yellow' }
         } catch { }
     }
+}
+
+# ── ④b 注册「守护」计划任务(2026-11-16)──────────────────────────
+# 为什么加(用户报障:「打印代理的脚本是会掉的吗?客户那边的打印机已经不显示了」):
+#   自启只有 HKCU\...\Run —— **只在这个用户登录时起一次**,掉了没人管:
+#   注销/换用户、进程被结束、监听线程抛错退出、轮询作业自己死掉(最隐蔽)……
+#   现场表现统一是:面板上那台打印机不见了 / 一直离线,而厂里没人知道为什么。
+# 现在:注册一个「每 1 分钟」的任务跑 watchdog.ps1 —— 不在就拉起来,活着但轮询停了就重启。
+#   · 用 wscript 启动(watchdog-hidden.vbs),不闪黑窗口;
+#   · /ru 当前用户 + /it:只在有登录会话时跑(打印本来就要求登录会话;也不需要管理员);
+#   · 用 cmd 传参是为了 /tr 里带引号(路径含中文/空格也能存对),win7 的 schtasks 同样适用。
+$taskName = 'YinjiaMesPrintAgent-Watch'
+$watchVbs = Join-Path $here 'watchdog-hidden.vbs'
+if (Test-Path $watchVbs) {
+    $trValue = 'wscript.exe \"' + $watchVbs + '\"'
+    $cmdLine = 'schtasks /create /tn "' + $taskName + '" /tr "' + $trValue + '" /sc minute /mo 1 /ru "' + $env:USERNAME + '" /it /f'
+    $taskOut = ''
+    try {
+        $taskOut = (& cmd.exe /c $cmdLine 2>&1 | Out-String).Trim()
+        if ($LASTEXITCODE -eq 0) {
+            Say "[OK] 已注册守护任务(每 1 分钟自检一次:$taskName)" 'Green'
+            # 立刻跑一次,别等下一分钟
+            & cmd.exe /c ('schtasks /run /tn "' + $taskName + '"') 2>&1 | Out-Null
+        } else {
+            Say "[WARN] 注册守护任务失败:$taskOut" 'Yellow'
+            Say '       不影响本次安装,但代理掉了以后不会自动起来(要人工重起/重启电脑)。' 'Yellow'
+        }
+    } catch {
+        Say "[WARN] 注册守护任务失败:$($_.Exception.Message)" 'Yellow'
+    }
+} else {
+    Say '[WARN] 同目录缺少 watchdog-hidden.vbs,跳过守护任务注册(整个文件夹一起拷贝)' 'Yellow'
 }
 
 # ── ⑤ 结果 ────────────────────────────────────────────────────────

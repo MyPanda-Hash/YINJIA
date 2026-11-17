@@ -1,0 +1,58 @@
+[
+  {
+    "panel": "PURCHASE_IN",
+    "label": "采购入库单",
+    "no": "PI-2026-11-0014",
+    "ok": false,
+    "erpNo": "",
+    "msg": "服务异常：转ERP失败: 金蝶接口失败: 请求接口返回失败:供应商必填"
+  },
+  {
+    "panel": "QC_RETURN",
+    "label": "暂收退料单",
+    "no": "TH-2026-11-0008",
+    "ok": true,
+    "erpNo": "CGTH-20261113-00002",
+    "msg": "success"
+  },
+  {
+    "panel": "FINISH_IN",
+    "label": "产品入库单",
+    "no": "FI-2026-11-0006",
+    "ok": true,
+    "erpNo": "CPRK-20261113-00002",
+    "msg": "success"
+  },
+  {
+    "panel": "OTHER_IN",
+    "label": "其他入库单",
+    "no": "OI-2026-11-0004",
+    "ok": true,
+    "erpNo": "QTRK-20261113-00006",
+    "msg": "success"
+  },
+  {
+    "panel": "SALE_OUT",
+    "label": "销售出库单",
+    "no": "SO-2026-11-0004",
+    "ok": true,
+    "erpNo": "XSCK-20261113-00002",
+    "msg": "success"
+  },
+  {
+    "panel": "MATERIAL_OUT",
+    "label": "材料出库单",
+    "no": "LL-2026-11-0022",
+    "ok": true,
+    "erpNo": "SCLL-20261113-00002",
+    "msg": "success"
+  },
+  {
+    "panel": "OTHER_OUT",
+    "label": "其他出库单",
+    "no": "OO-2026-11-0004",
+    "ok": true,
+    "erpNo": "QTCK-20261113-00004",
+    "msg": "success"
+  }
+]

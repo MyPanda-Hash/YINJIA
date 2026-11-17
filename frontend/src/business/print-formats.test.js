@@ -1,4 +1,4 @@
-﻿/**
+/**
  * print-formats.test.js — printProductCards 卡面渲染单测(2026-09-28,采购入库单·打印标识卡)
  * 口径:
  *  ① 单据行多带可选键(订单编号/供应商名称/数量/批次/生产日期)时卡面填充事实值;
@@ -53,7 +53,7 @@ globalThis.requestAnimationFrame = (cb) => { cb(); return 1 }
 globalThis.alert = () => { throw new Error('不应触发打印失败告警') }
 
 const { printProductCards, productCardQrText, printPuOrder, printPuOrderNoAmount, printLocationCards, locationCardQrText,
-  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows, planSheetShop, planSheetTitle, planSheetDatesFromRows, planSheetWindow, ymdAddDays, MAX_SHEET_DAYS, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS, PLAN_SHEET_MAX_PRINT_DAYS, pickSlipHtml, printWoQr } = await import('./print-formats.js')
+  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows, planSheetShop, planSheetTitle, planSheetDatesFromRows, planSheetWindow, ymdAddDays, MAX_SHEET_DAYS, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS, PLAN_SHEET_MAX_PRINT_DAYS, pickSlipHtml, mixSheetHtml, printWoQr, moldPlanQty } = await import('./print-formats.js')
 
 test('单据行(带可选键):订单编号/供应商/数量/批次/生产日期填充进卡面', async () => {
   const before = captured.printed
@@ -281,6 +281,8 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
     客户等级: '', 客户: '张莉', 加工单号: 'GD-2026-10-0226-1', 工单行号: 1, 公司代码: '0',
     物料编码: 'S031-3', 规格型号: '28*12*178', 生产线: '1号机',
     未交量: 10, 排产数量: 10, 当前工序完工量: 0,
+    // 2026-11-13 新增「订单数量」列:老数据没有 订单数量 键 ⇒ 印 需求数量 兜底
+    需求数量: 200,
     交期: '2026-11-05', 交期紧迫度: 5, '7天已排': 10, '15天已排': 10, '大于15天已排': 0,
     日计划: { '2026-10-31': 2, '2026-11-01': 2, '2026-11-05': 3 },
   }]
@@ -292,6 +294,14 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
     '生产计划<br>数量', '实际完成<br>数量', '成型交期', '成型交期<br>紧迫度', '7天', '15天', '大于15']) {
     assert.ok(html.includes('>' + h + '</th>'), '表头应含 ' + h)
   }
+  // 2026-11-13 用户口径「所有生产工单排单计划增加订单数量这个字段」:
+  //   列头单行(订单数量),位置在「未完成总数」之后、「生产计划数量」之前;值取 订单数量 ?? 需求数量。
+  assert.ok(html.includes('>订单数量</th>'), '表头应含 订单数量')
+  const iDone = html.indexOf('>未完成<br>总数</th>')
+  const iOrder = html.indexOf('>订单数量</th>')
+  const iPlan = html.indexOf('>生产计划<br>数量</th>')
+  assert.ok(iDone >= 0 && iDone < iOrder && iOrder < iPlan, '列顺序:未完成总数 → 订单数量 → 生产计划数量')
+  assert.ok(html.includes('<td class="r">200</td>'), '订单数量为空时退回 需求数量(200)照印,不是空列')
   // 2026-11-04 用户口径「客户等级这个列下不存在数据就默认隐藏了」:该行客户等级为空 ⇒ 不印这一列
   assert.ok(!html.includes('>客户等级</th>'), '客户等级全空 ⇒ 默认隐藏该列')
   // 有值时才印(甲/乙/丙…)——用同一行补一个非空等级再生成一次
@@ -309,6 +319,29 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
   assert.ok(html.includes('GD-2026-10-0226-1'), '单据编号值在行里')
   assert.ok(html.includes('>二维码</th>') && /data:image\/png/.test(html), '同一行带二维码')
   assert.ok(!html.includes('成型生产任务单'), '不再另起一张任务单')
+})
+
+// 2026-11-13 用户口径:排单计划纸表加「订单数量」列。
+//   取数口径 = `订单数量 ?? 需求数量`:工单行自己有订单数量(plang.xq_sl)就用它,
+//   没有(老数据/老接口没回这个键)才退回需求数量 —— 绝不打出空列。
+test('schedPlanSheetHtml:订单数量列 — 有订单数量取它,没有退回需求数量', async () => {
+  const base = {
+    客户: 'A', 加工单号: 'GD-ORD-1', 工单行号: 1, 公司代码: '0', 物料编码: 'S031-3',
+    规格型号: '28*12', 生产线: '1号机', 未交量: 10, 排产数量: 10, 当前工序完工量: 0,
+    日计划: { '2026-10-31': 1 },
+  }
+  const withOrder = await schedPlanSheetHtml([{ ...base, 订单数量: 300, 需求数量: 200 }],
+    ['2026-10-31'], { today: '2026-10-31', shop: '成型' })
+  assert.ok(withOrder.includes('>订单数量</th>'), '订单数量为固定列(单行表头)')
+  assert.ok(withOrder.includes('<td class="r">300</td>'), '有订单数量 ⇒ 印订单数量(不是需求数量)')
+  assert.ok(!withOrder.includes('<td class="r">200</td>'), '有订单数量时不再印需求数量')
+
+  const fallback = await schedPlanSheetHtml([{ ...base, 需求数量: 200 }], ['2026-10-31'], { today: '2026-10-31', shop: '成型' })
+  assert.ok(fallback.includes('<td class="r">200</td>'), '没有订单数量 ⇒ 退回需求数量')
+
+  const empty = await schedPlanSheetHtml([{ ...base }], ['2026-10-31'], { today: '2026-10-31', shop: '成型' })
+  assert.ok(empty.includes('>订单数量</th>'), '订单数量是固定版式列:没有数据也照印表头(不留手写空格)')
+  assert.ok(!empty.includes('undefined'), '两个键都没有 ⇒ 空格子,不得漏出 undefined')
 })
 
 // 2026-11-05 客户口径:「打印的就是打印的时候显示 3 天或者是 3 天 4 天,这样子我们自己可以去设置」
@@ -426,8 +459,9 @@ test('schedPlanSheetHtml:2026-11-05 版式 — 日期先占 6%/天,固定列拿�
   const rows = [mk(1), mk(2), mk(3)]
   const h3d = await schedPlanSheetHtml(rows, [], { dates: ['2026-10-29', '2026-10-30', '2026-10-31'] })
   assert.ok(h3d.includes('<col style="width:6.00%"/>'), '3 天 ⇒ 每天 6%(≈65px,4 位数字 + 横排表头都放得下)')
-  // 固定列按剩余宽度分:客户名称/单据编号拿 10.49%(旧的压窄算法只有 9%/10%)
-  assert.ok(h3d.includes('<col style="width:10.49%"/>'), '客户名称/单据编号 各 10.49%')
+  // 固定列按剩余宽度分:客户名称/单据编号 各 9.84%(旧的压窄算法只有 9%/10%;
+  //   2026-11-13 加「订单数量」列后固定列总基准宽度变大 ⇒ 10.49% → 9.84%)
+  assert.ok(h3d.includes('<col style="width:9.84%"/>'), '客户名称/单据编号 各 9.84%')
   assert.ok(h3d.includes('padding:3px 3px;font-size:10.5px'), '正文 10.5px(≈7.9pt)、内边距 3px')
   assert.ok(h3d.includes('font-weight:600;text-align:center;font-size:9.5px'), '表头 9.5px')
   assert.ok(h3d.includes('@page{size:A4 landscape;margin:8mm 6mm}'), 'A4 横向,上下 8mm / 左右 6mm')
@@ -463,8 +497,8 @@ test('schedPlanSheetHtml:日期表头始终横排;超过 10 列只印前 10 列'
   const d31 = planSheetWindow('2026-10-01', 31)
   const h31 = await schedPlanSheetHtml(rows, [], { dates: d31 })
   assert.equal((h31.match(/<th class="dt"/g) || []).length, 10, '31 天入参也只印前 10 列')
-  // 每行日期格 10 个 + 数字列 7 个(未完成总数/生产计划/实际完成/紧迫度/7天/15天/大于15)都带 class="r"
-  assert.equal((h31.match(/<td class="r">/g) || []).length, 3 * (10 + 7), '每行 10 个日期格 + 7 个数字列')
+  // 每行日期格 10 个 + 数字列 8 个(未完成总数/订单数量/生产计划/实际完成/紧迫度/7天/15天/大于15)都带 class="r"
+  assert.equal((h31.match(/<td class="r">/g) || []).length, 3 * (10 + 8), '每行 10 个日期格 + 8 个数字列')
   assert.ok(!h31.includes('td.d{font-size:7px'), '不再需要「极窄格降字号」那套补丁')
 })
 
@@ -536,4 +570,130 @@ test('printWoQr:带明细的载荷走同一套版式(打印层收到的是新 HT
   assert.equal(captured.printed, before + 1, '走页面内打印(window.print 一次)')
   assert.ok(captured.html.includes('width:24mm'), '新二维码尺寸')
   assert.equal((captured.html.match(/GD-T-1#1/g) || []).length, 3, '空行不印单号')
+})
+
+// ── 2026-11-15:成型折算后数量 / 排单计划「生产计划数量」都走**工序口径** ──────────────────
+// 用户截图报障:GD-2026-11-0028(成型换算率 0.5、排产 50)
+//   ·「成型生产任务单」的「成型折算后数量」印的是 50(成品口径)⇒ 应为 25;
+//   ·「成型车间排单计划」的「生产计划数量」印的是 50 ⇒ 应为 25。
+// 两处统一收口到 moldPlanQty / PLAN_SHEET 的 工序计划量。
+
+test('moldPlanQty:排产 × 成型换算率(detail 的 成型计划量 ÷ 计划合计)', () => {
+  const row = { 排产数量: 50, 当前工序: '装箱', 当前工序计划量: 50 }
+  const detail = { 计划合计: 50, 工序步骤: [{ 工序: '成型', 计划量: 25 }, { 工序: '装箱', 计划量: 50 }] }
+  assert.equal(moldPlanQty(row, detail), 25, '成型 0.5 ⇒ 50 折算成 25')
+  // 3 倍率(切炭那种率 >1 的路线,成型仍是 1):成型计划量 = 排产
+  assert.equal(moldPlanQty({ 排产数量: 80 }, { 计划合计: 80, 工序步骤: [{ 工序: '成型', 计划量: 80 }] }), 80)
+  // 没有 detail:当前工序就是成型 ⇒ 用后端算好的 当前工序计划量
+  assert.equal(moldPlanQty({ 排产数量: 50, 当前工序: '成型', 当前工序计划量: 25 }, null), 25)
+  // 没有 detail 且当前工序不是成型 ⇒ 不折算,退回排产数量(与旧版一致)
+  assert.equal(moldPlanQty({ 排产数量: 50, 当前工序: '装箱', 当前工序计划量: 50 }, null), 50)
+  // detail 里没有成型这道(路线不含成型)⇒ 同样退回排产数量,不印 0
+  assert.equal(moldPlanQty({ 排产数量: 50 }, { 计划合计: 50, 工序步骤: [{ 工序: '切炭', 计划量: 50 }] }), 50)
+})
+
+test('schedPlanSheetHtml:生产计划数量印**工序计划量**(成型 0.5:排产 50 → 印 25)', async () => {
+  const rows = [{
+    客户等级: '', 客户: '内部', 加工单号: 'GD-2026-11-0028', 工单行号: 1, 公司代码: '0',
+    物料编码: 'T410', 规格型号: '63*40*193', 生产线: '4号车间',
+    未交量: 50, 需求数量: 50, 订单数量: 50,
+    排产数量: 50,        // 成品口径
+    工序计划量: 25,      // 工序口径(planSheet 接口合并进来的)
+    当前工序完工量: 0,
+    交期: '2026-11-15', 交期紧迫度: 7, '7天已排': 25, '15天已排': 25, '大于15天已排': 0,
+    日计划: { '2026-11-15': 25 },
+  }]
+  const html = await schedPlanSheetHtml(rows, ['2026-11-15'], { today: '2026-11-15', shop: '成型' })
+  // 按表头定位「生产计划数量」那一列,断言单元格是 25(工序计划量)而不是 50(排产数量)
+  const heads = [...html.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)]
+    .map((m) => m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ''))
+  const trMatch = /<tbody>([\s\S]*?)<\/tbody>/.exec(html)
+  const firstTr = trMatch ? (/<tr>([\s\S]*?)<\/tr>/.exec(trMatch[1]) || [])[1] || '' : ''
+  const cells = [...firstTr.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((m) => m[1].replace(/\s+/g, ''))
+  const iP = heads.findIndex((h) => h.includes('生产计划数量'))
+  assert.ok(iP >= 0, '纸面应有「生产计划数量」列')
+  assert.equal(cells[iP], '25', '生产计划数量 = 工序计划量 25(不是排产数量 50)')
+})
+
+// 2026-11-16 用户口径「打印的这两个填写需要可以删除数据的」:
+// 弹窗里把「需方联系人 / 联系方式」清空后,纸面需方框必须**留空** ——
+// 以前弹窗把"两个都空"当成"没传 buyer"(null),出纸回落到公司默认那组,
+// 用户清了半天、打出来还是孙郝聪/13718162430 = 看起来删不掉。
+test('打印采购订单:需方联系人/联系方式清空后纸面留空(不回落公司默认那组,2026-11-16)', () => {
+  printPuOrder(PU_DOC, PU_LINES, { buyer: { 联系人: '', 联系方式: '' } })
+  const html = captured.html
+  assert.ok(html.includes('联 系 人：<br/>联系方式：</div>'), '需方框的联系人/联系方式留空(手填)')
+  assert.ok(!html.includes('孙郝聪') && !html.includes('13718162430'),
+    '显式传空 = 用户删掉了,不得回落到 COMPANY.buyer')
+})
+
+// 2026-11-18 混料单纸面:同一套版式,只换文案(列头/部门标签/签名)
+// 与打印代理 print-agent.ps1 的 $heads / $deptText / $signTexts 一一对应
+// ══════════════════════════════════════════════════════════════════
+const mixPayload = () => ({
+  标题: '混料单', 领料单号: 'PL-1', 领料部门: 'Admin', 打印日期: '2026-11-18',
+  表头: ['工单号', '物料名称', '规格', '单位', '计划用量', '实际用量', '备注'],
+  部门标签: '生产线',
+  签名: ['配料人:', '复核人:', '工艺员:', '班长:'],
+  明细: [{ 材料名称: '雅可比CS', 规格: '', 单位: 'kg', 请领数量: 86.172, 实发数量: 86.172, 备注: '' }],
+})
+
+test('pickSlipHtml:混料单换列头/部门标签/四条签名(缺省仍是领料单那套)', () => {
+  const html = pickSlipHtml(mixPayload(), '')
+  assert.ok(html.includes('<th>工单号</th>') && html.includes('<th>计划用量</th>')
+    && html.includes('<th>实际用量</th>'), '七列列头换成混料的')
+  assert.ok(!html.includes('<th>请领数量</th>'), '不再出现领料单的列头')
+  assert.ok(html.includes('生产线:') && !html.includes('领料部门:'), '抬头那一栏叫「生产线」')
+  for (const s of ['配料人:', '复核人:', '工艺员:', '班长:']) assert.ok(html.includes(s), '签名里有 ' + s)
+  assert.ok(!html.includes('仓管员:'), '不再出现领料单的签名')
+  assert.ok(html.includes('86.172'), '实际用量照印')
+  // 版式没变:仍是中一刀横打
+  assert.ok(html.includes('@page{size:210mm 148.5mm'), '同一套纸张')
+})
+
+test('pickSlipHtml:类别符号未给时回落领料单默认(老调用方零影响)', () => {
+  const html = pickSlipHtml(slipPayload(1), '')
+  assert.ok(html.includes('<th>订单号</th>') && html.includes('<th>请领数量</th>'), '默认列头不变')
+  assert.ok(html.includes('领料部门:'), '默认部门标签不变')
+  assert.ok(html.includes('部门主管:') && html.includes('仓管员:'), '默认签名不变')
+})
+
+// ══════════════════════════════════════════════════════════════════
+// 2026-11-18 第二轮:混料单改《成型配料记录》(YJ-QR-147)横板 A4
+// 纸样 17 列,左右两坨纵向合并格 —— 浏览器兜底也必须是这张纸
+// ══════════════════════════════════════════════════════════════════
+const mixSheetPayload = (n = 2) => ({
+  标题: '成型配料记录',
+  领料单号: 'PL-1',
+  纸面: {
+    标题: '成型配料记录', 文件编码: 'YJ-QR-147', 序号: 1, 车间: '成型1线', 产品编号: 'A-45-01',
+    配方版本号: '', 开始时间: '2026-11-18 09:01', 结束时间: '2026-11-18 09:20', 转速: '',
+    配料批次号: 'PL-1', 物料水分: '', 配料人: 'admin', 确认人: '',
+  },
+  明细: Array.from({ length: n }, (_, i) => ({
+    物料编号: 'M-00' + (i + 1), 物料名: '物料' + (i + 1), 添加比例: (50).toFixed(2) + '%',
+    应投重量: '10', 实投重量: '9.8', 物料批次: 'B2026' + (i + 1),
+  })),
+})
+
+test('mixSheetHtml:横板 A4 + 17 列 + 左右合并格(纸样版式)', () => {
+  const html = mixSheetHtml(mixSheetPayload(2))
+  assert.ok(html.includes('@page{size:297mm 210mm'), '横板 A4')
+  assert.ok(html.includes('成型配料记录') && html.includes('YJ-QR-147'), '标题 + 右上文件编码')
+  for (const h of ['序号', '车间', '产品编号', '配方版本号', '物料编号', '物料名', '添加比例',
+    '应投重量', '实投重量', '物料批次', '开始时间', '结束时间', '转速', '配料批次号',
+    '物料水分', '配料人', '确认人']) {
+    assert.ok(html.includes('>' + h + '<'), '列头缺:' + h)
+  }
+  // 左四列 + 右七列各只有一格(rowspan 合并),中间六列每行一个
+  assert.equal((html.match(/rowspan="8"/g) || []).length, 11, '11 个合并格(左4 + 右7),rowspan = 纸表 8 行')
+  assert.ok(html.includes('M-001') && html.includes('B20261'), '物料行数据在')
+  assert.ok(html.includes('admin') && html.includes('成型1线'), '抬头值在')
+})
+
+test('mixSheetHtml:明细超过 8 行自动续页,一行都不丢', () => {
+  const html = mixSheetHtml(mixSheetPayload(11))
+  assert.equal((html.match(/<div class="card">/g) || []).length, 2, '11 行 → 2 张纸')
+  for (let i = 1; i <= 11; i++) assert.ok(html.includes('M-00' + (i < 10 ? i : i)), '第 ' + i + ' 行必须在纸上')
+  assert.ok(html.includes('第 1/2 页') && html.includes('第 2/2 页'), '每页标页码')
 })

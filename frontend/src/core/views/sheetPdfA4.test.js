@@ -47,8 +47,10 @@ function blobFn() {
 
 test('① 页面尺寸固定 A4 竖向,不再按内容尺寸出纸', () => {
   const fn = blobFn()
-  assert.match(fn, /const\s+PAGE_W\s*=\s*SHEET_PAGE_W/, '宽度取共用的 A4 常量')
-  assert.match(fn, /const\s+PAGE_H\s*=\s*SHEET_PAGE_H/, '高度取共用的 A4 常量')
+  // 2026-11-16 合并:制程检验单等「宽表」截图(qcSheet=true)按 A4 **横向**出纸,
+  //   其余仍是 A4 竖向 ⇒ 页面尺寸仍取共用常量,只是按 qcWide 对调宽高(不是按每张截图尺寸)。
+  assert.match(fn, /const\s+PAGE_W\s*=\s*qcWide\s*\?\s*SHEET_PAGE_H\s*:\s*SHEET_PAGE_W/, '宽度取共用的 A4 常量(宽表对调)')
+  assert.match(fn, /const\s+PAGE_H\s*=\s*qcWide\s*\?\s*SHEET_PAGE_W\s*:\s*SHEET_PAGE_H/, '高度取共用的 A4 常量(宽表对调)')
   // 真源数值仍必须是 A4（改这里会同时影响打印页与导出件）
   assert.match(paper, /SHEET_PAGE_W = 210/, 'A4 宽 210mm')
   assert.match(paper, /SHEET_PAGE_H = 297/, 'A4 高 297mm')
@@ -58,11 +60,12 @@ test('① 页面尺寸固定 A4 竖向,不再按内容尺寸出纸', () => {
     '不能再用每张截图各自的尺寸加页')
 })
 
-test('② 每一页都是 portrait(不能再按 pw > ph 判定方向)', () => {
+test('② 每一页方向一致:默认 portrait;宽表(制程检验单)整份 landscape', () => {
   const fn = blobFn()
-  assert.match(fn, /format:\s*\[\s*PAGE_W,\s*PAGE_H\s*\]/, '首页尺寸 = A4 竖向')
-  assert.match(fn, /addPage\(\[\s*PAGE_W,\s*PAGE_H\s*\]\s*,\s*'p'\)/, '后续页同样 A4 竖向')
-  assert.ok(!/pw\s*>\s*ph\s*\?\s*'l'/.test(fn), '不能再按宽高比切横向')
+  assert.match(fn, /format:\s*\[\s*PAGE_W,\s*PAGE_H\s*\]/, '首页尺寸 = A4(宽表则对调)')
+  // 2026-11-16:方向由 qcWide 统一决定(整份一致),不再按每张截图的宽高比逐页切
+  assert.match(fn, /addPage\(\[\s*PAGE_W,\s*PAGE_H\s*\]\s*,\s*qcWide\s*\?\s*'l'\s*:\s*'p'\)/, '后续页与首页同方向')
+  assert.ok(!/pw\s*>\s*ph\s*\?\s*'l'/.test(fn), '不能再按每张截图的宽高比切横向')
 })
 
 test('③ 内容等比缩放并居中(不拉伸、不贴边)', () => {

@@ -38,7 +38,9 @@ import java.util.Map;
  * </ol>
  *
  * <h3>唯一约束 = 防连扫两下</h3>
- * {@code UX_wo_pick_doc_wo(工单号,工单行号) WHERE 状态 <> '已作废'} —— 同一工单行只能有**一对**有效单。
+ * {@code UX_wo_pick_doc_wo(工单号,工单行号,领料类型) WHERE 状态 <> '已作废'} ——
+ * 同一工单行的**同一种领料**(组装 / 混料)只能有一张有效单;
+ * 但组装与混料是两张**不同的**单,各占一行(2026-11-18 起,索引已加「领料类型」)。
  * 作废后允许重新生单(现场"开错了,作废重开"是常规操作),所以过滤条件里排除已作废。
  */
 @Service
@@ -49,15 +51,37 @@ public class WoPickDocService {
     public static final String STATE_DONE = "已完成";
     public static final String STATE_VOID = "已作废";
 
+    // ── 领料类型(2026-11-18,数据键不翻译)──────────────────────────────────────
+    /**
+     * 组装领料:按**工单产品**的组装物料清单展开用料(原来唯一的领料单)。
+     *
+     * <p>用户口径(2026-11-18):「现在的生成工单领料需要生成两张领料单(一种就是现在的
+     * 叫做组装领料,一种是混料领料(根据半成品的物料清单现在是空的))」。
+     */
+    public static final String KIND_ASSEMBLY = "组装";
+    /**
+     * 混料领料:按**半成品**(编码含 {@code **TB} 的那一行)自己的物料清单展开用料。
+     *
+     * <p>⚠ 用户口径:「有明细才生成」—— 半成品清单为空时**不产生空单**,
+     * 所以同一工单行**不一定**有这张单。
+     */
+    public static final String KIND_MIX = "混料";
+
     private final JdbcTemplate jdbc;
 
     public WoPickDocService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 
-    /** 台账一行(领域对象;给调用方用,避免到处 Map 取值) */
+    /**
+     * 台账一行(领域对象;给调用方用,避免到处 Map 取值)。
+     *
+     * <p>{@code pickKind} = 领料类型({@link #KIND_ASSEMBLY} / {@link #KIND_MIX}):
+     * 同一工单行可以有**两张**有效单,靠它区分(唯一索引也是 工单号+工单行号+领料类型)。
+     */
     public record PickDoc(long id, String woNo, int woLine, String productCode, String productName,
-                          String outNo, String backNo, String state, int itemCount, int doneCount,
+                          String outNo, String backNo, String pickKind, String state,
+                          int itemCount, int doneCount,
                           int printCount, String creator, Timestamp createAt, String submitter, Timestamp submitAt) { }
 
     /** 台账表在不在(测试库可能还没跑迁移;不在时调用方要给出可读提示而不是 500) */
@@ -70,40 +94,67 @@ public class WoPickDocService {
     /**
      * 查该工单行**当前有效**的那一对单据。
      *
+     * <p>⚠ 2026-11-18 起一个工单行最多有**两张**单(组装 / 混料)⇒ 本方法只返回**组装**那张
+     * (旧调用方的语义保持不变);要取混料那张用 {@link #findActive(String, int, String)}。
+     *
      * @return 没有则 null(已作废的不算 —— 作废后现场可以重新生单)
      */
     public PickDoc findActive(String woNo, int woLine) {
+        return findActive(woNo, woLine, KIND_ASSEMBLY);
+    }
+
+    /**
+     * 查该工单行 + 该领料类型下**当前有效**的单据。
+     *
+     * @param kind {@link #KIND_ASSEMBLY} / {@link #KIND_MIX}
+     * @return 没有则 null
+     */
+    public PickDoc findActive(String woNo, int woLine, String kind) {
         if (woNo == null || woNo.isBlank() || !tableReady()) return null;
         List<PickDoc> rows = jdbc.query(
-                "SELECT id, 工单号, 工单行号, 产品编号, 产品名称, 领料单号, 退料单号, 状态,"
-                        + " 物料项数, 已领项数, 打印次数, 创建人, 创建时间, 提交人, 提交时间"
-                        + " FROM dbo.wo_pick_doc WHERE 工单号 = ? AND 工单行号 = ? AND 状态 <> ?",
-                (rs, i) -> new PickDoc(rs.getLong("id"), rs.getString("工单号"), rs.getInt("工单行号"),
-                        rs.getString("产品编号"), rs.getString("产品名称"),
-                        rs.getString("领料单号"), rs.getString("退料单号"), rs.getString("状态"),
-                        rs.getInt("物料项数"), rs.getInt("已领项数"), rs.getInt("打印次数"),
-                        rs.getString("创建人"), rs.getTimestamp("创建时间"),
-                        rs.getString("提交人"), rs.getTimestamp("提交时间")),
-                woNo.trim(), woLine, STATE_VOID);
+                SQL_SELECT + " WHERE 工单号 = ? AND 工单行号 = ? AND ISNULL(领料类型,N'"
+                        + KIND_ASSEMBLY + "') = ? AND 状态 <> ?",
+                ROW_MAPPER,
+                woNo.trim(), woLine, kind == null || kind.isBlank() ? KIND_ASSEMBLY : kind.trim(), STATE_VOID);
         return rows.isEmpty() ? null : rows.get(0);
     }
 
     /** 按主键取(单据详情页用) */
     public PickDoc byId(long id) {
         if (!tableReady()) return null;
-        List<PickDoc> rows = jdbc.query(
-                "SELECT id, 工单号, 工单行号, 产品编号, 产品名称, 领料单号, 退料单号, 状态,"
-                        + " 物料项数, 已领项数, 打印次数, 创建人, 创建时间, 提交人, 提交时间"
-                        + " FROM dbo.wo_pick_doc WHERE id = ?",
-                (rs, i) -> new PickDoc(rs.getLong("id"), rs.getString("工单号"), rs.getInt("工单行号"),
-                        rs.getString("产品编号"), rs.getString("产品名称"),
-                        rs.getString("领料单号"), rs.getString("退料单号"), rs.getString("状态"),
-                        rs.getInt("物料项数"), rs.getInt("已领项数"), rs.getInt("打印次数"),
-                        rs.getString("创建人"), rs.getTimestamp("创建时间"),
-                        rs.getString("提交人"), rs.getTimestamp("提交时间")),
-                id);
+        List<PickDoc> rows = jdbc.query(SQL_SELECT + " WHERE id = ?", ROW_MAPPER, id);
         return rows.isEmpty() ? null : rows.get(0);
     }
+
+    /**
+     * 该工单行下**所有**有效单(组装 + 混料),按创建先后。
+     *
+     * <p>生产领料列表/扫码定位要一次看到两张单 —— 用户口径(2026-11-18):
+     * 「一个工单行会同时出现两张单时都能列出、都能点进去」。
+     */
+    public List<PickDoc> listActive(String woNo, int woLine) {
+        if (woNo == null || woNo.isBlank() || !tableReady()) return List.of();
+        String sql = SQL_SELECT + " WHERE 工单号 = ? AND 工单行号 = ? AND 状态 <> ?"
+                + " ORDER BY CASE ISNULL(领料类型,N'" + KIND_ASSEMBLY + "')"
+                + "   WHEN N'" + KIND_ASSEMBLY + "' THEN 0 ELSE 1 END, id";
+        return jdbc.query(sql, ROW_MAPPER, woNo.trim(), woLine, STATE_VOID);
+    }
+
+    /** 台账行的统一取数(所有按主键/条件查的地方共用,免得加一列要改三处) */
+    private static final String SQL_SELECT =
+            "SELECT id, 工单号, 工单行号, 产品编号, 产品名称, 领料单号, 退料单号,"
+                    + " ISNULL(领料类型,N'" + KIND_ASSEMBLY + "') AS 领料类型, 状态,"
+                    + " 物料项数, 已领项数, 打印次数, 创建人, 创建时间, 提交人, 提交时间"
+                    + " FROM dbo.wo_pick_doc";
+
+    private static final org.springframework.jdbc.core.RowMapper<PickDoc> ROW_MAPPER =
+            (rs, i) -> new PickDoc(rs.getLong("id"), rs.getString("工单号"), rs.getInt("工单行号"),
+                    rs.getString("产品编号"), rs.getString("产品名称"),
+                    rs.getString("领料单号"), rs.getString("退料单号"), rs.getString("领料类型"),
+                    rs.getString("状态"),
+                    rs.getInt("物料项数"), rs.getInt("已领项数"), rs.getInt("打印次数"),
+                    rs.getString("创建人"), rs.getTimestamp("创建时间"),
+                    rs.getString("提交人"), rs.getTimestamp("提交时间"));
 
     /**
      * 新建一对单据的台账行(生单成功后调用)。
@@ -112,19 +163,31 @@ public class WoPickDocService {
      * 调用方必须捕获它并给出「该工单行已经开过单了」—— **不要**吞掉当成成功,
      * 否则会出现"库里一对单、台账一对单、界面却说生成了两对"。
      *
-     * @param itemCount 按组装BOM表展开的物料项数
+     * @param itemCount 按 BOM 表展开的物料项数(只数需要真领料的行,半成品不算)
+     * @param pickKind  领料类型({@link #KIND_ASSEMBLY} / {@link #KIND_MIX})
      */
     public long insert(String woNo, int woLine, String productCode, String productName,
                        String outNo, String backNo, int itemCount, String user) {
+        return insert(woNo, woLine, productCode, productName, outNo, backNo, itemCount, user, KIND_ASSEMBLY);
+    }
+
+    /**
+     * 新建台账行(带领料类型;2026-11-18「一张工单行两张领料单」)。
+     *
+     * <p>⚠ 并发与唯一约束:索引是 (工单号, 工单行号, 领料类型),**同类型**再开一次才会撞;
+     * 组装与混料各占一行,互不影响。
+     */
+    public long insert(String woNo, int woLine, String productCode, String productName,
+                       String outNo, String backNo, int itemCount, String user, String pickKind) {
         KeyHolder kh = new GeneratedKeyHolder();
         LocalDateTime now = LocalDateTime.now();
         jdbc.update(con -> {
             PreparedStatement ps = con.prepareStatement(
                     "INSERT INTO dbo.wo_pick_doc"
                             + " (工单号, 工单行号, 产品编号, 产品名称, 领料单号, 退料单号, 状态,"
-                            + "  物料项数, 已领项数, 打印次数, 创建人, 创建时间,"
+                            + "  物料项数, 已领项数, 打印次数, 创建人, 创建时间, 领料类型,"
                             + "  asp_user1, asp_time1, asp_user2, asp_time2, asp_cancel)"
-                            + " VALUES (?,?,?,?,?,?,?,?,0,0,?,?,?,?,?,?,'N')",
+                            + " VALUES (?,?,?,?,?,?,?,?,0,0,?,?,?,?,?,?,?,'N')",
                     Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, woNo.trim());
             ps.setInt(2, woLine);
@@ -136,10 +199,11 @@ public class WoPickDocService {
             ps.setInt(8, Math.max(0, itemCount));
             ps.setString(9, user);
             ps.setTimestamp(10, Timestamp.valueOf(now));
-            ps.setString(11, user);
-            ps.setTimestamp(12, Timestamp.valueOf(now));
-            ps.setString(13, user);
-            ps.setTimestamp(14, Timestamp.valueOf(now));
+            ps.setString(11, pickKind == null || pickKind.isBlank() ? KIND_ASSEMBLY : pickKind.trim());
+            ps.setString(12, user);
+            ps.setTimestamp(13, Timestamp.valueOf(now));
+            ps.setString(14, user);
+            ps.setTimestamp(15, Timestamp.valueOf(now));
             return ps;
         }, kh);
         Number k = kh.getKey();
@@ -227,6 +291,7 @@ public class WoPickDocService {
         //   用 LEFT JOIN:台账里存的是开单当时的编号快照,物料档案被删/改名也不该让单据消失。
         StringBuilder sql = new StringBuilder(
                 "SELECT TOP (?) d.id, d.工单号, d.工单行号, d.产品编号, d.产品名称, d.领料单号, d.退料单号, d.状态,"
+                        + " ISNULL(d.领料类型,N'" + KIND_ASSEMBLY + "') AS 领料类型,"
                         + " d.物料项数, d.已领项数, d.打印次数, d.创建人,"
                         + " CONVERT(varchar(19), d.创建时间, 120) AS 创建时间,"
                         + " d.提交人, CONVERT(varchar(19), d.提交时间, 120) AS 提交时间,"
@@ -267,6 +332,7 @@ public class WoPickDocService {
             m.put("产品名称", r.get("产品名称"));
             m.put("领料单号", r.get("领料单号"));
             m.put("退料单号", r.get("退料单号"));
+            m.put("领料类型", r.get("领料类型"));
             m.put("状态", r.get("状态"));
             m.put("物料项数", r.get("物料项数"));
             m.put("已领项数", r.get("已领项数"));

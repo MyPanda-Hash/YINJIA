@@ -34,14 +34,22 @@ public class PanelConfigService {
      * 前端数量输入/显示按它走 —— 个/卷=0、kg/米=3,与后端保存/过账的取整口径同源。
      */
     private final BatchService batchService;
+    /**
+     * 角色字段视图(2026-11-13):同一面板按角色叠加"显示/隐藏"。
+     * 只在这里取一次覆盖 {@link PanelFieldViewService#applyTo},下游(fieldSpec/buildGridColumns/
+     * fieldsAt)全部照旧 —— 所以界面、查询、导出自动一致,前端渲染代码零改动。
+     */
+    private final PanelFieldViewService fieldView;
 
     public PanelConfigService(PanelRegistry registry, JdbcTemplate jdbc, TranslationService translations,
-                              CalcRuleService calcRules, BatchService batchService) {
+                              CalcRuleService calcRules, BatchService batchService,
+                              PanelFieldViewService fieldView) {
         this.registry = registry;
         this.jdbc = jdbc;
         this.translations = translations;
         this.calcRules = calcRules;
         this.batchService = batchService;
+        this.fieldView = fieldView;
     }
 
     /** 当前请求的目标语言键(en/ja/ko/...;zh 系=zh)。 */
@@ -71,8 +79,23 @@ public class PanelConfigService {
         return buildConfig(registry.panel(panelCode));
     }
 
+    /**
+     * {@code roleView=false} = 按「系统整体」出配置(界面设置里"字段视图=系统整体"时用)。
+     * 默认 true:叠上本角色的显示/隐藏覆盖(无覆盖时 {@link PanelFieldViewService#applyTo}
+     * 原样返回同一个对象,零开销)。
+     */
+    public Map<String, Object> getPanelConfig(String panelCode, boolean roleView) {
+        return buildConfig(registry.panel(panelCode), roleView);
+    }
+
     public Map<String, Object> buildConfig(PanelRegistry.PanelDef def) {
-        Map<String, Object> out = "archive".equals(def.mode()) ? buildArchiveConfig(def) : buildDocConfig(def);
+        return buildConfig(def, true);
+    }
+
+    public Map<String, Object> buildConfig(PanelRegistry.PanelDef def, boolean roleView) {
+        // 角色字段视图:只换字段清单的 hidden/visible,其余一律原样(2026-11-13)
+        PanelRegistry.PanelDef view = roleView ? fieldView.applyTo(def) : def;
+        Map<String, Object> out = "archive".equals(view.mode()) ? buildArchiveConfig(view) : buildDocConfig(view);
         // 单位精度快照(2026-11-09):所有面板一份,前端数量输入/显示按单位小数位走。
         // 放顶层而不是 metadata:metadata 在档案/单据两条构建路径里各有一份,这里一次挂全。
         try {
@@ -482,6 +505,12 @@ public class PanelConfigService {
         metadata.put("panelCategory", def.category());
         // 报表查询弹窗入口(T+ 同款):进入面板先弹查询条件(日期段必填),关闭弹窗即退出页面;前端 PanelxList 消费
         if (List.of("STOCK_SUMMARY", "STOCK_LEDGER").contains(def.code())) metadata.put("reportQueryDialog", true);
+        // 查询区参照字段「输入即查」开关(yj_panel.config 的 queryInputRef,2026-11-13):
+        // 用户口径「报工记录中上方的查询不能只是选择查询的,而是可以输入后就查询的形式」⇒ 前端据此把
+        // 查询区里只读+放大镜的参照字段改成可输入联想;自由输入时带控制键 `_fuzzy`,后端 appendDirectFilters
+        // 对这些字段做 RTRIM(列) LIKE '%值%'(精确选择仍等值)。真源 = yj_panel.config,不加代码。
+        // 只下发 true、不下发 false:缺省键 ⇒ 前端按现行为(只可精确选择),所有面板 metadata 形状不变。
+        if (def.queryInputRef()) metadata.put("queryInputRef", true);
         metadata.put("singleDoc", panelSingleDoc(def.code()));   // 见 yj_panel.config 的 singleDoc
         metadata.put("autoCodeField", doc ? autoCodeLabel(def) : null);
         // 保存即归档文书面板(真源 ButtonService.DOC_ARCHIVE_PANELS):前端据此放出
@@ -575,7 +604,9 @@ public class PanelConfigService {
                     // 当前的生产工单」)—— 排在「取出货检验计划」之前:先按工单行建单,再带检验项目。
                     // 通用「选单」不可用(见 QcProcInspController 类注释:来源须已审核 + 须带量明细行 +
                     // 头行映射只认来源表头),故走专用入口。
-                    if ("QC_PROC_INSP".equals(def.code()) && !merged.contains("选生产工单")) {
+                    // 2026-11-12:出货检验表观(QC_ASM_INSP)同口径接入(用户口径「同时增加当前出货表观可选
+                    //   生产工单,实现方式和出货功能检验的选择工单一致」),入口=/qc/asmInsp,准入=已进入组装/装箱。
+                    if (WO_PICK_PANELS.contains(def.code()) && !merged.contains("选生产工单")) {
                         int at = merged.indexOf("取出货检验计划");
                         merged.add(at < 0 ? anchor + 1 : at, "选生产工单");
                     }
@@ -1269,6 +1300,23 @@ public class PanelConfigService {
                     new String[]{"修改", "修改"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"导入", "导入"})),
+            // 销售退货单(2026-11-13 新增,用户口径「销售退货 sal_in_bound … 补齐这两个单,并且测试转erp」):
+            // 表单/表/面板字段由 tools/migrate-return-docs-20261113.sql 按金蝶 sal_in_bound 键集克隆销售出库单而来;
+            // 转ERP 推金蝶「销售退货单」/jdy/v2/scm/sal_in_bound(见 KingdeePushService 的 isSaleRet 分支)。
+            // 选单来源 = 销售订单(SELECT_FLOWS),与销售出库单同源;没有下游生单,故不放「生单」组。
+            java.util.Map.entry("SALE_IN", List.of(
+                    new String[]{"新增", "新增"},
+                    new String[]{"选单", "选单", "选销售订单"},
+                    new String[]{"修改", "修改"},
+                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
+                    new String[]{"删除", "删除", "删除单据"},
+                    new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
+                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
+                    new String[]{"转ERP", "转ERP", "批量转ERP"},
+                    new String[]{"打印", "打印", "预览", "导出"},
+                    new String[]{"查找", "查找", "刷新"},
+                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
+                    new String[]{"导入", "导入"})),
             // 材料出库单:选单=生产工单;生单灰(PANDA:生成材料出库单（直接退料）)
             // 转ERP(2026-09-28):材料出库单 → 金蝶「生产领料单」/jdy/v2/scm/inv_pick
             java.util.Map.entry("MATERIAL_OUT", List.of(
@@ -1284,6 +1332,22 @@ public class PanelConfigService {
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"修改", "修改"},
                     new String[]{"查找", "查找", "刷新"},
+                    new String[]{"导入", "导入"})),
+            // 生产退料单(2026-11-13 新增,与材料出库单同形):
+            // 表单/表/面板字段由 tools/migrate-return-docs-20261113.sql 按金蝶 inv_pick_ret 键集克隆材料出库单而来
+            // (金蝶生产退料单是生产领料单的**严格子集**,故只隐藏 MES 独有的领料类型/领料用途/单据标签);
+            // 转ERP 推金蝶「生产退料单」/jdy/v2/scm/inv_pick_ret(见 KingdeePushService 的 isPickRet 分支)。
+            java.util.Map.entry("MATERIAL_RET", List.of(
+                    new String[]{"新增", "新增"},
+                    new String[]{"修改", "修改"},
+                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
+                    new String[]{"删除", "删除", "删除单据"},
+                    new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
+                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
+                    new String[]{"转ERP", "转ERP", "批量转ERP"},
+                    new String[]{"打印", "打印", "预览", "导出"},
+                    new String[]{"查找", "查找", "刷新"},
+                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"导入", "导入"})),
             // 其他出库单(2026-10-14 重建):同其他入库单,转ERP 推金蝶「其他出库单」/jdy/v2/scm/inv_other_out
             // (业务类型 trans_type_id 真实账套=13)。委外三单(OUTSOURCE_*)仍保持 2026-10-08 下架状态。
@@ -1397,6 +1461,8 @@ public class PanelConfigService {
             java.util.Map.entry("OUTSOURCE_ORDER", "SO_ORDER"),      // 销售订单 → 委外加工单
             // OUTSOURCE_ISSUE / OUTSOURCE_IN 两条「委外加工单 → 委外发料单/入库单」已随两张面板下架移除(2026-10-08)
             java.util.Map.entry("SALE_OUT", "SO_ORDER"),             // 销售订单 → 销售出库单
+            // 2026-11-13 新增销售退货单:与销售出库单同源(销售订单 → 退货单:按订单挑货再退回来)
+            java.util.Map.entry("SALE_IN", "SO_ORDER"),
             // 「PU_ORDER ← PU_REQ」已随请购单下架移除(2026-10-08):采购订单现无上游可选单
             java.util.Map.entry("QC_RECV", "PU_ORDER"),              // 采购订单 → 送料暂收单(库存核算,2026-09-15;编码 9-20 由 SL_RECV 改)
             java.util.Map.entry("QC_INSP", "QC_RECV"),               // 送料暂收单 → 来料检验单(暂收入库单已下线,来源指向送料暂收单 QC_RECV)
@@ -1469,6 +1535,21 @@ public class PanelConfigService {
             {"不合格数量", "退货数量"},
             // 行级仓库沿链贯通(2026-09-21):采购订单行/暂收行叫「仓库」,检验行叫「仓库代码」,入库行又叫「仓库」
             {"仓库", "仓库代码"}, {"仓库代码", "仓库"},
+            // 行级**仓位**沿链贯通(2026-11-13 用户口径「从采购订单生单的时候就开始预填仓库仓位」):
+            // 采购订单行的仓位列 label 是「仓位编码」,暂收行/检验行/入库行是「仓位」(物理列都是 仓位编码),
+            // 且仓位系列都是**hidden 列**(visible=0) —— 同名映射按 seq 排在最后,必被 14 条上限挤爆
+            // (实测暂收口径根本带不到),故同义词兜底(同义词循环不占那 14 条名额)。
+            {"仓位编码", "仓位"}, {"仓位", "仓位"},
+            {"仓位名称", "仓位名称"}, {"仓位id", "仓位id"},
+            // 行级**采购单号**(2026-11-13 合单生单):暂收行已有「采购单号」,检验/退回为本次新增列 ——
+            // 合单后一张暂收单跨多张采购订单,靠它与「采购订单行号」一起把行归回origin订单;
+            // 同名字段映射按 seq 排在后面、会被 14 条上限挤掉,故同义词兜底。
+            {"采购单号", "采购单号"},
+            // 采购入库行的行级订单号沿用**已有的 源单编号**(金蝶 src_bill_no 同名同义;
+            // 见 docs/development/金蝶采购入库单-多订单混装核查.md §四.1),故 采购单号 → 源单编号
+            {"采购单号", "源单编号"}, {"源单编号", "源单编号"},
+            {"仓库编码", "仓库编码"}, {"仓库id", "仓库id"},
+            {"仓库启用仓位管理", "仓库启用仓位管理"},
             // 采购链订单行号(2026-09-20):采购订单行 行号(金蝶 seq)→ 下游各站 采购订单行号,
             // 逐站下传后在 采购入库行 落 源单行号,转ERP 推给金蝶作 src_seq
             {"行号", "采购订单行号"},
@@ -2297,6 +2378,15 @@ public class PanelConfigService {
     private static final java.util.Set<String> SHIP_PLAN_PANELS =
             java.util.Set.of("QC_ASM_INSP", "QC_PROC_INSP");
 
+    /**
+     * 「选生产工单」入口下发的面板集(2026-11-12 从「仅 QC_PROC_INSP」扩到表观单):
+     * 制程检验单 QC_PROC_INSP(2026-10-15)+ 出货检验表观 QC_ASM_INSP(2026-11-12 用户口径
+     * 「同时增加当前出货表观可选生产工单,实现方式和出货功能检验的选择工单一致」)。
+     * 首件检验单 QC_FIRST_INSP 不在此集 —— 它有自己的注入条件(见上面 FIRST_INSP_PANEL 那段)。
+     */
+    private static final java.util.Set<String> WO_PICK_PANELS =
+            java.util.Set.of("QC_PROC_INSP", "QC_ASM_INSP");
+
     /** 首件检验单(2026-10-15):工具栏注入「取成型工艺清单」入口 */
     private static final String FIRST_INSP_PANEL = "QC_FIRST_INSP";
     /** 检验项标准库编码(检验数据记录 QC_INSP_REC 的「检验项」字段 dict_sql 就是它) */
@@ -2686,6 +2776,124 @@ public class PanelConfigService {
         } catch (Exception e) {
             org.slf4j.LoggerFactory.getLogger(PanelConfigService.class)
                     .warn("[EXT_FIELD] 绑定审计写入失败({} {} {}): {}", action, label, col, e.getMessage());
+        }
+    }
+
+    /**
+     * 下拉字段「选项库」自动增项(2026-11-11 用户口径:处理意见「选择库可自动增加处理意见」)。
+     *
+     * <p>用途:纸面上把「处理意见」做成 el-select(allow-create)后,用户手输一个新意见时,前端调本方法把
+     * 新值追加进该字段的选项库({@code yj_field.dict_sql}),以后所有人在下拉里都能直接选 ——
+     * 只靠 allow-create 的话新值只存在于当前浏览器会话,下次打开又没了(不满足「选择库」语义)。
+     *
+     * <p>实现边界(只做加法,绝不改结构):
+     * <ul>
+     *   <li>只认「下拉框」字段,且 dict_sql 必须是 {@code SELECT v FROM (VALUES (N'a'),(N'b')) AS t(v)}
+     *       这种字面量列表形态 —— 其它形态(查字典表/JOIN)一律不动并返回 false;</li>
+     *   <li>已存在(去首尾空格比较)直接返回 false,不重复插;</li>
+     *   <li>值长度 ≤ 200、不含换行等控制字符;单引号按 T-SQL 规则转义,避免注入;</li>
+     *   <li>UPDATE 带 panel_code + label 精确条件,受影响行数 != 1 视为失败。</li>
+     * </ul>
+     *
+     * @return true = 已追加;false = 不需要/不允许追加(前端静默,不阻断保存)
+     */
+    public boolean appendDropdownOption(String panelCode, String label, String option) {
+        String code = panelCode == null ? "" : panelCode.trim();
+        String lab = label == null ? "" : label.trim();
+        String val = option == null ? "" : option.trim();
+        if (code.isEmpty() || lab.isEmpty() || val.isEmpty() || val.length() > 200) return false;
+        if (val.indexOf('\n') >= 0 || val.indexOf('\r') >= 0) return false;
+        try {
+            java.util.List<java.util.Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT data_type, dict_sql FROM yj_field WHERE panel_code = ? AND label = ?", code, lab);
+            if (rows.isEmpty()) return false;
+            Object type = rows.get(0).get("data_type");
+            Object sqlObj = rows.get(0).get("dict_sql");
+            if (!"下拉框".equals(type == null ? "" : String.valueOf(type).trim())) return false;
+            String sql = sqlObj == null ? "" : String.valueOf(sqlObj).trim();
+            // 只认 VALUES 字面量列表:SELECT v FROM (VALUES (N'a'),(N'b')) AS t(v)
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("(?is)^SELECT\\s+v\\s+FROM\\s*\\(\\s*VALUES\\s*(.*?)\\)\\s*(?:AS\\s+)?t\\(v\\)$")
+                    .matcher(sql);
+            if (!m.matches()) return false;
+            String values = m.group(1);
+            // 已有值:抽出所有 N'xxx' 字面量(去首尾空格比较)
+            java.util.regex.Matcher lit = java.util.regex.Pattern.compile("N?'((?:[^']|'')*)'").matcher(values);
+            java.util.List<String> existing = new java.util.ArrayList<>();
+            while (lit.find()) existing.add(lit.group(1).replace("''", "'").trim());
+            if (existing.contains(val)) return false;
+            String escaped = val.replace("'", "''");
+            String newValues = values.trim() + ", (N'" + escaped + "')";
+            String newSql = "SELECT v FROM (VALUES " + newValues + ") AS t(v)";
+            int n = jdbc.update("UPDATE yj_field SET dict_sql = ? WHERE panel_code = ? AND label = ?",
+                    newSql, code, lab);
+            return n == 1;
+        } catch (RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(PanelConfigService.class)
+                    .warn("[OPTION_LIB] 追加下拉选项失败({} {} {}): {}", code, lab, val, e.getMessage());
+            return false;
+        }
+    }
+
+    /** VALUES 字面量选项 SQL 的正则(两个方法共用一份口径:appendDropdownOption / saveDropdownOptions) */
+    private static final java.util.regex.Pattern VALUES_OPTIONS_RX = java.util.regex.Pattern
+            .compile("(?is)^SELECT\\s+v\\s+FROM\\s*\\(\\s*VALUES\\s*(.*?)\\)\\s*(?:AS\\s+)?t\\(v\\)$");
+    /** 单个选项里的 N'xxx' 字面量 */
+    private static final java.util.regex.Pattern VALUES_LITERAL_RX = java.util.regex.Pattern
+            .compile("N?'((?:[^']|'')*)'");
+
+    /**
+     * 下拉字段「选项库」**整体维护**(2026-11-11 用户口径:「能不能增加按钮或者弹窗?我觉得当前实现可行但是
+     * 弹窗形式更好维护」)—— 供纸面上的「⚙ 维护选项」弹窗调用:一次提交整份选项清单(可增、可删、可改名/排序)。
+     *
+     * <p>与 {@link #appendDropdownOption} 同一套边界:只认「下拉框」字段 + VALUES 字面量 dict_sql,
+     * 其它形态一律拒绝(返回 false,不动库)。额外约束:
+     * <ul>
+     *   <li>清单去首尾空格、去空项、去重(保序);</li>
+     *   <li>至少保留 1 项(否则下拉就空了,没法用);</li>
+     *   <li>每项 ≤ 200 字、不含换行;单引号转义;</li>
+     *   <li>写库仍是 {@code SELECT v FROM (VALUES (N'a'),(N'b')) AS t(v)} 形态(与手工维护一致)。</li>
+     * </ul>
+     *
+     * <p>⚠ 删除一个选项**不会**改动历史单据里的值:纸面对"不在选项里的历史值"有临时兜底项,
+     * 老单据照常显示原值(见 QcProcInspSheet.withCurrentOption)。
+     *
+     * @return true = 已保存;false = 拒绝(字段不是下拉框 / dict_sql 非 VALUES 形态 / 清单不合法)
+     */
+    public boolean saveDropdownOptions(String panelCode, String label, java.util.List<String> options) {
+        String code = panelCode == null ? "" : panelCode.trim();
+        String lab = label == null ? "" : label.trim();
+        if (code.isEmpty() || lab.isEmpty() || options == null) return false;
+        java.util.LinkedHashSet<String> cleaned = new java.util.LinkedHashSet<>();
+        for (String raw : options) {
+            String v = raw == null ? "" : raw.trim();
+            if (v.isEmpty()) continue;
+            if (v.length() > 200 || v.indexOf('\n') >= 0 || v.indexOf('\r') >= 0) return false;
+            cleaned.add(v);
+        }
+        if (cleaned.isEmpty()) return false;
+        try {
+            java.util.List<java.util.Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT data_type, dict_sql FROM yj_field WHERE panel_code = ? AND label = ?", code, lab);
+            if (rows.isEmpty()) return false;
+            Object type = rows.get(0).get("data_type");
+            Object sqlObj = rows.get(0).get("dict_sql");
+            if (!"下拉框".equals(type == null ? "" : String.valueOf(type).trim())) return false;
+            String sql = sqlObj == null ? "" : String.valueOf(sqlObj).trim();
+            if (!VALUES_OPTIONS_RX.matcher(sql).matches()) return false;   // 非字面量列表形态:不碰
+            StringBuilder values = new StringBuilder();
+            for (String v : cleaned) {
+                if (values.length() > 0) values.append(",");
+                values.append("(N'").append(v.replace("'", "''")).append("')");
+            }
+            String newSql = "SELECT v FROM (VALUES " + values + ") AS t(v)";
+            int n = jdbc.update("UPDATE yj_field SET dict_sql = ? WHERE panel_code = ? AND label = ?",
+                    newSql, code, lab);
+            return n == 1;
+        } catch (RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(PanelConfigService.class)
+                    .warn("[OPTION_LIB] 保存下拉选项失败({} {}): {}", code, lab, e.getMessage());
+            return false;
         }
     }
 }

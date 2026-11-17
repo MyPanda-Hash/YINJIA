@@ -201,7 +201,7 @@ public class KingdeePushService {
 
     /** 转ERP 支持的面板(与 ButtonService.ERP_HEAD_TABLE 同一套;下面用 isXxx 布尔推导表名/接口路径) */
     private static final Set<String> ERP_PANELS = Set.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT",
-            "FINISH_IN", "OTHER_IN", "OTHER_OUT", "QC_RETURN");
+            "FINISH_IN", "OTHER_IN", "OTHER_OUT", "QC_RETURN", "SALE_IN", "MATERIAL_RET");
 
     /** 转ERP 实现(只由 {@link #pushDocument} 调用,以保证单号级互斥) */
     private Map<String, Object> doPushDocument(String panelCode, String docNo, String operator) throws Exception {
@@ -249,16 +249,26 @@ public class KingdeePushService {
         // 在 ERP 里凭空消失,而且它还必须传 trans_type_id(金蝶无业务类型档案接口,只能写死账套常量)。
         // pur_ret 的头/行键名与 pur_inbound 同族 ⇒ materialMap()/storeIds/unitMap() 三套档案解析可原样复用。
         boolean isQcReturn = "QC_RETURN".equals(panelCode);
+        // 销售退货单 / 生产退料单(2026-11-13 新增,用户口径「销售退货 sal_in_bound 和 生产退料 inv_pick_ret …
+        // 补齐这两个单,并且测试转erp」):
+        //   · 销售退货 → 金蝶「销售退货单」POST /jdy/v2/scm/sal_in_bound
+        //     保存必填 bill_date / customer_id(可用 customer_number) + 分录 material_id·price·qty·stock_id·unit_id
+        //     —— 与销售出库同族,只是**多一个 price 必填**(销售出库的 price 是选填)。
+        //   · 生产退料 → 金蝶「生产退料单」POST /jdy/v2/scm/inv_pick_ret
+        //     该单据是生产领料单(inv_pick)的**严格子集**(头少 pick_type/pick_use_*,行键完全一致)
+        //     ⇒ 载荷构造直接复用材料出库单那段,只换接口路径与表名。
+        boolean isSaleRet = "SALE_IN".equals(panelCode);
+        boolean isPickRet = "MATERIAL_RET".equals(panelCode);
         String headTable = isOrder ? "bd_pu_order" : isPur ? "bd_purchase_in" : isMatOut ? "bd_material_out"
                 : isFinIn ? "bd_finish_in" : isOtherIn ? "bd_other_in" : isOtherOut ? "bd_other_out"
-                : isQcReturn ? "qc_return" : "bd_sale_out";
+                : isQcReturn ? "qc_return" : isSaleRet ? "bd_sale_in" : isPickRet ? "bd_material_ret" : "bd_sale_out";
         String lineTable = isOrder ? "bl_pu_order" : isPur ? "bl_purchase_in" : isMatOut ? "bl_material_out"
                 : isFinIn ? "bl_finish_in" : isOtherIn ? "bl_other_in" : isOtherOut ? "bl_other_out"
-                : isQcReturn ? "qc_return_detail" : "bl_sale_out";
+                : isQcReturn ? "qc_return_detail" : isSaleRet ? "bl_sale_in" : isPickRet ? "bl_material_ret" : "bl_sale_out";
         // 日志文案用的单据名(此前硬编码"采购入库单",材料出库单接进来后会把日志写错单)
         String docLabel = isOrder ? "采购订单" : isPur ? "采购入库单" : isMatOut ? "材料出库单"
                 : isFinIn ? "产品入库单" : isOtherIn ? "其他入库单" : isOtherOut ? "其他出库单"
-                : isQcReturn ? "暂收退料单" : "销售出库单";
+                : isQcReturn ? "暂收退料单" : isSaleRet ? "销售退货单" : isPickRet ? "生产退料单" : "销售出库单";
 
         Map<String, Object> head = jdbc.queryForMap(
                 "SELECT * FROM " + headTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
@@ -300,6 +310,11 @@ public class KingdeePushService {
                     + "(如确需重推:先在金蝶删除该订单并弃审本单清标记后再转)");
         }
 
+        // 🔴 取数口径(2026-11-13 用户红线,别改成"按面板可见字段取"):
+        //    「传数据时,不显示的字段也要做到能传 ERP,不能因为隐藏字段就将之前转 ERP 的数据给删减」
+        //    ⇒ 这里**必须** `SELECT *`(物理列),键是列名而不是面板标签;推哪些列由下面逐键硬编码决定。
+        //    一旦改成走 `def.fieldsAt(...)` 并过滤 hidden/visible,前端/角色视图一藏字段,ERP 载荷就少一块,
+        //    而且首转之后的历史单会呈现"数据被删减"。字段显隐只属于**界面**层,与推送无关。
         List<Map<String, Object>> lines = jdbc.queryForList(
                 "SELECT * FROM " + lineTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
         if (lines.isEmpty()) throw new RuntimeException("单据无明细行，不可转ERP");
@@ -323,7 +338,7 @@ public class KingdeePushService {
         // ④ 构建金蝶 body(平铺;不传 bill_no → 金蝶自动生成编号,MES 编号放备注追溯)
         ObjectNode body = json.createObjectNode();
         body.put("bill_date", str(head.get("单据日期")));
-        if (!isOrder && !isMatOut && !isFinIn && !isQcReturn) body.put("trans_type", "2"); // 入库/出库单的业务类型;采购订单/生产领料单/产品入库单/采购退货单无此项(产品入库单实测 trans_type 被静默忽略;pur_ret 字段表里也没有它)
+        if (!isOrder && !isMatOut && !isFinIn && !isQcReturn && !isSaleRet && !isPickRet) body.put("trans_type", "2"); // 入库/出库单的业务类型;采购订单/生产领料单/生产退料单/产品入库单/采购退货单/销售退货单无此项(产品入库单实测 trans_type 被静默忽略;pur_ret 字段表里也没有它)
         // 采购订单直推带 bill_no(2026-09-23):沿用公司 YJ- 编号(MES 同号)——真实账套的订单本来就是
         // YJ- 号(实测 YJ-20260924-01 等),入库单按号挂源单;不带 bill_no 金蝶自动编号(CGDD-…),
         // 入库单的 src_bill_no 按 MES 号就查不到源单(沙箱踩坑:CGDD-20260909-00001 无法被 YJ 号挂联)
@@ -350,7 +365,7 @@ public class KingdeePushService {
             // 幂等/查重抓手:金蝶 pur_ret 列表支持按 outside_pk_id 过滤,把 MES 单号带过去便于两侧对账
             body.put("outside_pk_id", docNo);
         }
-        else if (!isMatOut && !isFinIn && !isOtherOut) body.put("customer_number", str(head.get("客户编码")));
+        else if (!isMatOut && !isFinIn && !isOtherOut && !isPickRet) body.put("customer_number", str(head.get("客户编码")));
 
         // 其他入库单 / 其他出库单 头(2026-10-14):**业务类型(trans_type_id)是必填** ——
         // 沙箱实测:只发 trans_type / trans_type_number / trans_type_name 都会报「请填写"业务类型"」,
@@ -413,7 +428,7 @@ public class KingdeePushService {
         // 金蝶 inv_pick 头**没有** 供应商/客户/仓库/业务类型(与采购入库/销售出库不同),
         // 但领料要落「部门(dept_number)」与「经手人(emp_number)」——MES 侧存的是名称(生产车间/领用人),
         // 这里按档案解析成编码;解析不到就不带该字段(不阻断,金蝶按自己的默认值处理)。
-        if (isMatOut) {
+        if (isMatOut || isPickRet) {
             String deptNo = str(head.get("部门编码"));
             if (deptNo.isEmpty()) deptNo = archiveCode("bs_dept", "部门名称", "部门编码", str(head.get("生产车间")));
             if (!deptNo.isEmpty()) body.put("dept_number", deptNo);
@@ -421,13 +436,36 @@ public class KingdeePushService {
             if (empNo.isEmpty()) empNo = archiveCode("bs_emp", "员工名称", "员工编码", str(head.get("领用人")));
             if (!empNo.isEmpty()) {
                 body.put("emp_number", empNo);
-                // 金蝶 inv_pick 保存收的是 emp_id(职员内部id),emp_number 不在接口字段表里(静默忽略)
+                // 金蝶 inv_pick / inv_pick_ret 保存收的是 emp_id(职员内部id),emp_number 不在接口字段表里(静默忽略)
                 String empId = str(safeIdMap(EMP_LIST_PATH, "职员").get(empNo));
                 if (!empId.isEmpty()) body.put("emp_id", empId);
-                else log.warn("材料出库单[{}]经手人编码[{}]在金蝶职员档案中无对应id:本次只带 emp_number", docNo, empNo);
+                else log.warn("{}[{}]经手人编码[{}]在金蝶职员档案中无对应id:本次只带 emp_number", docLabel, docNo, empNo);
             }
-            String pickType = str(head.get("领料类型")); // 金蝶 inv_pick.pick_type(真实账套恒 "1")
-            if (!pickType.isEmpty()) body.put("pick_type", pickType);
+            // 生产退料单没有 pick_type / pick_use_*(金蝶该接口的键集里没有这两个)
+            if (isMatOut) {
+                String pickType = str(head.get("领料类型")); // 金蝶 inv_pick.pick_type(真实账套恒 "1")
+                if (!pickType.isEmpty()) body.put("pick_type", pickType);
+            }
+        }
+
+        // 销售退货单(sal_in_bound)头:客户(customer_number,金蝶按编码解析)+ 部门/经手人(选填)。
+        // 金蝶头键还有 return_reason_name(退货原因):MES 侧头/行都有「退货原因」列,头优先、行兜底。
+        if (isSaleRet) {
+            String custNo = str(head.get("客户编码"));
+            if (custNo.isEmpty()) custNo = archiveCode("dm_kh", "客户名称", "客户编码", str(head.get("客户")));
+            if (custNo.isEmpty()) {
+                throw new RuntimeException("客户[" + str(head.get("客户")) + "]没有客户编码,无法转ERP"
+                        + "(金蝶销售退货单的客户是必填项):请先在本单选好客户或补齐客户档案");
+            }
+            body.put("customer_number", custNo);
+            String reason = str(head.get("退货原因"));
+            if (reason.isEmpty()) { for (Map<String, Object> ln : lines) { String r = str(ln.get("退货原因")); if (!r.isEmpty()) { reason = r; break; } } }
+            if (!reason.isEmpty()) body.put("return_reason", reason);
+            String deptNo = str(head.get("部门编码"));
+            if (deptNo.isEmpty()) deptNo = archiveCode("bs_dept", "部门名称", "部门编码", str(head.get("部门")));
+            if (!deptNo.isEmpty()) body.put("dept_number", deptNo);
+            String empNo = str(head.get("经手人编码"));
+            if (!empNo.isEmpty()) body.put("emp_number", empNo);
         }
 
         ArrayNode entities = body.putArray("material_entity");
@@ -442,11 +480,15 @@ public class KingdeePushService {
         //   按无来源单的普通入库单推送,并在返回消息里明确提示,避免"账套里没有该订单 → 转ERP 直接失败"。
         String poNo = str(head.get("采购订单号"));
         String linkWarning = "";
+        // ★ 合单生单(2026-11-13):表头「采购订单号」这时可能是"订单1、订单2"的人读串 ——
+        //   它不是任何一张真实订单号,拿去做等值解析必然失败。这类单**逐行**用行级「源单编号」解析
+        //   (见下面 entities 循环),这里跳过表头预解析,也不给"未找到订单"的误导提示。
+        boolean multiOrderHead = poNo.contains("、") || poNo.contains(",");
         PoRefs poRefs = null;
         if (isPur && poNo.isEmpty()) {
             log.warn("采购入库单[{}]头上无采购订单号:本次转ERP 不带金蝶源单关联(src_bill_no/src_seq),"
                     + "金蝶侧显示为无来源单的普通入库单", docNo);
-        } else if (isPur) {
+        } else if (isPur && !multiOrderHead) {
             poRefs = resolvePoRefs(poNo);
             if (poRefs == null) {
                 // 兜底(2026-09-23):订单直推过金蝶的话,MES 已把金蝶侧真实号回写在 bd_pu_order.ERP单号
@@ -462,8 +504,9 @@ public class KingdeePushService {
                         + "或先在金蝶补建该订单后重审再转)";
                 log.warn("采购入库单[{}] 未挂来源单:金蝶账套内无采购订单[{}]", docNo, poNo);
             }
+        } else if (isPur) {
+            log.info("采购入库单[{}] 表头采购订单号为多单串[{}]:按**行级源单编号**逐行挂金蝶源单", docNo, poNo);
         }
-        boolean linkSrc = isPur && poRefs != null;
 
         // ── 销售出库单挂来源销售订单(2026-10-15 用户口径:
         //   「转erp时要把这个销售订单号与销售订单行号转成源订单号和源订单行号(在金蝶上)」)──
@@ -479,7 +522,8 @@ public class KingdeePushService {
         String soNo = str(head.get("销售订单号"));
         String soLinkWarning = "";
         SoRefs soRefs = null;
-        if (!isPur && !isOrder && !isMatOut && !isFinIn && !isOtherIn && !isOtherOut && !isQcReturn) {   // 仅销售出库单走此支
+        if (!isPur && !isOrder && !isMatOut && !isFinIn && !isOtherIn && !isOtherOut && !isQcReturn
+                && !isSaleRet && !isPickRet) {   // 仅销售出库单走此支
             if (soNo.isEmpty()) {
                 log.warn("销售出库单[{}]头上无销售订单号:本次转ERP 不带金蝶源单关联(src_bill_no/src_seq),"
                         + "金蝶侧显示为无来源单的普通销售出库单", docNo);
@@ -495,10 +539,10 @@ public class KingdeePushService {
         boolean linkSaleSrc = soRefs != null;
         // 采购订单直推的字段口径:订单行叫 物料编码/数量/单价/单位;入库行叫 存货编码/实收数量/单价/计量单位;
         // 材料出库行叫 材料编码/数量/单价/计量单位(料件口径,与采购入库的"存货"族不同名)
-        String matKey = isOrder ? "物料编码" : isMatOut ? "材料编码" : isFinIn ? "产品编码"
+        String matKey = isOrder ? "物料编码" : isMatOut || isPickRet ? "材料编码" : isFinIn ? "产品编码"
                 : isQcReturn ? "物料编码" : "存货编码";
         String qtyKey = isPur || isFinIn ? "实收数量" : isQcReturn ? "退货数量" : "数量";
-        String priceKey = isPur || isOrder || isMatOut || isQcReturn ? "单价" : "售价";
+        String priceKey = isPur || isOrder || isMatOut || isQcReturn || isPickRet ? "单价" : "售价";
         String unitKey = isOrder ? "单位" : "计量单位";
         // 行仓库编号 → 金蝶仓库id(采购订单不推仓库,不必拉)
         Map<String, String> storeIds = isOrder ? Map.of() : safeIdMap(STORE_LIST_PATH, "仓库");
@@ -554,7 +598,7 @@ public class KingdeePushService {
                 if (!isMatOut) { double cess = num(line, "税率%"); if (cess != 0) e.put("cess", cess); }
             }
             // 价格族:生产领料单只有 price/cost/unit_cost 三键(无金额/含税价),成本两键有值才推
-            if (isMatOut) {
+            if (isMatOut || isPickRet) {
                 double cost = num(line, "成本"); if (cost != 0) e.put("cost", cost);
                 double unitCost = num(line, "单位成本"); if (unitCost != 0) e.put("unit_cost", unitCost);
                 String comment = str(line.get("明细备注")); if (!comment.isEmpty()) e.put("comment", comment);
@@ -583,6 +627,18 @@ public class KingdeePushService {
                     "第" + rowNo + "行计量单位[" + unit + "]在当前账套金蝶单位档案中无对应ID,无法转ERP"
                             + (unit.isEmpty() ? "(行上未填计量单位)" : ""));
             e.put("unit_id", unitId);
+            // 基本单位族(2026-11-13 沙箱实测):产品入库 inv_product / 生产领料 inv_pick **还要** base_unit_* ——
+            // 只发 unit_id 时金蝶直接拒单「第1行分录:基本单位为空,请重新录入商品 / 单位为空,请重新选择单位」。
+            // 行上有「基本单位id/编码」(金蝶拉取的历史单都有,见出入库单据字段文档 §2)就用它,没有沿用 unit_id。
+            if (isFinIn || isMatOut || isPickRet) {
+                String baseId = str(line.get("基本单位id"));
+                String baseNo = str(line.get("基本单位编码"));
+                e.put("base_unit_id", baseId.isEmpty() ? unitId : baseId);
+                if (!baseNo.isEmpty()) e.put("base_unit_number", baseNo);
+                if (!unit.isEmpty()) e.put("unit_number", unit);
+                // MES 侧没有"基本数量"独立列(单位=基本单位时两者相等),按本行数量同值推
+                e.put("base_qty", plainDecimal(num(line, qtyKey)));
+            }
             // 仓库:行级 > 头级 > 默认正品仓(金蝶要求非服务商品必须录入仓库);
             // 落到默认仓时打日志 —— 否则"单据没录仓库"会被静默推成 CK00001,账面上看不出来。
             // 采购订单不推仓库(订单无入库语义)
@@ -621,31 +677,46 @@ public class KingdeePushService {
             // 批次号写在表头;金蝶 inv_product 的 batch_no 是行级键,实测仅批次管理商品才落库)
             if (isFinIn && batch.isEmpty()) batch = str(head.get("批次号"));
             if (!batch.isEmpty() && !isOrder) e.put("batch_no", batch);
-            // 来源单:行级 src_bill_no=采购订单号(同单全部行带同一订单号;订单号与采购订单号同义)
-            // src_seq=该行对应的采购订单行号(采购订单行 行号,沿 订单→暂收→检验→入库 逐站带下来)
+            // 来源单:行级 src_bill_no=**本行**的采购订单号(2026-11-13 合单生单起,行级优先),
+            // 行上没有才退回表头;src_seq=该行对应的采购订单行号(订单→暂收→检验→入库 逐站带下来)
             // 仅当订单在金蝶解析到(linkSrc)才推整组;src_seq 必须在订单确有该分录时才推,
             // 否则金蝶会因"源单分录不存在"整单被拒(用分录映射当白名单)。
-            if (linkSrc) {
-                if (materialId.isEmpty()) {
-                    throw new RuntimeException("第" + rowNo + "行存货编码[" + materialNo + "]在当前账套金蝶商品档案中无对应ID,"
-                            + "无法挂来源单(采购订单[" + poNo + "]):请核对商品档案或账套后重试");
+            if (isPur) {
+                // ★ 合单生单:一张采购入库单可能跨多张采购订单(行级「源单编号」各带各的),
+                //   表头「采购订单号」这时是"订单1、订单2"这种人读串 —— 不能拿它当 src_bill_no。
+                String linePo = str(line.get("源单编号"));
+                if (linePo.isEmpty()) linePo = str(line.get("采购单号"));   // 兼容口径
+                // 表头是多单串(合单)时,行上没有源单编号 ⇒ 该行不挂源单(不能拿串去当单号)
+                // 计数口径:同一张订单的行 → 全部挂该订单;行上没有号时才用表头(且表头不是多单串)
+                String srcPo = !linePo.isEmpty() ? linePo : (multiOrderHead ? "" : poNo);
+                PoLineRef hit = srcPo.isEmpty() ? null : poLineRefCache.computeIfAbsent(srcPo, this::resolveLinePoRef);
+                if (hit == null && !srcPo.isEmpty()) {
+                    log.warn("采购入库单[{}]第{}行 采购订单[{}]在金蝶账套内未找到:该行不带 src_bill_no/src_seq",
+                            docNo, rowNo, srcPo);
                 }
-                e.put("src_bill_no", poNo);
-                e.put("src_bill_type_id", "pur_bill_order");
-                e.put("src_bill_type_number", "pur_bill_order");
-                e.put("src_bill_type_name", "采购订单");
-                e.put("src_inter_id", poRefs.billId());
-                Integer srcSeq = intOf(lineColumn(line, "源单行号", "采购订单行号"));
-                if (srcSeq == null) {
-                    log.warn("采购入库单[{}]第{}行无采购订单行号:该行不带 src_seq(金蝶侧按订单号挂单,不定位到具体行)", docNo, rowNo);
-                } else {
-                    String entryId = poRefs.entryIdBySeq().get(srcSeq);
-                    if (entryId == null) {
-                        log.warn("采购入库单[{}]第{}行 采购订单行号[{}] 在采购订单[{}]分录中不存在:该行不带 src_seq/src_entry_id",
-                                docNo, rowNo, srcSeq, poNo);
+                if (hit != null) {
+                    PoRefs refs = hit.refs();
+                    if (materialId.isEmpty()) {
+                        throw new RuntimeException("第" + rowNo + "行存货编码[" + materialNo + "]在当前账套金蝶商品档案中无对应ID,"
+                                + "无法挂来源单(采购订单[" + srcPo + "]):请核对商品档案或账套后重试");
+                    }
+                    e.put("src_bill_no", hit.billNo());
+                    e.put("src_bill_type_id", "pur_bill_order");
+                    e.put("src_bill_type_number", "pur_bill_order");
+                    e.put("src_bill_type_name", "采购订单");
+                    e.put("src_inter_id", refs.billId());
+                    Integer srcSeq = intOf(lineColumn(line, "源单行号", "采购订单行号"));
+                    if (srcSeq == null) {
+                        log.warn("采购入库单[{}]第{}行无采购订单行号:该行不带 src_seq(金蝶侧按订单号挂单,不定位到具体行)", docNo, rowNo);
                     } else {
-                        e.put("src_seq", srcSeq);
-                        e.put("src_entry_id", entryId);
+                        String entryId = refs.entryIdBySeq().get(srcSeq);
+                        if (entryId == null) {
+                            log.warn("采购入库单[{}]第{}行 采购订单行号[{}] 在采购订单[{}]分录中不存在:该行不带 src_seq/src_entry_id",
+                                    docNo, rowNo, srcSeq, srcPo);
+                        } else {
+                            e.put("src_seq", srcSeq);
+                            e.put("src_entry_id", entryId);
+                        }
                     }
                 }
             }
@@ -684,6 +755,8 @@ public class KingdeePushService {
                 : isOtherIn ? "/jdy/v2/scm/inv_other_in"   // 其他入库单 → 金蝶「其他入库单」
                 : isOtherOut ? "/jdy/v2/scm/inv_other_out" // 其他出库单 → 金蝶「其他出库单」
                 : isQcReturn ? "/jdy/v2/scm/pur_ret"       // 暂收退料单 → 金蝶「采购退货单」(单据类型 pur_bill_outbound)
+                : isSaleRet ? "/jdy/v2/scm/sal_in_bound"   // 销售退货单 → 金蝶「销售退货单」
+                : isPickRet ? "/jdy/v2/scm/inv_pick_ret"   // 生产退料单 → 金蝶「生产退料单」
                 : "/jdy/v2/scm/sal_out_bound";
         JsonNode res = postJson(apiPath, body);
         long tPushed = System.currentTimeMillis();
@@ -728,6 +801,29 @@ public class KingdeePushService {
 
     /** 采购订单引用缓存(单号→引用;转ERP 为低频操作,进程内缓存即可;失败不缓存以便重试) */
     private final Map<String, PoRefs> poRefsCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 行级订单解析结果:金蝶侧**真实**单号(可能是 MES 号回写后的 ERP单号)+ 引用 */
+    private record PoLineRef(String billNo, PoRefs refs) {}
+
+    /** 行级解析缓存(合单生单后一张入库单可跨多张采购订单,逐行解析;同号只解析一次) */
+    private final Map<String, PoLineRef> poLineRefCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * **行级**采购订单解析(2026-11-13 合单生单):先按 MES 单号解析,解析不到再按该单的 ERP单号 兜底
+     * (直推过金蝶的订单,金蝶侧号已被回写到 bd_pu_order.ERP单号)。返回的 {@code billNo} 是**金蝶侧真实号**
+     * —— src_bill_no 必须写它才挂得上;两者都解析不到返回 null(该行不挂源单,不阻塞整单)。
+     */
+    private PoLineRef resolveLinePoRef(String poNo) {
+        if (poNo == null || poNo.isBlank()) return null;
+        PoRefs refs = resolvePoRefs(poNo);
+        if (refs != null) return new PoLineRef(poNo, refs);
+        String erpNo = mesOrderErpNo(poNo);
+        if (!erpNo.isEmpty()) {
+            PoRefs byErp = resolvePoRefs(erpNo);
+            if (byErp != null) return new PoLineRef(erpNo, byErp);
+        }
+        return null;
+    }
 
     /**
      * 按采购订单号向金蝶解析 订单单据id + 各分录id(推送 src_inter_id/src_entry_id 用)。

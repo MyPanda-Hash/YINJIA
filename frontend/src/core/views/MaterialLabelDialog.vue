@@ -47,10 +47,12 @@
            同日追加「打印份数还是通过 打印数量/每箱数量 计算出来,零头箱也根据计算带出」):
            卡面「数量」印每箱数量,张数 = ⌈本次打印数量 ÷ 每箱数量⌉,最后一箱不足则单独一张印零头。
            ⚠ 原来这里有一条「打几张卡在打印预览里设份数」的提示 —— 用户明确不要,已撤掉。 -->
-      <!-- 按采购订单打印记录带入后:数量/行锁定,只能改批次号与生产日期(2026-11-09 用户口径);
+      <!-- 按采购订单打印记录带入后:**本次打印数量与行**锁定(2026-11-09 用户口径),
+           「每箱数量」**不锁**(2026-11-13 用户口径「只锁定本次打印数量就行,每箱数量可以填」——
+           带入的只是纸上的数量,一箱装多少是打码时现场定的,锁掉就等于没法打);
            「取消带入」放在记录表的操作列(用户口径:取消按钮直接在操作那里) -->
       <div v-if="lockedBySource" class="mlq-lock">
-        {{ tt('已按采购订单打印记录带入：数量和行已锁定，只能修改上面的批次号和生产日期') }}
+        {{ tt('已按采购订单打印记录带入：本次打印数量和行已锁定；「每箱数量」仍可填，也能改上面的批次号与生产日期') }}
         <span class="mlq-lock-no">{{ sourcePrintNo }}</span>
       </div>
 
@@ -71,12 +73,14 @@
           </template>
         </el-table-column>
         <!-- 每箱数量(2026-11-11):**必填**(用户口径「这个设计为必填」) —— 卡面「数量」印它,
-             张数 = ⌈本次打印数量 ÷ 每箱数量⌉;0/空直接拦在确定打印那一步 -->
+             张数 = ⌈本次打印数量 ÷ 每箱数量⌉;0/空直接拦在确定打印那一步。
+             ⚠ 2026-11-13 用户口径「打印材料码带入后,每箱数量填不了,只锁定本次打印数量就行」:
+               它**不吃 lockedBySource**(带入后仍要能填),只按"本行有没有本次打印数量"决定可否输入。 -->
         <el-table-column width="150">
           <template #header><span class="mlq-req">{{ tt('每箱数量') }}</span></template>
           <template #default="{ row }">
             <el-input-number v-model="boxOf[row.id]" :min="0" :max="Number(qtyOf[row.id] || 0)" :controls="false"
-              :disabled="lockedBySource || !(Number(qtyOf[row.id] || 0) > 0)" :precision="precisionOf(row)"
+              :disabled="!(Number(qtyOf[row.id] || 0) > 0)" :precision="precisionOf(row)"
               :placeholder="tt('必填')" style="width: 130px" />
           </template>
         </el-table-column>
@@ -125,12 +129,13 @@
                   :precision="precisionOf(row)" style="width: 130px" />
               </template>
             </el-table-column>
-            <!-- 补登行同样要印卡(2026-11-11):每箱数量同样**必填**,张数按 打印数量÷每箱数量 拆 -->
+            <!-- 补登行同样要印卡(2026-11-11):每箱数量同样**必填**,张数按 打印数量÷每箱数量 拆;
+                 2026-11-13 与主表同口径:不吃 lockedBySource(带入后仍可填,只按本行数量决定可否输入) -->
             <el-table-column width="150">
               <template #header><span class="mlq-req">{{ tt('每箱数量') }}</span></template>
               <template #default="{ row }">
                 <el-input-number v-model="suppBox[row.suppKey]" :min="0" :max="Number(suppQty[row.suppKey] || 0)"
-                  :controls="false" :disabled="lockedBySource || !(Number(suppQty[row.suppKey] || 0) > 0)"
+                  :controls="false" :disabled="!(Number(suppQty[row.suppKey] || 0) > 0)"
                   :precision="precisionOf(row)" :placeholder="tt('必填')" style="width: 130px" />
               </template>
             </el-table-column>
@@ -526,7 +531,8 @@ async function applyPoPrint(row) {
     }
     syncPick(ids)
     sourcePrintNo.value = no     // 记下来源:打印时带给服务端,打过一次就不能再用这张记录
-    // 带入后数量/行锁定(2026-11-09):补登区一并清空并锁住,只留批次号/生产日期可改
+    // 带入后**数量/行**锁定(2026-11-09):补登区一并清空并锁住,只留批次号/生产日期/每箱数量可改
+    // (2026-11-13 用户口径:每箱数量不跟着锁 —— 带入的是纸上的数量,一箱装多少由打码时现场填)
     suppPicked.value = []
     for (const k of Object.keys(suppQty)) suppQty[k] = 0
     suppRef.value?.clearSelection()

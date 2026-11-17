@@ -1,0 +1,508 @@
+[
+  {
+    "label": "采购入库单",
+    "path": "/jdy/v2/scm/pur_inbound",
+    "dir": "in",
+    "exists": true,
+    "count": 3648,
+    "audited": 3646,
+    "firstRowKeys": 19,
+    "sample": [
+      {
+        "billno": "CGRK-20261113-03700",
+        "date": "2026-11-13",
+        "status": "C"
+      },
+      {
+        "billno": "CGRK-20261113-03699",
+        "date": "2026-11-13",
+        "status": "C"
+      },
+      {
+        "billno": "CGRK-20261113-03698",
+        "date": "2026-11-13",
+        "status": "C"
+      },
+      {
+        "billno": "CGRK-20261112-03697",
+        "date": "2026-11-12",
+        "status": "C"
+      },
+      {
+        "billno": "CGRK-20261111-03696",
+        "date": "2026-11-11",
+        "status": "C"
+      }
+    ],
+    "newest": {
+      "billno": "CGRK-20261113-03700",
+      "date": "2026-11-13",
+      "status": "C"
+    },
+    "oldest": {
+      "billno": "CGRK-20250411-00010",
+      "date": "2025-04-11",
+      "status": "C"
+    }
+  },
+  {
+    "label": "采购退货单",
+    "path": "/jdy/v2/scm/pur_ret",
+    "dir": "out",
+    "exists": true,
+    "count": 111,
+    "audited": 110,
+    "firstRowKeys": 12,
+    "sample": [
+      {
+        "billno": "CGTH-20261112-00119",
+        "date": "2026-11-12",
+        "status": "C"
+      },
+      {
+        "billno": "CGTH-20261111-00118",
+        "date": "2026-11-11",
+        "status": "Z"
+      },
+      {
+        "billno": "CGTH-20261104-00117",
+        "date": "2026-11-04",
+        "status": "C"
+      },
+      {
+        "billno": "CGTH-20261105-00116",
+        "date": "2026-11-05",
+        "status": "C"
+      },
+      {
+        "billno": "CGTH-20261105-00115",
+        "date": "2026-11-05",
+        "status": "C"
+      }
+    ],
+    "newest": {
+      "billno": "CGTH-20261112-00119",
+      "date": "2026-11-12",
+      "status": "C"
+    },
+    "oldest": {
+      "billno": "CGTH-20250421-00003",
+      "date": "2025-04-21",
+      "status": "C"
+    }
+  },
+  {
+    "label": "销售出库单",
+    "path": "/jdy/v2/scm/sal_out_bound",
+    "dir": "out",
+    "exists": true,
+    "count": 5487,
+    "audited": 5475,
+    "firstRowKeys": 25,
+    "sample": [
+      {
+        "billno": "XSCK-20261114-00009",
+        "date": "2026-11-14",
+        "status": "Z"
+      },
+      {
+        "billno": "XSCK-20261114-00008",
+        "date": "2026-11-14",
+        "status": "Z"
+      },
+      {
+        "billno": "XSCK-20261114-00007",
+        "date": "2026-11-14",
+        "status": "Z"
+      },
+      {
+        "billno": "XSCK-20261114-00005",
+        "date": "2026-11-14",
+        "status": "Z"
+      },
+      {
+        "billno": "XSCK-20261114-00004",
+        "date": "2026-11-14",
+        "status": "Z"
+      }
+    ],
+    "newest": {
+      "billno": "XSCK-20261114-00009",
+      "date": "2026-11-14",
+      "status": "Z"
+    },
+    "oldest": {
+      "billno": "XSCK-20250401-00002",
+      "date": "2025-04-01",
+      "status": "C"
+    }
+  },
+  {
+    "label": "销售退货单",
+    "path": "/jdy/v2/scm/sal_in_bound",
+    "dir": "in",
+    "exists": true,
+    "count": 96,
+    "audited": 95,
+    "firstRowKeys": 19,
+    "sample": [
+      {
+        "billno": "XSTH-20261001-00102",
+        "date": "2026-10-01",
+        "status": "Z"
+      },
+      {
+        "billno": "XSTH-20260926-00100",
+        "date": "2026-09-26",
+        "status": "C"
+      },
+      {
+        "billno": "XSTH-20260919-00099",
+        "date": "2026-09-19",
+        "status": "C"
+      },
+      {
+        "billno": "XSTH-20260831-00098",
+        "date": "2026-08-31",
+        "status": "C"
+      },
+      {
+        "billno": "XSTH-20260831-00097",
+        "date": "2026-08-31",
+        "status": "C"
+      }
+    ],
+    "newest": {
+      "billno": "XSTH-20261001-00102",
+      "date": "2026-10-01",
+      "status": "Z"
+    },
+    "oldest": {
+      "billno": "XSTH-20250401-00014",
+      "date": "2025-04-01",
+      "status": "C"
+    }
+  },
+  {
+    "label": "产品入库单",
+    "path": "/jdy/v2/scm/inv_product",
+    "dir": "in",
+    "exists": true,
+    "count": 3064,
+    "audited": 3064,
+    "firstRowKeys": 12,
+    "sample": [
+      {
+        "billno": "CPRK-20261113-00001",
+        "date": "2026-11-13",
+        "status": "C"
+      },
+      {
+        "billno": "CPRK-20261112-00007",
+        "date": "2026-11-12",
+        "status": "C"
+      },
+      {
+        "billno": "CPRK-20261112-00006",
+        "date": "2026-11-12",
+        "status": "C"
+      },
+      {
+        "billno": "CPRK-20261112-00005",
+        "date": "2026-11-12",
+        "status": "C"
+      },
+      {
+        "billno": "CPRK-20261112-00004",
+        "date": "2026-11-12",
+        "status": "C"
+      }
+    ],
+    "newest": {
+      "billno": "CPRK-20261113-00001",
+      "date": "2026-11-13",
+      "status": "C"
+    },
+    "oldest": {
+      "billno": "CPRK-20250415-00001",
+      "date": "2025-04-15",
+      "status": "C"
+    }
+  },
+  {
+    "label": "生产领料单",
+    "path": "/jdy/v2/scm/inv_pick",
+    "dir": "out",
+    "exists": true,
+    "count": 5353,
+    "audited": 5348,
+    "firstRowKeys": 10,
+    "sample": [
+      {
+        "billno": "SCLL-20261113-00007",
+        "date": "2026-11-13",
+        "status": "C"
+      },
+      {
+        "billno": "SCLL-20261113-00006",
+        "date": "2026-11-13",
+        "status": "C"
+      },
+      {
+        "billno": "SCLL-20261113-00005",
+        "date": "2026-11-13",
+        "status": "C"
+      },
+      {
+        "billno": "SCLL-20261113-00004",
+        "date": "2026-11-13",
+        "status": "C"
+      },
+      {
+        "billno": "SCLL-20261113-00003",
+        "date": "2026-11-13",
+        "status": "Z"
+      }
+    ],
+    "newest": {
+      "billno": "SCLL-20261113-00007",
+      "date": "2026-11-13",
+      "status": "C"
+    },
+    "oldest": {
+      "billno": "SCLL-20250504-00004",
+      "date": "2025-05-04",
+      "status": "C"
+    }
+  },
+  {
+    "label": "生产退料单",
+    "path": "/jdy/v2/scm/inv_pick_ret",
+    "dir": "in",
+    "exists": true,
+    "count": 953,
+    "audited": 953,
+    "firstRowKeys": 9,
+    "sample": [
+      {
+        "billno": "SCTL-20261113-00001",
+        "date": "2026-11-13",
+        "status": "C"
+      },
+      {
+        "billno": "SCTL-20261112-00001",
+        "date": "2026-11-12",
+        "status": "C"
+      },
+      {
+        "billno": "SCTL-20261111-00002",
+        "date": "2026-11-11",
+        "status": "C"
+      },
+      {
+        "billno": "SCTL-20261110-00001",
+        "date": "2026-11-10",
+        "status": "C"
+      },
+      {
+        "billno": "SCTL-20261111-00001",
+        "date": "2026-11-11",
+        "status": "C"
+      }
+    ],
+    "newest": {
+      "billno": "SCTL-20261113-00001",
+      "date": "2026-11-13",
+      "status": "C"
+    },
+    "oldest": {
+      "billno": "SCTL-20250506-00001",
+      "date": "2025-05-06",
+      "status": "C"
+    }
+  },
+  {
+    "label": "其他入库单",
+    "path": "/jdy/v2/scm/inv_other_in",
+    "dir": "in",
+    "exists": true,
+    "count": 83,
+    "audited": 82,
+    "firstRowKeys": 18,
+    "sample": [
+      {
+        "billno": "QTRK-20261111-00098",
+        "date": "2026-11-11",
+        "status": "Z"
+      },
+      {
+        "billno": "QTRK-20261029-00097",
+        "date": "2026-10-29",
+        "status": "C"
+      },
+      {
+        "billno": "QTRK-20261029-00096",
+        "date": "2026-10-29",
+        "status": "C"
+      },
+      {
+        "billno": "QTRK-20261017-00095",
+        "date": "2026-10-17",
+        "status": "C"
+      },
+      {
+        "billno": "QTRK-20261014-00094",
+        "date": "2026-10-14",
+        "status": "C"
+      }
+    ],
+    "newest": {
+      "billno": "QTRK-20261111-00098",
+      "date": "2026-11-11",
+      "status": "Z"
+    },
+    "oldest": {
+      "billno": "QTRK-20250809-00011",
+      "date": "2025-08-09",
+      "status": "C"
+    }
+  },
+  {
+    "label": "其他出库单",
+    "path": "/jdy/v2/scm/inv_other_out",
+    "dir": "out",
+    "exists": true,
+    "count": 1200,
+    "audited": 1200,
+    "firstRowKeys": 29,
+    "sample": [
+      {
+        "billno": "QTCK-20261113-01223",
+        "date": "2026-11-13",
+        "status": "C"
+      },
+      {
+        "billno": "QTCK-20261113-01222",
+        "date": "2026-11-13",
+        "status": "C"
+      },
+      {
+        "billno": "QTCK-20261112-01221",
+        "date": "2026-11-12",
+        "status": "C"
+      },
+      {
+        "billno": "QTCK-20261112-01220",
+        "date": "2026-11-12",
+        "status": "C"
+      },
+      {
+        "billno": "QTCK-20261111-01219",
+        "date": "2026-11-11",
+        "status": "C"
+      }
+    ],
+    "newest": {
+      "billno": "QTCK-20261113-01223",
+      "date": "2026-11-13",
+      "status": "C"
+    },
+    "oldest": {
+      "billno": "QTCK-20250401-00003",
+      "date": "2025-04-01",
+      "status": "C"
+    }
+  },
+  {
+    "label": "移仓单",
+    "path": "/jdy/v2/scm/inv_tfmove",
+    "dir": "move",
+    "exists": true,
+    "count": 206,
+    "audited": 206,
+    "firstRowKeys": 12,
+    "sample": [
+      {
+        "billno": "YCD-20261112-00001",
+        "date": "2026-11-12",
+        "status": "C"
+      },
+      {
+        "billno": "YCD-20261109-00001",
+        "date": "2026-11-09",
+        "status": "C"
+      },
+      {
+        "billno": "YCD-20261106-00001",
+        "date": "2026-11-06",
+        "status": "C"
+      },
+      {
+        "billno": "YCD-20261105-00002",
+        "date": "2026-11-05",
+        "status": "C"
+      },
+      {
+        "billno": "YCD-20261105-00001",
+        "date": "2026-11-05",
+        "status": "C"
+      }
+    ],
+    "newest": {
+      "billno": "YCD-20261112-00001",
+      "date": "2026-11-12",
+      "status": "C"
+    },
+    "oldest": {
+      "billno": "YCD-20250416-00002",
+      "date": "2025-04-16",
+      "status": "C"
+    }
+  },
+  {
+    "label": "盘点单",
+    "path": "/jdy/v2/scm/inv_check_bill",
+    "dir": "adjust",
+    "exists": true,
+    "count": 36,
+    "audited": 36,
+    "firstRowKeys": 14,
+    "sample": [
+      {
+        "billno": "PDD-20260106-00008",
+        "date": "2026-01-06",
+        "status": "C"
+      },
+      {
+        "billno": "PDD-20260106-00007",
+        "date": "2026-01-06",
+        "status": "C"
+      },
+      {
+        "billno": "PDD-20260106-00001",
+        "date": "2026-01-06",
+        "status": "C"
+      },
+      {
+        "billno": "PDD-20250702-00004",
+        "date": "2025-07-02",
+        "status": "C"
+      },
+      {
+        "billno": "PDD-20250702-00002",
+        "date": "2025-07-02",
+        "status": "C"
+      }
+    ],
+    "newest": {
+      "billno": "PDD-20260106-00008",
+      "date": "2026-01-06",
+      "status": "C"
+    },
+    "oldest": {
+      "billno": "PDD-20250523-00003",
+      "date": "2025-05-23",
+      "status": "C"
+    }
+  }
+]

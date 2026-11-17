@@ -246,3 +246,17 @@ tools/archive/_qc-proc-print-20261021/*.pdf
 
 # 打印代理安装时写的运行配置(含账号密码,绝不入库;换服务器重跑 安装.bat 会自动更新)
 deploy/print-agent/print-agent.config.json
+# 打印代理运行时文件:轮询心跳、诊断报告、打印输出的 PDF(都是机器上生成的,不入库)
+deploy/print-agent/poll-heartbeat.txt
+deploy/print-agent/watchdog-last.txt
+deploy/print-agent/watchdog-actions.txt
+deploy/print-agent/诊断.txt
+deploy/print-agent/print-out/
+
+# 增量部署包产物(make-incremental-package.ps1 生成,含 app.jar,不入库;zip 由 deploy/*.zip 覆盖)
+deploy/package-*/
+
+# Python 字节码:本地跑 py_compile / 部署脚本会生成 __pycache__
+# (2026-11-15 曾在部署取证目录误提交 4 个 .pyc,事后清理)
+__pycache__/
+*.pyc

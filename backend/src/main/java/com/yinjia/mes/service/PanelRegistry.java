@@ -273,6 +273,34 @@ public class PanelRegistry {
                 return List.of();
             }
         }
+        /**
+         * **查询区参照字段「输入即查」开关**(yj_panel.config 的 {@code "queryInputRef"},2026-11-13 起):
+         * <pre>{"queryInputRef": true}</pre>
+         *
+         * <p>用户口径(2026-11-13):「报工记录中上方的查询不能只是选择查询的,而是可以输入后就查询的形式」
+         * —— 查询区里的参照字段原来只能点放大镜选(只读输入框),要能**直接输入片段就查**。
+         *
+         * <p>由 PanelConfigService 下发 {@code metadata.queryInputRef = true}(仅 true 才下发,
+         * 缺省不下发 ⇒ 所有面板的 metadata 形状与现行为完全一致);前端据此把查询区的参照字段
+         * 改成可输入联想,自由输入时带控制键 {@code _fuzzy} 让后端做 LIKE
+         * (见 {@code QueryService#appendDirectFilters})。
+         *
+         * <p>声明式,与 {@link #fixedItems()} / {@link #uniqueKeys()} 同一条规矩:开/关 = 改这一行 JSON,
+         * 不加代码、不动表结构。config 为 NULL / 非法 JSON / 缺键 ⇒ false(宁可不启用,
+         * 也不能因为一段配置把面板/查询打不开)。
+         */
+        public boolean queryInputRef() {
+            if (config == null || !config.contains("queryInputRef")) return false;
+            try {
+                return CONFIG_JSON.readTree(config).path("queryInputRef").asBoolean(false);
+            } catch (Exception ex) {
+                org.slf4j.LoggerFactory.getLogger(PanelRegistry.class)
+                        .warn("[queryInputRef] 面板 {} 的 yj_panel.config 不是合法 JSON,输入即查按关闭处理:{}",
+                                code, ex.getMessage());
+                return false;
+            }
+        }
+
         /** 模块分组(对齐 HSDZ permission.GROP;缺省 其他) */
         public String moduleName() {
             return moduleGroup == null || moduleGroup.isBlank() ? "其他" : moduleGroup;

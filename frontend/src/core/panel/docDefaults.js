@@ -164,6 +164,19 @@ const DOC_DEFAULTS = {
   //   落库由后端 ButtonService.prefillPreparerName 在建单/保存时同样只补空值;
   //   提交审批时仍按 2026-10-04 口径刷成**提交人**(编制 = 提交审批的人),两处不冲突。
   QC_BHG: [['填写人', (form, ctx) => ctx.userName || '']],
+  // 2026-11-11 用户口径(YJ-QR-154《出货检验功能记录表》表样改造):「审核人默认冯敏、允许修改」。
+  //   落库键 = 头表新列「表单审核人」(yj_field hidden=1,纸面表尾「审核人」那一格),**不是**审批流的
+  //   虚拟字段「审核人」—— 后者会被 ButtonService.save() 的 body.remove("审核人") 静默丢弃
+  //   (那是 yj_doc_status.shr),与 QC_INSP_REC / 研发数据记录表同款口径。
+  //   ⚠ 走 DOC_DEFAULTS(仅空值带出)而不是 LOCKED_PERSON:这是纸面签名不是审批权,用户可改。
+  //   审批流本身不动(一级审批通过 = 已审核,表尾不再显示「批准」)。
+  QC_PROC_INSP: [['表单审核人', '冯敏']],
+  // 2026-11-12 出货检验表观(QC_ASM_INSP,原「组装成品检验单」)落成同款图2 纸面(YJ-QR-154):
+  //   表尾「审核人」那一格与出货检验单功能逐字同款 —— 默认带出「冯敏」、允许修改;
+  //   落库键同样是头表新列「表单审核人」(yj_field hidden=1),**不是**审批流虚拟字段「审核人」
+  //   (后者会被 ButtonService.save() 的 body.remove("审核人") 静默丢弃)。
+  //   ⚠ 走 DOC_DEFAULTS(仅空值时带出)而不是 LOCKED_PERSON:这是纸面签名不是审批权。
+  QC_ASM_INSP: [['表单审核人', '冯敏']],
 }
 
 /** 该面板由当前用户锁定的字段标签;没有则 null */

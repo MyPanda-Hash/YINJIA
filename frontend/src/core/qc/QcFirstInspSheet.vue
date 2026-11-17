@@ -10,9 +10,12 @@
                     第二级 = 测试项目(炭棒表观状态 / 炭棒外径mm / … )
                     左上角斜线格 = 「测试项目 ╲ 样品序号」
          标准行   : 每个测试项目该填的标准(来自《成型工艺清单》RD_MOLD_PROC)
-         数据区   : 1#..8# 八个样品行,**每组各自占一对** —— 表观及脱粉 1#/2#、尺寸及重量 3#/4#、
-                    强度 5#/6#、浊度及压降 7#/8#(见 firstInspCols.GROUP_SAMPLES);
-                    本组那一对格子空白可填(并铺了底色),其余格打「/」= 本格无需填写
+                    **表观/脱粉两列纸面是灰底 `#D9D9D9` + `/`(只读、不填)**,其余列照旧可改
+         数据区   : 1#..8# 八个样品行,**按纸面黄格逐格定可填范围**(第十一轮 2026-11-15 口径,
+                    唯一真源 docs/design/首件检验单-可填范围.md):表观/脱粉 1#/2#、
+                    外径/内径/长度/重量 3#/4#、跌落+挤压强度 5#/6#、压降/浊度 7#/8#;
+                    可填格铺黄 `#FFF3CA`,其余格打「/」= 本格无需填写
+                    (10 列 × 8 行 = 可填 20 格 / 打 `/` 60 格,判据 = firstInspCols.sampleRowsOf)
          相关要求 : 图片底部那 6 条(第 3/4/6 条按业务文案原样带出)
          表尾     : 检验结果 | 检验人 | 审核人 | 批准(2026-10-18 补审核人;2026-11-06 并入质量单据
                     两级审批后再补批准 —— 检验人=编制 / 审核=一级审批人 / 批准=超级管理员)
@@ -175,6 +178,9 @@
       </thead>
       <tbody>
         <!-- 标准行:来自《成型工艺清单》;可改(工艺清单没维护时品质自己补)
+             ⚠ 第十轮 2026-11-14(纸面口径):**表观/脱粉两列的标准格纸面是灰底 `#D9D9D9` + `/`、不填**
+               ⇒ 这两格只读(`std-check` 判据 = isCheckColumn,与可填范围同源),其余列照旧可改。
+               老单据里这两格万一有值(历史数据),只读态照原样显示、不吞数据。
              ⚠ 拖动下标(用户口径 2026-10-17「这个拖动下标应该跟着当前的这个表格框的右下角走」):
                原生 textarea 的抓手贴在**文本域**右下角,而同行里别的格内容更高时,文本域只占格子上半截
                ⇒ 抓手悬在半空(实测底差最大 64px,截图红框就是这个)。改为:关掉原生抓手(resize:none),
@@ -183,9 +189,11 @@
                表格里百分比高度解析不了(实测 height:100% 在 td 里一律算成 auto),所以只用 px。 -->
         <tr class="standard-row" :class="{ 'has-std-h': !!stdRowH && editable }" :style="stdRowStyle">
           <th class="rowlabel">{{ tt('标准') }}</th>
-          <td v-for="c in columns" :key="c.key">
+          <td v-for="c in columns" :key="c.key" :class="{ 'std-check': isCheckColumn(c) }">
+            <!-- 表观/脱粉:纸面灰底 `/`、不填(只读;有历史值就照原样显示) -->
+            <span v-if="isCheckColumn(c)" class="fi-stdtext">{{ c.standard || '/' }}</span>
             <el-input
-              v-if="editable"
+              v-else-if="editable"
               :model-value="c.standard"
               size="small"
               type="textarea"
@@ -195,7 +203,7 @@
             />
             <span v-else class="fi-stdtext">{{ c.standard || '/' }}</span>
             <span
-              v-if="editable"
+              v-if="editable && !isCheckColumn(c)"
               class="fi-rowgrip no-print"
               :title="tt('拖动调整「标准」行的行高')"
               @mousedown.prevent="startRowResize"
@@ -203,13 +211,14 @@
           </td>
           <td v-if="editable" class="col-op no-print"></td>
         </tr>
-        <!-- 数据区:1#..8#(⚠ 可填范围见 firstInspCols.isFillableCell —— **前两列保持原样**(勾选式、
-               只记 1#/2#,3#..8# 打 `/`),**其余所有测试项目列(含表头「＋」新增的列)1#..8# 八行全可填**。
+        <!-- 数据区:1#..8#(⚠ 可填范围 = 纸面黄格,判据 firstInspCols.sampleRowsOf:表观/脱粉 1#/2#、
+               外径/内径/长度/重量 3#/4#、跌落+挤压强度 5#/6#、压降/浊度 7#/8#;
+               认不出列名的新增列按分组兜底。可填格铺黄 `#FFF3CA`,其余格只读打「/」;
                老单据里那些不可填的格若已填过值,照原样显示,不吞数据) -->
         <tr v-for="sample in samples" :key="sample" class="sample-row">
           <th class="rowlabel">{{ sample }}#</th>
           <td v-for="c in columns" :key="c.key" :class="[{ 'is-check': isCheckColumn(c) }, zoneClass(sample, c)]">
-            <!-- 表观及脱粉:勾选式(无粘模/轻微粘模/严重粘模 …),只给 1#/2#(前两列保持原样)。 -->
+            <!-- 表观及脱粉:勾选式(无粘模/轻微粘模/严重粘模 …),纸面只给 1#/2#。 -->
             <template v-if="isCheckColumn(c)">
               <div v-if="editable && fillable(sample, c)" class="fi-checks">
                 <span v-for="o in checkOptions(c)" :key="o" class="fi-check">
@@ -225,11 +234,11 @@
                   >{{ tt(o) }}</span>
                 </span>
               </div>
-              <span v-else class="fi-checktext" :title="fillable(sample, c) ? '' : sampleHint()">
+              <span v-else class="fi-checktext" :title="fillable(sample, c) ? '' : sampleHint(c)">
                 {{ cellText(sample, c) || '/' }}
               </span>
             </template>
-            <!-- 其余列:文本录入格(本组那两支样品);不属于本组的格只读打「/」 -->
+            <!-- 其余列:文本录入格(本列那两支样品);不属于本列的格只读打「/」 -->
             <template v-else>
               <el-input
                 v-if="editable && fillable(sample, c)"
@@ -240,7 +249,7 @@
                 @update:model-value="v => setMeasured(sample, c, v)"
                 @change="() => normalizePrecision(sample, c)"
               />
-              <span v-else :title="fillable(sample, c) ? '' : sampleHint()">
+              <span v-else :title="fillable(sample, c) ? '' : sampleHint(c)">
                 {{ cellText(sample, c) || '/' }}
               </span>
             </template>
@@ -299,7 +308,7 @@ import { tt } from '@/i18n'
 import {
   columnsOf, groupsOf, addColumn, removeColumn, updateColumn,
   columnHasContent, ensureItems, ROW_STANDARD, ROW_SAMPLE, GROUP_ORDER,
-  seedDefaultColumns, isFillableCell, columnHeadText, isCheckColumn, CHECK_SAMPLE_ROWS,
+  seedDefaultColumns, isFillableCell, columnHeadText, isCheckColumn, sampleRowsOf,
 } from './firstInspCols.js'
 import { buildFirstInspExport } from './firstInspExport.js'
 
@@ -347,33 +356,37 @@ const groups = computed(() => groupsOf(columns.value))
 const groupCols = (g) => columns.value.filter((c) => c.group === g)
 const samples = [1, 2, 3, 4, 5, 6, 7, 8]
 /**
- * 可填范围(用户口径 2026-10-17):「让当前各个表格都能填写即可,**前两列保持原样**即可」,
- * 追问后补充「**以及后面新增的列也一样**」——
- *   · 前两列(炭棒表观状态 / 炭棒脱粉情况,勾选式):**保持原样** —— 只记 1#/2#,3#..8# 打 `/`;
- *   · 其余所有测试项目列(图纸上的 8 列 + 表头「＋」新增的列):**1#..8# 八行全部可填**。
- * 判据在 core/qc/firstInspCols.js 的 isFillableCell(单测钉住"前两列只有 1#/2#、其余列 8 行全开")。
- *
- * ⚠ 更早(同日上午)曾按图纸把四个分组各绑一对样品行(尺寸→3#/4#、强度→5#/6#、浊度→7#/8#),
- *   已被本口径取代 —— 现在**只剩"前两列只填 1#/2#"这一条限制**。
+ * 可填范围(**第十一轮 2026-11-15 纸面口径**;唯一真源 docs/design/首件检验单-可填范围.md):
+ * 用户口径「**没有黄色的格子就打上斜杠、不可填写**,对应的表格改成黄色」⇒ 纸面黄格才要填,
+ * 其余格打 `/`。四对样品行**按列名认**(不是按分组一刀切):
+ *   · 表观状态 / 脱粉情况(勾选式)          → 1#、2#
+ *   · 外径 / 内径 / 长度 / 重量              → 3#、4#
+ *   · 跌落 / 挤压强度(抗压强度)            → 5#、6#(2026-11-15 用户口径:挤压与跌落同一对)
+ *   · 压降 / 浊度NTU                        → 7#、8#
+ *   · 认不出列名的新增列                    → 按分组兜底(未知分组 7#/8#)
+ * 判据在 core/qc/firstInspCols.js 的 sampleRowsOf(单测钉死 10 列 × 8 行矩阵:可填 20 格 / `/` 60 格)。
  */
 function fillable(sample, c) {
   return isFillableCell(sample, c)
 }
 
-/** 不可填格的 title:说清本列该填哪两支样品(否则用户只看到一片「/」,不知道去哪填) */
-function sampleHint() {
+/**
+ * 不可填格的 title:说清**本列自己**该填哪两支样品(否则用户只看到一片「/」,不知道去哪填)。
+ * 文案复用既有词条「按相关要求：本组测试只记录 2 支样品（{a}）」—— 逐列换成该列的那两行。
+ */
+function sampleHint(c) {
   return tt('按相关要求：本组测试只记录 2 支样品（{a}）')
-    .replace('{a}', CHECK_SAMPLE_ROWS.map((n) => `${n}#`).join('、'))
+    .replace('{a}', sampleRowsOf(c).map((n) => `${n}#`).join('、'))
 }
 
 /**
- * 纸面「可填区」底色 —— 图片上前两列铺了底色,作用就是标出"这格要填"。
- * 现在**只有前两列还有"可填/不可填"之分**(1#/2# 可填),所以底色也只留在那两列上:
- * 其余列 8 行全可填,再铺底色就成了没有含义的装饰。只读态/打印件一样带(纸面本来就有)。
- * 色值取自用户给的图片(主色统计:黄 #FFF3CA)。
+ * 纸面「可填区」底色 —— 用户口径(2026-11-14):「**对应的表格改成黄色**」。
+ * 纸面上黄格 `#FFF3CA` 就是"这格要填"的标记 ⇒ **所有可填格都铺黄**(不再只给勾选列);
+ * 不可填格保持白底 + `/`。只读态/打印件一样带(纸面本来就有,打印走 print-color-adjust: exact)。
+ * 色值取自用户给的原图(量色:#FFF3CA)。
  */
 function zoneClass(sample, c) {
-  return isCheckColumn(c) && fillable(sample, c) ? 'gz-y' : ''
+  return fillable(sample, c) ? 'gz-y' : ''
 }
 
 /**
@@ -945,6 +958,11 @@ defineExpose({ exportFirstInspExcel })
   /* 自绘的拖动下标锚在**本格**右下角(见 .fi-rowgrip),必须有定位上下文 */
   position: relative;
 }
+/* 标准行的**表观/脱粉**两格:纸面是灰底 `#D9D9D9` + `/`(不填、只读;第十轮 2026-11-14 口径)。
+   放在 .standard-row td 之后 ⇒ 同特异性下后者居上,灰底盖得住默认的 #f7f7f7。 */
+.standard-row td.std-check {
+  background: #d9d9d9;
+}
 /* 标准行的拖动下标(2026-10-17 用户口径「这个拖动下标应该跟着当前的这个表格框的右下角走」):
    ① 关掉 textarea 原生抓手 —— 它贴在**文本域**右下角,同行别的格更高时就悬在半空(实测底差 64px);
    ② 拖过行高后(has-std-h),把文本域撑到格底,写字区跟着一起变大。
@@ -994,7 +1012,8 @@ defineExpose({ exportFirstInspExcel })
   text-align: left;
   padding: 4px 6px;
 }
-/* 「可填区」底色(照图片,只留前两列 1#/2# —— 现在只有它们还有"可填/不可填"之分)。
+/* 「可填区」底色 —— 用户口径(2026-11-14)「对应的表格改成黄色」:纸面黄格 = 要填的格,
+   ⇒ **所有可填格**都铺 `#FFF3CA`(不再只给勾选列),不可填格白底 + `/`。
    ⚠ 放在 .sample-row td.is-check 之后,那些勾选格才吃得到底色。 */
 .sample-row td.gz-y {
   background: #fff3ca;

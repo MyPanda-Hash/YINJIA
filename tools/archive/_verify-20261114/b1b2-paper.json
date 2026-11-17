@@ -1,0 +1,141 @@
+{
+ "before": {
+  "factory": "YINJIA-MES·测试库",
+  "hash": "#/dashboard"
+ },
+ "after": {
+  "factory": "YINJIA-MES·测试库",
+  "hash": "#/dashboard"
+ },
+ "menu": {
+  "found": false,
+  "visible": false,
+  "chain": [],
+  "allTopMenus": []
+ },
+ "panel": {
+  "hash": "#/panelx/list/QC_LINE_PATROL",
+  "kickedToLogin": false,
+  "sideBtns": [
+   "查询单据",
+   "模糊搜索",
+   "单据预览",
+   "新增",
+   "保存",
+   "保存为草稿",
+   "审批情况",
+   "打印",
+   "导出报表",
+   "导出",
+   "扫描填单",
+   "字段管理",
+   "删除"
+  ]
+ },
+ "paper": {
+  "sheet": true,
+  "editing": true,
+  "title": "成型车间巡线记录表",
+  "dateLabel": "日期：",
+  "approver": "审核人：",
+  "headers": [
+   "巡线时间",
+   "车间",
+   "产品信息确认（重点产品标注★）",
+   "炭棒长度范围mm",
+   "内径检查mm",
+   "重量范围g",
+   "两液密度（伊玛印品耐水煮要求测试）",
+   "表面状态",
+   "跌落强度",
+   "抗压强度",
+   "结果判定",
+   "巡线人员",
+   "增删"
+  ],
+  "headerCount": 12,
+  "rowCount": 12,
+  "firstBlockRows": [
+   [
+    "",
+    "",
+    "编号：",
+    "标准值：",
+    "标准值：",
+    "标准值：",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "＋×"
+   ],
+   [
+    "型号：",
+    "实测：",
+    "实测：",
+    "实测："
+   ],
+   [
+    "编号：",
+    "标准值：",
+    "标准值：",
+    "标准值："
+   ],
+   [
+    "型号：",
+    "实测：",
+    "实测：",
+    "实测："
+   ]
+  ],
+  "blocks": 3,
+  "blockCells": [
+   {
+    "key": "巡线时间",
+    "rowspan": "4"
+   },
+   {
+    "key": "车间",
+    "rowspan": "4"
+   },
+   {
+    "key": "两液密度",
+    "rowspan": "4"
+   },
+   {
+    "key": "表面状态",
+    "rowspan": "4"
+   },
+   {
+    "key": "跌落强度",
+    "rowspan": "4"
+   },
+   {
+    "key": "抗压强度",
+    "rowspan": "4"
+   }
+  ],
+  "prodCells": [
+   {
+    "field": "编号1",
+    "t": "编号："
+   },
+   {
+    "field": "长度标准1",
+    "t": "标准值："
+   },
+   {
+    "field": "内径标准1",
+    "t": "标准值："
+   },
+   {
+    "field": "重量标准1",
+    "t": "标准值："
+   }
+  ],
+  "rowspan4Count": 27,
+  "inputs": 72
+ }
+}

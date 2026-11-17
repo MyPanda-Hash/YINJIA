@@ -78,6 +78,9 @@ public class StockFlowService {
             case "PURCHASE_IN" -> 1;
             case "FINISH_IN" -> 2;
             case "OTHER_IN" -> 3;
+            // 2026-11-13 生产退料单(入库):4/8 是已下架委外段的保留号不回收(见下),
+            //   沿用 9..12 的「顺延编号」口径 ⇒ 入库段 13 = 生产退料。
+            case "MATERIAL_RET" -> SRC_MATERIAL_RET_IN;
             default -> -1;
         };
     }
@@ -102,6 +105,8 @@ public class StockFlowService {
     static final int SRC_TRANSFER_OUT = 10;
     static final int SRC_STOCKTAKE_IN = 11;
     static final int SRC_STOCKTAKE_OUT = 12;
+    /** 13 = 生产退料单(入库段;2026-11-13 随「手机扫码退料改落生产退料单」新增)。 */
+    static final int SRC_MATERIAL_RET_IN = 13;
 
     /**
      * 写流水(单方向面板:采购入库/产成品入库/其他入库/销售出库/材料出库/其他出库)。

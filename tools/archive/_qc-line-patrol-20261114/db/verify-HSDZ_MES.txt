@@ -1,0 +1,130 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== probe-04-verify.sql ==
+  | qc_line_patrol_detail | 32 | 
+  | qc_line_patrol_head | 12 | 
+  | qc_line_patrol_detail | 1 | id | bigint | 8 | 0 | 
+  | qc_line_patrol_detail | 2 | 单据编号 | nvarchar | 100 | 0 | 
+  | qc_line_patrol_detail | 3 | 行号 | int | 4 | 1 | 
+  | qc_line_patrol_detail | 4 | 巡线时间 | nvarchar | 40 | 1 | 
+  | qc_line_patrol_detail | 5 | 车间 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 6 | 编号1 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 7 | 型号1 | nvarchar | 200 | 1 | 
+  | qc_line_patrol_detail | 8 | 长度标准1 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 9 | 长度实测1 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 10 | 内径标准1 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 11 | 内径实测1 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 12 | 重量标准1 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 13 | 重量实测1 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 14 | 编号2 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 15 | 型号2 | nvarchar | 200 | 1 | 
+  | qc_line_patrol_detail | 16 | 长度标准2 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 17 | 长度实测2 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 18 | 内径标准2 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 19 | 内径实测2 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 20 | 重量标准2 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 21 | 重量实测2 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 22 | 两液密度 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 23 | 表面状态 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 24 | 跌落强度 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 25 | 抗压强度 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 26 | 结果判定 | nvarchar | 40 | 1 | 
+  | qc_line_patrol_detail | 27 | 巡线人员 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 28 | asp_user1 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 29 | asp_time1 | datetime2 | 8 | 1 | 
+  | qc_line_patrol_detail | 30 | asp_user2 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_detail | 31 | asp_time2 | datetime2 | 8 | 1 | 
+  | qc_line_patrol_detail | 32 | asp_cancel | nvarchar | 2 | 1 | 
+  | qc_line_patrol_head | 1 | id | bigint | 8 | 0 | 
+  | qc_line_patrol_head | 2 | 单据编号 | nvarchar | 100 | 0 | 
+  | qc_line_patrol_head | 3 | 单据日期 | date | 3 | 1 | 
+  | qc_line_patrol_head | 4 | 审核人 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_head | 5 | 审核时间 | datetime2 | 8 | 1 | 
+  | qc_line_patrol_head | 6 | 单据状态 | nvarchar | 40 | 1 | 
+  | qc_line_patrol_head | 7 | 备注 | nvarchar | 1000 | 1 | 
+  | qc_line_patrol_head | 8 | asp_user1 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_head | 9 | asp_time1 | datetime2 | 8 | 1 | 
+  | qc_line_patrol_head | 10 | asp_user2 | nvarchar | 100 | 1 | 
+  | qc_line_patrol_head | 11 | asp_time2 | datetime2 | 8 | 1 | 
+  | qc_line_patrol_head | 12 | asp_cancel | nvarchar | 2 | 1 | 
+  | qc_line_patrol_detail | ix_qc_line_patrol_detail_no | NONCLUSTERED | 0 | 1 | 单据编号 | 
+  | qc_line_patrol_detail | pk_qc_line_patrol_detail | CLUSTERED | 1 | 1 | id | 
+  | qc_line_patrol_head | ix_qc_line_patrol_head_no | NONCLUSTERED | 0 | 1 | 单据编号 | 
+  | qc_line_patrol_head | pk_qc_line_patrol_head | CLUSTERED | 1 | 1 | id | 
+  | qc_line_patrol_head | df_qc_line_patrol_head_cancel | asp_cancel | (N'N') | 
+  | qc_line_patrol_detail | df_qc_line_patrol_detail_cancel | asp_cancel | (N'N') | 
+  | qc_line_patrol_head | 1 | 7 | 
+  | qc_line_patrol_detail | 1 | 27 | 
+  | QC_LINE_PATROL | 成型车间巡线记录表 | 品质管理 | doc | qc_line_patrol_detail | qc_line_patrol_head | 单据编号 | id | 单据编号 | XJ | 单据日期 | 20 | items | 品质管理 | 
+  | 单据编号 | 单据编号 | 文本 | query,header | 10 | 140 | 0 | 1 | 0 | 1 | 
+  | 单据日期 | 单据日期 | 日期 | query,header | 20 | 110 | 1 | 1 | 0 | 1 | 
+  | 单据状态 | 单据状态 | 文本 | query,header | 190 | 90 | 0 | 0 | 0 | 1 | 
+  | 审核人 | 审核人 | 文本 | query,header | 200 | 90 | 0 | 0 | 0 | 1 | 
+  | 审核时间 | 审核时间 | 文本 | query,header | 210 | 140 | 0 | 0 | 0 | 1 | 
+  | 巡线时间 | 巡线时间 | 文本 | detail | 10 | 100 | 1 | 0 | 0 | 1 | 
+  | 车间 | 车间 | 文本 | detail | 20 | 100 | 1 | 0 | 0 | 1 | 
+  | 编号1 | 编号1 | 文本 | detail | 30 | 90 | 1 | 0 | 0 | 1 | 
+  | 型号1 | 型号1 | 文本 | detail | 40 | 160 | 1 | 0 | 0 | 1 | 
+  | 长度标准1 | 长度标准1 | 文本 | detail | 50 | 100 | 1 | 0 | 0 | 1 | 
+  | 长度实测1 | 长度实测1 | 文本 | detail | 60 | 100 | 1 | 0 | 0 | 1 | 
+  | 内径标准1 | 内径标准1 | 文本 | detail | 70 | 100 | 1 | 0 | 0 | 1 | 
+  | 内径实测1 | 内径实测1 | 文本 | detail | 80 | 100 | 1 | 0 | 0 | 1 | 
+  | 重量标准1 | 重量标准1 | 文本 | detail | 90 | 100 | 1 | 0 | 0 | 1 | 
+  | 重量实测1 | 重量实测1 | 文本 | detail | 100 | 100 | 1 | 0 | 0 | 1 | 
+  | 编号2 | 编号2 | 文本 | detail | 110 | 90 | 1 | 0 | 0 | 1 | 
+  | 型号2 | 型号2 | 文本 | detail | 120 | 160 | 1 | 0 | 0 | 1 | 
+  | 长度标准2 | 长度标准2 | 文本 | detail | 130 | 100 | 1 | 0 | 0 | 1 | 
+  | 长度实测2 | 长度实测2 | 文本 | detail | 140 | 100 | 1 | 0 | 0 | 1 | 
+  | 内径标准2 | 内径标准2 | 文本 | detail | 150 | 100 | 1 | 0 | 0 | 1 | 
+  | 内径实测2 | 内径实测2 | 文本 | detail | 160 | 100 | 1 | 0 | 0 | 1 | 
+  | 重量标准2 | 重量标准2 | 文本 | detail | 170 | 100 | 1 | 0 | 0 | 1 | 
+  | 重量实测2 | 重量实测2 | 文本 | detail | 180 | 100 | 1 | 0 | 0 | 1 | 
+  | 两液密度 | 两液密度 | 文本 | detail | 190 | 140 | 1 | 0 | 0 | 1 | 
+  | 表面状态 | 表面状态 | 文本 | detail | 200 | 110 | 1 | 0 | 0 | 1 | 
+  | 跌落强度 | 跌落强度 | 文本 | detail | 210 | 100 | 1 | 0 | 0 | 1 | 
+  | 抗压强度 | 抗压强度 | 文本 | detail | 220 | 100 | 1 | 0 | 0 | 1 | 
+  | 结果判定 | 结果判定 | 文本 | detail | 230 | 100 | 1 | 0 | 0 | 1 | 
+  | 巡线人员 | 巡线人员 | 文本 | detail | 240 | 100 | 1 | 0 | 0 | 1 | 
+  | 行号 | 行号 | 文本 | detail | 260 | 70 | 0 | 0 | 1 | 0 | 
+  | 30 | 1 | 
+  | 1 | admin | 管理员 | N | view,query,add,modify,modlog,del,export | 
+  | 2 | user | 普通用户 | N | view,query,add,modify,modlog,del,export | 
+  | 1025 | rd_file_owner | 文件负责人 | N | view,query,add,modify,modlog,del,export | 
+  | 1026 | rd_review | 研发审核 | N | view,query,add,modify,modlog,del,export | 
+  | 1029 | xiaoshou | 销售 | N | view,query,add,modify,modlog,del,export | 
+  | 1031 | ckgl | 仓库管理 | N | view,query,add,modify,modlog,del,export | 
+  | 1033 | sc | 生产 | N | view,query,add,modify,modlog,del,export | 
+  | 1036 | scxs | 生产销售 | N | view,query,add,modify,modlog,del,export | 
+  | 1037 | caigou | 采购 | N | view,query,add,modify,modlog,del,export | 
+  | 1039 | zhiliangshenhe | 质量审核 | N | view,query,add,modify,modlog,del,export | 
+  | 1040 | zhiliangjiance | 质量检测 | N | view,query,add,modify,modlog,del,export | 
+  | 1041 | 检验科 | 检验工程师 | N | view,query,add,modify,modlog,del,export | 
+  | 1042 | ceshizhuanyong | 测试专用角色 | Y | view,query,add,modify,modlog,del,export,print,audit,field,warn,selfaudit | 
+  | field | 编号1 | en | No. 1 | manual | 
+  | field | 编号2 | en | No. 2 | manual | 
+  | field | 表面状态 | en | Surface Condition | manual | 
+  | field | 长度标准1 | en | Length Standard 1 | manual | 
+  | field | 长度标准2 | en | Length Standard 2 | manual | 
+  | field | 长度实测1 | en | Length Measured 1 | manual | 
+  | field | 长度实测2 | en | Length Measured 2 | manual | 
+  | field | 结果判定 | en | Result Judgement | manual | 
+  | field | 两液密度 | en | Dual-liquid Density | manual | 
+  | field | 内径标准1 | en | ID Standard 1 | manual | 
+  | field | 内径标准2 | en | ID Standard 2 | manual | 
+  | field | 内径实测1 | en | ID Measured 1 | manual | 
+  | field | 内径实测2 | en | ID Measured 2 | manual | 
+  | field | 型号1 | en | Model 1 | manual | 
+  | field | 型号2 | en | Model 2 | manual | 
+  | field | 巡线人员 | en | Patrol Inspector | manual | 
+  | field | 巡线时间 | en | Patrol Time | manual | 
+  | field | 重量标准1 | en | Weight Standard 1 | manual | 
+  | field | 重量标准2 | en | Weight Standard 2 | manual | 
+  | field | 重量实测1 | en | Weight Measured 1 | manual | 
+  | field | 重量实测2 | en | Weight Measured 2 | manual | 
+  | panel | 成型车间巡线记录表 | en | Forming Workshop Line Patrol Record | manual | 
+  | 0 | 
+  | 跌落强度 | Drop Strength | manual | 
+  | 抗压强度 | Compressive Strength | manual | 
+  | migrate-qc-line-patrol-20261114.sql | dc78316ee8df9b4d | 2026-11-14 14:41:42.9436306 | 
+  | 0 | 
+  | 0 | 
+[OK] probe-04-verify.sql (2 batches)

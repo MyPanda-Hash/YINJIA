@@ -1,8 +1,11 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- 版本号**不写在这里**:由 build.ps1 的 $version / $versionCode 经 aapt2 link 的
+     version-code / version-name 参数注入。aapt2 这两个参数只在 manifest 里**没有**该属性
+     时才生效(写了就沿用文件里的值)。历史上两边手工同步,漏改一处就会出现「APK 文件名是
+     新版、装上去 versionCode 还是旧的」的假发布 —— 2026-11-15 出 1.0.13 时踩到。
+     改版本只改 build.ps1 一处。 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.yinjia.mes.app"
-    android:versionCode="13"
-    android:versionName="1.0.12">
+    package="com.yinjia.mes.app">
 
     <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />
 

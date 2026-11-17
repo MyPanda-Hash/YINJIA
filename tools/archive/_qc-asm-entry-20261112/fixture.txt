@@ -1,0 +1,4 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== asm-fixture.sql ==
+  | 2196 | 4011 | 4385 | 
+[OK] asm-fixture.sql (1 batches)

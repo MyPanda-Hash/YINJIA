@@ -1,0 +1,184 @@
+ M backend/src/main/java/com/yinjia/mes/service/QcFirstInspReportSupport.java
+ M backend/src/main/resources/reports/qc_first_insp.jrxml
+ D backend/src/main/resources/static/assets/404-4OGi-fe8.js
+ D backend/src/main/resources/static/assets/AccountDialog-BmXS7zpb.js
+ D backend/src/main/resources/static/assets/BusinessOverview-CCka0KoB.js
+ D backend/src/main/resources/static/assets/ChangePwdDialog-D4Ysr6VA.js
+ D backend/src/main/resources/static/assets/ColumnSettingsDialog-BWY6GeiE.js
+ D backend/src/main/resources/static/assets/DbBackup-Dwi42gOM.js
+ D backend/src/main/resources/static/assets/DcConfig-Bk6xz4pP.js
+ D backend/src/main/resources/static/assets/DcMonitor-618rKrzq.js
+ D backend/src/main/resources/static/assets/DcStats-ChsZiZUU.js
+ D backend/src/main/resources/static/assets/DeskSettingsDialog-qhWYnBj7.js
+ D backend/src/main/resources/static/assets/ErpIntegConfig-BVR2gzUX.js
+ D backend/src/main/resources/static/assets/ManufactureBoard-CvwQ_3Fn.js
+ D backend/src/main/resources/static/assets/MenuDesigner-BApeS3oC.js
+ D backend/src/main/resources/static/assets/MobileLabRecord-D3_TI9cQ.js
+ D backend/src/main/resources/static/assets/MobilePickCreate-BCc7aYZV.js
+ D backend/src/main/resources/static/assets/MobilePickDoc-hgdmFF3d.js
+ D backend/src/main/resources/static/assets/MobilePickList-CO0YcSXt.js
+ D backend/src/main/resources/static/assets/MobileReport-DVh4H431.js
+ D backend/src/main/resources/static/assets/MobileWarehouse-G5Lxj8uE.js
+ D backend/src/main/resources/static/assets/ModuleView-XWW5Qk9m.js
+ D backend/src/main/resources/static/assets/MoldProcPanel-DCYxE_2v.js
+ D backend/src/main/resources/static/assets/OrderConvert-CUOwl0Bn.js
+ D backend/src/main/resources/static/assets/OrgAdmin-Dkr8C1h3.js
+ D backend/src/main/resources/static/assets/PanelxForm-D0NEhgBe.js
+ D backend/src/main/resources/static/assets/PanelxList-BBTcbT7Y.js
+ D backend/src/main/resources/static/assets/PanelxList-S8B4cpOu.css
+ D backend/src/main/resources/static/assets/PickScanLog-CEjbQ_Ud.js
+ D backend/src/main/resources/static/assets/PortalLayout-D9DX5wUP.js
+ D backend/src/main/resources/static/assets/PrintStation-Bjh_QnqP.js
+ D backend/src/main/resources/static/assets/ProcFlowCard-DPb56mPf.js
+ D backend/src/main/resources/static/assets/ProjectFlow-DavgUlo8.js
+ D backend/src/main/resources/static/assets/RecordSheetPanels-DsHFqmWa.js
+ D backend/src/main/resources/static/assets/ReworkDesk-eVg7ji-p.js
+ D backend/src/main/resources/static/assets/ScanPick-DcIz9TTn.js
+ D backend/src/main/resources/static/assets/ScheduleBoard-CsBFHqfq.js
+ D backend/src/main/resources/static/assets/SerialNumber-CJb2gg7G.js
+ D backend/src/main/resources/static/assets/ShareFileCenter-DUai6FF-.js
+ D backend/src/main/resources/static/assets/SolutionCenter-C181ZHqK.js
+ D backend/src/main/resources/static/assets/StdLibManager-DBAEZNNF.js
+ D backend/src/main/resources/static/assets/SupplierAccount-6FrTm5Ow.js
+ D backend/src/main/resources/static/assets/SystemConsole-CuTRykip.js
+ D backend/src/main/resources/static/assets/UsageLog-D8wXq9C3.js
+ D backend/src/main/resources/static/assets/WorkOrderBoard-BgS6dwbf.js
+ D backend/src/main/resources/static/assets/WorkOrderBoard-ClxlmGqe.css
+ D backend/src/main/resources/static/assets/WorkOrderCreatePage-DYphNN6m.js
+ D backend/src/main/resources/static/assets/WorkOrderList-ASRBAsKf.css
+ D backend/src/main/resources/static/assets/WorkOrderList-CafxqAeP.js
+ D backend/src/main/resources/static/assets/WorkOrderPick-CmZH-KHI.js
+ D backend/src/main/resources/static/assets/WorkOrderProgressBoard-5pb0czhb.js
+ D backend/src/main/resources/static/assets/attachmentPreview-nb13Azoz.js
+ D backend/src/main/resources/static/assets/dayPlan-C3E_04C_.css
+ D backend/src/main/resources/static/assets/dayPlan-Dl06nBp7.js
+ D backend/src/main/resources/static/assets/dcApi-YpDHT7Oq.js
+ D backend/src/main/resources/static/assets/de-C44SCZnh.js
+ D backend/src/main/resources/static/assets/en-JuhhOA6N.js
+ D backend/src/main/resources/static/assets/erpOutcome-C_ghPin4.js
+ D backend/src/main/resources/static/assets/es-BNJcTvZV.js
+ D backend/src/main/resources/static/assets/fr-D6dHH98-.js
+ D backend/src/main/resources/static/assets/index-CjjoLr9W.js
+ D backend/src/main/resources/static/assets/index-ClJpeYhm.js
+ D backend/src/main/resources/static/assets/index-D5fBxrW-.js
+ D backend/src/main/resources/static/assets/index-zv0MfQ1X.js
+ D backend/src/main/resources/static/assets/index.es-Bkj3537N.js
+ D backend/src/main/resources/static/assets/ja-Df_9amPM.js
+ D backend/src/main/resources/static/assets/jspdf.es.min-mQhSEUeg.js
+ D backend/src/main/resources/static/assets/ko-DX9WUxOX.js
+ D backend/src/main/resources/static/assets/menu-JvOM8O12.js
+ D backend/src/main/resources/static/assets/printStation-Behas4T0.js
+ D backend/src/main/resources/static/assets/ru-D0FCRTVO.js
+ D backend/src/main/resources/static/assets/scanCode-DLnMwrGu.js
+ D backend/src/main/resources/static/assets/scanPick-B9DooETO.js
+ D backend/src/main/resources/static/assets/th-DVqKmxsI.js
+ D backend/src/main/resources/static/assets/useReportColumns-BuOJP_3h.js
+ D backend/src/main/resources/static/assets/vi-BX_x8AqX.js
+ D backend/src/main/resources/static/assets/web-DXWXkq77.js
+ D backend/src/main/resources/static/assets/zh-TW-BzyJfDG4.js
+ M backend/src/main/resources/static/index.html
+ M docs/design/首件检验单-可填范围.md
+ M docs/development/数据库表清单.md
+ M frontend/src/business/menus.js
+ M frontend/src/business/menus.test.js
+ M frontend/src/core/qc/QcFirstInspSheet.vue
+ M frontend/src/core/qc/firstInspCols.js
+ M frontend/src/core/qc/firstInspCols.test.js
+ M frontend/src/core/qc/firstInspExport.js
+ M frontend/src/core/qc/firstInspExport.test.js
+ M frontend/src/core/views/PanelxList.vue
+ M frontend/src/i18n/locales/de.js
+ M frontend/src/i18n/locales/en.js
+ M frontend/src/i18n/locales/es.js
+ M frontend/src/i18n/locales/fr.js
+ M frontend/src/i18n/locales/ja.js
+ M frontend/src/i18n/locales/ko.js
+ M frontend/src/i18n/locales/ru.js
+ M frontend/src/i18n/locales/th.js
+ M frontend/src/i18n/locales/vi.js
+ M frontend/src/i18n/locales/zh-TW.js
+ M tools/db-inuse-tables.txt
+ M tools/db-migrations.txt
+?? backend/src/main/resources/static/assets/404-lDuVmxp7.js
+?? backend/src/main/resources/static/assets/AccountDialog-A-RLqvKo.js
+?? backend/src/main/resources/static/assets/BusinessOverview-DIEa3KUb.js
+?? backend/src/main/resources/static/assets/ChangePwdDialog-k1R6Thn_.js
+?? backend/src/main/resources/static/assets/ColumnSettingsDialog-B83LrpTV.js
+?? backend/src/main/resources/static/assets/DbBackup-AilfoUDx.js
+?? backend/src/main/resources/static/assets/DcConfig-PuNekBVu.js
+?? backend/src/main/resources/static/assets/DcMonitor-DWyYkS8T.js
+?? backend/src/main/resources/static/assets/DcStats-CkvH_bfn.js
+?? backend/src/main/resources/static/assets/DeskSettingsDialog-BMtb80K2.js
+?? backend/src/main/resources/static/assets/ErpIntegConfig-BQWi6HET.js
+?? backend/src/main/resources/static/assets/ManufactureBoard-Bi-4F1CG.js
+?? backend/src/main/resources/static/assets/MenuDesigner-Bg7yzBeb.js
+?? backend/src/main/resources/static/assets/MobileLabRecord-FXrwxZyt.js
+?? backend/src/main/resources/static/assets/MobilePickCreate-QBxlfIAu.js
+?? backend/src/main/resources/static/assets/MobilePickDoc-DQ_4IwD4.js
+?? backend/src/main/resources/static/assets/MobilePickList-DRmJ-UKX.js
+?? backend/src/main/resources/static/assets/MobileReport-BWpWlQFQ.js
+?? backend/src/main/resources/static/assets/MobileWarehouse-CcDmf-yA.js
+?? backend/src/main/resources/static/assets/ModuleView-BmG82jOR.js
+?? backend/src/main/resources/static/assets/MoldProcPanel-CKYjGS5s.js
+?? backend/src/main/resources/static/assets/OrderConvert-CDaJdsu2.js
+?? backend/src/main/resources/static/assets/OrgAdmin-BywZHQbd.js
+?? backend/src/main/resources/static/assets/PanelxForm-sMJsN8ZI.js
+?? backend/src/main/resources/static/assets/PanelxList-BuaUPKMX.js
+?? backend/src/main/resources/static/assets/PanelxList-TQUIBMLW.css
+?? backend/src/main/resources/static/assets/PickScanLog-Bj0kum4n.js
+?? backend/src/main/resources/static/assets/PortalLayout-MpKikxVb.js
+?? backend/src/main/resources/static/assets/PrintStation-CoYdUCcx.js
+?? backend/src/main/resources/static/assets/ProcFlowCard-C0mes8uZ.js
+?? backend/src/main/resources/static/assets/ProjectFlow-B3LA2ihN.js
+?? backend/src/main/resources/static/assets/RecordSheetPanels-Dc9y00gD.js
+?? backend/src/main/resources/static/assets/ReworkDesk-5awDcN9A.js
+?? backend/src/main/resources/static/assets/ScanPick-B-26Tdmo.js
+?? backend/src/main/resources/static/assets/ScheduleBoard-kkuAeDIK.js
+?? backend/src/main/resources/static/assets/SerialNumber-B0uW26PI.js
+?? backend/src/main/resources/static/assets/ShareFileCenter-CgWvsjQW.js
+?? backend/src/main/resources/static/assets/SolutionCenter-0DvhL3K4.js
+?? backend/src/main/resources/static/assets/StdLibManager-CBkpv8_I.js
+?? backend/src/main/resources/static/assets/SupplierAccount-B5qF6l26.js
+?? backend/src/main/resources/static/assets/SystemConsole-ZNvjMmYP.js
+?? backend/src/main/resources/static/assets/UsageLog-BmcsBznD.js
+?? backend/src/main/resources/static/assets/WorkOrderBoard-Dcg-F83F.js
+?? backend/src/main/resources/static/assets/WorkOrderBoard-kAkqgsHy.css
+?? backend/src/main/resources/static/assets/WorkOrderCreatePage-GbA6mTyc.js
+?? backend/src/main/resources/static/assets/WorkOrderList-BQM6BQh5.js
+?? backend/src/main/resources/static/assets/WorkOrderList-c0F1CV7b.css
+?? backend/src/main/resources/static/assets/WorkOrderPick-Bj7W2TwM.js
+?? backend/src/main/resources/static/assets/WorkOrderProgressBoard-BKlVjpK5.js
+?? backend/src/main/resources/static/assets/attachmentPreview-iJGIzyKb.js
+?? backend/src/main/resources/static/assets/dcApi-Czld1fgY.js
+?? backend/src/main/resources/static/assets/de-BsQNu25l.js
+?? backend/src/main/resources/static/assets/en-C2GRrzI6.js
+?? backend/src/main/resources/static/assets/erpOutcome-D5ihMuJt.js
+?? backend/src/main/resources/static/assets/es-CWWUr1UG.js
+?? backend/src/main/resources/static/assets/fr-NQfkCmm7.js
+?? backend/src/main/resources/static/assets/index-BDI-BmBU.js
+?? backend/src/main/resources/static/assets/index-BcGdGsYQ.js
+?? backend/src/main/resources/static/assets/index-CLIxwxsm.js
+?? backend/src/main/resources/static/assets/index-D9I4wFt4.js
+?? backend/src/main/resources/static/assets/index.es-Cpifvs8v.js
+?? backend/src/main/resources/static/assets/ja-CZyRKAfG.js
+?? backend/src/main/resources/static/assets/jspdf.es.min-_0f-7Qhe.js
+?? backend/src/main/resources/static/assets/ko-CHn5S8Bd.js
+?? backend/src/main/resources/static/assets/menu-BRQ_ZWrK.js
+?? backend/src/main/resources/static/assets/printStation-BRlHHt7-.js
+?? backend/src/main/resources/static/assets/ru-BA7wWoqq.js
+?? backend/src/main/resources/static/assets/scanCode-Dg_Mlem1.js
+?? backend/src/main/resources/static/assets/scanPick-BUTJ-JSD.js
+?? backend/src/main/resources/static/assets/th-DrztCoPK.js
+?? backend/src/main/resources/static/assets/useReportColumns-DMJDDs0y.js
+?? backend/src/main/resources/static/assets/vi-D4e2OBCt.js
+?? backend/src/main/resources/static/assets/web-CMjINUbY.js
+?? backend/src/main/resources/static/assets/woFlowChain-C3E_04C_.css
+?? backend/src/main/resources/static/assets/woFlowChain-CVqLnSPA.js
+?? backend/src/main/resources/static/assets/zh-TW-CUpmckF_.js
+?? docs/design/成型车间巡线记录表-首版.md
+?? frontend/src/core/qc/QcLinePatrolSheet.vue
+?? tools/archive/_first-insp-report-20261114/
+?? tools/archive/_first-insp-yellow-20261114/
+?? tools/archive/_qc-line-patrol-20261114/
+?? tools/archive/_verify-20261114/
+?? tools/migrate-qc-line-patrol-20261114.sql

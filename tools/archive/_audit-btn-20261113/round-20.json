@@ -1,0 +1,57 @@
+{
+  "http": 200,
+  "body": "{\"code\":200,\"message\":\"success\",\"data\":{\"单据状态\":\"已审核\",\"编号\":\"YJ-20261013-01\"}}",
+  "state": {
+    "doc": "单据：YJ-20261013-01",
+    "status": "已审核",
+    "auditCells": [
+      "审核人：admin",
+      "审核日期：",
+      "审核时间：2026-11-13 10:40:52",
+      "审核意见：-"
+    ],
+    "toolbar": [
+      {
+        "main": "新增",
+        "disabled": false
+      },
+      {
+        "main": "保存",
+        "disabled": true
+      },
+      {
+        "main": "删除",
+        "disabled": false
+      },
+      {
+        "main": "审核",
+        "disabled": true
+      },
+      {
+        "main": "审批",
+        "disabled": true
+      },
+      {
+        "main": "生单",
+        "disabled": false
+      },
+      {
+        "main": "刷新",
+        "disabled": false
+      },
+      {
+        "main": "打印",
+        "disabled": false
+      },
+      {
+        "main": "导入",
+        "disabled": false
+      },
+      {
+        "main": "更多",
+        "disabled": false
+      }
+    ]
+  },
+  "history": []
+}

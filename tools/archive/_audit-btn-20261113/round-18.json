@@ -1,0 +1,19 @@
+{
+  "status": "草稿",
+  "foot": "",
+  "msgs": [],
+  "calls": [
+    {
+      "url": "/api/px/queryFormDataList",
+      "status": 200,
+      "body": "{\"code\":200,\"message\":\"success\",\"data\":{\"totalSize\":3,\"list\":[{\"编号\":\"币别\",\"状态\":\"启用\",\"单据状态\":\"启用\",\"detail\":{\"cur\":[{\"id\":42,\"编码\":\"USD\",\"名称\":\"美金\",\"币别符号\":\"$\",\"汇率\":1.000000,\"汇率类型\":\"浮动汇率\",\"金额小数位\":2,\"单价小数位\":2",
+      "req": "{\"panelCode\":\"CUR\",\"condition\":{},\"keyword\":\"\",\"pageNo\":1,\"pageSize\":100}"
+    },
+    {
+      "url": "/api/px/queryFormDataList",
+      "status": 200,
+      "body": "{\"code\":200,\"message\":\"success\",\"data\":{\"totalSize\":3,\"list\":[{\"编号\":\"币别\",\"状态\":\"启用\",\"单据状态\":\"启用\",\"detail\":{\"cur\":[{\"id\":42,\"编码\":\"USD\",\"名称\":\"美金\",\"币别符号\":\"$\",\"汇率\":1.000000,\"汇率类型\":\"浮动汇率\",\"金额小数位\":2,\"单价小数位\":2",
+      "req": "{\"panelCode\":\"CUR\",\"condition\":{},\"keyword\":\"\",\"pageNo\":1,\"pageSize\":100}"
+    }
+  ]
+}

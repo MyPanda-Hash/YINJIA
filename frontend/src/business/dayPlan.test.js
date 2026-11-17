@@ -1,6 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { qtyText, isPast, isToday, dayColState, isOverCapacity, dayCellQty, isOutOfPlanRange } from './dayPlan.js'
+import {
+  qtyText, isPast, isToday, dayColState, isOverCapacity, dayCellQty, isOutOfPlanRange,
+  dayCellView, historyShortfalls, shortfallTotals,
+} from './dayPlan.js'
 
 // ⚠ 2026-10-31 用户口径「当前不需要手填,能自动算就可以了」:
 //   日计划改由后端自动均摊(DayPlanSpread),前端的 buildSplit / diffPlan / unplannedQty
@@ -43,7 +46,7 @@ test('isOverCapacity:超产能只用于显示;未配产能(<=0)不判', () => {
   assert.equal(isOverCapacity(12000, null), false)
 })
 
-test('dayCellQty:一格一个数 —— 有报工显示实际,没报工显示计划', () => {
+test('dayCellQty:一格一个数 —— 有报工显示实际,没报工显示计划(旧口径,保留给降级路径)', () => {
   // 没报工 ⇒ 显示计划
   assert.deepEqual(dayCellQty(2, 0), { qty: 2, isActual: false })
   // 报了(不论达成与否)⇒ 显示实际(标色,2026-10-31 用户口径「完成数量不能没有」)
@@ -84,4 +87,88 @@ test('isOutOfPlanRange:区间 = 开工日 → 计划完工日,区间外画斜杠
   // 完工日早于开工日(录入反了,实测 GD-2026-10-0202:10-11 → 10-10):收成单日窗口,不整行画杠
   assert.equal(isOutOfPlanRange('2026-10-11', '2026-10-11', '2026-10-10'), false)
   assert.equal(isOutOfPlanRange('2026-10-12', '2026-10-11', '2026-10-10'), true)
+})
+
+// ⚠ 2026-11-13 用户口径(附截图):「在这里增加一个原计划量/报工数,当天结束后未完成会进行提示」
+//   「报工后显示在当前位置和原计划量/实际报工量」⇒ 格内两数「原计划/报工」,过去日期不足标红。
+test('dayCellView:有报工 ⇒ 原计划/报工;今天结束前不判欠产', () => {
+  const v = dayCellView(700, 15, 715, false)   // 今天:日计划已扣掉 15,原计划仍是 715
+  assert.equal(v.text, '715/15')
+  assert.equal(v.planText, '715')
+  assert.equal(v.actualText, '15')
+  assert.equal(v.hasActual, true)
+  assert.equal(v.short, 0)                     // 当天还没结束 ⇒ 不提示未完成
+})
+
+test('dayCellView:过去日期 报工<原计划 ⇒ 欠产(short),达成/超产 ⇒ 不欠', () => {
+  const short = dayCellView(0, 15, 715, true)  // 历史日期没有重摊计划,只剩原计划对照
+  assert.equal(short.text, '715/15')
+  assert.equal(short.short, 700)
+  const done = dayCellView(0, 715, 715, true)
+  assert.equal(done.text, '715/715')
+  assert.equal(done.short, 0)
+  const over = dayCellView(0, 800, 715, true)  // 超产:不算欠
+  assert.equal(over.short, 0)
+})
+
+test('dayCellView:过去日期一笔没报 ⇒ 原计划/0(整格欠产)', () => {
+  const v = dayCellView(0, 0, 700, true)
+  assert.equal(v.text, '700/0')
+  assert.equal(v.hasActual, false)
+  assert.equal(v.short, 700)
+})
+
+test('dayCellView:没报工 ⇒ 仍显示计划(今天及以后,原样)', () => {
+  const v = dayCellView(685, 0, 715, false)
+  assert.equal(v.text, '685')                  // 没报工时格内还是"今天起还要做多少"
+  assert.equal(v.short, 0)
+  assert.equal(v.hasActual, false)
+})
+
+test('dayCellView:后端没返回 原计划(旧 8090)⇒ 退回单数显示,不造数', () => {
+  // 有报工、无基线 ⇒ 只显示报工(2026-11-13 实测口径:不拿"今天起还要做多少"冒充原计划)
+  const deg = dayCellView(685, 15, 0, false)
+  assert.equal(deg.text, '15')
+  assert.equal(deg.planText, '')
+  assert.equal(deg.actualText, '15')
+  assert.equal(deg.hasActual, true)
+  assert.equal(deg.hasBaseline, false)
+  assert.equal(dayCellView(0, 15, 0, true).text, '15')
+  assert.equal(dayCellView(0, 15, 0, true).short, 0)   // 没有基线就不判欠产
+  // 没报工、无基线 ⇒ 计划
+  assert.equal(dayCellView(2, 0, null, false).text, '2')
+  assert.equal(dayCellView(0, 0, 0, true).text, '')
+})
+
+test('historyShortfalls:只数已结束日期;今天/未来/原计划0 都不算', () => {
+  const rows = [
+    {
+      行id: 1,
+      原计划: { '2026-11-10': 700, '2026-11-11': 700, '2026-11-12': 0, '2026-11-13': 715, '2026-11-14': 100 },
+      日报工: { '2026-11-10': 15, '2026-11-11': 700, '2026-11-13': 15, '2026-11-14': 200 },
+    },
+    { 行id: 2, 原计划: { '2026-11-11': 300 }, 日报工: {} },
+  ]
+  const items = historyShortfalls(rows, '2026-11-13')
+  assert.deepEqual(items.map((x) => [x.row.行id, x.date, x.plan, x.actual, x.short]), [
+    [1, '2026-11-10', 700, 15, 685],
+    [2, '2026-11-11', 300, 0, 300],
+  ])
+  assert.deepEqual(shortfallTotals(items), { count: 2, plan: 1000, actual: 15, qty: 985 })
+})
+
+test('shortfallTotals:三数并列(原计划 / 报工 / 欠产),让「欠产 = 计划−报工」自证', () => {
+  // 2026-11-13 用户反馈的现场数:两天原计划 1667、报工 600、欠产 1067(曾被误读成"计划量 1067")
+  const items = [
+    { plan: 834, actual: 500, short: 334 },
+    { plan: 833, actual: 100, short: 733 },
+  ]
+  assert.deepEqual(shortfallTotals(items), { count: 2, plan: 1667, actual: 600, qty: 1067 })
+})
+
+test('historyShortfalls:后端未升级(没有 原计划)/空行 ⇒ 空,顶部提示整行不出现', () => {
+  assert.deepEqual(historyShortfalls([{ 行id: 1 }], '2026-11-13'), [])
+  assert.deepEqual(historyShortfalls([], '2026-11-13'), [])
+  assert.deepEqual(historyShortfalls([{ 原计划: { '2026-11-10': 5 } }], ''), [])   // 没拿到今天不判
+  assert.deepEqual(shortfallTotals(null), { count: 0, plan: 0, actual: 0, qty: 0 })
 })

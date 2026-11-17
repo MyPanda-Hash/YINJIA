@@ -1,21 +1,31 @@
 # 银嘉 MES · 安卓壳(`android/`)
 
-> **日期**:2026-10-20(2026-11-09 出 1.0.7 / 1.0.8)
-> **产物**:`android/dist/yinjia-mes-1.0.8.apk`(自签名,可直接侧载 / 覆盖升级)
+> **日期**:2026-10-20(2026-11-15 出 1.0.13)
+> **产物**:`android/dist/yinjia-mes-1.0.13.apk`(自签名,可直接侧载 / 覆盖升级)
 > **不依赖 Gradle / Android Studio**:用 SDK 的 `aapt2 / javac / d8 / apksigner` 四步手搓出包,
 > 离线、几十秒、可重复构建(本机没有 Gradle,也没有装 Studio)。
 
-## 0. 版本与「直接更新」(2026-11-09)
+## 0. 版本与「直接更新」(2026-11-15)
 
 | 项 | 值 |
 |---|---|
 | 包名 | `com.yinjia.mes.app`(**永不改**;改了就是另一个 App,旧图标/旧数据都不跟着走) |
-| 本版 | `versionName=1.0.8`、`versionCode=9`(上一版 1.0.7 = 8,更早 1.0.6 = 7) |
+| 本版 | `versionName=1.0.13`、`versionCode=14`(上一版 1.0.12 = 13;1.0.9~1.0.11 = 10/11/12) |
 | 签名证书 | `CN=Yinjia MES Debug`(仓库内 `android/debug.keystore`,SHA-256 `b455080b…9cbc`) |
 | 覆盖升级 | 与旧版 **同一把钥匙 + versionCode 更大** ⇒ 手机上直接装新 APK 就是「更新」,不用卸载 |
+| 1.0.13 内容 | **整站前端重打(原生壳代码未改)**:含 1.0.12 之后 287 个提交 / 163 个前端源文件的全部更新
+(生产工单草稿箱与新增整页编制、品质管理「样品检验」、出货检验表观审批流、产成品入库多批次与检验门禁、
+库存以金蝶真实账套为准、检验数据记录明细表、角色字段视图、自定义字段父/子目录、采购链贯通、拍照上传等) |
+| 1.0.9~1.0.12 内容 | 1.0.12 手机端两道状态闸门(已保存单据锁定设备名称 / 审批通过后整单只读);1.0.11 删除行确认弹窗;
+1.0.10 加标水「测试日期」日期选择器;1.0.9 加标水明细列随「测试项目」变 |
 | 1.0.8 内容 | **拍照上传附件走原生相机**:实验室记录手机登记的「拍照/上传附件」点下去打开原生相机页
 (复用扫码那台相机,底部「拍照」大按钮、点屏幕开关手电),拍完自动回传并上传;网页里 `<input type=file>` 也补上了 `onShowFileChooser`(可进相册/文件) |
 | 1.0.7 内容 | 手机扫码新增 **实验室记录手机登记**(3 张研发记录表的手机端:逐行附件、模糊查询、明细折叠、回填电脑端面板) |
+
+> **版本号只有一处真源(2026-11-15 修正)**:改版本只改 `build.ps1` 的 `$version` / `$versionCode`;
+> `AndroidManifest.xml` 里**不写** versionCode/versionName —— aapt2 的 `version-code` / `version-name`
+> 参数只在 manifest 缺这两个属性时才注入,写了就沿用文件里的值。以前两边手工同步,
+> 2026-11-15 出 1.0.13 时就踩到「APK 文件名是 1.0.13、装上去 versionCode 还是 13」的假发布(已修正并复验)。
 
 > 铁律:① `com.yinjia.mes.app` 与 `android/debug.keystore` 丢了就无法覆盖升级(只能卸载重装);
 > ② 每次出包 **versionCode 必须比上一版大**(脚本里 `$versionCode`),否则安卓拒绝覆盖安装;
@@ -91,8 +101,8 @@ SDK 位置探测见 `android/sdk.ps1`:`ANDROID_HOME` → `ANDROID_SDK_ROOT` →
 `%LOCALAPPDATA%\Android\Sdk` → **各盘根目录的 `\SDK` / `\Android\Sdk` / `\android-sdk` 等**
 (本机 SDK 就在 `E:\SDK`,不必再手工设环境变量)。
 
-**手机安装 / 升级**:把 `android/dist/yinjia-mes-1.0.8.apk` 拷到手机点安装(需允许「安装未知应用」)。
-手机上已装旧版的**直接装这个就是升级**(同包名同签名、versionCode 9>8);装完可从「我的桌面 → 设置」里
+**手机安装 / 升级**:把 `android/dist/yinjia-mes-1.0.13.apk` 拷到手机点安装(需允许「安装未知应用」)。
+手机上已装旧版的**直接装这个就是升级**(同包名同签名、versionCode 14>13);装完可从「我的桌面 → 设置」里
 看到壳版本,或看 APK 文件名核对。
 
 > 出包前先 `cd frontend && npm run build`(脚本会自己把 `frontend/dist` 收进 `assets/www`,
@@ -255,3 +265,44 @@ SDK 位置探测见 `android/sdk.ps1`:`ANDROID_HOME` → `ANDROID_SDK_ROOT` →
     `logcat` 无 FATAL / 无 `YjPhoto` 报错**,权限弹窗也按预期出现。
   - ⚠ 尚未在真机上走完"拍照 → 上传 → 回填"整链(模拟器无真实镜头)。
 - 版本 `1.0.8`(versionCode 9);证据截图 `tools/archive/_lab-native-photo-20261109/`。
+
+---
+
+## 9. 2026-11-15:出 **1.0.13** —— 1.0.12 之后的整站前端重打
+
+> 用户口径:「帮我看下这个安卓的更新然后帮我重新打包」。
+
+- **改动范围**:`android/` 原生代码 **零改动**(`git diff --numstat 019a12917..HEAD -- android/` = 0 文件;
+  最后一次碰 `android/` 的提交就是 1.0.12 的出包提交 `019a12917`)。变的只是**打进 APK 的前端**
+  —— 1.0.12 之后 **287 个提交 / 163 个前端源文件**(生产工单整页编制+草稿箱、样品检验、出货检验表观审批流、
+  产成品入库多批次、库存以金蝶为准、检验数据记录明细表、角色字段视图、自定义字段父/子目录、采购链贯通、
+  手机报工超量改弹窗 等)。所以本版 = **纯前端重打**,原生行为与 1.0.12 完全一致。
+- **前端产物取证**:`frontend/dist`(173 文件)与 `backend/src/main/resources/static` **逐文件 SHA-256 全等**,
+  而 static 由 HEAD `61ffe85f4`「前端静态产物同步」入库、时间紧接在最后一次 `frontend/src` 改动之后
+  ⇒ 确认打进去的就是当前源码的构建产物。本次**未重跑 `npm run build`**(本机沙箱内 esbuild 报 `spawn EPERM`,
+  绕法见 `docs/development/开发与质量.md`;不影响出包,因为 dist 已被上面两条取证钉死在 HEAD)。
+- **版本号机制修正(本轮真问题)**:`AndroidManifest.xml` 原来硬写 `android:versionCode="13"` /
+  `versionName="1.0.12"`,而 `aapt2 link` 的 `version-code` / `version-name` **只在 manifest 缺该属性时才生效**
+  ⇒ 第一次出包的文件名是 1.0.13、`aapt2 dump badging` 却仍是 `versionCode=13 / 1.0.12`
+  (装上去是"假发布":覆盖升级看着成功、版本没变)。已把这两个属性从 manifest 删除,
+  版本只由 `build.ps1` 注入;重出后实测 `versionCode=14 / versionName=1.0.13`。
+- **验证(不需要手机的部分全绿)**:
+
+| 项 | 结果 |
+|---|---|
+| 包信息 | `com.yinjia.mes.app`、`versionCode=14`、`versionName=1.0.13`、`minSdk 24`、`targetSdk 34`、label「银嘉MES」 |
+| 签名/对齐 | `apksigner verify` 通过(v2+v3;`CN=Yinjia MES Debug`,SHA-256 `b455080b…9cbc` 与上一版**同一把钥匙** ⇒ 可覆盖升级);`zipalign -c 4` 通过 |
+| 体积/指纹 | `dist/yinjia-mes-1.0.13.apk` **2.74 MB**(2,870,731 字节),SHA-256 `93E3AFFE…4D704F` |
+| 前端资源 | APK 内 `assets/www/` **173 个文件**,与 `frontend/dist` **逐文件 SHA-256 全等(0 失配)**;**0 个反斜杠条目**;`index.html` 逐字节一致 |
+| dex | `class_defs_size=332`;`scanMulti / takePhoto / hasCamera / __yjPhotoResult / __yjScanResultMulti`、`GenericMultipleBarcodeReader` 全在 |
+| 桥契约 | 前端用到的 `YjNative.*` 全在壳内(`scan/scanMulti/takePhoto/getBaseUrl/setBaseUrl/toast/appVersion`),三个回调均在 |
+| 权限/明文 | INTERNET / ACCESS_NETWORK_STATE / CAMERA / VIBRATE;`usesCleartextTraffic=true` + `networkSecurityConfig` 已挂 |
+| 真机 | `adb devices` 为空 ⇒ **仍未真机验证** |
+
+- **仍未真机验证**:手机插上后跑 `powershell -ExecutionPolicy Bypass -File android\install.ps1` 覆盖安装即可
+  (该脚本按 `LastWriteTime` 取 `dist\` 下最新 APK,即 1.0.13)。
+- **出包脚本两个编码铁律**(本轮踩到):`android/build.ps1` **必须是 UTF-8 带 BOM**(缺 BOM 时
+  Windows PowerShell 5.1 按 ANSI 解析,脚本里的中文全变乱码,`Write-Host` 日志成"鏀惰繘"这类);
+  `AndroidManifest.xml` 也保持 BOM(保持既有约定,减少无意义 diff)。
+- **既有隐患(非本次引入)**:壳没实现 `setDownloadListener` ⇒ APK 内点 CSV / 报表导出(`a.download`)不落盘;
+  要支持需在 `MainActivity` 接 DownloadManager(另开任务)。

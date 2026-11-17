@@ -8,6 +8,10 @@
 
   tooltip 显示「工序 · 完工量/计划量(· 待审)(· 状态)」——列宽有限时看数字不必展开明细。
   工序名是数据键(中文原文),显示层一律 tt()。状态判定与 WoProgressRing.vue 同口径。
+
+  🔴 2026-11-13(契约 CONTRACT.md §3.1/§3.2/§4):圆点可点 → emit('step-click', step);
+    圆点右上角检验小点可点 → emit('insp-click', step)。两处都 @click.stop(别把 el-table
+    整行点击带起来),cursor:pointer + 轻量 hover 反馈;判定/跳转全在父组件,本组件仍是纯展示。
 -->
 <template>
   <div class="wpc">
@@ -16,11 +20,14 @@
       <div v-for="(s, i) in steps" :key="i" class="wpc-step"
            :class="['st-' + toneOf(s), { 'is-current': s['当前'] }]">
         <el-tooltip :content="tipOf(s)" placement="top" :show-after="120">
-          <span class="wpc-dot">
+          <!-- 圆点可点:点工序 → 该工序排产(父组件判定未排产/未到达) -->
+          <span class="wpc-dot is-clickable" @click.stop="onStepClick(s)">
             <el-icon v-if="toneOf(s) === 'done'" class="wpc-check"><Check /></el-icon>
             <i v-else-if="toneOf(s) === 'doing'" class="wpc-core"></i>
-            <!-- 检验标记(2026-11-08 第4轮):应检工序点右上角小圆点,状态色与看板环下徽标同口径 -->
-            <i v-if="insOf(s)" class="wpc-ins" :class="'ins-' + insToneOf(s)"></i>
+            <!-- 检验标记(2026-11-08 第4轮):应检工序点右上角小圆点,状态色与看板环下徽标同口径
+                 2026-11-13:小圆点可点 → 打开该工序检验单;内层 stop 防止触发圆点的工序点击 -->
+            <i v-if="insOf(s)" class="wpc-ins is-clickable" :class="'ins-' + insToneOf(s)"
+               @click.stop="onInspClick(s)"></i>
           </span>
         </el-tooltip>
         <!-- 连接线画在「本圆点中心 → 下一圆点中心」之间(绝对定位,不占布局宽度) -->
@@ -43,6 +50,19 @@ const props = defineProps({
   /** 工序步骤数组(接口契约「工序步骤」) */
   steps: { type: Array, default: () => [] },
 })
+
+/**
+ * 2026-11-13(契约 §4):只发事件,判定与跳转全在父组件 WorkOrderProgressBoard
+ *   step-click → 点圆点(未排产/未到达 → 提示;否则跳工单排产的该工序)
+ *   insp-click → 点圆点右上角检验小点(选单跳检验单面板)
+ */
+const emit = defineEmits(['step-click', 'insp-click'])
+function onStepClick(s) {
+  emit('step-click', s)
+}
+function onInspClick(s) {
+  emit('insp-click', s)
+}
 
 /** 状态档位(与 WoProgressRing.tone 同口径:已完成 布尔优先,其次状态字面量/当前/完工量) */
 function toneOf(s) {
@@ -89,7 +109,11 @@ function tipOf(s) {
     const docs = Array.isArray(ins['单据']) ? ins['单据'] : []
     const firstNo = docs[0]?.['检验单号']
     parts.push(`${tt('检验状态')}: ${tt(state || '需检')}${firstNo ? ' · ' + firstNo : ''}`)
+    // 2026-11-13(契约 §5):小圆点可点 → 打开检验单,悬停提示同 Ring 的检验徽标
+    parts.push(tt('点击查看检验单'))
   }
+  // 2026-11-13(契约 §5):圆点可点 → 跳到该工序排产
+  parts.push(tt('点击工序跳转到该工序排产'))
   return parts.join(' · ')
 }
 </script>
@@ -131,6 +155,13 @@ function tipOf(s) {
   box-shadow: 0 0 0 2px #fff;
   color: #fff;
 }
+/* 2026-11-13(契约 §3.1):圆点可点 —— cursor + 轻量 hover 反馈(系统灰细光圈,无动画/发光) */
+.wpc-dot.is-clickable {
+  cursor: pointer;
+}
+.wpc-dot.is-clickable:hover {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px #c0c4cc;
+}
 .wpc-check {
   font-size: 9px;
 }
@@ -162,6 +193,14 @@ function tipOf(s) {
 }
 .wpc-ins.ins-need {
   background: #c0c4cc;
+}
+/* 2026-11-13(契约 §3.2):右上角检验小点可点 —— cursor + 系统蓝浅光圈 hover(小圆点仅 7px,
+   给一圈浅蓝光圈更明确地告知可点) */
+.wpc-ins.is-clickable {
+  cursor: pointer;
+}
+.wpc-ins.is-clickable:hover {
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.35);
 }
 
 .wpc-link {

@@ -33,6 +33,19 @@ import * as QRCodeMod from 'qrcode'
 export const PRINT_TYPE_PICK_SLIP = 'PICK_SLIP'   // 生产领料单(工单二维码 + 领料明细)
 
 /**
+ * 2026-11-16 新增三种纸面报表 —— 版式与「生产领料单」**完全一致**,纸上只是标题不同
+ * (用户口径:「其他领料,其他退料和生产退料。都要可以打印报表……打印格式和生产领料一样,只是名称不同」)。
+ *
+ * <p>为什么要分成三个类型而不是复用 PICK_SLIP:类型是**派单键** ——
+ * 「自动打印」页按类型勾选,一台电脑打了生产领料单不代表它也要出其他退料的纸
+ * (2026-11-04 用户口径「加个勾选打印类型的」)。三个 code 必须与后端
+ * {@code PrintStationController.PRINT_TYPES} 的键逐字一致。
+ */
+export const PRINT_TYPE_OTHER_PICK_SLIP = 'OTHER_PICK_SLIP'   // 其他领料单(其他出库单)
+export const PRINT_TYPE_OTHER_RET_SLIP = 'OTHER_RET_SLIP'     // 其他退料单(生产退料单上的其他退料)
+export const PRINT_TYPE_MAT_RET_SLIP = 'MAT_RET_SLIP'         // 生产退料单(手机扫码生产退料)
+
+/**
  * 把二维码渲染成 dataURL(PNG,base64)。
  *
  * <p>为什么要前端生成再传给打印电脑(2026-11-01 用户口径「要有二维码显示,和工单同个二维码」):
@@ -92,6 +105,9 @@ export async function queueToPrintStation(payload) {
       领料部门: payload?.领料部门 || '',
       打印日期: payload?.打印日期 || '',
       明细: Array.isArray(payload?.明细) ? payload.明细 : [],
+      // 2026-11-18 第二轮:整张单的抬头数据(混料单 →《成型配料记录》横板 A4 专用纸表)。
+      // 服务端把 `纸面` 原样存进打印缓存、派单时一起下发,代理按固定版式画。
+      纸面: payload?.纸面 && typeof payload.纸面 === 'object' ? payload.纸面 : undefined,
       来源: payload?.来源 || 'mobile',
     })
     const d = res.data?.data || res.data || {}
@@ -150,5 +166,40 @@ export async function saveStationConfig({ stationName, enabled, types, paper } =
  */
 export async function deleteStationConfig(stationName) {
   const res = await request.post('/px/print/station/delete', { stationName: stationName || '' })
+  return res.data?.data || res.data || {}
+}
+
+/**
+ * 打印缓存(离线补打)开关 —— 2026-11-16。
+ *
+ * <p>用户口径:「能在自动打印里面做个打印缓存吗，就是在打印代理掉了后，重新连接这个打印缓存，
+ * 会将这期间打印的补回来。」
+ *
+ * <p>关闭只是"以后不再缓存"(新任务回到旧口径:只发给在线站点);
+ * **已经缓存的任务不会因为关开关而丢**,仍会在代理回来后补打 —— 免得以为关一下就把积压清了。
+ */
+export async function saveCacheConfig({ enabled } = {}) {
+  const res = await request.post('/px/print/cache/config', { enabled: !!enabled })
+  return res.data?.data || res.data || {}
+}
+
+/**
+ * 重发一条缓存任务:清掉"已送达"标记、状态回 PENDING ⇒ 代理下次轮询(≤4 秒)再打一次。
+ * 用于打歪/补印;不重发的话任务由代理自己按入队顺序领走,不需要人点。
+ */
+export async function retryCacheTask(id) {
+  const res = await request.post('/px/print/cache/retry', { id })
+  return res.data?.data || res.data || {}
+}
+
+/** 删一条缓存任务(作废单/打错单:不再补打) */
+export async function deleteCacheTask(id) {
+  const res = await request.post('/px/print/cache/delete', { id })
+  return res.data?.data || res.data || {}
+}
+
+/** 清空待补打的缓存;{@code stationName} 为空 = 清全部 */
+export async function clearPrintCache({ stationName } = {}) {
+  const res = await request.post('/px/print/cache/clear', { stationName: stationName || '' })
   return res.data?.data || res.data || {}
 }

@@ -313,7 +313,7 @@
                   :disabled="readonly"
                   :placeholder="tt('选择面板字段或直接输入常量')"
                 >
-                  <el-option v-for="f in panelFieldOptions" :key="f.字段名" :label="f.字段名" :value="f.字段名" />
+                  <el-option v-for="f in panelFieldOptions" :key="f.字段名" :label="panelFieldLabel(f)" :value="f.字段名" />
                 </el-select>
               </template>
             </el-table-column>
@@ -478,6 +478,16 @@ async function loadPanelFields() {
   } catch (e) {
     panelFieldOptions.value = []
   }
+}
+
+/**
+ * MES 字段下拉的显示名。
+ * 2026-11-13 用户红线:隐藏字段也要能配映射、能传 ERP —— 后端已改成全量返回,
+ * 这里只是把「界面上不显示」这件事标出来,提示配置者"它虽然看不见,但照样会推"。
+ */
+function panelFieldLabel(f) {
+  const name = f?.字段名 || ''
+  return Number(f?.可见) === 1 ? name : `${name}${tt('（界面上已隐藏）')}`
 }
 
 /* ── 选择 ── */

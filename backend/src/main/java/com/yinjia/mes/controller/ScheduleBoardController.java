@@ -6,6 +6,7 @@ import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.ScheduleBoardService;
 import com.yinjia.mes.service.ProcessTaskService;
+import com.yinjia.mes.service.SchedulePreplanService;
 import com.yinjia.mes.service.WorkOrderDayPlanService;
 import com.yinjia.mes.service.WorkOrderTransferService;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -51,17 +52,25 @@ public class ScheduleBoardController {
     private final ExternalReportAbsorbService absorbService;
     /** 工单日排产(2026-10-29):生产工单/工单排产两页表格内的日期列 —— 读计划 + 写计划(不另记完成量) */
     private final WorkOrderDayPlanService dayPlanService;
+    /** 工序路线排线编排(2026-11-13 第五轮):排产数量 &lt; 需求数量时先把剩余数量自动切单,再排产 */
+    private final SchedulePreplanService preplanService;
+    /** 报工审核钩子/产成品入库补生成(2026-11-13):finishInBackfill 复用按钮服务的多批次入库草稿逻辑 */
+    private final com.yinjia.mes.service.ButtonService buttons;
 
     public ScheduleBoardController(ScheduleBoardService service, PanelPermissionService perm,
                                    WorkOrderTransferService transferService, ProcessTaskService processTask,
                                    ExternalReportAbsorbService absorbService,
-                                   WorkOrderDayPlanService dayPlanService) {
+                                   WorkOrderDayPlanService dayPlanService,
+                                   SchedulePreplanService preplanService,
+                                   com.yinjia.mes.service.ButtonService buttons) {
         this.service = service;
         this.perm = perm;
         this.transferService = transferService;
         this.processTask = processTask;
         this.absorbService = absorbService;
         this.dayPlanService = dayPlanService;
+        this.preplanService = preplanService;
+        this.buttons = buttons;
     }
 
     /** 待排产池(已审核·未指派产线);9.29 批次③:车间账号看不到池(池内行无产线 ⇒ 无车间判据)
@@ -125,7 +134,23 @@ public class ScheduleBoardController {
         Object qty = body.get("排产数量");
         Double planQty = qty == null || String.valueOf(qty).isBlank() || "null".equals(String.valueOf(qty))
                 ? null : Double.valueOf(String.valueOf(qty));
-        return ApiResult.ok(processTask.preplanManual(no, lineId, steps, str(body.get("排产班组")), planQty, currentUser()));
+        return ApiResult.ok(preplanService.preplan(no, lineId, steps, str(body.get("排产班组")), planQty, currentUser()));
+    }
+
+    /**
+     * 产成品入库草稿**补生成**(2026-11-13 多批次口径):对指定工单行,按全部已审核的最后一道工序报工
+     * 重算/补生成多批次入库草稿(幂等;已提交/已审核的入库单不动、后续批次另建新单)。
+     * 用途:①修好自动生成逻辑后补历史工单;②现场发现漏生成时手工触发。
+     * 权限:与「排产」同口径(排产员/生产管理)。
+     */
+    @PostMapping("/finishInBackfill")
+    public ApiResult<Map<String, Object>> finishInBackfill(@RequestBody Map<String, Object> body) {
+        perm.requirePanelViewAny(SCHEDULING_ENTRIES);
+        perm.requireButtonAny(SCHEDULING_ENTRIES, "排产");
+        String no = str(body.get("加工单号"));
+        Object id = body.get("行id") != null ? body.get("行id") : body.get("工单行id");
+        Long lineId = id == null || String.valueOf(id).isBlank() ? null : Long.valueOf(String.valueOf(id));
+        return ApiResult.ok(buttons.finishInBackfill(no, lineId, currentUser()));
     }
 
     /** 撤销排产回池(换线=撤销+重排);有报工/入库不可撤销 */

@@ -252,6 +252,105 @@ public class WorkOrderSplitService {
         return out;
     }
 
+    // ────────────────────────── 排产剩余自动切单(2026-11-13 第五轮) ──────────────────────────
+
+    /**
+     * **排产时排产数量小于需求数量 ⇒ 自动把剩余数量切出子工单**(用户 2026-11-13 口径:
+     * 「当前我排产数量未能达到需求数量的话会导致这个工单的剩余数量无法被排产,需要实现当目前排产数量
+     *   小于这个需求数量时自动将剩余数量切单」)。
+     *
+     * <p><b>为什么需要</b>:本系统 `plang` 一行只有 `xq_sl 需求` / `pl_sl 排产` 两个数量;排产弹窗允许
+     * 人工把 `pl_sl` 改小(部分排产),但改小后**剩余数量没有载体** —— 该行已有产线、不再进「待排产池」,
+     * 剩余量永远排不进去。切出子工单后:父行需求同步核减到本次排产量、子单带着剩余需求**未排产**
+     * (`scx` 空)进待排产池,可单独排产/切分,且两者需求相加仍等于原需求(不重复计)。
+     *
+     * <p><b>与 {@link #split(Map, String)} 的区别**:常规切单是"从**已排产量**里切走 qty"(父单 pl_sl 减 qty);
+     * 本方法是"把**未排产的那部分需求**分离出去"(父单 pl_sl 不变、xq_sl 减 remainder;子单 pl_sl=xq_sl=remainder
+     * 且**不继承排产线**)。所以不能复用 split()。
+     *
+     * <p><b>占用链</b>:与常规切单同一口径按行拆账({@link #splitLink}),来源订单行的剩余可转总量不变。
+     *
+     * <p>事务:由调用方({@link SchedulePreplanService})与排产本身放在同一事务里 —— 切单失败则整次排产回滚。
+     *
+     * @param parentId  父工单行id(plang.id)
+     * @param remainder 剩余数量(= 需求数量 − 本次排产数量,> 0)
+     * @param user      当前账号
+     * @return {子工单号, 子工单行id, 切出数量, 父单剩余需求, 占用链已拆账}
+     */
+    @Transactional
+    public Map<String, Object> splitRemainderForSchedule(long parentId, double remainder, String user) {
+        double rest = round(remainder);
+        if (!(rest > 0.0001)) return Map.of();
+        Map<String, Object> p = loadParent(java.util.Map.of("行id", parentId));
+        String parentNo = String.valueOf(p.get("pl_no"));
+        int parentXc = ((Number) p.get("pl_xc")).intValue();
+        String batch = str(p.get("批次号"));
+        String route = str(p.get("工艺路线"));
+        double demand = num(p.get("xq_sl"));
+        if (com.yinjia.mes.service.PlangClose.isClosed(str(p.get("ja")), num(p.get("pl_sl")),
+                num(p.get("rk_sl")), parentNo))
+            throw new IllegalStateException("工单 " + parentNo + " 已结案,不能排产/切单");
+        if (rest > demand + 0.0001)
+            throw new IllegalStateException("剩余数量 " + rest + " 超过该行需求数量 " + round(demand));
+        double leftDemand = round(demand - rest);
+
+        int seq = nextSplitSeq(parentId, parentNo);
+        String childNo = parentNo + "-" + seq;
+        String root = familyRoot(p);
+        // 子单备注:写明是排产剩余自动切出 + 父单行键(现场/追溯一眼能对上)
+        String remark = "排产剩余自动切单(父单 " + parentNo + "#" + parentXc + " 需求 " + trim(demand)
+                + " − 本次排产 " + trim(leftDemand) + " = 剩余 " + trim(rest) + ")";
+
+        int ins = jdbc.update(
+                "INSERT INTO dbo.plang (comm, pl_no, pl_xc, pl_date, scx, pl_man, khdm, dm, mc, gg, gg2, jldw,"
+                        + " pl_sl, xq_sl, rk_sl, yl, dj, jine, cp_date, st_date, cp_date2, bz, ja,"
+                        + " od_no, od_xc, lot_no, color, siz, lb, mjlx, ll_no, wb_no, ypl_sl, ll_no2, remark,"
+                        + " llxz, cgrkdh, lldh, djlx, zl, [批次号], [源工单号], [源工单行id], [拆分序号],"
+                        + " [根工单号], [是否切单], [工艺路线],"
+                        + " asp_cancel, asp_user1, asp_time1)"
+                        + " SELECT comm, ?, 1, GETDATE(), NULL, NULL, khdm, dm, mc, gg, gg2, jldw,"
+                        + "   ?, ?, 0, 0, dj, jine, cp_date, st_date, cp_date2, ?, N'N',"
+                        + "   od_no, od_xc, lot_no, color, siz, NULL, mjlx, NULL, NULL, ypl_sl, NULL, remark,"
+                        + "   llxz, cgrkdh, lldh, djlx, zl, [批次号], ?, ?, ?,"
+                        + "   ?, N'Y', [工艺路线],"
+                        + "   N'N', ?, GETDATE()"
+                        + " FROM dbo.plang WHERE id=?",
+                childNo, rest, rest, remark, parentNo, parentId, seq, root, user, parentId);
+        if (ins == 0) throw new IllegalStateException("子工单创建失败(父行已不存在)");
+        Long childId = jdbc.queryForObject(
+                "SELECT TOP 1 id FROM dbo.plang WHERE pl_no=? AND [源工单行id]=? ORDER BY id DESC",
+                Long.class, childNo, parentId);
+
+        // 父行:需求核减(排产数量不动,由后续排产写入);余量按 需求−排产 重算
+        jdbc.update("UPDATE dbo.plang SET xq_sl=ISNULL(xq_sl,0)-?, yl=(ISNULL(xq_sl,0)-?)-ISNULL(pl_sl,0),"
+                + " asp_user2=? WHERE id=?", rest, rest, user, parentId);
+
+        // 子单工序台账(未排产形态:首道已落实、其余计划 —— 与订单结转生成的待排产行同构)
+        try {
+            processTask.ensureLedgerForWorkOrder(childNo, route, user);
+        } catch (Exception e) {
+            log.warn("[排产剩余切单] 子单 {} 建工序台账失败(不阻断): {}", childNo, e.getMessage());
+        }
+        // 占用链拆账(订单结转来源):父行占用减 remainder、子行新增同量,订单行剩余可转不变
+        boolean linkAdjusted = splitLink(parentNo, parentXc, batch, childNo, childId, rest);
+
+        logUsage(user, "排产剩余自动切单", childNo, 1);
+        logUsage(user, "切出子工单(排产剩余)", parentNo, parentXc);
+        logSplit("排产剩余切单", parentNo, parentId, childNo, root, seq, rest, leftDemand, str(p.get("交期")), remark, user);
+        log.info("[排产剩余切单] {}#{} 需求 {} → 本次排产 {} / 剩余 {} 切出子单 {} (占用链={})",
+                parentNo, parentXc, trim(demand), trim(leftDemand), trim(rest), childNo, linkAdjusted);
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("子工单号", childNo);
+        out.put("子工单行id", childId);
+        out.put("切出数量", trim(rest));
+        out.put("父单剩余需求", trim(leftDemand));
+        out.put("占用链已拆账", linkAdjusted);
+        out.put("提示", "排产数量 " + trim(leftDemand) + " 小于需求数量 " + trim(demand)
+                + ":剩余 " + trim(rest) + " 已自动切出子工单 " + childNo + "(待排产,可在待排产池单独排产)");
+        return out;
+    }
+
     // ────────────────────────── 撤回切单 ──────────────────────────
 
     /** 撤回切单:子单无下游则软删 + 父单还原 + 占用链回冲;有下游拒绝并指出挡路单据。 */

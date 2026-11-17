@@ -92,6 +92,62 @@ public class ScheduleBoardService {
             + " WHEN " + DONE_ROW + " THEN N'完工'"
             + " WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END";
 
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // 「当前工序」口径(2026-11-12):明细表 / 左侧产线汇总 / 顶部合计**必须同源**,
+    // 否则会出现用户报障的那个现象 —— 「左侧线数量 0,右侧明细却有 5421」。
+    // 三处都用下面这 3 个表达式拼 SQL,禁止在别处再写一套等价的子查询(平行实现 = 口径漂移)。
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * 台账行的**行级归属**判据(2026-11-12 收口,配合 {@code migrate-wo-ledger-rowid-align-20261112.sql})：
+     * 台账唯一权威键 = {@code 工单行id}(2026-10-15 用户口径「工单号+工单行号确定当前唯一工单」);
+     * 只有老数据 {@code 工单行id IS NULL} 时才回落按工单号匹配。
+     *
+     * <p>🔴 为什么必须这么改:存量台账里有 2026-10-10 早于「行级锚定」修好的行 ——
+     * {@code 工单行id=123} 指向 GD-2026-09-0049 行5,却存着 {@code 工单号=GD-2026-10-0003}。
+     * 旧的 `工单号=? AND (工单行id=? OR 工单行id IS NULL)` 会把它们整个漏掉 ⇒
+     * 状态永远停在「已落实」、计划量取不到、看板上把**早已完工**的行当成「等装箱的活」。
+     *
+     * @param p 本行 plang 的别名
+     * @param w 台账 wo_process_line 的别名
+     */
+    private static String ledgerOfRow(String p, String w) {
+        return "(" + w + ".工单行id = " + p + ".id"
+                + " OR (" + w + ".工单行id IS NULL AND " + w + ".工单号 = " + p + ".pl_no))";
+    }
+
+    /**
+     * **当前工序** = 台账里**最前一道「已落实」**(行级归属),缺台账回落本行 {@code p.[当前工序]}。
+     * 2026-11-11 按量流转后可能多道同时在制 ⇒ 取工序序最前、尚未做完的那道,与
+     * {@code ProcessFlow.currentOp} 同口径。(别名固定 p / 子查询内 w)
+     */
+    private static String curOpExpr() {
+        return "ISNULL(NULLIF((SELECT TOP 1 w.工序 FROM dbo.wo_process_line w"
+                + " WHERE ISNULL(w.asp_cancel,'N')<>'Y' AND ISNULL(w.状态,N'')=N'已落实'"
+                + "   AND " + ledgerOfRow("p", "w")
+                + " ORDER BY ISNULL(w.工序序,999) ASC, w.id ASC), N''), ISNULL(p.[当前工序],N''))";
+    }
+
+    /** 某道工序在本工单行上的**已审报工量**(行锚定:scjl.gd_id → plang_pc.plang_id,老数据按批次兜底) */
+    private static String reportedQtyExpr(String opExpr) {
+        return "ISNULL((SELECT SUM(ISNULL(s.sl,0)) FROM dbo.scjl s"
+                + " WHERE s.gldh = p.pl_no AND s.gxdm = " + opExpr
+                + "   AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
+                + "   AND (EXISTS (SELECT 1 FROM dbo.plang_pc pcx WHERE pcx.id = s.gd_id AND pcx.plang_id = p.id)"
+                + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'') = ISNULL(p.[批次号],N'')))), 0)";
+    }
+
+    /** 某道工序的**计划量**(工序口径):台账计划数量优先(排产时按行算好),缺失回落 排产数量 × 该道换算率 */
+    private static String planQtyExpr(String opExpr) {
+        return "ISNULL(NULLIF((SELECT TOP 1 ISNULL(w2.计划数量,0) FROM dbo.wo_process_line w2"
+                + " WHERE ISNULL(w2.asp_cancel,'N')<>'Y' AND " + ledgerOfRow("p", "w2")
+                + "   AND w2.工序 = " + opExpr
+                + " ORDER BY ISNULL(w2.工序序,999), w2.id), 0),"
+                + " ISNULL((SELECT TOP 1 ISNULL(p.pl_sl,0) * ISNULL(r.换算率,1)"
+                + "  FROM dbo.bs_route r WHERE r.工艺路线编码 = ISNULL(p.[工艺路线],N'')"
+                + "    AND r.工序名称 = " + opExpr + " AND ISNULL(r.asp_cancel,'N')<>'Y'), 0))";
+    }
+
     /**
      * 工序检验单:面板 → 头表 + 明细的不合格列 + 追溯里显示的类别。
      * 表**同构**(头/行结构一致,建表见 {@code tools/migrate-qc-process-insp.sql}),
@@ -120,7 +176,11 @@ public class ScheduleBoardService {
     private static final Map<String, InspSpec> INSP_HEAD = Map.of(
             "QC_FIRST_INSP", new InspSpec("qc_first_insp_head", "不合格数量", "首件检验"),
             "QC_PROC_INSP", new InspSpec("qc_proc_insp_head", "不良数量", "制程检验"),
-            "QC_ASM_INSP", new InspSpec("qc_asm_insp_head", "不合格数量", "组装成品检验"));
+            // ⚠ 2026-11-11 改名(用户口径「将当前的组装成品检验修改为出货检验表观」):只动**显示串**。
+            //   label 会被拼进下面那支 SELECT 的 `检验类型` 下发(见 trace 的 qc 段),所以
+            //   L1404 的 typeOrder 排序表**必须与这里同值**,否则追溯里的检验单排序会掉到末尾(99)。
+            //   面板代号 QC_ASM_INSP / 表名 qc_asm_insp_* / 单号前缀 ZJ / 历史数据一律不动。
+            "QC_ASM_INSP", new InspSpec("qc_asm_insp_head", "不合格数量", "出货检验表观"));
 
     /** 应检工序:成型、组装 —— 与 {@code QcInspAutoService.OP_PANELS} 同源 */
     private static final List<String> INSP_OPS = List.of("成型", "组装");
@@ -759,6 +819,12 @@ public class ScheduleBoardService {
         String noLike = key == null ? like : "%" + key[0] + "%";
         Integer xcEq = key == null ? null : Integer.valueOf(key[1]);
         boolean all = "all".equalsIgnoreCase(mode);
+        // 「本线排产数量」SQL 片段(2026-11-11,与 {@link #scheduled()} 的 本线排产数量 同口径):
+        //   当前工序 = 台账里**最前面的**「已落实」道(2026-11-11 按量流转后可多道同时在制 ⇒ ASC,
+        //   与 scheduled() 的 {@link #curOpExpr()} 是**同一个**表达式);本线排产量 = 该道台账计划数量,
+        //   取不到回落 成品排产数量 × 该道换算率(见 {@link #planQtyExpr(String)})。
+        final String curOpToday = curOpExpr();
+        final String lineQtyToday = planQtyExpr(curOpToday);
         return jdbc.queryForList(
                 "SELECT ISNULL(p.scx,N'') AS 生产线, p.pl_no AS 加工单号, p.id AS 行id, p.pl_xc AS 工单行号,"
                         + " ISNULL(p.[批次号],N'') AS 批次号, ISNULL(p.lb,N'') AS 排产班组,"
@@ -770,6 +836,10 @@ public class ScheduleBoardService {
                         // 生产状态 = {@link #ST_EXPR}(唯一定义,与工单排产看板/生产工单列表同源)
                         + " " + ST_EXPR + " AS 生产状态,"
                         + " ISNULL(p.pl_sl,0) AS 排产数量,"
+                        // 本线排产数量(2026-11-11 用户口径):②已排产同样是「工单行 × 当前产线」粒度,
+                        //   这一列显示本线要排/要做的量(= 排产数量 × 该道换算率);
+                        //   成品口径的 排产数量(pl_sl) 照旧返回给打印/切单/未交量等使用。
+                        + " " + lineQtyToday + " AS 本线排产数量,"
                         + " ISNULL(p.xq_sl,0) AS 需求数量, ISNULL(p.rk_sl,0) AS 入库数量,"
                         // 余量(2026-10-30 改行级,见 {@link #ROW_YL}):本工单行需求 − 本工单行占用
                         + " " + ROW_YL + " AS 余量,"
@@ -777,7 +847,7 @@ public class ScheduleBoardService {
                         + " CONVERT(varchar(10), p.cp_date, 120) AS 预完工日,"
                         // 计划线(各工序)(2026-10-07 预排全程线):排产时人工逐道选定的线
                         + " (SELECT STUFF((SELECT N' → ' + x.工序 + N':' + ISNULL(NULLIF(x.计划生产线,N''),N'待定')"
-                        + "   FROM dbo.wo_process_line x WHERE x.工单号=p.pl_no AND ISNULL(x.asp_cancel,'N')<>N'Y'"
+                        + "   FROM dbo.wo_process_line x WHERE ISNULL(x.asp_cancel,'N')<>N'Y' AND " + ledgerOfRow("p", "x")
                         + "   ORDER BY ISNULL(x.工序序,999) FOR XML PATH('')),1,3,N'')) AS 计划线"
                         + " FROM dbo.plang p"
                         + " WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'') <> N''"
@@ -839,6 +909,11 @@ public class ScheduleBoardService {
                         + " FROM bs_prod_line"
                         + " WHERE ISNULL([asp_cancel],'N') <> 'Y' AND (? = N'' OR ISNULL([生产车间],N'') = ?)"
                         + " ORDER BY ISNULL([排序],999), [生产线]", ws, ws);
+        // 本线任务量(2026-11-12 用户口径「左侧边栏数量和本线排产数量/当前工序报工数量要关联起来」):
+        //   每行 = 选中该线后右侧「未完工」明细里那批行的合计,口径与 {@link #scheduled} **逐行同源** ——
+        //   前者(A 类)取出就来自 scheduled 主查询,后者(B 类)来自 {@link #lineProcessRows} 的同一批过滤条件;
+        //   计划量/已报量表达式复用 {@link #planQtyExpr}/{@link #reportedQtyExpr},不另写一套公式。
+        Map<String, Map<String, Object>> taskStats = lineTaskStats(ws);
         // 产能可见(2026-10-31):每条线「今天已排 / 日产能 / 今日余量」——只显示、不拦截;
         //   未配产能(日产能 0/空)时 今日余量 = null ⇒ 前端显示"未配",不显示 0/超载。
         Map<String, Double> doneToday = new LinkedHashMap<>();
@@ -855,12 +930,103 @@ public class ScheduleBoardService {
             m.put("停用", Integer.valueOf(1).equals(line.get("停用")));
             double v = bk.getOrDefault(ln, 0d);
             m.put("未交量", Math.round(v * 10000d) / 10000d);
+            // 本线任务量(2026-11-12):与右侧「未完工」明细同一批行、同一口径 ——
+            //   本线排产数量 = Σ该行当前工序计划量;本线已报完工量 = Σ该行当前工序已审报工;
+            //   本线未完工量 = Σmax(计划−已报,0)(逐行截断,不做总量相减)。
+            Map<String, Object> ts = taskStats.getOrDefault(ln, Map.of());
+            m.put("本线排产数量", r4(Num.of(ts.get("本线排产数量"))));
+            m.put("本线已报完工量", r4(Num.of(ts.get("本线已报完工量"))));
+            m.put("本线未完工量", r4(Num.of(ts.get("本线未完工量"))));
+            m.put("本线行数", (int) Math.round(Num.of(ts.get("行数"))));
             double cap = Num.of(line.get("日产能"));
             double done = doneToday.getOrDefault(ln, 0d);
             m.put("日产能", r4(cap));
             m.put("今日已排", r4(done));
             m.put("今日余量", cap > 0 ? r4(cap - done) : null);
             out.add(m);
+        }
+        return out;
+    }
+
+    /**
+     * **左侧产线骨架的「本线任务量」**(2026-11-12 用户口径)。
+     *
+     * <p>用户报障(原话)：「左侧边栏显示的数量和当前的生产线排产数量(本线排产数量)和当前工序报工数量
+     * 没有任何关联」—— 原来左栏只有**成品口径**的未交量(排产−入库),对后道线(装箱/组装)几乎恒为 0,
+     * 而右侧明细按「工单行 × 该线工序」算出来是 5421/1100,两处自说自话。
+     *
+     * <p>现口径 = 选中该线后右侧「未完工」明细那批行的合计,与 {@link #scheduled} 逐行同源:
+     * <ul>
+     *   <li><b>A 类</b>:工单**当前线**在本线的行({@code plang_pc.scx=本线})—— 与 scheduled 主查询同样的
+     *       未结案 + 未完工过滤,当前工序/计划量/已报量复用 {@link #curOpExpr()}/{@link #planQtyExpr}/
+     *       {@link #reportedQtyExpr};</li>
+     *   <li><b>B 类</b>:台账归到本线、但工单当前线不在本线的「本线工序任务」—— 与 {@link #lineProcessRows}
+     *       同一批过滤(状态=已落实、工单行未完工未结案、按 (工单行, 工序) 去重);</li>
+     *   <li>{@code 本线未完工量 = Σ max(本线计划 − 本线已报, 0)}(逐行截断,不做总量相减,避免负值抵消)。</li>
+     * </ul>
+     *
+     * <p>两段都是**一次分组查询**(不是逐线 N+1),20~40 条产线也是常数级取数。
+     *
+     * @param ws 车间(空=不限;与 linesSummary 同一收敛口径)
+     * @return 生产线 → {行数, 本线排产数量, 本线已报完工量, 本线未完工量}
+     */
+    private Map<String, Map<String, Object>> lineTaskStats(String ws) {
+        // 车间收敛:A 类按 plang_pc.scx、B 类按「台账归线」判本车间的线
+        String wsCondA = ws.isEmpty() ? ""
+                : " AND EXISTS (SELECT 1 FROM bs_prod_line pl WHERE pl.生产线 = pc.scx"
+                + "   AND ISNULL(pl.asp_cancel,'N')<>'Y' AND ISNULL(pl.生产车间,N'') = ?)";
+        String wsCondB = ws.isEmpty() ? ""
+                : " AND EXISTS (SELECT 1 FROM bs_prod_line pl"
+                + "   WHERE pl.生产线 = COALESCE(NULLIF(w.实际生产线,N''),NULLIF(w.计划生产线,N''))"
+                + "     AND ISNULL(pl.asp_cancel,'N')<>'Y' AND ISNULL(pl.生产车间,N'') = ?)";
+        List<Object> argsA = new ArrayList<>();
+        if (!ws.isEmpty()) argsA.add(ws);
+        String curOp = curOpExpr();
+        // ── A 类:工单当前线在本线(与 scheduled() 主查询同一批行) ─────────────────────
+        String sqlA = "SELECT 生产线, COUNT(*) AS 行数,"
+                + " SUM(本线计划) AS 本线排产数量, SUM(本线已报) AS 本线已报完工量,"
+                + " SUM(CASE WHEN 本线计划 > 本线已报 THEN 本线计划 - 本线已报 ELSE 0 END) AS 本线未完工量"
+                + " FROM (SELECT ISNULL(pc.scx,N'') AS 生产线,"
+                + "        " + planQtyExpr(curOp) + " AS 本线计划,"
+                + "        " + reportedQtyExpr(curOp) + " AS 本线已报"
+                + "   FROM dbo.plang_pc pc"
+                + "   JOIN dbo.plang p ON p.comm = pc.comm AND p.pl_no = pc.pl_no AND p.pl_xc = pc.pl_xc"
+                + "     AND pc.plang_id = p.id AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                + "   WHERE ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'')<>N''"
+                + "     AND " + NOT_CLOSED + " AND NOT (" + DONE_ROW + ")" + wsCondA
+                + " ) t GROUP BY 生产线";
+        // ── B 类:台账归本线的「本线工序任务」(与 lineProcessRows 同一批过滤/去重) ────────
+        List<Object> argsB = new ArrayList<>();
+        if (!ws.isEmpty()) argsB.add(ws);
+        String lineExpr = "COALESCE(NULLIF(w.实际生产线,N''),NULLIF(w.计划生产线,N''))";
+        String sqlB = "SELECT t.生产线, COUNT(*) AS 行数,"
+                + " SUM(t.本线计划) AS 本线排产数量, SUM(t.本线已报) AS 本线已报完工量,"
+                + " SUM(CASE WHEN t.本线计划 > t.本线已报 THEN t.本线计划 - t.本线已报 ELSE 0 END) AS 本线未完工量"
+                + " FROM (SELECT " + lineExpr + " AS 生产线,"
+                + "        ISNULL(w.计划数量,0) AS 本线计划,"
+                + "        " + reportedQtyExpr("w.工序") + " AS 本线已报,"
+                + "        ROW_NUMBER() OVER (PARTITION BY p.id, w.工序, " + lineExpr
+                + "           ORDER BY CASE WHEN ISNULL(w.实际生产线,N'')<>N'' THEN 0 ELSE 1 END, w.id) AS rn"
+                + "   FROM dbo.wo_process_line w"
+                + "   JOIN dbo.plang p ON p.id = w.工单行id AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                + "   JOIN dbo.plang_pc pp ON pp.plang_id = p.id AND ISNULL(pp.asp_cancel,'N')<>'Y'"
+                + "   WHERE ISNULL(w.asp_cancel,'N')<>'Y' AND ISNULL(w.状态,N'')=N'已落实'"
+                + "     AND " + NOT_CLOSED + " AND NOT (" + DONE_ROW + ")"
+                + "     AND ISNULL(pp.scx,N'') <> " + lineExpr + wsCondB
+                + " ) t WHERE t.rn = 1 GROUP BY t.生产线";
+        Map<String, Map<String, Object>> out = new LinkedHashMap<>();
+        for (List<Map<String, Object>> part : List.of(
+                jdbc.queryForList(sqlA, argsA.toArray()),
+                jdbc.queryForList(sqlB, argsB.toArray()))) {
+            for (Map<String, Object> r : part) {
+                String ln = String.valueOf(r.get("生产线"));
+                if (ln.isEmpty() || "null".equals(ln)) continue;
+                Map<String, Object> m = out.computeIfAbsent(ln, k -> new LinkedHashMap<>());
+                m.merge("行数", Num.of(r.get("行数")), (a, b) -> Num.of(a) + Num.of(b));
+                m.merge("本线排产数量", Num.of(r.get("本线排产数量")), (a, b) -> Num.of(a) + Num.of(b));
+                m.merge("本线已报完工量", Num.of(r.get("本线已报完工量")), (a, b) -> Num.of(a) + Num.of(b));
+                m.merge("本线未完工量", Num.of(r.get("本线未完工量")), (a, b) -> Num.of(a) + Num.of(b));
+            }
         }
         return out;
     }
@@ -889,26 +1055,23 @@ public class ScheduleBoardService {
         //   回落值原取 wpp.当前工序 —— 视图 v_wo_process_progress 是**按单号聚合**的整单派生值
         //   ⇒ 同工单所有行显示同一个工序(与行级口径冲突)。现回落 p.[当前工序](本行状态列)。
         //   ⚠ 不跨 CROSS APPLY 引用别名(T-SQL 实测「Invalid column name」)⇒ 拼成局部变量复用
-        final String curOp = "ISNULL(NULLIF((SELECT TOP 1 w.工序 FROM dbo.wo_process_line w"
-                + " WHERE w.工单号 = p.pl_no AND ISNULL(w.asp_cancel,'N')<>'Y'"
-                + "   AND (w.工单行id = p.id OR w.工单行id IS NULL) AND ISNULL(w.状态,N'')=N'已落实'"
-                + " ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(p.[当前工序],N''))";
+        // 当前工序 = 预排台账里**最前一道「已落实」**。2026-11-11 按量流转后可能**多道同时在制**
+        //   (成型在做、切炭也在做已流入的那批)⇒ 取最前面还没做完的那道(工序序 ASC),与
+        //   ProcessFlow.currentOp 同口径;已完工道由状态过滤自动跳过,缺台账回落本行 p.[当前工序]。
+        //   ⚠ 2026-11-12 起表达式收口到 {@link #curOpExpr()}:左侧产线汇总/顶部合计用**同一个**表达式,
+        //     否则「左栏 0、右侧明细 5421」这种自相矛盾还会复发。
+        final String curOp = curOpExpr();
         final String prevOp = "(SELECT TOP 1 r4.工序名称 FROM dbo.bs_route r4"
                 + " WHERE r4.工艺路线编码 = ISNULL(p.[工艺路线],N'') AND ISNULL(r4.asp_cancel,'N')<>'Y'"
                 + "   AND ISNULL(r4.加工顺序,999) < ISNULL(NULLIF((SELECT TOP 1 w4.工序序 FROM dbo.wo_process_line w4"
-                + "        WHERE w4.工单号 = p.pl_no AND ISNULL(w4.asp_cancel,'N')<>'Y'"
-                + "          AND (w4.工单行id = p.id OR w4.工单行id IS NULL) AND w4.工序 = " + curOp + "), 0),"
+                + "        WHERE ISNULL(w4.asp_cancel,'N')<>'Y' AND " + ledgerOfRow("p", "w4")
+                + "          AND w4.工序 = " + curOp + "), 0),"
                 + "      ISNULL((SELECT TOP 1 ISNULL(r5.加工顺序,999) FROM dbo.bs_route r5"
                 + "        WHERE r5.工艺路线编码 = ISNULL(p.[工艺路线],N'') AND r5.工序名称 = " + curOp
                 + "          AND ISNULL(r5.asp_cancel,'N')<>'Y'), 0))"
                 + " ORDER BY ISNULL(r4.加工顺序,999) DESC)";
-        // 某道工序的「本行已审报工量」(按行锚定:scjl.gd_id → plang_pc.plang_id,老数据按批次兜底)
-        final String qtyOf = "(SELECT SUM(ISNULL(s.sl,0)) FROM dbo.scjl s"
-                + " WHERE s.gldh = p.pl_no AND s.gxdm = %s"
-                + "   AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
-                + "   AND (EXISTS (SELECT 1 FROM dbo.plang_pc pcx WHERE pcx.id = s.gd_id AND pcx.plang_id = p.id)"
-                + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'') = ISNULL(p.[批次号],N''))))";
-        return jdbc.queryForList(
+        // 某道工序的「本行已审报工量」= {@link #reportedQtyExpr(String)}(唯一口径;行锚定)
+        List<Map<String, Object>> out = jdbc.queryForList(
                 // 行id = **工单行身份**(plang.id),行级键的第一段(2026-10-15「能按行的都按行」):
                 //   下游(打印留痕/取消结案/调拨/追溯)一律拿它定位,不再只靠(工单号+批次号)反查 ——
                 //   同天多笔转单批次号相同,只有 plang.id 才唯一。
@@ -933,7 +1096,7 @@ public class ScheduleBoardService {
                         + " ISNULL(p.ll_no2,N'') AS 领料单号, ISNULL(p.rk_no,N'') AS 入库单号,"
                         // 计划线(各工序)(2026-10-07 预排全程线):排产时人工逐道选定的线,按工序序箭头串联
                         + " (SELECT STUFF((SELECT N' → ' + x.工序 + N':' + ISNULL(NULLIF(x.计划生产线,N''),N'待定')"
-                        + "   FROM dbo.wo_process_line x WHERE x.工单号=p.pl_no AND ISNULL(x.asp_cancel,'N')<>N'Y'"
+                        + "   FROM dbo.wo_process_line x WHERE ISNULL(x.asp_cancel,'N')<>N'Y' AND " + ledgerOfRow("p", "x")
                         + "   ORDER BY ISNULL(x.工序序,999) FOR XML PATH('')),1,3,N'')) AS 计划线,"
                         + " " + com.yinjia.mes.service.PlangClose.closedFlag("p") + " AS 结案,"
                         + " N'' AS 结案人, CAST(NULL AS datetime) AS 结案时间,"
@@ -946,27 +1109,24 @@ public class ScheduleBoardService {
                         + " " + curOp + " AS 当前工序,"
                         // 当前工序在路线里的顺序(台账工序序优先,取不到用路线加工顺序,都取不到记 0)
                         + " ISNULL(NULLIF((SELECT TOP 1 w3.工序序 FROM dbo.wo_process_line w3"
-                        + "    WHERE w3.工单号 = p.pl_no AND ISNULL(w3.asp_cancel,'N')<>'Y'"
-                        + "      AND (w3.工单行id = p.id OR w3.工单行id IS NULL) AND w3.工序 = " + curOp + "), 0),"
+                        + "    WHERE ISNULL(w3.asp_cancel,'N')<>'Y' AND " + ledgerOfRow("p", "w3")
+                        + "      AND w3.工序 = " + curOp + "), 0),"
                         + "   ISNULL((SELECT TOP 1 ISNULL(r3.加工顺序,999) FROM dbo.bs_route r3"
                         + "    WHERE r3.工艺路线编码 = ISNULL(p.[工艺路线],N'') AND r3.工序名称 = " + curOp
                         + "      AND ISNULL(r3.asp_cancel,'N')<>'Y'), 0)) AS 当前工序序,"
-                        // 当前工序计划量:台账里该道的计划数量优先(排产时按行算好),否则 行排产 × 该道换算率
-                        + " ISNULL(NULLIF((SELECT TOP 1 ISNULL(w2.计划数量,0) FROM dbo.wo_process_line w2"
-                        + "    WHERE w2.工单号 = p.pl_no AND ISNULL(w2.asp_cancel,'N')<>'Y'"
-                        + "      AND (w2.工单行id = p.id OR w2.工单行id IS NULL) AND w2.工序 = " + curOp + "), 0),"
-                        + "   ISNULL((SELECT TOP 1 ISNULL(p.pl_sl,0) * ISNULL(r.换算率,1)"
-                        + "    FROM dbo.bs_route r WHERE r.工艺路线编码 = ISNULL(p.[工艺路线],N'')"
-                        + "      AND r.工序名称 = " + curOp + " AND ISNULL(r.asp_cancel,'N')<>'Y'), 0)) AS 当前工序计划量,"
+                        // 当前工序计划量 = {@link #planQtyExpr}(台账计划数量优先,缺失回落 排产数量 × 该道换算率)
+                        + " " + planQtyExpr(curOp) + " AS 当前工序计划量,"
                         // 当前工序完工量(本行该道已审报工量)
-                        + " ISNULL(" + String.format(qtyOf, curOp) + ", 0) AS 当前工序完工量,"
+                        + " " + reportedQtyExpr(curOp) + " AS 当前工序完工量,"
                         // 上道工序 + 上道完工量(该线要处理的来料量)
                         + " ISNULL(" + prevOp + ", N'') AS 上道工序,"
-                        + " ISNULL(" + String.format(qtyOf, prevOp) + ", 0) AS 上道完工量,"
+                        + " " + reportedQtyExpr(prevOp) + " AS 上道完工量,"
                         // 未交量 = 成品口径:排产 − 入库(不足 0 记 0);**不再**减去工序口径的报工量
                         //   ⚠ 未交量是**本行当前**的状态(还没入库=还没交),与上道做了多少无关(2026-10-07 用户确认)
                         + " CASE WHEN ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0) THEN 0"
                         + "      ELSE ISNULL(p.pl_sl,0) - ISNULL(p.rk_sl,0) END AS 未交量,"
+                        // 按量流转展示(2026-11-12 方案A,只读):enrichRowFlow 需要本行路线编码
+                        + " ISNULL(p.[工艺路线],N'') AS 工艺路线,"
                         + " ISNULL(pc.[批次号],N'') AS 批次号"
                         + " FROM dbo.plang_pc pc"
                         + " JOIN dbo.plang p ON p.comm = pc.comm AND p.pl_no = pc.pl_no AND p.pl_xc = pc.pl_xc"
@@ -985,6 +1145,131 @@ public class ScheduleBoardService {
                         //   与口径冲突。改为稳定的业务键:工单号 + 工单行号(可预期、可复现,不随交期跳)。
                         + " ORDER BY pc.pl_no, pc.pl_xc",
                 line == null ? "" : line, line == null ? "" : line, ws, ws);
+        // 本线排产数量(2026-11-11 用户口径):本页一行 = 一张工单行在**当前产线**做**当前工序**,
+        //   页面「排产数量」列要显示的是**本线要排/要做的量** = 排产数量 × 该道换算率 ——
+        //   同一次查询里已经有「当前工序计划量」(台账计划数量优先、缺失回落 pl_sl×换算率),
+        //   这里补一个同值别名,让「工单排产 / 快速排产②已排产」两页统一读 `本线排产数量`。
+        //   ⚠ 只读别名:不改 pl_sl、不写库;成品口径的 排产数量(pl_sl) 照旧返回,
+        //     供打印/切单/未交量/领料/结案等既有判据使用。
+        for (Map<String, Object> r : out) {
+            r.put("本线排产数量", r.get("当前工序计划量"));
+            r.put("行来源", "当前线");
+        }
+        // 🔴 2026-11-12 用户口径(报障:「怎么没有看到这个单据在装箱线的存在呢?组装里面没有这个单,
+        //   我要打工单和排产计划啊」):**本线工序任务** —— 后道车间必须能在自己的线上看到"等我的那批",
+        //   并且能打印工单/排产计划。
+        //   为什么原来看不到:行来源只有 `plang_pc.scx = 选中线`(工单**当前**线,单值);
+        //   而台账里后道工序的「计划生产线」早就排好了(例:GD-2026-11-0012 的装箱 → 装箱2(新厂),
+        //   状态已落实、可加工 1000),只是工单当前线还停在 1号车间(成型)。
+        //   ⇒ 这里再取一遍「该线有工序台账、但工单当前不在该线」的行:当前工序 = **本线那道工序**,
+        //     本线排产数量 = 该道台账计划数量;其余(可加工/待报/待流入)由 enrichRowFlow 按该道算。
+        //   ⚠ 只读:不改 pc.scx、不写库、不影响报工/转序(转序仍由 applyNextProcess 按量推进)。
+        if (line != null && !line.isBlank()) {
+            out.addAll(lineProcessRows(line.trim(), scope, ws));
+        }
+        // 左侧产线汇总的「本线排产数量 / 本线已报完工量 / 本线未完工量」= 本方法这批行的合计
+        //   ({@link #lineTaskStats}):两边共用 curOpExpr / planQtyExpr / reportedQtyExpr 三个表达式 +
+        //   同一批 A/B 类行过滤,所以「左栏线数字 = 选中线后顶部合计」是构造上成立的,不靠人肉对账。
+        // 按量流转展示(2026-11-12 用户口径「方案A = 只做显示」):补
+        //   上道完工(折成品) / 本工序可加工量 / 待报量 / 待流入量 —— **只读**,不写库、不影响报工。
+        //   口径与报工页/追溯同源(ProcessFlow);取数 3 条批量查询,不随行数放大。
+        ProcessFlow.enrichRowFlow(jdbc, out);
+        return out;
+    }
+
+    /**
+     * **本线工序任务**:该产线在台账里负责、但工单**当前线不在本线**的工序行(2026-11-12)。
+     *
+     * <p>用途:后道车间(切炭/组装/装箱)在自己的线看板上能看到"等我的那批",并能勾选打印工单/排单计划。
+     * 行口径与 {@link #scheduled} 完全一致(同列名),区别只有:
+     * <ul>
+     *   <li>{@code 当前工序} = **本线那道工序**(不是工单当前工序);</li>
+     *   <li>{@code 当前工序计划量}/{@code 本线排产数量} = 该道台账计划数量;</li>
+     *   <li>{@code 当前工序完工量} = 该道已审报工量(行级锚定);</li>
+     *   <li>{@code 行来源} = {@code 本线工序}(前端据此打标记、打印取该道数量)。</li>
+     * </ul>
+     * 状态筛选:页签「已完工」→ 该道台账状态=已完工;其它页签 → 该道未完工(含"计划"=还没流入)。
+     * 「未完工/全部」另加**整张工单行未完工/未结案**过滤(做完了的行不该再挂"等我的活",2026-11-12)。
+     * 去重:同一工单行同一道工序有多条台账时只取一条(优先有实际线的)。只读,不写库。
+     */
+    private List<Map<String, Object>> lineProcessRows(String line, String scope, String ws) {
+        StringBuilder stCond = new StringBuilder();
+        // 2026-11-12 用户口径(第二轮):「当前只要流入到下面存在有数据的才要显示,没有流入到工序的不进行显示」
+        //   ⇒ 未完工侧只列「已落实」(= 上一道已审报工折成品 > 0,真的有量流下来);
+        //     「计划」= 还没流入,一律不显示(不再是"提前打印排产计划"的口径)。
+        if ("已完工".equals(scope)) stCond.append(" AND ISNULL(w.状态,N'')=N'已完工'");
+        else stCond.append(" AND ISNULL(w.状态,N'')=N'已落实'");
+        // 🔴 2026-11-12(用户报障「左侧数量与本线排产/报工数量没有关联」的根因之一):
+        //   **整张工单行已完工/已结案的行不该再挂成"等我的活"** —— 与 2026-10-16 用户口径
+        //   (「完工后组装内没有当前生产工单」)同一条原则。只在「未完工/全部」页签生效;
+        //   「已完工」页签本来就是看做完的历史,不加这道过滤(否则整页恒空)。
+        //   实测踩到的:历史台账行(id=16/17/18,工单行id=123 → GD-2026-09-0049 行5)在 2026-10-10
+        //   建账时存了错误的工单号,状态被旧代码冻在「已落实」;该行其实 生产完工、入库=排产=996。
+        //   于是 装箱2(新厂) 凭空多出「组装 421/已报 996」一行,顶部合计被顶到 5421、左栏却是 0。
+        //   台账按工单行id 收口 + 状态重算见 {@code migrate-wo-ledger-rowid-align-20261112.sql};
+        //   这里再加一道**看板侧兜底**,即使台账状态又漂了也不会把已完工的单当成待做活。
+        final String notDone = "已完工".equals(scope) ? ""
+                : " AND NOT (" + CLOSED + ") AND NOT (" + DONE_ROW + ")";
+        // 车间过滤:选中线属于哪个车间,只取该车间的线(与既有 workshop 收敛同口径)
+        StringBuilder wsCond = new StringBuilder();
+        List<Object> args = new ArrayList<>();
+        args.add(line);
+        args.add(line);
+        args.add(line);
+        args.add(line);   // 第 4 个:ISNULL(pp.scx,N'') <> ?(工单当前不在本线)
+        if (!ws.isEmpty()) {
+            wsCond.append(" AND EXISTS (SELECT 1 FROM bs_prod_line pl WHERE pl.生产线 = ?")
+                    .append(" AND ISNULL(pl.asp_cancel,'N')<>'Y' AND ISNULL(pl.生产车间,N'') = ?)");
+            args.add(line);
+            args.add(ws);
+        }
+        return jdbc.queryForList(
+                "SELECT * FROM ("
+                        + " SELECT p.id AS 行id, pp.pl_no AS 加工单号, pp.pl_xc AS 工单行号, ISNULL(p.comm,N'') AS 公司代码,"
+                        + "        ISNULL(dk.mc, p.khdm) AS 客户, ISNULL(dk.khjb,N'') AS 客户等级,"
+                        + "        ? AS 生产线,"
+                        + "        CONVERT(varchar(10), w.计划开工日期, 120) AS 开工日期,"
+                        + "        CONVERT(varchar(10), COALESCE(w.计划完工日期, pp.cp_date), 120) AS 计划完工日期,"
+                        + "        CONVERT(varchar(10), p.cp_date2, 120) AS 实际完工日期,"
+                        + "        ISNULL(p.od_no,N'') AS 客户PO, p.dm AS 物料编码,"
+                        + "        ISNULL(p.mc,N'') AS 产品名称, ISNULL(p.gg,N'') AS 规格型号, ISNULL(p.jldw,N'') AS 单位,"
+                        + "        " + ST_EXPR + " AS 生产状态,"   // 与页签筛选同源(未完工/在产);完工/结案的行已被下面 WHERE 剔除
+                        + "        ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量, ISNULL(p.rk_sl,0) AS 入库数量,"
+                        + "        " + ROW_YL + " AS 余量,"
+                        + "        ISNULL(pp.[批次号],N'') AS 批号, ISNULL(管控.重点管控, N'否') AS 重点管控,"
+                        + "        ISNULL(pp.pl_man,N'') AS 操作员,"
+                        + "        CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注,"
+                        + "        ISNULL(p.ll_no2,N'') AS 领料单号, ISNULL(p.rk_no,N'') AS 入库单号,"
+                        + "        N'' AS 计划线,"
+                        + "        " + PlangClose.closedFlag("p") + " AS 结案, N'' AS 结案人, CAST(NULL AS datetime) AS 结案时间,"
+                        + "        ISNULL(p.[打印人],N'') AS 打印人, CONVERT(varchar(16), p.[打印时间], 120) AS 打印时间,"
+                        + "        ISNULL(p.asp_print,0) AS 打印次数,"
+                        + "        w.工序 AS 当前工序, ISNULL(w.工序序,0) AS 当前工序序,"
+                        + "        ISNULL(w.计划数量,0) AS 当前工序计划量,"
+                        // 该道已审报工量 = {@link #reportedQtyExpr}(与当前线行/左侧汇总同一表达式)
+                        + "        " + reportedQtyExpr("w.工序") + " AS 当前工序完工量,"
+                        + "        N'' AS 上道工序, 0 AS 上道完工量,"    // 上道工序/上道完工量由 enrichRowFlow 按 ProcessFlow 补
+                        + "        CASE WHEN ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0) THEN 0"
+                        + "             ELSE ISNULL(p.pl_sl,0) - ISNULL(p.rk_sl,0) END AS 未交量,"
+                        + "        ISNULL(p.[工艺路线],N'') AS 工艺路线,"
+                        + "        ISNULL(pp.[批次号],N'') AS 批次号,"
+                        + "        ISNULL(w.计划数量,0) AS 本线排产数量,"
+                        + "        N'本线工序' AS 行来源,"
+                        + "        ROW_NUMBER() OVER (PARTITION BY p.id, w.工序"
+                        + "           ORDER BY CASE WHEN ISNULL(w.实际生产线,N'')<>N'' THEN 0 ELSE 1 END, w.id) AS rn"
+                        + " FROM dbo.wo_process_line w"
+                        + " JOIN dbo.plang p ON p.id = w.工单行id AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + " JOIN dbo.plang_pc pp ON pp.plang_id = p.id AND ISNULL(pp.asp_cancel,'N')<>'Y'"
+                        + " LEFT JOIN dbo.dm_kh dk ON dk.dm = p.khdm"
+                        + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
+                        + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
+                        + " WHERE ISNULL(w.asp_cancel,'N')<>'Y'"
+                        + "   AND (ISNULL(w.实际生产线,N'') = ? OR (ISNULL(w.实际生产线,N'')=N'' AND ISNULL(w.计划生产线,N'') = ?))"
+                        + "   AND ISNULL(pp.scx,N'') <> ?"          // 工单当前**不在**本线(在本线的由上面的查询出)
+                        + notDone
+                        + wsCond + stCond
+                        + ") t WHERE t.rn = 1 ORDER BY t.加工单号, t.工单行号, t.当前工序序",
+                args.toArray());
     }
 
     /**
@@ -1206,50 +1491,79 @@ public class ScheduleBoardService {
                         + " ORDER BY pc.pl_xc, pc.[批次号]",
                 byRow ? new Object[]{doc, curRow.get("行id")} : new Object[]{doc});
 
-        // 完工数据:报工记录(scjl,参考库口径;按 工序 汇总:完成数量=Σsl,计划数量=排产冗余)
+        // 完工数据:报工记录(scjl)按 工序 汇总。本段口径(2026-11-15 一次收口):
+        //   · **完成数量只算已审**(wgzt='Y'),与工序进度「完工量」同源;草稿不再冒充完工;
+        //   · 新增 **待审数量**(草稿/未审),与工序进度「待审量」同源 —— 原来 SUM(sl) 把草稿混进完成数,
+        //     而「单据状态」只要有一条已审就写"已审核"(实测 GD-2026-10-0226-1 组装:完成 10/状态已审核,
+        //     同弹窗工序进度却是 0/待审 10);拆开后两段同源。
+        //   · 单据状态三态:含草稿 / 已审核 / 草稿;
+        //   · 报工人+报工时间取**同一条**(最近一张报工单)—— 原来各自 MAX,多张单时会 A 的人名配 B 的时间;
+        //   · **计划数量不再取 scjl.pl_sl**(报工单上是**成品口径**,成型率 0.5 的单也写 50),改由
+        //     {@link #fillDonePlanQty} 按**工序口径**回填,并下发 换算率。用户口径(2026-11-15):
+        //     「工序的数据应该是换算后的数量,因为当前的工单工序存在换算机制」。
         // 2026-10-15:按行追溯时只统计**本行**的报工(gd_id=本行排产行id;历史空 gd_id 用本行批次兜底)。
         // 2026-10-16:锚定补第②级 scjl.[工单行号](草稿报工尚未写 gd_id,靠保存时落库的行号归属),
-        //   并**一并返回审核状态** —— 与「工序进度」段同源,避免两段一个说"有报工"、一个说"0/未开始"。
+        //   并一并返回审核状态 —— 与「工序进度」段同源,避免两段一个说"有报工"、一个说"0/未开始"。
+        final String repAggSql = "SELECT ISNULL(s.gxdm, N'') AS 工序,"
+                + " SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN ISNULL(s.sl,0) ELSE 0 END) AS 完成数量,"
+                + " SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN 0 ELSE ISNULL(s.sl,0) END) AS 待审数量,"
+                + " MAX(CASE WHEN s.rn=1 THEN s.asp_user1 END) AS 报工人,"
+                + " MAX(CASE WHEN s.rn=1 THEN CONVERT(varchar(16), s.asp_time1, 120) END) AS 报工时间,"
+                + " CASE WHEN SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN ISNULL(s.sl,0) ELSE 0 END) > 0"
+                + "           AND SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN 0 ELSE ISNULL(s.sl,0) END) > 0 THEN N'含草稿'"
+                + "      WHEN SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN ISNULL(s.sl,0) ELSE 0 END) > 0 THEN N'已审核'"
+                + "      ELSE N'草稿' END AS 单据状态"
+                + " FROM (SELECT s.*, ROW_NUMBER() OVER (PARTITION BY ISNULL(s.gxdm,N'')"
+                + "         ORDER BY s.asp_time1 DESC, s.id DESC) AS rn"
+                + "       FROM dbo.scjl s WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y'" + repRowCond + ") s"
+                + " GROUP BY s.gxdm ORDER BY s.gxdm";
         List<Map<String, Object>> done = byRow
-                ? jdbc.queryForList(
-                        "SELECT ISNULL(s.gxdm, N'') AS 工序, MAX(ISNULL(s.pl_sl,0)) AS 计划数量,"
-                                + " SUM(ISNULL(s.sl,0)) AS 完成数量, MAX(s.asp_user1) AS 报工人,"
-                                + " CONVERT(varchar(16), MAX(s.asp_time1), 120) AS 报工时间,"
-                                + " CASE WHEN SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN ISNULL(s.sl,0) ELSE 0 END) > 0"
-                                + "      THEN N'已审核' ELSE N'草稿' END AS 单据状态"
-                                + " FROM dbo.scjl s WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y'" + repRowCond
-                                + " GROUP BY s.gxdm ORDER BY s.gxdm", doc, rowId, curRow.get("工单行号"), rowBatch)
-                : jdbc.queryForList(
-                        "SELECT ISNULL(s.gxdm, N'') AS 工序, MAX(ISNULL(s.pl_sl,0)) AS 计划数量,"
-                                + " SUM(ISNULL(s.sl,0)) AS 完成数量, MAX(s.asp_user1) AS 报工人,"
-                                + " CONVERT(varchar(16), MAX(s.asp_time1), 120) AS 报工时间,"
-                                + " CASE WHEN SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN ISNULL(s.sl,0) ELSE 0 END) > 0"
-                                + "      THEN N'已审核' ELSE N'草稿' END AS 单据状态"
-                                + " FROM dbo.scjl s WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
-                                + " GROUP BY s.gxdm ORDER BY s.gxdm", doc);
+                ? jdbc.queryForList(repAggSql, doc, rowId, curRow.get("工单行号"), rowBatch)
+                : jdbc.queryForList(repAggSql, doc);
+        // 计划数量 + 换算率(工序口径;唯一实现见方法注释)
+        fillDonePlanQty(done, doc, rowId, byRow);
         // 入库单据(产成品入库单挂 加工单号)
         // 行级收敛(2026-10-15 步5,结构变更已随 migrate-finish-in-wo-line-20261015.sql 落地):
         //   带 rowId 时按「本行」取 —— 优先 [工单行号]=本行 pl_xc,**老单没有行号**(该列 2026-10-15 才加)
         //   时按 [批次号]=本行批次兜底;两者都空=历史未标注,归入整单口径(不猜、不回填)。
+        // 2026-11-13(用户口径「工单会存在多个批次号,可以在工单详情追溯中看到不同的批次号进入」):
+        //   一张入库单可有多条明细行,每行一个完工日批次(批号+实收数量) ⇒ 这里按**明细行**展开返回,
+        //   表头字段重复填写、批次号取明细批号(无明细的老单回退表头批次);界面据此列不同批次号。
         List<Map<String, Object>> fins = byRow
                 ? jdbc.queryForList(
                         "SELECT f.[单据编号], CONVERT(varchar(10), f.[单据日期], 120) AS 单据日期,"
                                 + " ISNULL(f.[入库类别],N'') AS 入库类别, ISNULL(f.[经手人],N'') AS 经手人, ISNULL(f.[备注],N'') AS 备注,"
-                                + " ISNULL(f.[批次号],N'') AS 批次号, f.[工单行号] AS 工单行号,"
+                                + " COALESCE(NULLIF(d.[批号],N''), f.[批次号], N'') AS 批次号, f.[工单行号] AS 工单行号,"
+                                + " ISNULL(d.[实收数量],0) AS 实收数量, ISNULL(d.[产品编码],N'') AS 产品编码,"
+                                + " ISNULL(d.[产品名称],N'') AS 产品名称,"
+                                + " CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废'"
+                                + "      WHEN s.shr IS NOT NULL THEN N'已审核'"
+                                + "      WHEN ISNULL(s.pending,'N')='Y' THEN N'审批中' ELSE N'草稿' END AS 单据状态,"
                                 + " CASE WHEN f.[工单行号] IS NOT NULL THEN N'按工单行'"
                                 + "      WHEN ISNULL(f.[批次号],N'')<>N'' THEN N'按批次' ELSE N'历史未标注' END AS 收敛口径"
-                                + " FROM bd_finish_in f WHERE f.[加工单号]=? AND ISNULL(f.asp_cancel,'N')<>'Y'"
+                                + " FROM bd_finish_in f"
+                                + " LEFT JOIN bl_finish_in d ON d.[单据编号]=f.[单据编号] AND ISNULL(d.asp_cancel,'N')<>'Y'"
+                                + " LEFT JOIN yj_doc_status s ON s.panel_code=N'FINISH_IN' AND s.doc_no=f.[单据编号]"
+                                + " WHERE f.[加工单号]=? AND ISNULL(f.asp_cancel,'N')<>'Y'"
                                 + "   AND (f.[工单行号]=? OR (f.[工单行号] IS NULL AND ISNULL(f.[批次号],N'')=?"
                                 + "        AND ISNULL(f.[批次号],N'')<>N''))"
-                                + " ORDER BY f.[单据编号]", doc, curRow.get("工单行号"), rowBatch)
+                                + " ORDER BY f.[单据编号], d.[序号]", doc, curRow.get("工单行号"), rowBatch)
                 : jdbc.queryForList(
                         "SELECT f.[单据编号], CONVERT(varchar(10), f.[单据日期], 120) AS 单据日期,"
                                 + " ISNULL(f.[入库类别],N'') AS 入库类别, ISNULL(f.[经手人],N'') AS 经手人, ISNULL(f.[备注],N'') AS 备注,"
-                                + " ISNULL(f.[批次号],N'') AS 批次号, f.[工单行号] AS 工单行号,"
+                                + " COALESCE(NULLIF(d.[批号],N''), f.[批次号], N'') AS 批次号, f.[工单行号] AS 工单行号,"
+                                + " ISNULL(d.[实收数量],0) AS 实收数量, ISNULL(d.[产品编码],N'') AS 产品编码,"
+                                + " ISNULL(d.[产品名称],N'') AS 产品名称,"
+                                + " CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废'"
+                                + "      WHEN s.shr IS NOT NULL THEN N'已审核'"
+                                + "      WHEN ISNULL(s.pending,'N')='Y' THEN N'审批中' ELSE N'草稿' END AS 单据状态,"
                                 + " CASE WHEN f.[工单行号] IS NOT NULL THEN N'按工单行'"
                                 + "      WHEN ISNULL(f.[批次号],N'')<>N'' THEN N'按批次' ELSE N'历史未标注' END AS 收敛口径"
-                                + " FROM bd_finish_in f WHERE f.[加工单号]=? AND ISNULL(f.asp_cancel,'N')<>'Y'"
-                                + " ORDER BY f.[单据编号]", doc);
+                                + " FROM bd_finish_in f"
+                                + " LEFT JOIN bl_finish_in d ON d.[单据编号]=f.[单据编号] AND ISNULL(d.asp_cancel,'N')<>'Y'"
+                                + " LEFT JOIN yj_doc_status s ON s.panel_code=N'FINISH_IN' AND s.doc_no=f.[单据编号]"
+                                + " WHERE f.[加工单号]=? AND ISNULL(f.asp_cancel,'N')<>'Y'"
+                                + " ORDER BY f.[单据编号], d.[序号]", doc);
         // 领料数据:材料出库单(领料单)—— **按 工单号+工单行号 收敛**(2026-10-15,用户口径)。
         // 🔴 原实现 `WHERE m.[加工单号]=?` 查的是**明细行** bl_material_out.[加工单号] —— 该列**实测全为空**
         //   (转领料单只写单头,明细由仓库补填)⇒ 这一段永远返回空,用户看到的就是"领料数据没有"。
@@ -1369,8 +1683,10 @@ public class ScheduleBoardService {
                             + " WHERE ISNULL(h.asp_cancel,'N')<>'Y' AND h.工单号=?" + qcRowCond,
                     qcArgs.toArray()));
         }
-        // 排序:按 首件 → 制程 → 组装成品 的工序顺序,同类型再按单号(2026-10-18 三张单一起进追溯)
-        List<String> typeOrder = List.of("首件检验", "制程检验", "组装成品检验");
+        // 排序:按 首件 → 制程 → 出货检验表观 的工序顺序,同类型再按单号(2026-10-18 三张单一起进追溯)
+        // ⚠ 2026-11-11:第三项跟着 INSP_HEAD 的 label 一起改名(排序键 = 下发的 `检验类型` 原文,
+        //   两处必须同值,否则 QC_ASM_INSP 的单在追溯里会排到最后)。
+        List<String> typeOrder = List.of("首件检验", "制程检验", "出货检验表观");
         qc.sort((a, b) -> {
             int ia = typeOrder.indexOf(String.valueOf(a.get("检验类型")));
             int ib = typeOrder.indexOf(String.valueOf(b.get("检验类型")));
@@ -1548,6 +1864,83 @@ public class ScheduleBoardService {
         segScope.put("家族清单", rowScope);
         out.put("分段口径", segScope);
         return out;
+    }
+
+    /**
+     * 追溯「完工数据」段的 **工序口径计划量 + 换算率** 回填(2026-11-15)。
+     *
+     * <p><b>为什么改</b>:原 SQL 取 {@code MAX(scjl.pl_sl)} —— 那是**报工单上的成品口径计划量**
+     * (成型换算率 0.5 的行也写 50),而同一行的「完成数量」是**工序口径**的报工量。
+     * 实测 GD-2026-11-0028-1 成型:计划显示 50 / 完成 25 ⇒ 看上去"只做了一半",
+     * 与上方工序进度(25/25 已完工)自相矛盾。用户口径(2026-11-15):
+     * 「工序的数据应该是换算后的数量,因为当前的工单工序存在换算机制」。
+     *
+     * <p><b>口径</b>(与工序进度 {@code ProcessTaskService#stepsSummary}、报工封顶
+     * {@code WoReportService} 同一个算式):
+     * <ol>
+     *   <li>该道工序计划量 = **本行排产数量 × 该道自己的换算率**(各道独立折算、❌ 不累乘;率空/≤0 按 1);</li>
+     *   <li>**整单口径**(不带工单行id)按**各行分别折算后累加**,❌ 不是「整单合计 × 一次换算率」——
+     *       同一工单可有多行(实测 GD-2026-09-0009 = 11 行),各行路线与换算率可以不同;每行用**自己的路线**取率;</li>
+     *   <li>路线里查不到该工序(路线改过/老单)→ 按率 1:与 {@code routeLines}「无明细=标准五道、率 1」
+     *       同一兜底,保证有报工的工序不会凭空显示 0 计划;</li>
+     *   <li>{@code 换算率} 列只为把换算过程摆在明面上(计划量 = 排产数量 × 该道换算率):
+     *       各行/各道率一致才回填,不一致留空(不拿其中一个充数)。</li>
+     * </ol>
+     *
+     * <p><b>为什么不用工序台账 {@code wo_process_line.计划数量}</b>(2026-11-15 决策,别再改回去):
+     * 台账是排产/切单时按同一算式算好的存量快照,健康数据与算式**逐行相等**;但存量里有
+     * **9 行**是历史脏值(如 GD-2026-09-0049 行1 排产 1100、成型台账 56000 = 旧 bug 串行),
+     * 若这里优先读台账,会出现「完工数据 计划 56000 / 同一弹窗工序进度 1100」的新自相矛盾。
+     * 看板 {@link #planQtyExpr(String)}(当前工序计划量)仍台账优先,那 9 行的台账订正属**另开的存量任务**。
+     *
+     * @param done  完工数据行(就地写入 {@code 计划数量} / {@code 换算率})
+     * @param doc   工单号
+     * @param rowId 工单行id(plang.id;null = 整单口径)
+     * @param byRow 是否按工单行口径
+     */
+    private void fillDonePlanQty(List<Map<String, Object>> done, String doc, Long rowId, boolean byRow) {
+        if (done == null || done.isEmpty()) return;
+        // ① 本行(或整单全部有效行)的排产数量 + 工艺路线(整单时要逐行折算,不能拿合计乘一次率)
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.[工艺路线],N'') AS 工艺路线"
+                        + " FROM dbo.plang p WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + (byRow ? " AND p.id=?" : "")
+                        + " ORDER BY p.pl_xc, p.id", byRow ? new Object[]{doc, rowId} : new Object[]{doc});
+        if (rows.isEmpty()) return;
+        // ② 路线换算率(路线 → 工序 → 率;同一路线同一道有多条时取最大,与 ProcessTaskService 一致)
+        Map<String, Map<String, Double>> rates = new HashMap<>();
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT r.工艺路线编码, r.工序名称, MAX(ISNULL(r.换算率,1)) AS 换算率"
+                        + " FROM dbo.bs_route r WHERE ISNULL(r.asp_cancel,'N')<>'Y'"
+                        + "   AND ISNULL(r.工序名称,N'')<>N''"
+                        + "   AND r.工艺路线编码 IN (SELECT DISTINCT ISNULL(p.[工艺路线],N'') FROM dbo.plang p"
+                        + "        WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y')"
+                        + " GROUP BY r.工艺路线编码, r.工序名称", doc)) {
+            rates.computeIfAbsent(String.valueOf(r.get("工艺路线编码")).trim(), k -> new HashMap<>())
+                    .put(String.valueOf(r.get("工序名称")).trim(), Num.of(r.get("换算率")));
+        }
+        for (Map<String, Object> d : done) {
+            String op = String.valueOf(d.get("工序") == null ? "" : d.get("工序")).trim();
+            if (op.isEmpty()) continue;
+            double total = 0;
+            LinkedHashSet<Double> usedRates = new LinkedHashSet<>();
+            for (Map<String, Object> row : rows) {
+                double rate = rateOf(rates, String.valueOf(row.get("工艺路线")), op);
+                usedRates.add(rate);                             // 换算率列:与"这一道到底折了多少"同源
+                total += Num.of(row.get("排产数量")) * rate;      // 工序计划量 = 本行排产数量 × 该道换算率
+            }
+            d.put("计划数量", r4(total));
+            // 换算率:各行一致才显示(空串=各行口径不一,不拿其中一个充数;前端显示 '-')
+            d.put("换算率", usedRates.size() == 1 ? r4(usedRates.iterator().next()) : "");
+        }
+    }
+
+    /** 路线里某道工序的换算率;路线为空 / 路线里没有该工序 ⇒ 1(不折算,见 {@link #fillDonePlanQty}) */
+    private static double rateOf(Map<String, Map<String, Double>> rates, String route, String op) {
+        Map<String, Double> m = rates.get(route == null ? "" : route.trim());
+        if (m == null) return 1;
+        Double r = m.get(op);
+        return r == null || r <= 0 ? 1 : r;
     }
 
     /**

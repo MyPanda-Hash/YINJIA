@@ -59,6 +59,7 @@
       </div>
       <div class="mp-row mp-row-gap">
         <el-input
+          ref="scanInput"
           v-model="locateText"
           :placeholder="tt('扫工单号/领料单号,或直接输入后点打开')"
           size="large"
@@ -88,6 +89,7 @@
         >
           <div class="mp-doc-l1">
             <span class="mp-doc-no mono">{{ d.领料单号 || tt('未生成') }}</span>
+            <span class="mp-doc-kind">{{ tt(d.领料类型 || '组装') }}</span>
             <span class="mp-doc-state">{{ d.状态 }}</span>
           </div>
           <div class="mp-doc-l2">
@@ -127,6 +129,7 @@
         >
           <div class="mp-doc-l1">
             <span class="mp-doc-no mono">{{ d.领料单号 || '—' }}</span>
+            <span class="mp-doc-kind">{{ tt(d.领料类型 || '组装') }}</span>
             <!-- 退料标志(2026-10-30 第三轮):退过料的单在列表里就能认出来 -->
             <span v-if="hasReturn(d)" class="mp-flag" :title="d.退料单号">{{ tt('含退料') }}</span>
             <span class="mp-doc-state is-done">{{ d.状态 }}</span>
@@ -157,6 +160,7 @@ import { useRouter } from 'vue-router'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { parseWorkOrderCode } from '@/business/scanCode'
+import { focusScanNow } from '@/business/scanFocus'
 
 const router = useRouter()
 
@@ -164,6 +168,8 @@ const keyword = ref('')
 const listLoading = ref(false)
 const locateText = ref('')
 const locateLoading = ref(false)
+/** 扫码/定位框:PDA 连扫用(2026-11-16 用户口径,见 business/scanFocus.js) */
+const scanInput = ref(null)
 const errText = ref('')
 const okText = ref('')
 /** 点了「扫码」后是否还在等壳回调 —— 用来兜底提示"没收到扫码结果"(2026-11-01) */
@@ -253,6 +259,8 @@ async function refreshAll() {
 onMounted(() => {
   bindScan()
   loadList()
+  // PDA 连扫(2026-11-16):进页面光标就落在扫码/定位框
+  focusScanNow(() => scanInput.value, { delay: 350 })
 })
 
 /**
@@ -388,6 +396,8 @@ async function locate(line) {
     showErr(errMsgOf(e) || tt('查询失败'))
   } finally {
     locateLoading.value = false
+    // PDA 连扫(2026-11-16):定位/扫码结束光标回到扫码框(打开单据时页面会跳走,聚焦无副作用)
+    focusScanNow(() => scanInput.value, { delay: 150 })
   }
 }
 
@@ -496,6 +506,7 @@ function openDoc(id) {
   background: var(--el-color-warning-light-8); color: var(--el-color-warning-dark-2);
 }
 .mp-doc-state {
+.mp-doc-kind { padding: 0 6px; border-radius: 8px; font-size: 11px; background: var(--el-color-warning-light-9); color: var(--el-color-warning); }
   margin-left: auto; padding: 0 6px; border-radius: 4px; font-size: 11px;
   background: var(--el-color-warning-light-8); color: var(--el-color-warning-dark-2);
 }

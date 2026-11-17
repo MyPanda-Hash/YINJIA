@@ -95,7 +95,8 @@
         <i class="lg lg-doing">{{ tt('蓝=进行中') }}</i>
         <i class="lg lg-idle">{{ tt('灰=未开始') }}</i>
       </span>
-      <span class="wpb-tip">{{ tt('点击行可跳转到生产工单并定位该工单') }}</span>
+      <!-- 2026-11-13(契约 §5):汇总条右侧提示改成「行 / 工序 / 检验标记」三处可点的完整说明 -->
+      <span class="wpb-tip">{{ tt('点击行可跳转到生产工单并定位该工单；点击工序跳转到该工序排产，点击检验标记打开检验单') }}</span>
     </div>
 
     <!-- 刷新失败但仍有旧数据:保留数据,顶部给一条可读提示(既有数据不清空) -->
@@ -150,9 +151,15 @@
             <div v-if="row['订单号']" class="wpb-meta-line wpb-ellipsis" :title="orderText(row)">
               {{ tt('订单号') }}: {{ orderText(row) }}
             </div>
-            <!-- 品质提示(2026-11-08 第4轮):走到应检工序时提示品质去检验;当前工序就在待检清单里时加底色更醒目 -->
-            <div v-if="pendingOps(row).length" class="wpb-qc-hint" :class="{ hot: pendingHot(row) }"
-                 :title="`${tt('待品质检验')}: ${pendingOpsText(row)}`">
+            <!-- 品质提示(2026-11-08 第4轮):走到应检工序时提示品质去检验;当前工序就在待检清单里时加底色更醒目
+                 2026-11-13(契约 §4):提示条本身可点 → 打开第一条待检验/待审核且有单据的工序的检验单;
+                 整行点击行为不变,所以这里必须 stop(否则会连带跳生产工单) -->
+            <div v-if="pendingOps(row).length" class="wpb-qc-hint is-clickable"
+                 :class="{ hot: pendingHot(row) }" role="button" tabindex="0"
+                 :title="`${tt('待品质检验')}: ${pendingOpsText(row)} · ${tt('点击查看检验单')}`"
+                 @click.stop="onQcHintClick(row)"
+                 @keydown.enter.stop.prevent="onQcHintClick(row)"
+                 @keydown.space.stop.prevent="onQcHintClick(row)">
               {{ tt('待品质检验') }}: {{ pendingOpsText(row) }}
             </div>
           </div>
@@ -195,10 +202,13 @@
               {{ tt('批次号') }}: <em>{{ row['批次号'] }}</em>
             </div>
           </div>
-          <!-- ⑥ 完工信息:该行各道工序的环形进度(4 道时允许 wrap,不横向溢出) -->
+          <!-- ⑥ 完工信息:该行各道工序的环形进度(4 道时允许 wrap,不横向溢出)
+               2026-11-13(契约 §3.1/§3.2):环可点 → 该工序排产;环下检验徽标可点 → 该工序检验单 -->
           <div class="wpb-cell wpb-ops">
             <template v-if="stepsOf(row).length">
-              <WoProgressRing v-for="(s, i) in stepsOf(row)" :key="i" :step="s" :size="ringSize" />
+              <WoProgressRing v-for="(s, i) in stepsOf(row)" :key="i" :step="s" :size="ringSize"
+                              @step-click="onStepClick(row, $event)"
+                              @insp-click="onInspClick(row, $event)" />
             </template>
             <span v-else class="wpb-ops-empty">{{ tt('未排产') }}</span>
           </div>
@@ -249,7 +259,10 @@
           </el-table-column>
           <el-table-column :label="tt('生产进度')" min-width="300">
             <template #default="{ row }">
-              <WoProgressChain :steps="stepsOf(row)" />
+              <!-- 2026-11-13(契约 §3.1/§3.2):圆点 → 该工序排产;右上角检验小点 → 该工序检验单 -->
+              <WoProgressChain :steps="stepsOf(row)"
+                               @step-click="onStepClick(row, $event)"
+                               @insp-click="onInspClick(row, $event)" />
             </template>
           </el-table-column>
           <el-table-column :label="tt('产品编号')" prop="产品编码" width="110" show-overflow-tooltip />
@@ -284,6 +297,7 @@
 <script setup>
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { Refresh, Tickets, WarningFilled } from '@element-plus/icons-vue'
 import request from '@core/request'
 import { tt } from '@/i18n'
@@ -316,6 +330,21 @@ const STATUS_META = {
   在产: { tone: 'doing', label: '在产', tag: 'primary' },
   完工: { tone: 'done', label: '已完工', tag: 'success' },
   已结案: { tone: 'muted', label: '已结案', tag: 'info' },
+}
+
+/* ===== 检验类型 → 面板码(2026-11-13 契约 §3.2:唯一映射,只写这一处) =====
+   键 = 后端下发的检验类型显示名(数据键中文,不随语言变化,故不包 tt());
+   值 = 面板引擎面板码。「出货检验表观」2026-11-11 前叫「组装成品检验」,两个名字都认。 */
+const INSP_PANEL_BY_TYPE = {
+  首件检验: 'QC_FIRST_INSP',
+  制程检验: 'QC_PROC_INSP',
+  出货检验表观: 'QC_ASM_INSP',
+  组装成品检验: 'QC_ASM_INSP',
+}
+/** 检验类型显示名 → 面板码;不在映射内返回 ''(调用方按「暂无检验单」静默处理,不猜面板) */
+function panelCodeOf(inspType) {
+  const type = String(inspType || '').trim()
+  return INSP_PANEL_BY_TYPE[type] || ''
 }
 
 const router = useRouter()
@@ -531,6 +560,120 @@ function openRow(row) {
     path: '/prod/plan/workOrderList',
     query: { keyword: String(no), focus: String(row['行id'] ?? '') },
   })
+}
+
+/* ===== 工序 / 检验单点击跳转(2026-11-13,契约 CONTRACT.md §3.1/§3.2/§4) =====
+   子组件只发事件(step-click / insp-click),判定与提示全部在这里做:
+     · 点工序 → 未排产/未到达就只提示;否则跳工单排产页并定位该工单行的该道工序;
+     · 点检验徽标/待检验提示 → 选一张检验单跳面板引擎列表(applyDocNoQuery 定位到该单)。
+   全部字段按「缺失即静默降级」处理:step.生产线 空就回退 row.生产线,不抛错、不显示 undefined。 */
+
+/** 待处理(优先跳这张)的检验单据状态 */
+const INSP_PENDING_STATES = ['草稿', '审批中']
+/** 算「品质待处理」的工序检验状态 */
+const QC_PENDING_STATES = ['待检验', '待审核']
+/** 检验单号比较:纯数字按数值比(避免 '9' > '10' 的字典序错),否则按自然序比较 */
+const inspNoCollator = new Intl.Collator('zh-CN', { numeric: true, sensitivity: 'base' })
+function compareInspDocNo(a, b) {
+  const x = String(a?.['检验单号'] ?? '').trim()
+  const y = String(b?.['检验单号'] ?? '').trim()
+  if (x !== '' && y !== '') {
+    const nx = Number(x)
+    const ny = Number(y)
+    if (Number.isFinite(nx) && Number.isFinite(ny)) return nx - ny
+  }
+  return inspNoCollator.compare(x, y)
+}
+
+/** 工序的检验单据数组(接口未给 / 结构不对时返回空数组,界面静默降级) */
+function inspDocsOf(step) {
+  const docs = step?.['检验']?.['单据']
+  return Array.isArray(docs) ? docs.filter((d) => d && typeof d === 'object') : []
+}
+
+/**
+ * 选哪张检验单:优先「单据状态 ∈ {草稿,审批中}」的待处理单,没有则取检验单号最大的那张。
+ * 无单据返回 null。
+ */
+function pickInspDoc(step) {
+  const docs = inspDocsOf(step)
+  if (!docs.length) return null
+  const pending = docs.filter((d) => INSP_PENDING_STATES.includes(String(d?.['单据状态'] || '').trim()))
+  const pool = pending.length ? pending : docs
+  return pool.slice().sort((a, b) => compareInspDocNo(b, a))[0]
+}
+
+/** 检验单的检验类型显示名:单据自带优先,缺失回退 step.检验.类型[0](字段不全时静默) */
+function inspTypeOf(doc, step) {
+  const type = String(doc?.['检验类型'] || '').trim()
+  if (type) return type
+  const list = step?.['检验']?.['类型']
+  return Array.isArray(list) && list.length ? String(list[0] || '').trim() : ''
+}
+
+/** 打开某道工序的检验单:选单 → 检验类型映射面板码 → /panelx/list/<面板码>?docNo=<单号> */
+function openInspDoc(step) {
+  const doc = pickInspDoc(step)
+  const no = String(doc?.['检验单号'] ?? '').trim()
+  // 单据缺失、单号缺失、检验类型不在契约映射内:都按「暂无检验单」提示,不盲目打开错面板
+  const panelCode = panelCodeOf(inspTypeOf(doc, step))
+  if (!doc || !no || !panelCode) {
+    ElMessage.warning(tt('该工序暂无检验单'))
+    return
+  }
+  router.push(`/panelx/list/${panelCode}?docNo=${encodeURIComponent(no)}`)
+}
+
+/**
+ * 点工序(看板环 / 列表圆点):按契约 §4 判定
+ *   ① 未排产 或 行.生产线 为空 → 该工单未进行排产
+ *   ② 完工量<=0 且 待审量<=0(进度 0% 且没有草稿报工) → 该工序未到达
+ *   ③ 否则跳 /prod/plan/workOrderBoard?line&wo&rowid&op
+ */
+function onStepClick(row, step) {
+  if (!step || typeof step !== 'object') return
+  const prodStatus = String(row?.['生产状态'] || '').trim()
+  const rowLine = String(row?.['生产线'] || '').trim()
+  if (prodStatus === '未排产' || !rowLine) {
+    ElMessage.warning(tt('该工单未进行排产'))
+    return
+  }
+  if (Number(step['完工量'] || 0) <= 0 && Number(step['待审量'] || 0) <= 0) {
+    ElMessage.warning(tt('该工序未到达'))
+    return
+  }
+  // step.生产线 由后端新增,暂未就绪或为空时回退 行.生产线(静默降级,不出现 undefined)
+  const line = String(step['生产线'] || '').trim() || rowLine
+  router.push({
+    path: '/prod/plan/workOrderBoard',
+    query: {
+      line,
+      wo: String(row?.['工单号'] ?? ''),
+      rowid: String(row?.['行id'] ?? ''),
+      op: String(step['工序'] ?? ''),
+    },
+  })
+}
+
+/** 点检验徽标(环下徽标 / 列表圆点右上角小点):有单按 §3.2 跳,无单提示 */
+function onInspClick(row, step) {
+  openInspDoc(step)
+}
+
+/**
+ * 点行级「待品质检验: 成型 / 组装」提示条(契约 §4 最后一条):
+ * 打开第一条「检验状态 ∈ {待检验,待审核} 且 有单据」的工序的检验单;一条都没有则提示。
+ */
+function onQcHintClick(row) {
+  const hit = stepsOf(row).find((s) => {
+    const state = String(s?.['检验']?.['状态'] || '').trim()
+    return QC_PENDING_STATES.includes(state) && inspDocsOf(s).length > 0
+  })
+  if (!hit) {
+    ElMessage.warning(tt('该工序暂无检验单'))
+    return
+  }
+  openInspDoc(hit)
 }
 
 /** 列表模式 el-table 行样式(整行可点击) */
@@ -943,6 +1086,15 @@ onBeforeUnmount(() => {
   line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* 2026-11-13(契约 §4):提示条可点 → 打开该工序检验单;cursor + 轻量 hover(只有下划线,
+   不加底色块/动画,保持浅色系统风) */
+.wpb-qc-hint.is-clickable {
+  cursor: pointer;
+}
+.wpb-qc-hint.is-clickable:hover {
+  color: #cf9236;
+  text-decoration: underline;
 }
 .wpb-qc-hint.hot {
   padding: 0 4px;

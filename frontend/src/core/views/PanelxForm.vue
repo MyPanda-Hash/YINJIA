@@ -558,14 +558,22 @@ function clearDictPick() {
 }
 // 审批按钮权限（提交审批/审批情况公开；审批通过/驳回需角色审批权限）
 const APPROVE_ACTIONS = ['审批通过', '审批驳回']
-// 直接「审核」仅管理员（2026-09-22）：审批下拉最下的直审按钮收权——
-// 有审批权的角色走 提交审批→审批通过（同效已审核），不再保留直审入口；后端 audit() 同口径拒绝
+// 直接「审核」:列表页(PanelxList)2026-11-13 起已放开给有审批权的角色;本页(表单页)只到
+// RD_APPROVAL / RD_PROD_INFO 这类**保存即归档**的纸面单,直审在那里没有实际用途
+// ⇒ 维持「仅管理员」不变(避免把只有草稿才成立的直审口径开到归档单上)。
 const ADMIN_ONLY_ACTIONS = ['审核']
+// 两级审批面板(与 PanelxList.DIRECT_AUDIT_BLOCKED / 后端 ButtonService.TWO_LEVEL_PANELS 同口径):
+// 直审会一步跨过第二级签核 ⇒ 这两张单连管理员也不给该入口,免得点了才报「走两级审批」。
+const DIRECT_AUDIT_BLOCKED_PANELS = ['RD_PROD_INFO', 'RD_SAMPLE_EXT']
 function filterGroups(raw) {
   const canApprove = user.isAdmin || user.approvePanels.includes(panelCode.value)
+  const auditBlocked = DIRECT_AUDIT_BLOCKED_PANELS.includes(String(panelCode.value))
   return (raw || [])
     .map((g) => {
-      let actions = (g.actions || g.items || []).filter((a) => !(!user.isAdmin && ADMIN_ONLY_ACTIONS.includes(a)))
+      let actions = (g.actions || g.items || []).filter((a) => {
+        if (a === '审核' && auditBlocked) return false
+        return !(!user.isAdmin && ADMIN_ONLY_ACTIONS.includes(a))
+      })
       if (!canApprove) actions = actions.filter((a) => !APPROVE_ACTIONS.includes(a))
       return { ...g, actions }
     })
@@ -1329,12 +1337,18 @@ async function onButton(action) {
   // 人工审核：确认弹窗 + 审核意见（选填）；审核人取当前登录人（后端从 JWT 取）
   let auditOpinion = ''
   if (action === '审核') {
-    // 已审核过的单据不允许再次审核，也不允许补填审批意见
-    if (status.value !== '草稿') return ElMessage.warning('仅草稿状态可审核，已审核单据不允许再次审核')
+    // 已审核过的单据不允许再次审核，也不允许补填审批意见；
+    // 2026-11-13 与列表页同口径:可审的是「没提交审批」的两档(草稿 / 修改中)
+    const stNow = String(status.value || '')
+    if (!['草稿', '修改中'].includes(stNow)) {
+      return ElMessage.warning(['审批中', '待二级审批'].includes(stNow)
+        ? tt('该单已提交审批：请用「审批通过」完成审批')
+        : tt('仅草稿状态可审核，已审核单据不允许再次审核'))
+    }
     const no = form['单据编号'] || form['锭号'] || form['编号'] || ''
     try {
       const { value } = await ElMessageBox.prompt(
-        tt('单据：{no}（当前状态：{st}）').replace('{no}', no).replace('{st}', status.value),
+        tt('单据：{no}（当前状态：{st}）').replace('{no}', no).replace('{st}', tt(stNow)),
         tt('人工审核确认'),
         { confirmButtonText: tt('确认审核'), cancelButtonText: tt('取消'), inputType: 'textarea', inputPlaceholder: tt('审核意见（选填）') }
       )

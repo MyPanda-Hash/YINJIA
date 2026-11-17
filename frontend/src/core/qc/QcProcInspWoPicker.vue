@@ -1,14 +1,19 @@
-<!-- QcProcInspWoPicker.vue — 选生产工单(2026-10-15;2026-10-16 扩到首件检验单)
+<!-- QcProcInspWoPicker.vue — 选生产工单(2026-10-15;2026-10-16 扩到首件检验单;2026-11-12 扩到出货检验表观)
 
      用户口径:「选择生产工单加工单行号唯一确定当前的生产工单」(制程检验单)、
      「让当前的首件检验单也可以选择到生产工单。当前制程检验单中存在实现方式,可以参照制程检验单
-     的实现方式进行」(首件检验单)⇒ **同一个弹窗**按 mode 分流,不复制一份:
+     的实现方式进行」(首件检验单)、
+     「同时增加当前出货表观可选生产工单,实现方式和出货功能检验的选择工单一致」(出货检验表观)
+     ⇒ **同一个弹窗**按 mode 分流,不复制一份:
 
        mode='proc' (默认) → /qc/procInsp/woLines  + /qc/procInsp/fromWoLine  → 生成**制程检验单**草稿
                             (表头带产品/批次/产线,明细留空,检验项目随后用「取出货检验计划」带入);
        mode='first'      → /qc/firstInsp/woLines + /qc/firstInsp/fromWoLine → 生成**首件检验单**草稿
                             (表头多带客户代码/客户名称,明细按《成型工艺清单》预铺 —— 与报工审核
-                             自动出单同源,故手工建的与自动出的长得一样)。
+                             自动出单同源,故手工建的与自动出的长得一样);
+       mode='asm'        → /qc/asmInsp/woLines   + /qc/asmInsp/fromWoLine   → 生成**出货检验表观**草稿
+                            (2026-11-12:与自动出单同一份表头组装、明细按《出货检验计划表》预铺;
+                             准入 = **已进入组装/装箱环节**,判据/话术在后端 AsmInspEntry)。
 
      🔴 2026-10-20 口径(首件检验单):用户口径「首件检验单需要关联当前的生产工单即可,不需要实现成型
         报工完成流程才产生。就是当前检验单能选取工单,未完工的工单就可以选取,但是已经完成的就不需要
@@ -17,6 +22,12 @@
             故成型完工量/成型计划量/可开单/已建单号四列**只在制程模式显示**,首件模式改显示「生产状态」
             (与「生产工单」列表同一套判据:未排产/在产/未完工;完工与已结案的行不会出现在本列表);
           · 制程检验单保持原样(已排产 + 成型报工门禁 + 强制开单通道)。
+
+     🔴 2026-11-12 口径(出货检验表观,mode='asm'):准入 = **已进入组装/装箱环节**
+        (用户口径「在进入到组装/装箱这个工序或者产线的时候就生成」;判据在后端 AsmInspEntry):
+          · 列 = 工艺路线含「组装/装箱」且未作废、未结案的工单行;未进入的行**照旧列出并置灰**写明原因
+            (与制程「门禁不藏行」同一口径),有「强制开单」权限可填原因越闸(留痕 yj_usage_log);
+          · 列显示 进入环节(组装/装箱)/ 进入量 / 已审报工量 / 已建单号 / 生产状态。
 
      ⚠ 文件名保留历史名(QcProcInsp…):改名要动 PanelxList 的 import 与模板,收益只是好看;
        调用方一处(mode 由 PanelxList 按当前面板给)。
@@ -30,18 +41,24 @@
              destroy-on-close @update:model-value="(v) => emit('update:modelValue', v)" @open="load(1)">
     <div class="wopick-tip">
       {{ isFirst
-        ? tt('选择一条未完工的生产工单行（工单号 + 工单行号唯一确定）生成首件检验单草稿（明细按成型工艺清单预铺）。')
-        : tt('选择一条生产工单行（工单号 + 工单行号唯一确定）生成出货检验单功能草稿；已建单的行会标出来，重复选择不会重复建单。') }}
+        ? tt('选择一条未完工的生产工单行（工单号 + 工单行号唯一确定）生成今天的首件检验单草稿（每天一张，明细按成型工艺清单预铺）。')
+        : (isAsm
+          ? tt('选择一条已进入组装/装箱工序的生产工单行（工单号 + 工单行号唯一确定）生成出货检验表观草稿；已建单的行会标出来，重复选择不会重复建单。')
+          : tt('选择一条生产工单行（工单号 + 工单行号唯一确定）生成出货检验单功能草稿；已建单的行会标出来，重复选择不会重复建单。')) }}
     </div>
     <!-- 列表门槛(制程,2026-10-18 用户口径「选取的生产工单应该至少排产完成[成]型才能出现」):
          后端 woLines 只回**已排产入线**(有预排台账的还要求成型那道已排)的工单行,见 WoInspGate.pickable。
          门禁(2026-10-19「成型完成后的生产工单才能生成检验单」)仍逐行判定:置灰 + 写明原因,
          真正的拦截在后端(422)。
          🔴 2026-10-20:首件检验单**已退出**这道门禁(用户口径「未完工的工单就可以选取」)——
-         服务端只回未完工、且还没有首件检验单的工单行,每行都可选。 -->
+         服务端只回未完工、且**今天**还没有首件检验单的工单行,每行都可选。
+         🔴 2026-11-12:首件检验单按「每天一个生产批次」出(**一天一张**),故准入按**天**判:
+         昨天出过单不影响今天再建;今天已出过的行不再列出。 -->
     <div class="wopick-gate">{{ isFirst
-      ? tt('只列未完工的工单行；已完工、已结案或已有首件检验单的工单行不再列出。')
-      : tt('只列已排产（成型已排）的工单行；成型未报工的行会置灰并写明原因。') }}</div>
+      ? tt('只列未完工的工单行；已完工、已结案或今天已有首件检验单的工单行不再列出。')
+      : (isAsm
+        ? tt('只列工艺路线含「组装/装箱」的工单行；尚未进入组装/装箱的行会置灰并写明原因。')
+        : tt('只列已排产（成型已排）的工单行；成型未报工的行会置灰并写明原因。')) }}</div>
 
     <div class="wopick-bar">
       <el-input v-model="keyword" :placeholder="tt('工单号 / 产品编码 / 产品名称')" clearable style="width: 280px"
@@ -59,9 +76,18 @@
       <el-table-column :label="tt('批次号')" prop="批次号" width="100" />
       <el-table-column :label="tt('生产线')" prop="生产线" width="100" />
       <el-table-column :label="tt('排产数量')" prop="排产数量" width="90" align="right" />
-      <!-- 门禁三列只对制程检验单有意义(首件已退出成型报工门禁,每行都可选,见文件头 2026-10-20) -->
-      <el-table-column v-if="!isFirst" :label="tt('成型完工量')" prop="成型完工量" width="100" align="right" />
-      <el-table-column v-if="!isFirst" :label="tt('成型计划量')" prop="成型计划量" width="100" align="right" />
+      <!-- 门禁三列只对制程检验单有意义(首件已退出成型报工门禁;表观单按「进入组装/装箱」判) -->
+      <el-table-column v-if="!isFirst && !isAsm" :label="tt('成型完工量')" prop="成型完工量" width="100" align="right" />
+      <el-table-column v-if="!isFirst && !isAsm" :label="tt('成型计划量')" prop="成型计划量" width="100" align="right" />
+      <!-- 表观单专用三列(2026-11-12):进到哪道 / 流进来多少 / 那道自己报了多少 -->
+      <el-table-column v-if="isAsm" :label="tt('进入环节')" prop="进入环节" width="90">
+        <template #default="{ row }">
+          <el-tag v-if="row['进入环节']" size="small" type="success">{{ tt(row['进入环节']) }}</el-tag>
+          <span v-else>{{ '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column v-if="isAsm" :label="tt('进入量')" prop="进入量" width="90" align="right" />
+      <el-table-column v-if="isAsm" :label="tt('已审报工量')" prop="已审报工量" width="100" align="right" />
       <el-table-column v-if="!isFirst" :label="tt('可开单')" width="130">
         <template #default="{ row }">
           <el-tooltip v-if="row['预警放行']" :content="tt(row['不能开单原因'])" placement="top">
@@ -71,14 +97,15 @@
             {{ row['免门禁'] ? tt('免门禁') : (row['存量放行'] ? tt('存量放行') : tt('可开单')) }}
           </el-tag>
           <el-tooltip v-else :content="tt(row['不能开单原因'])" placement="top">
-            <el-tag size="small" type="info">{{ tt('成型未报工') }}</el-tag>
+            <el-tag size="small" type="info">{{ isAsm ? tt('未进入组装/装箱') : tt('成型未报工') }}</el-tag>
           </el-tooltip>
         </template>
       </el-table-column>
       <!-- 首件模式:未完工的工单行才列出来(后端已过滤)。这里放「生产状态」而不是裸的「完工状态」——
            口径与「生产工单」列表同一套(PlangStatus):未排产/在产/未完工;完工与已结案的行根本不会出现。
-           (2026-10-20 用户报障:库里 完工状态 为空时这里兜底显示「未开工」,与生产工单列表的「未排产」对不上) -->
-      <el-table-column v-if="isFirst" :label="tt('生产状态')" width="100">
+           (2026-10-20 用户报障:库里 完工状态 为空时这里兜底显示「未开工」,与生产工单列表的「未排产」对不上)
+           2026-11-12:表观单同样下发「生产状态」,一并显示。 -->
+      <el-table-column v-if="isFirst || isAsm" :label="tt('生产状态')" width="100">
         <template #default="{ row }">
           <el-tag size="small" :type="prodStatusType(row['生产状态'])">
             {{ tt(row['生产状态'] || '未完工') }}
@@ -120,14 +147,17 @@ import { tt } from '@/i18n'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
-  /** 'proc' = 制程检验单(默认) / 'first' = 首件检验单 —— 只切换接口与话术,弹窗长得一样 */
+  /** 'proc' = 制程检验单(默认) / 'first' = 首件检验单 / 'asm' = 出货检验表观 —— 只切换接口与话术,弹窗长得一样 */
   mode: { type: String, default: 'proc' },
 })
 const emit = defineEmits(['update:modelValue', 'picked'])
 
-/** 接口基路径:两套后端入口字段完全对齐(QcProcInspController / QcFirstInspController) */
-const base = computed(() => (props.mode === 'first' ? '/qc/firstInsp' : '/qc/procInsp'))
+/** 接口基路径:三套后端入口字段完全对齐(QcProcInspController / QcFirstInspController / QcAsmInspController) */
+const base = computed(() => (props.mode === 'first' ? '/qc/firstInsp'
+  : (props.mode === 'asm' ? '/qc/asmInsp' : '/qc/procInsp')))
 const isFirst = computed(() => props.mode === 'first')
+/** 出货检验表观(2026-11-12):准入/列与制程单不同 —— 见文件头 */
+const isAsm = computed(() => props.mode === 'asm')
 
 const keyword = ref('')
 const rows = ref([])
@@ -234,7 +264,8 @@ async function submit(extra) {
     emit('update:modelValue', false)
     emit('picked', res.data || {})
   } catch (error) {
-    ElMessage.error(error?.message || (isFirst.value ? tt('生成首件检验单失败') : tt('生成出货检验单功能失败')))
+    ElMessage.error(error?.message || (isFirst.value ? tt('生成首件检验单失败')
+      : (isAsm.value ? tt('生成出货检验表观失败') : tt('生成出货检验单功能失败'))))
   } finally {
     saving.value = false
   }

@@ -180,6 +180,11 @@ public class PanelPermissionService {
         m.put(PagePanelRegistry.WORK_ORDER_BOARD + "|日排产", new String[]{"dayplan"});
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|日排产", new String[]{"dayplan"});
         m.put(PagePanelRegistry.WORK_ORDER_LIST + "|打印", new String[]{"print"});
+        // 新增生产工单(2026-11-13):顶部「新增」按钮 + POST /px/workOrderList/create 共用 create 词。
+        //   按钮名取页面实际文案「新增」(与页面按钮文字一致,便于对照矩阵)。
+        m.put(PagePanelRegistry.WORK_ORDER_LIST + "|新增", new String[]{"create"});
+        // 删除工单(2026-11-13 第二轮):顶部「删除工单」按钮 + POST /px/workOrderList/delete 共用 del 词。
+        m.put(PagePanelRegistry.WORK_ORDER_LIST + "|删除工单", new String[]{"del"});
         // 生产工单列表:「结案/取消结案」是同一个按钮的两种取向,同挂 close 词;
         // 工单排产看板上的「取消结案」是**另一个**动作(只撤结案不改结案)⇒ 挂 unclose 词。
         // 两者共用一个端点(/px/workOrderList/close),故该端点按 requireButtonAny 取「任一命中」。
@@ -237,8 +242,21 @@ public class PanelPermissionService {
         if (need == null) return;
         Set<String> perms = permsOf(user).getOrDefault(panelCode, Set.of());
         for (String n : need) if (perms.contains(n)) return;
+        // 2026-11-13 用户口径「本人自审权限绑定审核按钮」:角色只勾了「本人自审」(selfaudit)、
+        // 没勾审批列时,这三颗按钮原先在**接口层**就被挡(403),授了权限也用不了。
+        // 这里只对"服务层自带 selfaudit 判据"的三个动作放行,真正能不能落笔由
+        // ButtonService.audit()/approve() 按 canSelfAudit 再判一次(别人的单一律拒)。
+        // ⚠ 别扩大成"need 含 audit 就放行":弃审/中止/删除审批那些动作没有自审判据,放行=白送。
+        if (perms.contains("selfaudit") && SELF_AUDIT_ACTIONS.contains(buttonName)) return;
         throw new AccessDeniedException(denyMessage(need, buttonName));
     }
+
+    /**
+     * 允许「本人自审」放行的动作(2026-11-13)。
+     * 三条都在 ButtonService 里另有 {@code canSelfAudit} 判据(编制与审批分离的豁免),
+     * 所以接口层放行不等于越权;不在此列的动作照旧要 audit 词。
+     */
+    private static final Set<String> SELF_AUDIT_ACTIONS = Set.of("审核", "审批通过", "审批驳回");
 
     /**
      * 按钮权限校验(**跨面板任一命中**)—— 2026-10-16 页面级面板用:

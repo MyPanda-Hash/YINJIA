@@ -1,0 +1,7 @@
+// round-03:验收结束,回到我的桌面并交还页面(不关闭,留给用户)
+const task = await taskSpace('deploy-20261116-verify')
+const page = task.page('p1')
+await page.goto('http://36.140.66.163:8090/#/dashboard', { timeout: 60000 })
+await page.waitForTimeout(3000)
+console.log('最终 hash:', await page.evaluate(() => location.hash))
+await task.finish({ keep: true })

@@ -154,6 +154,19 @@ public class WorkOrderProgressService {
                         + "   AND ISNULL(w.状态,N'') = N'已落实'"
                         + " ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC", nos.toArray());
 
+        // ── 预排台账(2026-11-13,契约 §2)──────────────────────────────────────────────
+        // 用途:给每道工序补「生产线 / 台账状态 / 已排产」三个**展示字段**(工序点击要跳工单排产的对应线)。
+        // ⚠ 与上面那条 ledger 查询**刻意分开、互不影响**:上面那条只认「已落实」、按工序序 DESC 取第一条,
+        //   是「当前工序」的唯一口径(currentProcessOf),牵动看板汇总与生产工单列表,**一行都不能动**;
+        //   这一条把未作废的**全部**台账行取回来(计划/已落实/已完工都算),只做工序级映射,不改任何口径。
+        List<Map<String, Object>> schedRows = jdbc.queryForList(
+                "SELECT w.工单号 AS 工单号, w.工单行id AS 行id, ISNULL(w.工序, N'') AS 工序,"
+                        + " ISNULL(w.计划生产线, N'') AS 计划生产线, ISNULL(w.实际生产线, N'') AS 实际生产线,"
+                        + " ISNULL(w.状态, N'') AS 状态"
+                        + " FROM dbo.wo_process_line w"
+                        + " WHERE w.工单号 IN (" + in + ") AND ISNULL(w.asp_cancel,'N')<>'Y'"
+                        + " ORDER BY w.工单行id, ISNULL(w.工序序,999), w.id", nos.toArray());
+
         // 工单号 → 该单的行;行id → 行;行id → 报工累计
         Map<String, List<Map<String, Object>>> byNo = new HashMap<>();
         Map<Object, Map<String, Object>> byRowId = new HashMap<>();
@@ -196,6 +209,29 @@ public class WorkOrderProgressService {
             ledgerByNo.computeIfAbsent(nz(str(l.get("工单号"))), k -> new ArrayList<>()).add(l);
         }
 
+        // 工序级台账映射(2026-11-13):行级 key = 工单行id;工单级(工单行id IS NULL)另放一张表做兜底。
+        //   值 = 工序 → {生产线, 台账状态};同一工序有多条未作废台账行时取**进度最靠后**的一条
+        //   (实际生产线要等「已落实」才回填,取最靠后才拿得到真正投的线;同级取先出现者,确定性仍由 ORDER BY 保证)。
+        Map<Object, Map<String, Map<String, Object>>> schedByRow = new HashMap<>();
+        Map<String, Map<String, Map<String, Object>>> schedByOrder = new HashMap<>();
+        for (Map<String, Object> l : schedRows) {
+            String op = nz(str(l.get("工序")));
+            if (op.isEmpty()) continue;                                  // 工序为空的脏行不参与
+            String planLine = nz(str(l.get("计划生产线")));
+            String actLine = nz(str(l.get("实际生产线")));
+            String lstate = nz(str(l.get("状态")));
+            Map<String, Object> one = new LinkedHashMap<>();
+            one.put("生产线", actLine.isEmpty() ? planLine : actLine);    // 实际生产线非空优先,否则计划生产线
+            one.put("台账状态", lstate);
+            one.put("_rank", ledgerRank(lstate));
+            Object lid = l.get("行id");
+            Map<String, Map<String, Object>> target = lid == null
+                    ? schedByOrder.computeIfAbsent(nz(str(l.get("工单号"))), k -> new HashMap<>())
+                    : schedByRow.computeIfAbsent(numKey(lid), k -> new HashMap<>());
+            Map<String, Object> old = target.get(op);
+            if (old == null || (int) old.get("_rank") <= (int) one.get("_rank")) target.put(op, one);
+        }
+
         // 工序检验单(2026-11-08):批量取三张工序检验单并按工单行归属 —— 用于工序步骤上的
         // 「待品质检验」提示与完工后「合格绿/不合格红」结论(只认已审核单据,弃审后结果自动回退)
         Map<Long, List<Map<String, Object>>> inspByRow = inspection.docsByRow(rows);
@@ -224,6 +260,21 @@ public class WorkOrderProgressService {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> steps = (List<Map<String, Object>>) summary.get("工序步骤");
             inspection.attach(r, steps, inspByRow.getOrDefault((long) num(r.get("行id")), List.of()));
+            // 每步补「生产线 / 台账状态 / 已排产」(契约 §2,2026-11-13):
+            //   匹配顺序与 currentProcessOf 一致 —— 本行 工单行id = 行.行id 优先,工单级(工单行id IS NULL)兜底;
+            //   都不命中 = **无台账**(生产线/台账状态给 '',已排产 false),不猜、不回落到 行.生产线 ——
+            //   前端要靠这两个空值区分「该工单未进行排产」与「排了产但这条线还没填」。
+            Map<String, Map<String, Object>> rowSched = schedByRow.getOrDefault(key, Map.of());
+            Map<String, Map<String, Object>> orderSched =
+                    schedByOrder.getOrDefault(nz(str(r.get("工单号"))), Map.of());
+            for (Map<String, Object> step : steps) {
+                String op = nz(str(step.get("工序")));
+                Map<String, Object> s = rowSched.get(op);
+                if (s == null) s = orderSched.get(op);                   // 行级没排到才落工单级兜底
+                step.put("生产线", s == null ? "" : nz(str(s.get("生产线"))));
+                step.put("台账状态", s == null ? "" : nz(str(s.get("台账状态"))));
+                step.put("已排产", s != null);
+            }
             if (!((List<?>) r.getOrDefault("待检验工序", List.of())).isEmpty()) waiting++;
             if (isActive(st)) active++; else finished++;
             progressSum += num(summary.get("进度"));
@@ -247,6 +298,19 @@ public class WorkOrderProgressService {
             }
         }
         return nz(str(row.get("表头当前工序")));
+    }
+
+    /**
+     * 预排台账状态权重(2026-11-13,只服务工序步骤的「生产线/台账状态」展示字段):
+     * 同一工序存在多条未作废台账行时,取**进度最靠后**的一条 —— 计划 &lt; 已落实 &lt; 已完工。
+     * 依据:{@code 实际生产线} 是「落实」动作回填的,计划态那行只有计划线;取最靠后才拿得到真正投的线。
+     * 未知/空状态给 0(等同不覆盖已有值)。
+     */
+    private static int ledgerRank(String state) {
+        if ("已完工".equals(state)) return 3;
+        if ("已落实".equals(state)) return 2;
+        if ("计划".equals(state)) return 1;
+        return 0;
     }
 
     private static Map<String, Object> summary(int total, int active, int finished) {

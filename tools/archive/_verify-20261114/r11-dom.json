@@ -1,0 +1,181 @@
+{
+ "opened": {
+  "ok": true
+ },
+ "dom": {
+  "hash": "#/panelx/list/QC_FIRST_INSP",
+  "factory": "YINJIA-MES·测试库",
+  "cols": [
+   "炭棒表观状态",
+   "炭棒脱粉情况",
+   "炭棒外径(mm)",
+   "炭棒内径(mm)",
+   "炭棒长度(mm)",
+   "炭棒重量(g)",
+   "跌落",
+   "挤压强度(kgf)",
+   "浊度NTU",
+   "压降kPa"
+  ],
+  "sampleRows": 8,
+  "gzY": 20,
+  "gzYColors": [
+   "rgb(255, 243, 202)"
+  ],
+  "slash": 60,
+  "stdCheck": 2,
+  "stdColors": [
+   "rgb(217, 217, 217)"
+  ],
+  "stdCheckControls": 0,
+  "fillableRows": [
+   {
+    "col": "炭棒表观状态",
+    "rows": [
+     1,
+     2
+    ]
+   },
+   {
+    "col": "炭棒脱粉情况",
+    "rows": [
+     1,
+     2
+    ]
+   },
+   {
+    "col": "炭棒外径(mm)",
+    "rows": [
+     3,
+     4
+    ]
+   },
+   {
+    "col": "炭棒内径(mm)",
+    "rows": [
+     3,
+     4
+    ]
+   },
+   {
+    "col": "炭棒长度(mm)",
+    "rows": [
+     3,
+     4
+    ]
+   },
+   {
+    "col": "炭棒重量(g)",
+    "rows": [
+     3,
+     4
+    ]
+   },
+   {
+    "col": "跌落",
+    "rows": [
+     5,
+     6
+    ]
+   },
+   {
+    "col": "挤压强度(kgf)",
+    "rows": [
+     5,
+     6
+    ]
+   },
+   {
+    "col": "浊度NTU",
+    "rows": [
+     7,
+     8
+    ]
+   },
+   {
+    "col": "压降kPa",
+    "rows": [
+     7,
+     8
+    ]
+   }
+  ],
+  "fillableTotal": 20,
+  "compressRows": [
+   5,
+   6
+  ],
+  "compressCells": {
+   "5#": {
+    "bg": "rgb(255, 243, 202)",
+    "hasInput": true,
+    "boxes": 0,
+    "text": "",
+    "title": "按表显数据记录（不取整）"
+   },
+   "6#": {
+    "bg": "rgb(255, 243, 202)",
+    "hasInput": true,
+    "boxes": 0,
+    "text": "",
+    "title": "按表显数据记录（不取整）"
+   },
+   "7#": {
+    "bg": "rgba(0, 0, 0, 0)",
+    "hasInput": false,
+    "boxes": 0,
+    "text": "/",
+    "title": "按相关要求：本组测试只记录 2 支样品（5#、6#）"
+   },
+   "8#": {
+    "bg": "rgba(0, 0, 0, 0)",
+    "hasInput": false,
+    "boxes": 0,
+    "text": "/",
+    "title": "按相关要求：本组测试只记录 2 支样品（5#、6#）"
+   }
+  },
+  "compressValues": {
+   "5#": "32.5",
+   "6#": "",
+   "7#": "/",
+   "8#": "/"
+  },
+  "dropRows": [
+   5,
+   6
+  ],
+  "turbRows": [
+   7,
+   8
+  ],
+  "pressRows": [
+   7,
+   8
+  ],
+  "appearanceRows": [
+   1,
+   2
+  ],
+  "depowderRows": [
+   1,
+   2
+  ],
+  "outerRows": [
+   3,
+   4
+  ],
+  "innerRows": [
+   3,
+   4
+  ],
+  "lengthRows": [
+   3,
+   4
+  ],
+  "weightRows": [
+   3,
+   4
+  ]
+ }
+}

@@ -1,0 +1,6 @@
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== verify-asm-doc.sql ==
+  | ZJ-2026-11-0004 | GD-TEST-ASM-20261112 | 1 | 组装 | TESTASM01 |  | TEST-ASM-001 | 300.0000 | 2026-11-12 | 2026-11-12 | 2026-11-12 23:07:16 | 
+  | ASM_ENTRY | GD-TEST-ASM-20261112 | GD-TEST-ASM-20261112#1 | QC_ASM_INSP | ZJ-2026-11-0004 | ACTIVE | 
+  | 2196 | GD-TEST-ASM-20261112 | 1 | 成型 | 在制 | 
+[OK] verify-asm-doc.sql (1 batches)

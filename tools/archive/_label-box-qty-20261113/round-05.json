@@ -1,0 +1,38 @@
+{
+  "rect": {
+    "r": [
+      46,
+      473,
+      104,
+      20
+    ],
+    "hit": "打印单号"
+  },
+  "after": {
+    "rows": [
+      {
+        "qty": "240",
+        "qtyDisabled": false,
+        "box": "100",
+        "boxDisabled": false
+      },
+      {
+        "qty": "18",
+        "qtyDisabled": false,
+        "box": "",
+        "boxDisabled": false
+      }
+    ],
+    "banner": "",
+    "hasCancel": false,
+    "msgs": []
+  },
+  "typed": {
+    "ok": true,
+    "value": "100"
+  },
+  "final": {
+    "boxValue": "100",
+    "hint": "行号 1.0000：每箱 100 ⇒ 共 3 张（整箱 2 + 零头箱 40，零头不足一箱，已自动出卡）"
+  }
+}

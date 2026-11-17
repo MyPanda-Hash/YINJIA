@@ -48,7 +48,7 @@
             <!-- 当前工序 / 完工状态:报工提交后由后端推进,这里读的是工单行的实时值 -->
             <div class="mp-kv">
               <span>{{ tt('当前工序') }}</span>
-              <b class="mp-cur">{{ wo.当前工序 || '—' }}</b>
+              <b class="mp-cur">{{ wo.当前工序 ? tt(wo.当前工序) : '—' }}</b>
             </div>
             <div class="mp-kv"><span>{{ tt('完工状态') }}</span><b>{{ wo.完工状态 || '—' }}</b></div>
             <div class="mp-kv"><span>{{ tt('报工人') }}</span><b>{{ reporterName || '—' }}</b></div>
@@ -68,10 +68,16 @@
               :class="{ 'is-active': pickedOp === op.工序, 'is-done': Number(op.已报工) >= Number(op.计划数量) && Number(op.计划数量) > 0 }"
               @click="pickOp(op)"
             >
-              <div class="mp-op-name">{{ opLabel(op.工序) }}</div>
+              <div class="mp-op-name">{{ tt(opLabel(op.工序)) }}</div>
               <div class="mp-op-meta">
                 <span>{{ fmt(op.已报工) }} / {{ fmt(op.计划数量) }}</span>
                 <span v-if="Number(op.待审核) > 0" class="mp-op-pending">{{ tt('待审') }} {{ fmt(op.待审核) }}</span>
+              </div>
+              <!-- 按量流转(2026-11-11 用户口径):本道能报多少 = **上一道已审完工量**流下来的量,
+                   不是本道的计划量。工序1 计划 500 只报 200 ⇒ 工序2 这里显示"可报 200"。 -->
+              <div class="mp-op-flow" :title="tt('本道可报量 = 上一道已审核完工量(按量流转)')">
+                {{ tt('可报') }} <b>{{ fmt(leftOf(op)) }}</b>
+                <span class="mp-op-avail">{{ tt('可加工量') }} {{ fmt(op.可加工量 || 0) }}</span>
               </div>
               <div class="mp-op-bar"><i :style="{ width: pct(op) + '%' }"></i></div>
             </div>
@@ -127,7 +133,9 @@
               {{ tt('提交报工') }}
             </el-button>
           </div>
-          <div v-if="picked && !canSubmit && submitHint" class="mp-warn">{{ submitHint }}</div>
+          <!-- 提交按钮下方提示(2026-11-13):不再只在"不能提交"时出现 —— 填超了也立刻提示
+               「本次最多可报 X」,让人先看到;真点提交才弹窗讲算式(弹窗见文件尾)。 -->
+          <div v-if="picked && submitHint" class="mp-warn">{{ submitHint }}</div>
         </section>
       </div>
 
@@ -141,7 +149,7 @@
           <div v-if="!today.length" class="mp-empty">{{ tt('今天还没有报工记录') }}</div>
           <div v-for="(r, i) in today" :key="i" class="mp-line">
             <div class="mp-line-main">
-              <div class="mp-line-name">{{ opLabel(r.工序) }} · {{ fmt(r.报工数量) }} {{ wo ? wo.计量单位 : '' }}</div>
+              <div class="mp-line-name">{{ tt(opLabel(r.工序)) }} · {{ fmt(r.报工数量) }} {{ wo ? wo.计量单位 : '' }}</div>
               <div class="mp-line-meta">
                 {{ r.报工单号 }} · {{ r.报工人 || '—' }} · {{ r.完工状态 === 'Y' ? tt('已审核') : tt('待审核') }}
               </div>
@@ -150,6 +158,62 @@
         </section>
       </div>
     </div>
+
+    <!-- 报工超量弹窗(2026-11-13 用户口径:「当前这个报工提示不明确,实现一个弹窗提示;手机端适配手机比例;
+         文案简洁明了;指出当前工序的可报工数量依赖于上一个工序,不能超出当前的值」)───────────────
+         口径:用户填超了**不直接提交**,弹窗把三件事讲完就够 ——
+           ① 本次最多可报 X(大数字);
+           ② 你填了 Y(超出 Z);
+           ③ 一句算式:`可报 = 上一道「成型」已审完工 1200 − 本道已报 1100 = 100` + 一句"不能超过上一道实际产出"。
+         手机适配:弹窗宽度 92% / 最大 420px、大字号大按钮;样式放在下方**非 scoped** 的 .mp-cap-dlg 里
+         (el-dialog 是 append-to-body,scoped 样式够不到)。 -->
+    <el-dialog v-model="cap.visible" :title="tt('报工数量超出可报上限')" class="mp-cap-dlg" width="92%"
+               align-center :close-on-click-modal="false" append-to-body>
+      <div class="mp-cap">
+        <div class="mp-cap-big">
+          <span class="mp-cap-lb">{{ tt('本次最多可报') }}</span>
+          <b class="mp-cap-max">{{ fmt(cap.max) }}</b>
+          <span class="mp-cap-unit">{{ wo ? wo.计量单位 : '' }}</span>
+        </div>
+        <div class="mp-cap-line">
+          {{ tt('你填了') }} <b>{{ fmt(cap.qty) }}</b>（{{ tt('超出') }} <b class="mp-cap-over">{{ fmt(cap.overBy) }}</b>）
+        </div>
+        <div class="mp-cap-formula">
+          <template v-if="cap.isFirst">
+            {{ tt('可报 = 本道排产') }} {{ fmt(cap.avail) }} − {{ tt('本道已报') }} {{ fmt(cap.reported) }} = {{ fmt(cap.max) }}
+          </template>
+          <template v-else>
+            {{ tt('可报 = 上一道') }}「{{ tt(opLabel(cap.prevOp)) }}」{{ tt('已审完工') }} {{ fmt(cap.avail) }}
+            − {{ tt('本道已报') }} {{ fmt(cap.reported) }} = {{ fmt(cap.max) }}
+          </template>
+        </div>
+        <div class="mp-cap-tip">
+          {{ cap.isFirst ? tt('首道工序按排产数量封顶。') : tt('本道只能报上一道工序真正流下来的量,不能超过它。') }}
+        </div>
+      </div>
+      <template #footer>
+        <div class="mp-cap-actions">
+          <el-button size="large" @click="cap.visible = false">{{ tt('知道了') }}</el-button>
+          <el-button size="large" type="primary" @click="applyCapMax">
+            {{ tt('改为') }} {{ fmt(cap.max) }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- 其它提交失败:一句人话(不再把后端一长串原文挂到页面顶部) -->
+    <el-dialog v-model="errDlg.visible" :title="tt('报工未提交成功')" class="mp-cap-dlg" width="92%"
+               align-center append-to-body>
+      <div class="mp-cap">
+        <div class="mp-cap-line mp-cap-reason">{{ errDlg.text }}</div>
+        <div class="mp-cap-tip">{{ tt('请稍后重试;仍不行就到「工序报工单」手工开单。') }}</div>
+      </div>
+      <template #footer>
+        <div class="mp-cap-actions">
+          <el-button size="large" type="primary" @click="errDlg.visible = false">{{ tt('知道了') }}</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -159,6 +223,8 @@ import { ElMessage } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { parseWorkOrderCode } from '@/business/scanCode'
+import { focusScanNow } from '@/business/scanFocus'
+import { reportCapInfo, isOverCapMessage, conciseReportError } from '@/business/reportCap'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
@@ -175,6 +241,11 @@ const pickedOp = ref('')
 const qty = ref(0)
 const saving = ref(false)
 const errText = ref('')
+/** 报工超量弹窗(2026-11-13 用户口径「提示不明确 ⇒ 弹窗 + 手机适配 + 文案简洁」):
+ *  字段全部来自纯函数 business/reportCap.js 的 reportCapInfo,组件只负责显示。 */
+const cap = ref({ visible: false, op: '', prevOp: '', isFirst: true, plan: 0, avail: 0, reported: 0, max: 0, qty: 0, over: false, overBy: 0 })
+/** 其它提交失败弹窗(一句人话;不再把后端长原文挂横幅) */
+const errDlg = ref({ visible: false, text: '' })
 /** 组装物料清单(2026-11-01):后端 /workReport/context 按工单行产品下发的 bs_asm_bom 内容;
  *  只有「组装」工序才有 BOM,其它工序与此无关 ⇒ 仅当选中的工序=组装 时才展示。 */
 const asmBom = ref(null)
@@ -189,6 +260,16 @@ const pct = (op) => {
   const done = Number(op.已报工) || 0
   if (plan <= 0) return 0
   return Math.min(100, Math.round((done / plan) * 100))
+}
+/**
+ * 本道**剩余可报量**(按量流转,2026-11-11):后端 ProcessFlow 派生 = 可加工量 − 已报工。
+ * 可加工量 = 上一道已审完工量折算到本道(首道 = 排产数量折算),所以后道只能报前道真正流下来的量。
+ * 老接口没有该字段时退回历史口径(计划量 − 已报工),保证不崩。
+ */
+const leftOf = (op) => {
+  if (!op) return 0
+  if (op.剩余可报 !== undefined && op.剩余可报 !== null) return Math.max(Number(op.剩余可报) || 0, 0)
+  return Math.max((Number(op.计划数量) || 0) - (Number(op.已报工) || 0), 0)
 }
 
 /** 工序中文名(库里就是「成型/切炭/组装」;切炭不要写成"切碳") */
@@ -209,11 +290,50 @@ const bomRows = computed(() => {
   }))
 })
 const canSubmit = computed(() => !!wo.value && !!picked.value && Number(qty.value) > 0 && !saving.value)
+/**
+ * 提交按钮下方的一行提示(2026-11-13 简化文案;真正提交超量时弹窗说明):
+ * 优先口径 = `可报 = 上一道已审完工 − 本道已报`(按量流转,见 business/reportCap.js)。
+ */
 const submitHint = computed(() => {
   if (!picked.value) return tt('请先选择工序')
   if (!(Number(qty.value) > 0)) return tt('请填写完工数量')
+  const info = reportCapInfo(ops.value, pickedOp.value, qty.value)
+  const left = Math.max(Number(leftOf(picked.value)) || 0, 0)
+  if (left <= 0) {
+    return info && info.isFirst
+      ? tt('本道计划量已报完,暂不能报工')
+      : tt('上一道工序还没有已审核完工,本道暂不能报工')
+  }
+  if (Number(qty.value) > left + 0.0001) return tt('本次最多可报') + ' ' + fmt(left)
   return ''
 })
+
+/** 打开「超出可报上限」弹窗(前端预检 + 后端 409 兜底共用) */
+function openCapDialog(info) {
+  if (!info) {
+    const op = picked.value || {}
+    info = {
+      op: String(op.工序 || ''),
+      prevOp: '',
+      isFirst: true,
+      plan: Number(op.计划数量) || 0,
+      avail: Number(op.可加工量) || 0,
+      reported: Number(op.已报工) || 0,
+      max: Math.max(Number(leftOf(op)) || 0, 0),
+      qty: Number(qty.value) || 0,
+    }
+  }
+  cap.value = { ...info, visible: true, over: true, overBy: Math.max((Number(info.qty) || 0) - (Number(info.max) || 0), 0) }
+}
+/** 「改为 X」:把完工数量改成可报上限(不自动提交,让人自己再确认一次) */
+function applyCapMax() {
+  qty.value = Math.round((Number(cap.value.max) || 0) * 10000) / 10000
+  cap.value.visible = false
+}
+/** 其它提交失败:弹窗给一句人话 */
+function openErrorDialog(text) {
+  errDlg.value = { visible: true, text: String(text || '').trim() || tt('提交报工失败') }
+}
 
 /** 扫码桥:两个安卓壳都注入 window.YjNative(自研 ZXing),网页版没有 */
 const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan)
@@ -279,32 +399,38 @@ async function loadWo(line) {
     today.value = Array.isArray(data.今日报工) ? data.今日报工 : []
     // 组装物料(2026-11-01):后端按工单行产品编码下发;只有选中「组装」工序时才展示
     asmBom.value = data.组装物料 || null
-    // 默认选中「当前工序」,没有就选第一道未做满的
+    // 默认选中「当前工序」,没有就选第一道还有可报量的
     const cur = String(wo.value?.当前工序 || '').trim()
     const hit = ops.value.find((o) => o.工序 === cur)
-      || ops.value.find((o) => Number(o.计划数量) > 0 && Number(o.已报工) < Number(o.计划数量))
+      || ops.value.find((o) => leftOf(o) > 0)
       || ops.value[0]
     if (hit) {
       pickedOp.value = hit.工序
-      // 数量默认 = 计划量 - 已报工(还差多少),不能为负
-      const left = (Number(hit.计划数量) || 0) - (Number(hit.已报工) || 0)
+      // 数量默认 = **本道剩余可报**(按量流转:上一道流下来多少就只能报多少)
+      const left = leftOf(hit)
       qty.value = left > 0 ? Math.round(left * 10000) / 10000 : 0
     }
   } catch (e) {
     errText.value = e?.response?.data?.message || e?.message || tt('查询工单失败')
   } finally {
     woLoading.value = false
+    // PDA 连扫(2026-11-16):扫完/查完把光标放回工单扫码框,好接着扫下一张
+    focusScanNow(() => woInput.value, { delay: 120 })
   }
 }
 
 function pickOp(op) {
   pickedOp.value = op.工序
-  const left = (Number(op.计划数量) || 0) - (Number(op.已报工) || 0)
+  // 数量默认 = 本道剩余可报(按量流转:计划量在这里不再等于可报量)
+  const left = leftOf(op)
   qty.value = left > 0 ? Math.round(left * 10000) / 10000 : 0
 }
 
 async function submit() {
   if (!canSubmit.value) return
+  // ① 前端先拦:超量不必等后端 409 —— 弹窗直接讲清"最多能报多少 + 为什么"(2026-11-13 用户口径)
+  const info = reportCapInfo(ops.value, pickedOp.value, qty.value)
+  if (info && info.over) { openCapDialog(info); return }
   saving.value = true
   errText.value = ''
   try {
@@ -328,9 +454,17 @@ async function submit() {
     }
     await loadWo(wo.value.工单行号)   // 重新拉一次:工序进度/当前工序会变
   } catch (e) {
-    errText.value = e?.response?.data?.message || e?.message || tt('提交报工失败')
+    // ② 后端兜底(并发/别人先报了):超量类错误同样走弹窗;其它错误只弹一句人话,不挂长横幅
+    const msg = e?.response?.data?.message || e?.message || ''
+    if (isOverCapMessage(msg)) {
+      openCapDialog(reportCapInfo(ops.value, pickedOp.value, qty.value))
+    } else {
+      openErrorDialog(conciseReportError(msg, tt('提交报工失败')))
+    }
   } finally {
     saving.value = false
+    // 提交完光标回扫码框(下一张工单直接扫)
+    focusScanNow(() => woInput.value, { delay: 200 })
   }
 }
 </script>
@@ -430,6 +564,13 @@ async function submit() {
   margin-top: 4px; font-size: 11px; color: var(--el-text-color-secondary);
 }
 .mp-op-pending { color: var(--el-color-warning); }
+/* 按量流转(2026-11-11):本道可报量 = 上一道已审核完工量流下来的量 —— 现场一眼看到"还能报多少" */
+.mp-op-flow {
+  display: flex; align-items: baseline; gap: 6px;
+  margin-top: 3px; font-size: 11px; color: var(--el-text-color-secondary);
+}
+.mp-op-flow b { color: var(--el-color-primary); font-size: 13px; }
+.mp-op-avail { color: var(--el-text-color-placeholder); }
 .mp-op-bar { height: 4px; margin-top: 6px; border-radius: 2px; background: var(--el-fill-color); overflow: hidden; }
 .mp-op-bar i { display: block; height: 100%; background: var(--el-color-primary); }
 
@@ -462,5 +603,38 @@ async function submit() {
   .mp-body { flex-direction: row; align-items: flex-start; }
   .mp-left { flex: 1.6; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
   .mp-right { flex: 1; min-width: 0; }
+}
+</style>
+
+<!-- 报工提示弹窗(2026-11-13):el-dialog append-to-body,scoped 样式够不到 ⇒ 单独一块非 scoped,
+     类名统一 .mp-cap-dlg 前缀,不污染全局。手机适配:宽度 92%(由组件 width 属性给)、最大 420px,
+     窄屏按钮撑满/极窄屏竖排;字号按手机阅读放大(主数字 34px)。 -->
+<style>
+.mp-cap-dlg { max-width: 420px; border-radius: 12px; }
+.mp-cap-dlg .el-dialog__header { padding: 16px 16px 4px; }
+.mp-cap-dlg .el-dialog__title { font-size: 16px; font-weight: 600; line-height: 1.4; }
+.mp-cap-dlg .el-dialog__body { padding: 6px 16px 4px; }
+.mp-cap-dlg .el-dialog__footer { padding: 10px 16px 16px; }
+.mp-cap { font-size: 14px; line-height: 1.5; color: var(--el-text-color-regular); }
+.mp-cap-big { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.mp-cap-lb { font-size: 14px; color: var(--el-text-color-regular); }
+.mp-cap-max { font-size: 34px; font-weight: 700; line-height: 1.1; color: var(--el-color-primary); font-variant-numeric: tabular-nums; }
+.mp-cap-unit { font-size: 13px; color: var(--el-text-color-secondary); }
+.mp-cap-line { margin-top: 6px; font-size: 14px; }
+.mp-cap-line b { font-weight: 600; }
+.mp-cap-over { color: var(--el-color-danger); }
+.mp-cap-formula {
+  margin-top: 12px; padding: 8px 10px; border-radius: 8px;
+  background: var(--el-fill-color-lighter);
+  font-size: 12px; line-height: 1.6; color: var(--el-text-color-regular); word-break: break-word;
+}
+.mp-cap-tip { margin-top: 10px; font-size: 12px; line-height: 1.6; color: var(--el-color-warning-dark-2); }
+.mp-cap-reason { font-size: 15px; line-height: 1.6; word-break: break-word; }
+.mp-cap-actions { display: flex; gap: 10px; }
+.mp-cap-actions .el-button { flex: 1; margin-left: 0; }
+/* 极窄屏(iPhone SE 320 等):两个按钮竖排,主按钮在上(拇指够得到) */
+@media (max-width: 360px) {
+  .mp-cap-actions { flex-direction: column-reverse; }
+  .mp-cap-max { font-size: 30px; }
 }
 </style>

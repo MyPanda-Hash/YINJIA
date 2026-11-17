@@ -26,6 +26,7 @@ table:yj_doc_status   # 单据状态表(shr审核/canceled作废/stopped中止/p
 table:yj_erp_wh_map   # 金蝶仓库编码 → MES 仓库编码 映射(条码/库存面板按此把外部仓归到 MES 仓;改口径只改数据:CK00006/YCL-01→WH-CL)
 table:yj_ext_bind_log   # 动态字段绑定审计(bind绑定/retire退绑/clear清空;备用列池操作留痕)
 table:yj_field   # 面板字段注册表(列名/中文标签/类型/字典SQL/参照面板/位置query|header|detail/必填)
+table:yj_field_view   # 角色字段视图(2026-11-13):同一面板各角色「显示/隐藏哪些字段」;只存显隐(顺序与栏名仍由 yj_field=系统整体决定),同一角色所有账号共用;行存在=显式设定,行不存在=跟随整体 —— 原「表格调整/表头调整」对 yj_field 的写入一点没改
 table:yj_form_approval   # 审批流记录(提交/通过/驳回留痕)
 table:yj_locale   # 语言表(启用语言清单,插行即出现语言切换器)
 table:yj_lot_seq   # 批号流水表(批号=yyyymmdd+3位流水,材料/产品批号统一取号)
@@ -33,6 +34,7 @@ table:yj_message   # 站内消息表(收件人/消息码/关联面板与单据/�
 table:yj_menu_node   # 菜单覆盖表(系统管理平台·菜单设计):只存名称/上级/同级排序/隐藏 + 界面新建的分组;导航基线与数据键(path/面板Code/图标)仍在 frontend/src/business/menus.js,合并口径见 frontend/src/business/menuOverrides.js
 table:yj_panel   # 面板注册表(元数据核心:面板编码/模式doc|flat|archive/头行表/前缀/日期列/模块分组)
 table:yj_plan_term   # 计划条款表(阶段中止/恢复申请:stage/reason/state)
+table:yj_print_task   # 自动打印·任务缓存(离线补打,2026-11-16):一行=一条手机端发起的打印任务;代理掉线期间的单子留在这里,回来第一次轮询按 id 顺序补打;targets/delivered 是逗号分隔站点名,载荷整条 JSON 存(payload_json),状态 PENDING/SENT/DONE/FAILED/EXPIRED,默认保留 3 天 = 72 小时(print.cache_hours)
 table:yj_report_template   # 报表模板表(ADR-0002:DB 存储精细模板,上传即编译校验生效免重启;template_code 唯一,panel_code 绑定面板)
 table:yj_role   # 角色表(角色编码/名称/is_admin)
 table:yj_role_panel   # 角色-面板授权表(perms动作词表含view等,can_approve=审批权)
@@ -306,4 +308,21 @@ table:qc_oqc_head       # 出厂检验报告头表(一份=一个产品;销售出
 table:qc_oqc_detail     # 出厂检验报告行表(序号/检验项目/要求/抽样标准/抽检量/测量值1..5/结果/判定/数据来源)
 table:qc_oqc_item_map   # 出厂检验项目对齐表(报告项目 ← 源面板+源表区+源项目名,按优先级取第一个有值的)
 view:v_oqc_std          # 出厂检验标准层只读视图(取自 rd_insp_plan_head/_detail;不改计划表任何一列)
+
+# ── 2026-11-13 生产工单「新增生产工单」(含临时工单) ──
+table:wo_bom   # 工单物料清单(临时工单用料;一行=工单行×一个子件;常规工单用料仍取产品标准 bs_asm_bom;本表只在「新增生产工单→临时工单」写入,领料/报工取 BOM 时优先本表、查不到回落 bs_asm_bom)
+
+# ── 2026-11-13 生产工单「保存草稿 + 整页编制 + 草稿箱」(方案 A) ──
+table:wo_draft_head   # 生产工单编制草稿头(草稿号 GDD-/状态 草稿|已提交/工单类型/产品·客户·数量·日期·路线·备注;提交后回填正式工单号;草稿不写 plang,避免进入待排产/报工/领料)
+table:wo_draft_line   # 生产工单编制草稿·临时工单用料行(一行=草稿×一个子件;草稿期允许不完整,提交时校验后写入正式 wo_bom)
+
+# ── 2026-11-14 成型车间巡线记录表「巡线检验」(面板 QC_LINE_PATROL) ──
+table:qc_line_patrol_head   # 成型车间巡线记录表头表(2026-11-14 新增;纸面大标题「成型车间巡线记录表」,品质管理→制程品质→巡线检验;头只放 单据编号/日期/审核人与状态,记录内容全在行表;单据号前缀 XJ;migrate-qc-line-patrol-20261114.sql 新建)
+table:qc_line_patrol_detail   # 成型车间巡线记录表行表(一行 = 纸面一个「记录块」:块内 4 子行 = 产品①/② 的 编号·型号 + 长度/内径/重量的标准值与实测值;块级列 巡线时间/车间/两液密度/表面状态/跌落强度/抗压强度/结果判定/巡线人员 在纸面 4 子行上 rowspan=4;块序号落 行号)
+
+# ── 2026-11-15 品质管理 → 样品检验(送样登记表 + 检验委托单) ──
+table:qc_sample_reg   # 送样登记表/内部检测目录(档案单表;一行=一个可检验项目:检测元素/内部检出限/检测误差/测试方法/测试周期/收费/检测标准;检验委托单「检验类别」从这里带入;migrate-sample-insp-20261115.sql 新建并灌 44 行种子)
+table:qc_insp_commission_head   # 检验委托单头表(委托检验合同 YJ-QP-701-1-01 (00);单据号前缀 WT;委托方/样品/检验类别·依据/处理方式·判定规则·报告类型·有效期/双方确认/审核人与状态)
+table:qc_insp_commission_detail   # 检验委托单行表(一行=从送样登记表带入的一个检验项目快照:检测元素/内部检出限/检测误差/测试方法/测试周期/收费/检测标准;不建外键)
 view:v_qc_insp_rec_detail   # 检验数据记录明细表只读视图(2026-11-11:一行=一条检验数据记录=来料检验单一行物料;摊平 来料检验单号+行号/检验数据记录单号/采购订单号+行号/送料暂收单号+行号/采购入库单号+行号;QC_INSP_REC_DETAIL 取数,不改任何业务表)
+

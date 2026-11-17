@@ -161,6 +161,70 @@
       </div>
     </section>
 
+    <!-- 打印缓存(离线补打) · 2026-11-16 用户口径:
+         「能在自动打印里面做个打印缓存吗，就是在打印代理掉了后，重新连接这个打印缓存，
+           会将这期间打印的补回来。」
+         以前:目标站点只按**在线**算 ⇒ 代理一掉线那台电脑直接不在目标里、单子当场丢弃;
+              队列还只在内存里,服务端一重启(每次部署)就清空。
+         现在:按**配置**(开关开 + 勾了该类型)算目标,任务落库(yj_print_task),
+              代理回来第一次 /pending 就按入队顺序补打;这里能看、能补打、能删、能清空。 -->
+    <section class="ps-card">
+      <div class="ps-sec">
+        <span>{{ tt('打印缓存(离线补打)') }}</span>
+        <span class="ps-sec-num">{{ cacheItems.length }}</span>
+        <span class="ps-sec-note">{{ tt('代理掉线期间的单子留在这里,回来按顺序补打') }}</span>
+      </div>
+
+      <div class="ps-row">
+        <div class="ps-row-main">
+          <div class="ps-row-title">{{ tt('代理掉线时缓存打印任务') }}</div>
+          <div class="ps-row-sub">
+            {{ tt('开着:那台电脑掉线期间点的打印会留在这里,代理一回来就按顺序补打;关着:掉线就退回手机自己打印') }}
+          </div>
+        </div>
+        <el-switch
+          :model-value="cacheEnabled"
+          :loading="savingCache"
+          @change="(v) => saveCacheCfg(!!v)"
+        />
+      </div>
+
+      <div v-if="!cacheItems.length" class="ps-empty">{{ tt('缓存里没有待补打的单子') }}</div>
+
+      <div v-for="c in cacheItems" :key="c.id" class="ps-cache">
+        <div class="ps-cache-head">
+          <span class="ps-cache-t">{{ c.时间 }}</span>
+          <span class="ps-cache-n">
+            {{ c.标题 }}<i v-if="c.单号 || c.工单号"> · {{ c.单号 || c.工单号 }}</i>
+          </span>
+          <span class="ps-cache-tag" :class="{ wait: c.状态 === 'PENDING' }">
+            {{ c.状态 === 'SENT' ? tt('已发出,等回执') : tt('等待补打') }}
+          </span>
+        </div>
+        <div class="ps-cache-meta">
+          <span>{{ tt('目标电脑') }}:{{ (c.目标站点 || []).join('、') || '—' }}</span>
+          <span v-if="c.失败原因" class="ps-meta-warn">{{ tt('失败') }}:{{ c.失败原因 }}</span>
+          <el-button
+            size="small"
+            text
+            type="primary"
+            :loading="cacheBusy === c.id"
+            @click="retryCache(c)"
+          >
+            {{ tt('补打') }}
+          </el-button>
+          <el-button size="small" text type="danger" @click="deleteCache(c)">{{ tt('删除') }}</el-button>
+        </div>
+      </div>
+
+      <div class="ps-hint">{{ tt('缓存保留 3 天;过期的单子不再补打,列表里还能看到') }}</div>
+      <div class="ps-hint">
+        <el-button size="small" text type="danger" :disabled="!cacheItems.length" @click="clearCacheAll">
+          {{ tt('清空缓存') }}
+        </el-button>
+      </div>
+    </section>
+
     <!-- ② 本机打印代理(运行参数;代理没连上时置灰) -->
     <section class="ps-card">
       <div class="ps-sec">{{ tt('本机打印代理') }}</div>
@@ -252,7 +316,15 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
-import { deleteStationConfig, fetchStationState, saveStationConfig } from '@/business/printStation'
+import {
+  clearPrintCache,
+  deleteCacheTask,
+  deleteStationConfig,
+  fetchStationState,
+  retryCacheTask,
+  saveCacheConfig,
+  saveStationConfig,
+} from '@/business/printStation'
 
 /** 本地代理的探活地址(代理默认监听本机 18777,见 tools/printing/print-agent.ps1) */
 const AGENT_URL = 'http://127.0.0.1:18777/health'
@@ -273,6 +345,19 @@ const recent = ref([])
 const newName = ref('')
 const adding = ref(false)
 
+/**
+ * 打印缓存(离线补打,2026-11-16)。
+ *
+ * <p>服务端在 `state.cache` 里下发:{@code enabled} 开关 + {@code items} 待补打清单
+ * (每条含 类型/标题/单号/目标站点/已送达/状态/时间)。这里只做三件事:
+ * 显示、重发({@code retry})、清掉({@code delete} / {@code clear})。
+ * 真正的补打由那台电脑的代理下次轮询完成 —— 页面不参与取任务。
+ */
+const cacheEnabled = ref(true)
+const savingCache = ref(false)
+/** 正在重发的任务 id(按钮 loading) */
+const cacheBusy = ref(0)
+
 const agentOk = ref(false)
 /** 代理的出纸方式:auto=自动兜底 / printer=直接打印 / pdf=只落 PDF(来自代理 /health) */
 const agentMode = ref('printer')
@@ -292,6 +377,8 @@ let timer = null
 /** 打印电脑清单(含各自开关与类型) */
 const stationRows = computed(() => (Array.isArray(state.value.stations) ? state.value.stations : []))
 const onlineCount = computed(() => stationRows.value.filter((s) => s.online && s.enabled).length)
+/** 打印缓存里待补打的单子(服务端 `state.cache.items`) */
+const cacheItems = computed(() => (Array.isArray(state.value.cache?.items) ? state.value.cache.items : []))
 
 /**
  * 顶部徽标:服务端总闸固定开,所以只说"现在有几台电脑在打"。
@@ -365,6 +452,8 @@ async function refreshState() {
     queueSize.value = Number(d?.queueSize) || 0
     if (Array.isArray(d?.types)) typeOptions.value = d.types
     if (Array.isArray(d?.recent)) recent.value = d.recent
+    // 打印缓存:开关 + 待补打清单(2026-11-16)
+    if (d?.cache) cacheEnabled.value = d.cache.enabled !== false
   } catch (e) {
     if (e?.response?.status === 403) errText.value = tt('没有自动打印的权限:请联系管理员在组织架构里授权')
   } finally {
@@ -477,6 +566,89 @@ async function removeStation(s) {
 }
 
 /**
+ * 打印缓存三件事(2026-11-16 用户口径「做个打印缓存……代理掉了后重新连上把期间打印的补回来」):
+ * 开关 / 单条重发 / 清掉。
+ *
+ * <p>服务端存的是**任务本身**(`yj_print_task`),不是"打印过的标记" ——
+ * 所以开关关掉只是"以后不再缓存",已经缓存的不受影响,仍会补打。
+ */
+async function saveCacheCfg(enabled) {
+  const prev = cacheEnabled.value
+  cacheEnabled.value = enabled
+  savingCache.value = true
+  clearErr()
+  try {
+    await saveCacheConfig({ enabled })
+    ElMessage.success(tt('已保存'))
+    await refreshState()
+  } catch (e) {
+    cacheEnabled.value = prev
+    errText.value = errMsgOf(e) || tt('保存失败')
+  } finally {
+    savingCache.value = false
+  }
+}
+
+/** 重发一条:清掉"已送达"标记 ⇒ 代理下次轮询(≤4 秒)就会再打一次 */
+async function retryCache(c) {
+  if (!c?.id) return
+  cacheBusy.value = c.id
+  clearErr()
+  try {
+    await retryCacheTask(c.id)
+    ElMessage.success(tt('已重新排队,代理下一次轮询就会补打'))
+    await refreshState()
+  } catch (e) {
+    errText.value = errMsgOf(e) || tt('补打发不出去')
+  } finally {
+    cacheBusy.value = 0
+  }
+}
+
+/** 删一条:这条不要补打了(打错单/作废单) */
+async function deleteCache(c) {
+  if (!c?.id) return
+  try {
+    await ElMessageBox.confirm(
+      tt('确定删除这条缓存吗?删掉后不再补打'),
+      tt('删除缓存'),
+      { type: 'warning', confirmButtonText: tt('删除'), cancelButtonText: tt('取消') },
+    )
+  } catch {
+    return
+  }
+  clearErr()
+  try {
+    await deleteCacheTask(c.id)
+    ElMessage.success(tt('已删除'))
+    await refreshState()
+  } catch (e) {
+    errText.value = errMsgOf(e) || tt('删除失败')
+  }
+}
+
+/** 清空全部待补打(换账套/重来一遍时用) */
+async function clearCacheAll() {
+  try {
+    await ElMessageBox.confirm(
+      tt('确定清空打印缓存吗?清空后这些单子不再补打'),
+      tt('清空缓存'),
+      { type: 'warning', confirmButtonText: tt('清空'), cancelButtonText: tt('取消') },
+    )
+  } catch {
+    return
+  }
+  clearErr()
+  try {
+    await clearPrintCache({ stationName: '' })
+    ElMessage.success(tt('已清空'))
+    await refreshState()
+  } catch (e) {
+    errText.value = errMsgOf(e) || tt('保存失败')
+  }
+}
+
+/**
  * 保存「输出方式 / PDF 目录」到**本地代理**(2026-11-01)。
  *
  * 为什么存代理而不是服务端:真正决定"出纸还是落文件、落到哪个目录"的是代理进程,
@@ -573,6 +745,27 @@ async function saveAgentConfig() {
 .ps-add-row { display: flex; align-items: center; gap: 8px; }
 .ps-add-row :deep(.el-input) { flex: 1; min-width: 0; }
 .ps-add-row :deep(.el-button) { flex: none; height: 40px; margin-left: 0; }
+
+/* 打印缓存(离线补打,2026-11-16):一行一条待补打任务 */
+.ps-cache {
+  padding: 8px 12px; margin-top: 8px; border-radius: 6px;
+  background: var(--el-fill-color-lighter);
+  border: 1px solid var(--el-border-color-lighter);
+}
+.ps-cache-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ps-cache-t { flex: none; font-size: 12px; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
+.ps-cache-n { flex: 1; min-width: 0; font-size: 13px; word-break: break-all; }
+.ps-cache-n i { font-style: normal; color: var(--el-text-color-secondary); }
+.ps-cache-tag {
+  flex: none; padding: 0 6px; border-radius: 4px; font-size: 11px;
+  background: var(--el-color-success-light-8); color: var(--el-color-success-dark-2);
+}
+.ps-cache-tag.wait { background: var(--el-color-warning-light-8); color: var(--el-color-warning-dark-2); }
+.ps-cache-meta {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 2px; font-size: 11px; color: var(--el-text-color-secondary);
+}
+.ps-cache-meta :deep(.el-button) { margin-left: 0; }
 
 .ps-row {
   display: flex; align-items: center; gap: 12px;

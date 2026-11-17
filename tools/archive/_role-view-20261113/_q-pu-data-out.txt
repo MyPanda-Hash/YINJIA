@@ -1,0 +1,17 @@
+
+>> SELECT panel_code, line_table, head_table FROM yj_panel WHERE RTRIM(panel_code) IN ('GFDA','INV')
+  panel_code=GFDA | line_table=dm_gf | head_table=null | 
+  panel_code=INV | line_table=bs_inv | head_table=null | 
+
+>> SELECT TOP 3 供应商编码, 供应商名称 FROM dbo.dm_gf WHERE ISNULL(asp_cancel,'N')<>'Y' ORDER BY id
+  (err) 列名 '供应商编码' 无效。
+
+>> SELECT TOP 3 存货编码, 存货名称, 计量单位 FROM dbo.bs_inv ORDER BY id
+  存货编码=YJ-SX-011-6 | 存货名称=032端盖 | 计量单位=个 | 
+  存货编码=YJ-SX-011-9 | 存货名称=036S/032S端盖 | 计量单位=个 | 
+  存货编码=YJ-SX-011-10 | 存货名称=036S/032S端盖 | 计量单位=个 | 
+
+>> SELECT TOP 3 币种, 汇率 FROM dbo.bd_pu_order ORDER BY id DESC
+  币种=null | 汇率=null | 
+  币种=人民币 | 汇率=1.0000 | 
+  币种=人民币 | 汇率=1.0000 | 

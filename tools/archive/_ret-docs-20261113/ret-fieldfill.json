@@ -1,0 +1,1138 @@
+{
+  "销售退货单": {
+    "listPath": "/jdy/v2/scm/sal_in_bound",
+    "detailPath": "/jdy/v2/scm/sal_in_bound_detail",
+    "sampleBills": 30,
+    "sampleLines": 45,
+    "head": [
+      {
+        "key": "all_debt",
+        "pct": 100
+      },
+      {
+        "key": "attachments",
+        "pct": 100
+      },
+      {
+        "key": "attachments_url",
+        "pct": 0
+      },
+      {
+        "key": "audit_time",
+        "pct": 97
+      },
+      {
+        "key": "auditor_id",
+        "pct": 97
+      },
+      {
+        "key": "auditor_name",
+        "pct": 97
+      },
+      {
+        "key": "auditor_number",
+        "pct": 97
+      },
+      {
+        "key": "bill_date",
+        "pct": 100
+      },
+      {
+        "key": "bill_dis_amount",
+        "pct": 100
+      },
+      {
+        "key": "bill_dis_rate",
+        "pct": 100
+      },
+      {
+        "key": "bill_no",
+        "pct": 100
+      },
+      {
+        "key": "bill_status",
+        "pct": 100
+      },
+      {
+        "key": "bill_stock_id",
+        "pct": 0
+      },
+      {
+        "key": "bill_stock_name",
+        "pct": 0
+      },
+      {
+        "key": "bill_stock_number",
+        "pct": 0
+      },
+      {
+        "key": "contact_address",
+        "pct": 0
+      },
+      {
+        "key": "contact_city_id",
+        "pct": 0
+      },
+      {
+        "key": "contact_city_name",
+        "pct": 0
+      },
+      {
+        "key": "contact_city_number",
+        "pct": 0
+      },
+      {
+        "key": "contact_country_id",
+        "pct": 23
+      },
+      {
+        "key": "contact_country_name",
+        "pct": 23
+      },
+      {
+        "key": "contact_country_number",
+        "pct": 23
+      },
+      {
+        "key": "contact_district_id",
+        "pct": 0
+      },
+      {
+        "key": "contact_district_name",
+        "pct": 0
+      },
+      {
+        "key": "contact_district_number",
+        "pct": 0
+      },
+      {
+        "key": "contact_info",
+        "pct": 0
+      },
+      {
+        "key": "contact_linkman",
+        "pct": 80
+      },
+      {
+        "key": "contact_phone",
+        "pct": 73
+      },
+      {
+        "key": "contact_province_id",
+        "pct": 0
+      },
+      {
+        "key": "contact_province_name",
+        "pct": 0
+      },
+      {
+        "key": "contact_province_number",
+        "pct": 0
+      },
+      {
+        "key": "cost_fee",
+        "pct": 100
+      },
+      {
+        "key": "create_time",
+        "pct": 100
+      },
+      {
+        "key": "creator_id",
+        "pct": 100
+      },
+      {
+        "key": "creator_name",
+        "pct": 100
+      },
+      {
+        "key": "creator_number",
+        "pct": 100
+      },
+      {
+        "key": "currency_id",
+        "pct": 100
+      },
+      {
+        "key": "cus_bear_fee_entry",
+        "pct": 0
+      },
+      {
+        "key": "cus_bear_fee_status",
+        "pct": 93
+      },
+      {
+        "key": "cus_currency_id",
+        "pct": 100
+      },
+      {
+        "key": "cus_exchange_rate",
+        "pct": 100
+      },
+      {
+        "key": "custom_field",
+        "pct": 0
+      },
+      {
+        "key": "customer_id",
+        "pct": 100
+      },
+      {
+        "key": "deduction_balance",
+        "pct": 100
+      },
+      {
+        "key": "dept_id",
+        "pct": 100
+      },
+      {
+        "key": "dept_name",
+        "pct": 100
+      },
+      {
+        "key": "dept_number",
+        "pct": 100
+      },
+      {
+        "key": "due_date",
+        "pct": 100
+      },
+      {
+        "key": "emp_id",
+        "pct": 100
+      },
+      {
+        "key": "emp_name",
+        "pct": 100
+      },
+      {
+        "key": "emp_number",
+        "pct": 100
+      },
+      {
+        "key": "f_logistics_id",
+        "pct": 100
+      },
+      {
+        "key": "id",
+        "pct": 100
+      },
+      {
+        "key": "invoiced_amount",
+        "pct": 100
+      },
+      {
+        "key": "io_status",
+        "pct": 0
+      },
+      {
+        "key": "ivc_type",
+        "pct": 100
+      },
+      {
+        "key": "last_debt",
+        "pct": 100
+      },
+      {
+        "key": "modifier_id",
+        "pct": 100
+      },
+      {
+        "key": "modifier_name",
+        "pct": 100
+      },
+      {
+        "key": "modifier_number",
+        "pct": 100
+      },
+      {
+        "key": "modify_time",
+        "pct": 100
+      },
+      {
+        "key": "payment_entry",
+        "pct": 0
+      },
+      {
+        "key": "recevice_delivery",
+        "pct": 0
+      },
+      {
+        "key": "remark",
+        "pct": 0
+      },
+      {
+        "key": "return_reason_id",
+        "pct": 0
+      },
+      {
+        "key": "return_reason_name",
+        "pct": 0
+      },
+      {
+        "key": "return_reason_number",
+        "pct": 0
+      },
+      {
+        "key": "setting_term_id",
+        "pct": 57
+      },
+      {
+        "key": "setting_term_name",
+        "pct": 57
+      },
+      {
+        "key": "setting_term_number",
+        "pct": 57
+      },
+      {
+        "key": "settle_customer_id",
+        "pct": 100
+      },
+      {
+        "key": "settle_customer_name",
+        "pct": 100
+      },
+      {
+        "key": "settle_customer_number",
+        "pct": 100
+      },
+      {
+        "key": "subsist_info",
+        "pct": 100
+      },
+      {
+        "key": "total_amount",
+        "pct": 100
+      },
+      {
+        "key": "total_un_settle_amount",
+        "pct": 100
+      },
+      {
+        "key": "trans_type",
+        "pct": 100
+      }
+    ],
+    "line": [
+      {
+        "key": "act_non_tax_amount",
+        "pct": 100
+      },
+      {
+        "key": "act_tax_price",
+        "pct": 100
+      },
+      {
+        "key": "all_amount",
+        "pct": 100
+      },
+      {
+        "key": "amount",
+        "pct": 100
+      },
+      {
+        "key": "aux_coefficient",
+        "pct": 100
+      },
+      {
+        "key": "aux_id1",
+        "pct": 0
+      },
+      {
+        "key": "aux_id2",
+        "pct": 0
+      },
+      {
+        "key": "aux_id3",
+        "pct": 0
+      },
+      {
+        "key": "aux_name1",
+        "pct": 0
+      },
+      {
+        "key": "aux_name2",
+        "pct": 0
+      },
+      {
+        "key": "aux_name3",
+        "pct": 0
+      },
+      {
+        "key": "aux_number1",
+        "pct": 0
+      },
+      {
+        "key": "aux_number2",
+        "pct": 0
+      },
+      {
+        "key": "aux_number3",
+        "pct": 0
+      },
+      {
+        "key": "aux_prop_id",
+        "pct": 0
+      },
+      {
+        "key": "aux_prop_name",
+        "pct": 0
+      },
+      {
+        "key": "aux_prop_number",
+        "pct": 0
+      },
+      {
+        "key": "aux_qty",
+        "pct": 100
+      },
+      {
+        "key": "aux_unit_id",
+        "pct": 0
+      },
+      {
+        "key": "aux_unit_name",
+        "pct": 0
+      },
+      {
+        "key": "aux_unit_number",
+        "pct": 0
+      },
+      {
+        "key": "barcode",
+        "pct": 0
+      },
+      {
+        "key": "base_qty",
+        "pct": 100
+      },
+      {
+        "key": "base_unit_id",
+        "pct": 100
+      },
+      {
+        "key": "base_unit_name",
+        "pct": 100
+      },
+      {
+        "key": "base_unit_number",
+        "pct": 100
+      },
+      {
+        "key": "batch_no",
+        "pct": 84
+      },
+      {
+        "key": "bill_dis_distribution",
+        "pct": 100
+      },
+      {
+        "key": "cess",
+        "pct": 100
+      },
+      {
+        "key": "coefficient",
+        "pct": 100
+      },
+      {
+        "key": "comment",
+        "pct": 0
+      },
+      {
+        "key": "conversion_rate",
+        "pct": 0
+      },
+      {
+        "key": "cost",
+        "pct": 100
+      },
+      {
+        "key": "cur_settle_amount",
+        "pct": 100
+      },
+      {
+        "key": "custom_entity_field",
+        "pct": 0
+      },
+      {
+        "key": "dis_amount",
+        "pct": 100
+      },
+      {
+        "key": "dis_price",
+        "pct": 100
+      },
+      {
+        "key": "dis_rate",
+        "pct": 100
+      },
+      {
+        "key": "discount",
+        "pct": 100
+      },
+      {
+        "key": "divide_diff_amount",
+        "pct": 100
+      },
+      {
+        "key": "entry_invoiced_amount",
+        "pct": 100
+      },
+      {
+        "key": "entry_invoiced_qty",
+        "pct": 100
+      },
+      {
+        "key": "entry_ivc_amount",
+        "pct": 100
+      },
+      {
+        "key": "entry_ivc_qty",
+        "pct": 100
+      },
+      {
+        "key": "entry_settle_status",
+        "pct": 100
+      },
+      {
+        "key": "entry_status",
+        "pct": 0
+      },
+      {
+        "key": "entry_un_ivc_amount",
+        "pct": 100
+      },
+      {
+        "key": "entry_un_ivc_qty",
+        "pct": 100
+      },
+      {
+        "key": "fee",
+        "pct": 100
+      },
+      {
+        "key": "id",
+        "pct": 100
+      },
+      {
+        "key": "inv_base_qty",
+        "pct": 100
+      },
+      {
+        "key": "inv_qty",
+        "pct": 100
+      },
+      {
+        "key": "is_free",
+        "pct": 100
+      },
+      {
+        "key": "kf_date",
+        "pct": 0
+      },
+      {
+        "key": "kf_period",
+        "pct": 100
+      },
+      {
+        "key": "kf_type",
+        "pct": 0
+      },
+      {
+        "key": "material_help_code",
+        "pct": 0
+      },
+      {
+        "key": "material_id",
+        "pct": 100
+      },
+      {
+        "key": "material_is_asst_attr",
+        "pct": 100
+      },
+      {
+        "key": "material_is_batch",
+        "pct": 100
+      },
+      {
+        "key": "material_is_kf_period",
+        "pct": 100
+      },
+      {
+        "key": "material_is_multi_unit",
+        "pct": 100
+      },
+      {
+        "key": "material_is_serial",
+        "pct": 100
+      },
+      {
+        "key": "material_model",
+        "pct": 78
+      },
+      {
+        "key": "material_name",
+        "pct": 100
+      },
+      {
+        "key": "material_number",
+        "pct": 100
+      },
+      {
+        "key": "picture",
+        "pct": 0
+      },
+      {
+        "key": "pre_dis_amount",
+        "pct": 100
+      },
+      {
+        "key": "price",
+        "pct": 100
+      },
+      {
+        "key": "pro_license",
+        "pct": 0
+      },
+      {
+        "key": "pro_place",
+        "pct": 0
+      },
+      {
+        "key": "pro_reg_no",
+        "pct": 0
+      },
+      {
+        "key": "qty",
+        "pct": 100
+      },
+      {
+        "key": "return_qty",
+        "pct": 100
+      },
+      {
+        "key": "return_qty_unit",
+        "pct": 100
+      },
+      {
+        "key": "seq",
+        "pct": 100
+      },
+      {
+        "key": "sn_list",
+        "pct": 0
+      },
+      {
+        "key": "sn_list_id",
+        "pct": 100
+      },
+      {
+        "key": "sp_id",
+        "pct": 0
+      },
+      {
+        "key": "sp_name",
+        "pct": 0
+      },
+      {
+        "key": "sp_number",
+        "pct": 0
+      },
+      {
+        "key": "src_bill_date",
+        "pct": 0
+      },
+      {
+        "key": "src_bill_no",
+        "pct": 24
+      },
+      {
+        "key": "src_bill_type_id",
+        "pct": 24
+      },
+      {
+        "key": "src_bill_type_name",
+        "pct": 24
+      },
+      {
+        "key": "src_bill_type_number",
+        "pct": 24
+      },
+      {
+        "key": "src_entry_id",
+        "pct": 100
+      },
+      {
+        "key": "src_inter_id",
+        "pct": 100
+      },
+      {
+        "key": "src_order_bill_no",
+        "pct": 24
+      },
+      {
+        "key": "src_order_id",
+        "pct": 0
+      },
+      {
+        "key": "src_seq",
+        "pct": 100
+      },
+      {
+        "key": "stock_id",
+        "pct": 100
+      },
+      {
+        "key": "stock_is_allow_freight",
+        "pct": 100
+      },
+      {
+        "key": "stock_name",
+        "pct": 100
+      },
+      {
+        "key": "stock_number",
+        "pct": 100
+      },
+      {
+        "key": "tax_amount",
+        "pct": 100
+      },
+      {
+        "key": "tax_price",
+        "pct": 100
+      },
+      {
+        "key": "unit_cost",
+        "pct": 100
+      },
+      {
+        "key": "unit_id",
+        "pct": 100
+      },
+      {
+        "key": "unit_name",
+        "pct": 100
+      },
+      {
+        "key": "unit_number",
+        "pct": 100
+      },
+      {
+        "key": "valid_date",
+        "pct": 0
+      }
+    ]
+  },
+  "生产退料单": {
+    "listPath": "/jdy/v2/scm/inv_pick_ret",
+    "detailPath": "/jdy/v2/scm/inv_pick_ret_detail",
+    "sampleBills": 30,
+    "sampleLines": 113,
+    "head": [
+      {
+        "key": "audit_time",
+        "pct": 100
+      },
+      {
+        "key": "auditor_id",
+        "pct": 100
+      },
+      {
+        "key": "auditor_name",
+        "pct": 100
+      },
+      {
+        "key": "auditor_number",
+        "pct": 100
+      },
+      {
+        "key": "bill_date",
+        "pct": 100
+      },
+      {
+        "key": "bill_no",
+        "pct": 100
+      },
+      {
+        "key": "bill_status",
+        "pct": 100
+      },
+      {
+        "key": "bill_type_id",
+        "pct": 100
+      },
+      {
+        "key": "bill_type_name",
+        "pct": 100
+      },
+      {
+        "key": "bill_type_number",
+        "pct": 100
+      },
+      {
+        "key": "create_time",
+        "pct": 100
+      },
+      {
+        "key": "creator_id",
+        "pct": 100
+      },
+      {
+        "key": "creator_name",
+        "pct": 100
+      },
+      {
+        "key": "creator_number",
+        "pct": 100
+      },
+      {
+        "key": "custom_field",
+        "pct": 0
+      },
+      {
+        "key": "dept_id",
+        "pct": 100
+      },
+      {
+        "key": "dept_name",
+        "pct": 100
+      },
+      {
+        "key": "dept_number",
+        "pct": 100
+      },
+      {
+        "key": "emp_id",
+        "pct": 100
+      },
+      {
+        "key": "emp_name",
+        "pct": 100
+      },
+      {
+        "key": "emp_number",
+        "pct": 90
+      },
+      {
+        "key": "id",
+        "pct": 100
+      },
+      {
+        "key": "modifier_id",
+        "pct": 100
+      },
+      {
+        "key": "modifier_name",
+        "pct": 100
+      },
+      {
+        "key": "modifier_number",
+        "pct": 100
+      },
+      {
+        "key": "modify_time",
+        "pct": 100
+      },
+      {
+        "key": "remark",
+        "pct": 0
+      }
+    ],
+    "line": [
+      {
+        "key": "aux1_id",
+        "pct": 0
+      },
+      {
+        "key": "aux1_name",
+        "pct": 0
+      },
+      {
+        "key": "aux1_number",
+        "pct": 0
+      },
+      {
+        "key": "aux2_id",
+        "pct": 0
+      },
+      {
+        "key": "aux2_name",
+        "pct": 0
+      },
+      {
+        "key": "aux2_number",
+        "pct": 0
+      },
+      {
+        "key": "aux3_id",
+        "pct": 0
+      },
+      {
+        "key": "aux3_name",
+        "pct": 0
+      },
+      {
+        "key": "aux3_number",
+        "pct": 0
+      },
+      {
+        "key": "aux_coefficient",
+        "pct": 100
+      },
+      {
+        "key": "aux_prop_id",
+        "pct": 0
+      },
+      {
+        "key": "aux_prop_name",
+        "pct": 0
+      },
+      {
+        "key": "aux_prop_number",
+        "pct": 0
+      },
+      {
+        "key": "aux_qty",
+        "pct": 100
+      },
+      {
+        "key": "aux_unit_id",
+        "pct": 0
+      },
+      {
+        "key": "aux_unit_name",
+        "pct": 0
+      },
+      {
+        "key": "aux_unit_number",
+        "pct": 0
+      },
+      {
+        "key": "barcode",
+        "pct": 0
+      },
+      {
+        "key": "base_qty",
+        "pct": 100
+      },
+      {
+        "key": "base_unit_id",
+        "pct": 100
+      },
+      {
+        "key": "base_unit_name",
+        "pct": 100
+      },
+      {
+        "key": "base_unit_number",
+        "pct": 100
+      },
+      {
+        "key": "batch_no",
+        "pct": 63
+      },
+      {
+        "key": "coefficient",
+        "pct": 100
+      },
+      {
+        "key": "comment",
+        "pct": 0
+      },
+      {
+        "key": "conversion_rate",
+        "pct": 0
+      },
+      {
+        "key": "cost",
+        "pct": 100
+      },
+      {
+        "key": "custom_entity_field",
+        "pct": 0
+      },
+      {
+        "key": "def_float_qty",
+        "pct": 100
+      },
+      {
+        "key": "id",
+        "pct": 100
+      },
+      {
+        "key": "inv_base_qty",
+        "pct": 100
+      },
+      {
+        "key": "inv_qty",
+        "pct": 100
+      },
+      {
+        "key": "kf_date",
+        "pct": 0
+      },
+      {
+        "key": "kf_period",
+        "pct": 100
+      },
+      {
+        "key": "kf_type",
+        "pct": 0
+      },
+      {
+        "key": "material_id",
+        "pct": 100
+      },
+      {
+        "key": "material_is_asst_attr",
+        "pct": 100
+      },
+      {
+        "key": "material_is_batch",
+        "pct": 100
+      },
+      {
+        "key": "material_is_kf_period",
+        "pct": 100
+      },
+      {
+        "key": "material_is_multi_unit",
+        "pct": 100
+      },
+      {
+        "key": "material_is_serial",
+        "pct": 100
+      },
+      {
+        "key": "material_model",
+        "pct": 81
+      },
+      {
+        "key": "material_name",
+        "pct": 100
+      },
+      {
+        "key": "material_number",
+        "pct": 100
+      },
+      {
+        "key": "picture",
+        "pct": 0
+      },
+      {
+        "key": "price",
+        "pct": 100
+      },
+      {
+        "key": "pro_license",
+        "pct": 0
+      },
+      {
+        "key": "pro_place",
+        "pct": 0
+      },
+      {
+        "key": "pro_reg_no",
+        "pct": 0
+      },
+      {
+        "key": "qty",
+        "pct": 100
+      },
+      {
+        "key": "seq",
+        "pct": 100
+      },
+      {
+        "key": "sn_list",
+        "pct": 0
+      },
+      {
+        "key": "sn_list_id",
+        "pct": 100
+      },
+      {
+        "key": "sp_id",
+        "pct": 0
+      },
+      {
+        "key": "sp_name",
+        "pct": 0
+      },
+      {
+        "key": "sp_number",
+        "pct": 0
+      },
+      {
+        "key": "src_bill_date",
+        "pct": 0
+      },
+      {
+        "key": "src_bill_no",
+        "pct": 0
+      },
+      {
+        "key": "src_bill_type_id",
+        "pct": 0
+      },
+      {
+        "key": "src_bill_type_name",
+        "pct": 0
+      },
+      {
+        "key": "src_bill_type_number",
+        "pct": 0
+      },
+      {
+        "key": "src_entry_id",
+        "pct": 100
+      },
+      {
+        "key": "src_inter_id",
+        "pct": 100
+      },
+      {
+        "key": "src_seq",
+        "pct": 100
+      },
+      {
+        "key": "stock_id",
+        "pct": 100
+      },
+      {
+        "key": "stock_is_allow_freight",
+        "pct": 100
+      },
+      {
+        "key": "stock_name",
+        "pct": 100
+      },
+      {
+        "key": "stock_number",
+        "pct": 100
+      },
+      {
+        "key": "unit_cost",
+        "pct": 100
+      },
+      {
+        "key": "unit_id",
+        "pct": 100
+      },
+      {
+        "key": "unit_name",
+        "pct": 100
+      },
+      {
+        "key": "unit_number",
+        "pct": 100
+      },
+      {
+        "key": "valid_date",
+        "pct": 0
+      }
+    ]
+  }
+}

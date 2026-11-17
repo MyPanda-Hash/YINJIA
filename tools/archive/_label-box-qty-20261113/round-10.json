@@ -1,0 +1,56 @@
+{
+  "prep": {
+    "ok": true,
+    "wraps": 2,
+    "r": [
+      45,
+      479,
+      104,
+      20
+    ],
+    "hitIsBtn": false,
+    "hit": "打印单号"
+  },
+  "state": {
+    "rows": [
+      {
+        "qty": "240",
+        "qtyDisabled": false,
+        "box": "120",
+        "boxDisabled": false
+      },
+      {
+        "qty": "18",
+        "qtyDisabled": false,
+        "box": "",
+        "boxDisabled": false
+      }
+    ],
+    "banner": "",
+    "hasCancelBtn": false,
+    "zeroFillDisabled": [
+      {
+        "t": "按剩余量填充",
+        "d": false
+      },
+      {
+        "t": "清空",
+        "d": false
+      },
+      {
+        "t": "确定并打印",
+        "d": false
+      }
+    ],
+    "msgs": []
+  },
+  "typed": {
+    "ok": true,
+    "value": "120"
+  },
+  "final": {
+    "boxValue": "120",
+    "hint": "行号 1.0000：每箱 120 ⇒ 共 2 张（整箱 2）",
+    "banner": ""
+  }
+}

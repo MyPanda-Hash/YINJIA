@@ -1,7 +1,22 @@
 <!-- WorkOrderBoard.vue — 工单排产(2026-09-23 纠偏,替代「生产排产」平铺看板,参考旧系统工单排产页)
      产线骨架:左侧=生产线档案**全部线**(与基础资料对应,停用线标记可查看);选中线 → 右侧正在运行的工单明细
      (未完工/已完工/全部);勾选已排 → 批量调线(启用线)/转领料(默认 BOM×排产数量 生成领料单草稿,2026-10-14)。
-     无班别维度(用户拍板)。开线管理已按用户拍板去除(2026-09-24):本页只做 按线查看+调线+转领料,不含待排产池(排产入口单一=排产工作台)。 -->
+     无班别维度(用户拍板)。开线管理已按用户拍板去除(2026-09-24):本页只做 按线查看+调线+转领料,不含待排产池(排产入口单一=排产工作台)。
+     2026-11-12(用户报障「左侧边栏显示的数量和…本线排产数量…当前工序报工数量没有任何关联」):
+     左侧每线主数字从**成品口径** 未交量(排产−入库)改为**本线排产数量**,并加「已报 · 未完工」次行;
+     顶部统计三项同步改工序口径 —— 三处与右侧「未完工」页签明细同源(详见左栏注释)。
+     2026-11-13(用户口径「增加一个原计划量/报工数,当天结束后未完成会进行提示」):
+     日期格从「一个数」改成**原计划/报工**两数(例 715/15);日期 < 今天且报工 < 原计划 ⇒ 该格标红,
+     页面顶部再给一行红色汇总(处数 + 合计欠产,悬停看明细),不弹窗。未完成的量由后端
+     `DayPlanSpread.mergeReported` 向今天及以后重排,前端只负责显示。
+     2026-11-13(契约 tools/archive/_wo-progress-click-20261113/CONTRACT.md §3.1):新增**深链定位** ——
+     从「生产工序进度看板」点某道工序跳来(?line&wo&rowid&op):按 line 选线 → 定位该工单行
+     (浅蓝底高亮 + 滚到表格中间)→ 上下文区提示「已定位:工单号#行号 · 工序」;
+     参数用完即摘(router.replace),keep-alive 再次跳入靠 watch(route.query)/onActivated 重新定位。
+     2026-11-14(用户口径「删除掉这个工序流转明细,这个作用不明显还很丑,除非有其他方法」):
+     **展开行那道 8 列大表整体删除**;同样的数字收进「当前工序」格的悬停提示
+     (business/woFlowChain.js;当前工序标 ▶、深链定位的那道标 ★),平时看不见,要看鼠标停一下;
+     全工序进度仍看「生产工序进度看板」的环/圆点链。 -->
 <template>
   <div class="wb-page">
     <!-- 顶部:开工日期 + 汇总条 -->
@@ -24,8 +39,31 @@
       </span>
     </div>
 
+    <!-- 历史欠产汇总条(2026-11-13 用户口径「当天结束后未完成会进行提示」)───────────────
+         口径 = 当前选线「未完工/已完工/全部」页签明细里,日期 < 今天 且 报工 < 原计划 的格子合计;
+         不弹窗:一条红色汇总 + 悬停看逐条明细(:title,最多 15 行)。后端没返回「原计划」时
+         shortInfo.count = 0 ⇒ 整条不渲染(老后端/老数据自然降级,不出假提示)。
+         ⚠ 2026-11-13 用户反馈「两天的计划量是 1067…应该是计划量-实际报工数量」—— 用户把单个
+         欠产数误读成了计划合计(实际两天原计划 834+833=1667、报工 600、欠产 1067)⇒
+         提示改成**三数并列**:`原计划 1667 − 报工数 600 = 欠产 1067`,算式自证,不再只放一个数。 -->
+    <div v-if="shortInfo.count" class="wb-short-bar" :title="shortTitle">
+      <span class="wb-short-main">
+        {{ tt('历史未完成') }} {{ shortInfo.count }} {{ tt('处') }} ·
+        {{ tt('原计划') }} {{ num(shortInfo.plan) }} − {{ tt('报工数') }} {{ num(shortInfo.actual) }}
+        = {{ tt('欠产') }} {{ num(shortInfo.qty) }}
+      </span>
+      <span class="wb-short-hint">{{ tt('标红格 = 当天已结束但报工未达原计划(汇总含未显示为列的日期)') }}</span>
+    </div>
+
     <div class="wb-body">
-      <!-- 左:各线 未交量(=基础资料生产线档案,含停用) -->
+      <!-- 左:各线「本线排产数量」+「已报/未完工」次行(2026-11-12 用户报障)───────────────────────
+           原话:「左侧边栏显示的数量和当前的生产线排产数量(本线排产数量)和当前工序报工数量没有任何关联」。
+           原因:主数字原先是**成品口径** 未交量(= 排产 − 入库),与右侧明细的工序口径毫无关系 ⇒
+           出现「左侧该线 0、右侧明细 5421 / 报工 1100」这种自相矛盾的现场。
+           现改为与右侧「未完工」页签明细**同一批行**的合计(接口 linesSummary 新增 3 个数字字段):
+             主数字 = 本线排产数量(字段暂缺 ⇒ 回退成品口径 未交量,不显示空白/NaN)
+             次行   = 已报完工量 · 本线未完工量(两个字段都缺 ⇒ 整行隐藏,不占高度)
+           左侧是产线骨架,口径固定按「未完工」页签,不随右侧页签切换(右侧切「已完工/全部」时只有顶部统计变)。 -->
       <div class="wb-left">
         <div class="wb-left-head">{{ tt('工序/工艺') }} / {{ tt('生产线') }}</div>
         <!-- 按工序/工艺分组(2026-10-05,依《新系统产线命名.xlsx》):分发维度=生产线,功能分组=成型/切炭/组装 -->
@@ -38,7 +76,7 @@
               <span v-if="l.停用" class="wb-tag off-line">{{ tt('停用') }}</span>
             </div>
             <div class="wb-line-row">
-              <span class="wb-qty">{{ num(l.未交量) }}</span>
+              <span class="wb-qty" :title="tt('本线排产数量(该线「未完工」页签明细合计,与右侧顶部统计同源)')">{{ num(lineQty(l)) }}</span>
               <!-- 今日已排/日产能(2026-10-31):只显示、不拦截;未配产能的线明确写"未配",不显示 0 -->
               <span v-if="Number(l.日产能 || 0) > 0" class="wb-daycap"
                     :class="{ over: l.今日余量 != null && Number(l.今日余量) < 0 }"
@@ -47,6 +85,9 @@
               </span>
               <span v-else class="wb-daycap unset" :title="tt('产线档案未配日产能')">{{ tt('未配产能') }}</span>
             </div>
+            <!-- 次行(2026-11-12):本线已报完工量 · 本线未完工量,与主数字同一批行(11px 灰字,210px 栏内单行省略) -->
+            <div v-if="lineFlowText(l)" class="wb-line-sub"
+                 :title="tt('已报完工量·本线未完工量(本线排产−已报,按「未完工」页签口径)')">{{ lineFlowText(l) }}</div>
           </div>
         </template>
       </div>
@@ -57,8 +98,15 @@
           <span class="wb-ctx-label">{{ tt('生产线') }}：<b>{{ sel.line || tt('（点击左侧选择）') }}</b>
             <span v-if="shop" class="wb-shop">{{ tt('当前车间') }}：{{ shop }}</span>
           </span>
-          <span class="wb-ctx-stats">
-            {{ tt('排产数量') }} {{ num(selQty) }}　|　{{ tt('未完工量') }} {{ num(selOutstanding) }}
+          <!-- 深链定位提示(2026-11-13,契约 CONTRACT.md §3.1):从「生产工序进度看板」点某道工序跳来时
+               显示「已定位:工单号#行号 · 工序」,让用户知道为什么停在这一行;参数用完即摘,
+               提示只留到切产线/切片签/刷新(那些动作会 clearFocus) -->
+          <span v-if="focusTip" class="wb-focus-tip" :title="focusTip">{{ focusTip }}</span>
+          <!-- 顶部统计(2026-11-12 改口径):三项全是**工序口径** = 右侧「未完工」页签明细行合计,
+               与左侧每线数字同源(选中哪条线,左侧该线主数字 = 这里的「本线排产数量」)。
+               成品口径的未交量(排产−入库)不再冒充「未完工量」,只在 tooltip 里报合计供对账。 -->
+          <span class="wb-ctx-stats" :title="ctxStatsTitle">
+            {{ tt('本线排产数量') }} {{ num(selQty) }}　|　{{ tt('已报完工量') }} {{ num(selDone) }}　|　{{ tt('未完工量') }} {{ num(selRemaining) }}
           </span>
         </div>
 
@@ -117,9 +165,21 @@
                    数据源 bs_bom 与后端 /px/scheduleBoard/toPicking 端点同期删除 ⇒ 按钮一并撤掉 -->
             </div>
           </div>
-          <el-table :data="schedRows" size="small" border height="100%" empty-text=""
+          <!-- ⚠ 深链定位(2026-11-13,契约 §3.1)给表格留了两个绑定,别删:
+               ref=schedTable   → 定位后从表格内部 .el-table__body 找高亮行做 scrollIntoView
+               :row-class-name  → 命中的行挂 .wb-focus-row(浅蓝底 + 左侧 3px 蓝边)
+               (:row-key 只用来让 el-table 认行身份 —— 同号工单行多批时不串行;此前它还喂
+                expand-row-keys,2026-11-14 展开区删除后已无此用途) -->
+          <el-table ref="schedTable" :data="schedRows" size="small" border height="100%" empty-text=""
+                    :row-key="rowKeyOf" :row-class-name="rowClassName"
                     @selection-change="(r) => (checkedSched = r)">
             <el-table-column type="selection" width="42" />
+            <!-- 按量流转·逐道明细(2026-11-12 方案A 的展开行)**已于 2026-11-14 删除**:
+                 用户口径「删除掉这个工序流转明细,这个作用不明显还很丑,除非有其他方法」——
+                 行内已有「当前工序/当前工序计划量/当前工序完工量/上道工序/上道完工量/可加工量/
+                 待报量/待流入量」八列,展开表把同样的数字再说一遍;全工序进度看
+                 「生产工序进度看板」。同样的数字改成「当前工序」格的悬停提示
+                 (business/woFlowChain.js),列与展开箭头都不再占位。 -->
             <!-- ══════════ 冻结区(2026-11-08 用户口径)══════════
                  用户原话:「排单界面物产品编码、产品规格、订单数量,显示在前面冻结,方便看。……进行修改还需要
                  考虑当前冻结后如何显示其他的信息对其他信息进行处理要如何实现。」
@@ -164,35 +224,105 @@
               </template>
             </el-table-column>
             <el-table-column :label="tt('实际完工日期')" prop="实际完工日期" width="105" />
-            <el-table-column :label="tt('排产数量')" prop="排产数量" width="90" align="right" />
+            <!-- 本线排产数量(2026-11-11 用户口径):本页一行 = 一张工单行在**当前产线**做**当前工序**,
+                 所以「排产数量」列要看的是**本线要排/要做的量** = 排产数量 × 该道换算率
+                 (= 该行当前工序的台账计划数量,接口既有字段 `当前工序计划量`)。
+                 成品口径的排产数量 pl_sl 仍由接口返回,供打印/切单/未交量/领料使用 —— 本列不改任何数据。 -->
+            <el-table-column prop="本线排产数量" width="110" align="right">
+              <template #header>
+                <span :title="tt('本线排产数量 = 排产数量 × 该工序自己的换算率(取该行当前工序的台账计划数量);成品口径请用左侧「订单数量」')">{{ tt('本线排产数量') }}</span>
+              </template>
+              <!-- 后端 scheduled() 已返回同值别名 本线排产数量;老服务/老数据取不到时回退既有字段 当前工序计划量 -->
+              <template #default="{ row }">{{ num(row['本线排产数量'] ?? row['当前工序计划量']) }}</template>
+            </el-table-column>
             <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
-            <!-- 工序口径:当前工序 = 该行**现在该做的工序**(预排台账位置;在切炭线就显示切炭),
-                 旁边给「上道工序 + 上道完工量」= 来料量(上一道已审报工量) -->
+            <!-- 工序口径(2026-11-12 用户口径「这些数据完成需要放在前面…放在工序那边」):
+                 工序块从左到右读成一条链 ——
+                 当前工序 → 本道计划量 → 本道已做 → 上道工序/上道已做 → 能做多少 → 还能报 → 还缺。
+                 上道工序/上道完工量从原来的"日期列后面"前移到这里;未交量属整单口径,留在原位不动。 -->
+            <!-- 当前工序(2026-11-14):悬停 = 该行逐道工序的计划量/已审完工/可加工量/待流入量
+                 (原「工序流转明细」展开区的内容收在这里,平时看不见;▶ = 当前工序,★ = 深链定位的那道) -->
             <el-table-column :label="tt('当前工序')" prop="当前工序" width="95" sortable>
-              <template #default="{ row }">{{ row.当前工序 ? tt(row.当前工序) : '-' }}</template>
+              <template #default="{ row }">
+                <span :title="flowTip(row)">{{ row.当前工序 ? tt(row.当前工序) : '-' }}</span>
+              </template>
             </el-table-column>
             <el-table-column :label="tt('当前工序计划量')" prop="当前工序计划量" width="120" align="right" />
             <el-table-column :label="tt('当前工序完工量')" prop="当前工序完工量" width="120" align="right" />
+            <el-table-column :label="tt('上道工序')" prop="上道工序" width="95">
+              <template #default="{ row }">{{ row.上道工序 ? tt(row.上道工序) : '-' }}</template>
+            </el-table-column>
+            <el-table-column width="110" align="right">
+              <template #header>
+                <span :title="tt('上道完工量 = 上一道已审核报工数(上一道自己的计量单位,不折算);换算率不同时,本道能做多少看「可加工量」')">{{ tt('上道完工量') }}</span>
+              </template>
+              <template #default="{ row }">{{ flowNum(row.上道完工量) }}</template>
+            </el-table-column>
+            <!-- 按量流转(2026-11-12,只读展示):可加工量(= 上一道流下来、本道现在最多能做多少) /
+                 待报量(还能报) / 待流入量(还等上一道)。上道做了多少看上面前移的「上道完工量」。 -->
+            <el-table-column width="100" align="right">
+              <template #header>
+                <span :title="tt('可加工量 = 上一道流下来的量(已按换算率折到本道单位),也就是本道现在最多能做多少')">{{ tt('可加工量') }}</span>
+              </template>
+              <template #default="{ row }">{{ flowNum(row.当前工序可加工量) }}</template>
+            </el-table-column>
+            <el-table-column width="92" align="right">
+              <template #header>
+                <span :title="tt('待报量 = 可加工量 − 本工序已审报工(本道还能报多少)')">{{ tt('待报量') }}</span>
+              </template>
+              <template #default="{ row }">{{ flowNum(row.当前工序待报量) }}</template>
+            </el-table-column>
+            <el-table-column width="100" align="right">
+              <template #header>
+                <span :title="tt('待流入量 = 本工序计划量 − 可加工量(还等上一道流下来多少)')">{{ tt('待流入量') }}</span>
+              </template>
+              <template #default="{ row }">
+                <span :class="{ 'wb-flow-gap': Number(row.当前工序待流入量 || 0) > 0 }">{{ flowNum(row.当前工序待流入量) }}</span>
+              </template>
+            </el-table-column>
             <!-- 日排产(2026-10-29):直接长在现有明细表里(不新增表格/块),紧跟工序完工口径。
                  每个日期格都可填计划(含今天以前的日期 —— 用户口径「23~28 号填不了」);
                  格下方小灰字 = 该天已审核报工量(含手机端),只读。 -->
             <el-table-column :label="tt('交期紧迫度')" prop="交期紧迫度" width="90" align="right" />
-            <el-table-column :label="tt('7天需交付')" prop="7天需交付" width="92" align="right" />
-            <el-table-column :label="tt('15天需交付')" prop="15天需交付" width="96" align="right" />
-            <el-table-column :label="tt('大于15天需交付')" prop="大于15天需交付" width="112" align="right" />
+            <!-- 需交付三桶(2026-11-15 用户口径「这里原来也应该是工序计划量的」):后端已改成**工序计划量**
+                 (= 排产数量 × 该道换算率),与下面「已排」三桶(日计划合计)同一把尺;
+                 原来是「需求数量」(成品口径)⇒ 成型换算率 0.5 的行会出现 需交付 50 / 已排 25 两个单位在比。
+                 值走 num() 显式渲染:0 显示 0(与已排三桶一致,不用 prop 默认渲染)。
+                 ⚠ 2026-11-15 实测踩坑:同一行里 `prop` 默认渲染 `0` 竟然出空格(合并进 row 的 0 值),
+                 用默认插槽 + num() 才稳定显示 0。 -->
+            <el-table-column width="92" align="right">
+              <template #header>
+                <span :title="tt('需交付 = 工序计划量(排产数量 × 该道换算率),按交期落桶;与「已排」三桶同一口径')">{{ tt('7天需交付') }}</span>
+              </template>
+              <template #default="{ row }">{{ num(row['7天需交付']) }}</template>
+            </el-table-column>
+            <el-table-column width="96" align="right">
+              <template #header>
+                <span :title="tt('需交付 = 工序计划量(排产数量 × 该道换算率),按交期落桶;与「已排」三桶同一口径')">{{ tt('15天需交付') }}</span>
+              </template>
+              <template #default="{ row }">{{ num(row['15天需交付']) }}</template>
+            </el-table-column>
+            <el-table-column width="112" align="right">
+              <template #header>
+                <span :title="tt('需交付 = 工序计划量(排产数量 × 该道换算率),按交期落桶;与「已排」三桶同一口径')">{{ tt('大于15天需交付') }}</span>
+              </template>
+              <template #default="{ row }">{{ num(row['大于15天需交付']) }}</template>
+            </el-table-column>
             <el-table-column :label="tt('7天已排')" prop="7天已排" width="88" align="right" />
             <el-table-column :label="tt('15天已排')" prop="15天已排" width="92" align="right" />
             <el-table-column :label="tt('大于15天已排')" prop="大于15天已排" width="108" align="right" />
-            <!-- 日期列(2026-10-31):列头多一行「该线当天 已排/日产能」——产能只显示、不拦截录入。
-                 超产能只把列头标红(不弹窗、不改数、不禁填);未配产能(档案日产能 0/空)写"未配",不判超载。
+            <!-- 日期列(2026-10-31;2026-11-13 改「原计划/报工」两数):列头多一行「该线当天 已排/日产能」
+                 ——产能只显示、不拦截录入。超产能只把列头标红(不弹窗、不改数、不禁填);
+                 未配产能(档案日产能 0/空)写"未配",不判超载。
                  列分段:今天列标「今」+ 浅蓝底;过去列灰底 = 历史对照段;
-                 格内两个数分清:上方计划(**自动算,只读**)/ 下方报工(绿色 + 「实」标),两行居中对齐。 -->
+                 格内 = **原计划/报工**(例 715/15;没报工只显示计划;当天已结束且原计划>0没报工 =
+                 `原计划/0`);日期 < 今天且报工 < 原计划 ⇒ 该格标红(short),顶部另有红色汇总条。 -->
             <el-table-column v-for="d in planDates" :key="d" width="88" align="center"
                              :label-class-name="'dp-col-' + dayColState(d, planToday)"
                              :class-name="'dp-col-' + dayColState(d, planToday)">
               <template #header>
                 <div class="dp-head" :class="{ over: isOverDay(d), past: dayColState(d, planToday) === 'past' }"
-                     :title="tt('计划由系统按 工序计划量÷开工日→交期 自动均摊;双击数量弹出调整')">
+                     :title="dayHeadTitle">
                   <div class="dp-date">{{ d.slice(5) }}<span v-if="isToday(d, planToday)" class="dp-today">{{ tt('今') }}</span></div>
                   <div v-if="lineCap > 0" class="dp-cap" :title="tt('该线当天已排/日产能')">
                     {{ qtyText(dayTotal[d]) }}/{{ qtyText(lineCap) }}
@@ -204,23 +334,29 @@
                 <el-input-number v-if="qtyEdit === qtyKey(row, d)" v-model="qtyDraft" size="small"
                                  :controls="false" :min="0" class="dp-input" autofocus
                                  @blur="commitQty(row, d)" @keyup.enter="commitQty(row, d)" @keyup.esc="cancelQtyEdit" />
-                <!-- 区间外(开工日~计划完工日之外)且当天无计划/实报:画「/」——这一天不归本行排
+                <!-- 区间外(开工日~计划完工日之外)且当天无计划/原计划/实报:画「/」——这一天不归本行排
                      (2026-11-01 用户口径;例:开工日改成 11-02 后,11-01 的格子要画斜杠) -->
                 <span v-else-if="isOutCell(row, d)" class="dp-out"
                       :title="tt('不在本行排产区间(开工日~计划完工日)内')">/</span>
-                <span v-else class="dp-plan" :class="{ manual: isManual(row, d), actual: dayCell(row, d).isActual }"
+                <span v-else class="dp-plan"
+                      :class="{ manual: isManual(row, d), actual: cell(row, d).hasActual, short: cell(row, d).short > 0 }"
                       :title="dayTitle(row, d)" @click="startQtyEdit(row, d)">
-                  {{ qtyText(dayCell(row, d).qty) }}<span v-if="isManual(row, d)" class="dp-hand"
+                  {{ cell(row, d).text }}<span v-if="isManual(row, d)" class="dp-hand"
                     :class="{ over: Number(row.超分配 || 0) > 0 }" :title="overTitle(row)">{{ tt('手') }}</span>
                 </span>
               </template>
             </el-table-column>
-            <el-table-column :label="tt('上道工序')" prop="上道工序" width="95">
-              <template #default="{ row }">{{ row.上道工序 ? tt(row.上道工序) : '-' }}</template>
+            <!-- 成品口径:未交量 = 排产数量 − 入库数量(此前误减工序口径报工量 ⇒ 换算率 >1 时出负数)
+                 ⚠ 2026-11-12 用户口径:未交量是**整张工单**的口径,不属于工序块 ⇒ 保持原位(日期列之后),
+                   不随「上道工序/上道完工量」一起前移到工序列。
+                 2026-11-15 用户再次确认:「未交量应该是当前整个工单剩余的成品数量」⇒ 本列**不折工序**,
+                   与上面需交付/已排(工序口径)刻意不同;表头 tooltip 写清,避免又按工序口径去读。 -->
+            <el-table-column width="85" align="right">
+              <template #header>
+                <span :title="tt('未交量 = 排产数量 − 入库数量(成品口径,整单剩余;不折工序)')">{{ tt('未交量') }}</span>
+              </template>
+              <template #default="{ row }">{{ flowNum(row.未交量) }}</template>
             </el-table-column>
-            <el-table-column :label="tt('上道完工量')" prop="上道完工量" width="110" align="right" />
-            <!-- 成品口径:未交量 = 排产数量 − 入库数量(此前误减工序口径报工量 ⇒ 换算率 >1 时出负数) -->
-            <el-table-column :label="tt('未交量')" prop="未交量" width="85" align="right" />
             <!-- 「余量」列已隐藏(2026-11-08 用户口径「直接隐藏吧」):它是「本工单行需求 − 本行订单占用」
                  (form_flow_link SO→PLANG)的口径 —— 新口径下需求=转单量、占用链也写同一个数,余量恒为 0
                  (正式库实测 399 行里 397 行为 0),与「当前工序还剩多少未生产」无关、极易误读;
@@ -316,15 +452,19 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onActivated, nextTick, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
-import { printWorkTaskSheet, printSchedPlanSheet, pickPlanSheetRows, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS } from '@/business/print-formats'
+import { printWorkTaskSheet, printSchedPlanSheet, pickPlanSheetRows, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS, moldPlanQty } from '@/business/print-formats'
 import { Setting } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
-import { qtyText, isOverCapacity, dayColState, isToday, dayCellQty, isOutOfPlanRange } from '@/business/dayPlan'
+import { qtyText, isOverCapacity, dayColState, isToday, isPast, isOutOfPlanRange,
+  dayCellView, historyShortfalls, shortfallTotals } from '@/business/dayPlan'
+// 逐道工序的悬停提示文本(2026-11-14:原「工序流转明细」展开区删除后,数字收到「当前工序」格)
+import { flowChainTip } from '@/business/woFlowChain'
 import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
@@ -388,9 +528,45 @@ const raLimited = ref(false)
 const raLines = computed(() => raLinesAll.value.filter((l) => !raShop.value || l.生产车间 === raShop.value))
 
 function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '0' }
+/** 按量流转字段展示(2026-11-12):没数显示 '-'，0 照显示(缺口 0 有意义) */
+function flowNum(v) { return (v === null || v === undefined || v === '') ? '-' : num(v) }
+/**
+ * 左侧每线**主数字**(2026-11-12):= 接口新字段「本线排产数量」(该线「未完工」页签明细行的计划量合计)。
+ * 字段暂缺(后端未升级/联调中)⇒ 回退成品口径「未交量」,绝不渲染空白或 NaN。
+ */
+function lineQty(l) {
+  const v = l['本线排产数量']
+  return (v === undefined || v === null || v === '') ? l['未交量'] : v
+}
+/**
+ * 左侧每线**次行**文案「已报 X · 未完工 Y」(2026-11-12):X=本线已报完工量、Y=本线未完工量,
+ * 与主数字同一批行;两个字段都缺 ⇒ 返回空串 ⇒ 模板整行不渲染(不留一条 0/0 的假数据)。
+ */
+function lineFlowText(l) {
+  const parts = []
+  const done = l['本线已报完工量']
+  const left = l['本线未完工量']
+  if (done !== undefined && done !== null && done !== '') parts.push(`${tt('已报')} ${num(done)}`)
+  if (left !== undefined && left !== null && left !== '') parts.push(`${tt('未完工')} ${num(left)}`)
+  return parts.join(' · ')
+}
 function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 
-const selQty = computed(() => schedRows.value.reduce((a, r) => a + Number(r.排产数量 || 0), 0))
+// 本线排产数量合计(2026-11-11 用户口径「顶部合计同步按本线量算」):
+//   与本页「本线排产数量」列同源 = 当前工序台账计划数量(= 排产数量 × 该道换算率)。
+//   ⚠ 跨工序相加口径不同(成型件 + 装箱件),只在同工序/同车间内看这个合计才有意义。
+//   2026-11-12:它同时是左侧每线主数字的口径(接口 linesSummary 的 本线排产数量 = 同一批行合计),
+//   ⇒ 选中线时「左侧该线数字 = 顶部这里」;成品口径(Σ 未交量)见 selOutstanding(只进 tooltip)。
+const selQty = computed(() => schedRows.value.reduce((a, r) => a + Number((r.本线排产数量 ?? r.当前工序计划量) || 0), 0))
+/** 本线已报完工量合计(2026-11-12):与左侧次行同源 = 同一批「未完工」页签行,Σ 当前工序完工量 */
+const selDone = computed(() => schedRows.value.reduce((a, r) => a + Number(r['当前工序完工量'] || 0), 0))
+/** 本线未完工量合计(2026-11-12):**逐行** max(本线排产 − 已报, 0) 再相加 ——
+ *  先加后减会把"某行超报"的富余抵掉别行的缺口,与左侧按行汇总的数字对不上。 */
+const selRemaining = computed(() => schedRows.value.reduce((a, r) => {
+  const plan = Number(r['本线排产数量'] ?? r['当前工序计划量'] ?? 0)
+  const done = Number(r['当前工序完工量'] || 0)
+  return a + Math.max(plan - done, 0)
+}, 0))
 /** 左侧按工序/工艺两级分组(2026-10-05):第1级=成型/切炭/组装,第2级=产线分组(成型下 烧结/X烧结) */
 const lineGroups = computed(() => {
   const m = new Map()
@@ -406,16 +582,29 @@ const shop = computed(() => {
   const set = [...new Set(lineSummary.value.map((l) => l.生产车间).filter(Boolean))]
   return set.length === 1 ? set[0] : ''
 })
-// 未完工量=Σ未交量(**成品口径**:排产−入库,2026-10-07 起);旧数据无未交量字段时回退余量
+// 未交量合计 = Σ未交量(**成品口径**:排产−入库,2026-10-07 起);旧数据无未交量字段时回退余量。
+//   ⚠ 2026-11-12 口径纠偏:它**不再**充当顶部「未完工量」—— 顶部「未完工量」改按工序口径(selRemaining,
+//     与右侧明细/左侧每线同源);本值只进顶部统计的 tooltip,用来对账"成品口径还欠多少"。
 const selOutstanding = computed(() => schedRows.value.reduce((a, r) => a + (r.未交量 !== undefined ? Number(r.未交量 || 0) : Number(r.余量 || 0)), 0))
+/** 顶部统计 tooltip(2026-11-12):说清这是**工序口径**(与右侧明细表格同源),并交代成品口径未交量合计 */
+const ctxStatsTitle = computed(() => [
+  tt('工序口径:与右侧明细表格同源(当前页签下选中线的行合计;「未完工」页签时与左侧每线数字一致)'),
+  tt('本线已报完工量') + ' = Σ' + tt('当前工序完工量') + '；'
+    + tt('本线未完工量') + ' = Σmax(' + tt('本线排产数量') + '−' + tt('当前工序完工量') + ',0)',
+  tt('成品口径的未交量合计') + ' = ' + num(selOutstanding.value),
+].join('\n'))
 // 产能可见(2026-10-31 用户口径「产能只显示、不拦截;不影响实际排产量」):
 //   顶部汇总 = 全部启用线今天「已排 > 日产能」的条数与合计超额(/stats 实时算,不落表)。
 const overLineCount = computed(() => Number(s.value['今日超载线数'] || 0))
 const overQty = computed(() => Number(s.value['今日超额合计'] || 0))
 
+/** 选中一条产线:重取该线排产明细 + 日计划(既有行为不变)。
+ *  2026-11-13 深链定位要复用同一条路径 ⇒ 返回 Promise(模板点击忽略返回值,深链里 await 它再定位行);
+ *  同时清掉上一次的定位高亮/提示(用户主动切线 = 不再"定位在某行")。 */
 function select(l) {
+  clearFocus()
   sel.line = l.生产线
-  loadScheduled().then(() => loadDayPlan())
+  return loadScheduled().then(() => loadDayPlan())
 }
 
 async function loadSummary() {
@@ -453,6 +642,29 @@ const planDates = ref([])
 const planToday = ref('')
 /** 「日排产」权(改当天数量/日期):两页任一授予即可;没权限时格内不给编辑 */
 const canDayPlan = computed(() => canDoAny(permUser, ['WORK_ORDER_LIST', 'WORK_ORDER_BOARD'], 'dayplan'))
+// ── 历史欠产汇总(2026-11-13 用户口径「当天结束后未完成会进行提示」)──────────────────
+//   判定全部在 business/dayPlan.js(historyShortfalls 只数 日期 < 今天 的格子,与格内 short 同口径);
+//   这里只做「当前页签明细行」的合计与 tooltip 文案。
+//   ⚠ 后端没返回 row.原计划(老 jar/该日不在原计划区间)⇒ items 为空 ⇒ 汇总条 v-if 自然不渲染。
+const shortItems = computed(() => historyShortfalls(schedRows.value, planToday.value))
+const shortInfo = computed(() => shortfallTotals(shortItems.value))
+/** 顶部汇总条悬停明细:每行「工单号#行号 · 日期 · 原计划 X / 报工数 Y · 欠产 Z」,最多 15 行 */
+const shortTitle = computed(() => {
+  const MAX = 15
+  const lines = [tt('历史未完成明细')]
+  for (const x of shortItems.value.slice(0, MAX)) {
+    const no = x.row['加工单号'] ?? x.row['工单号'] ?? ''
+    const ln = x.row['工单行号']
+    lines.push(`${no}${ln != null && ln !== '' ? '#' + ln : ''} · ${x.date} · `
+      + `${tt('原计划')} ${qtyText(x.plan)} / ${tt('报工数')} ${qtyText(x.actual) || '0'} · ${tt('欠产')} ${qtyText(x.short)}`)
+  }
+  const rest = shortItems.value.length - MAX
+  if (rest > 0) lines.push(`… ${tt('共')} ${shortItems.value.length} ${tt('处')}`)
+  return lines.join('\n')
+})
+/** 日期列头 tooltip(2026-11-13 新口径:`原计划/报工` 两数 + 标红含义) */
+const dayHeadTitle = computed(() =>
+  tt('格内:原计划/报工;原计划 = 工序计划量按 开工日→交期 均摊(不扣报工、历史也保留);标红 = 当天已结束未达成'))
 // ── 产能可见(2026-10-31,用户口径「产能只显示、不拦截;不影响实际排产量」)──────────────
 //   lineCap  = 产线档案 bs_prod_line.日产能(0/空 = 未配产能 ⇒ 不判超载);
 //   dayTotal = 该线每天已排合计(后端按 plang.scx 当前归属算,不分页签;含人工指定);
@@ -477,25 +689,55 @@ function overTitle(row) {
   return over > 0 ? `${tt('人工指定')} · ${tt('超分配')} ${qtyText(over)}` : tt('人工指定')
 }
 
-/** 格内显示一个数:计划 ∪ 实际融合(未达成显示实际;没报工显示计划) —— 见 business/dayPlan.js */
-function dayCell(row, d) {
-  return dayCellQty((row.日计划 || {})[d], (row.日报工 || {})[d])
+/**
+ * 日期格显示模型(2026-11-13 用户口径):`原计划/报工` 两数(例 715/15),判定口径全在
+ * business/dayPlan.js 的 dayCellView(两页共用,单测覆盖):
+ *   有报工 ⇒ 原计划/报工;没报工 ⇒ 计划;已结束且原计划>0没报工 ⇒ 原计划/0(short=整格欠产);
+ *   short 只在 日期 < 今天 时 > 0(今天还没结束,不判欠产)。
+ * ⚠ 后端没返回「原计划」(老 jar)⇒ baseline 为空 ⇒ dayCellView 自动退回单数显示,不显示假数据。
+ * ⚠ planToday 在 script setup 里是 ref:script 内取 .value(模板自动解包,别在模板里传 planToday)。
+ */
+function cell(row, d) {
+  return dayCellView((row.日计划 || {})[d], (row.日报工 || {})[d], (row.原计划 || {})[d],
+    isPast(d, planToday.value))
 }
 /** 本行排产区间(开工日~计划完工日)之外的空白格:画「/」(2026-11-01 用户口径,
- *  例:开工日改成 11-02 后,11-01 那格要画 /)。有计划/实报/人工指定的格子照旧显示数字。 */
+ *  例:开工日改成 11-02 后,11-01 那格要画 /)。有计划/原计划/实报/人工指定的格子照旧显示数字
+ *  (2026-11-13:加「原计划」—— 历史日期计划已不在 日计划 里,但原计划基线还在,不能画杠)。 */
 function isOutCell(row, d) {
   const p = Number((row.日计划 || {})[d] || 0)
   const a = Number((row.日报工 || {})[d] || 0)
-  if (p > 0 || a > 0) return false
+  const b = Number((row.原计划 || {})[d] || 0)
+  if (p > 0 || a > 0 || b > 0) return false
   return isOutOfPlanRange(d, row.计划开工日期 || '', row.计划完工日期 || '')
 }
-/** 格 tooltip:计划 / 实报都摆出来,但不占版面 */
+/** 格 tooltip(2026-11-13 新口径):欠产时把「当天未完成 · 原计划/报工/欠产 · 已并入后续重排」写全;
+ *  有报工/有计划时给 原计划 + 报工 + 编辑提示;空格只留编辑提示。 */
 function dayTitle(row, d) {
-  const p = Number((row.日计划 || {})[d] || 0)
-  const a = Number((row.日报工 || {})[d] || 0)
-  let t = `${tt('计划')} ${qtyText(p)}`
-  if (a > 0) t += ` · ${tt('实报')} ${qtyText(a)}` + (a < p ? ` (${tt('差')} ${qtyText(p - a)})` : '')
-  return t + ' · ' + tt('双击直接填当天数量;清空恢复自动')
+  const v = cell(row, d)
+  if (v.short > 0) {
+    return `${tt('当天未完成')} · ${tt('原计划')} ${v.planText} · ${tt('报工数')} ${v.actualText || '0'}`
+      + ` · ${tt('欠产')} ${qtyText(v.short)} · ${tt('未完成量已并入后续日期重排')}`
+  }
+  if (v.hasActual) {
+    // 基线缺失(老后端/该日不在原计划区间)⇒ dayCellView 只返回报工数(planText 为空)⇒ 文案也只写报工,
+    // 不能拿"今天起还要做多少"冒充原计划(2026-11-13 口径:降级只显示单数,不造对照)。
+    const hint = tt('双击直接填当天数量;清空恢复自动')
+    return (v.planText ? `${tt('原计划')} ${v.planText} · ` : '') + `${tt('报工数')} ${v.actualText} · ${hint}`
+  }
+  if (v.text) return `${tt('计划')} ${v.text} · ${tt('双击直接填当天数量;清空恢复自动')}`
+  return tt('双击直接填当天数量;清空恢复自动')
+}
+
+/**
+ * 双击改数量的「计划值」(2026-11-13,两处共用:编辑框预填 + commitQty 的 before 比较)。
+ * 口径 = 人工指定 ▸ 日计划 ▸ 原计划 ▸ 0。
+ * ⚠ 不能用格内显示值:格内是 `原计划/报工` 两数,拿显示值当 before 会把「没改」误判成「改成了报工数」,
+ *   一失焦就把人工指定写成报工数(例:格内 715/15,预填 15 ⇒ 人工指定被写成 15)。
+ */
+function planEditValue(row, d) {
+  const v = (row.人工指定 || {})[d] ?? (row.日计划 || {})[d] ?? (row.原计划 || {})[d] ?? 0
+  return Number(v || 0)
 }
 
 /** 格内直接填(2026-10-31 用户口径「直接填写这个就行」):双击变输入框,回车/失焦保存,Esc 取消 */
@@ -505,13 +747,13 @@ function qtyKey(row, d) { return `${row.行id}|${d}` }
 function startQtyEdit(row, d) {
   if (!canDayPlan.value) return
   qtyEdit.value = qtyKey(row, d)
-  qtyDraft.value = Number(dayCell(row, d).qty || 0) || undefined
+  qtyDraft.value = planEditValue(row, d) || undefined
 }
 function cancelQtyEdit() { qtyEdit.value = ''; qtyDraft.value = 0 }
 async function commitQty(row, d) {
   if (qtyEdit.value !== qtyKey(row, d)) return
   const v = Number(qtyDraft.value || 0)
-  const before = Number(dayCell(row, d).qty || 0)
+  const before = planEditValue(row, d)
   qtyEdit.value = ''
   if (v === before) return
   try {
@@ -541,6 +783,9 @@ async function loadDayPlan() {
       row.工序日 = p ? p['工序'] : (row.当前工序 || '')
       row.日计划 = { ...((p && p['日计划']) || {}) }
       row.日报工 = { ...((p && p['日报工']) || {}) }
+      // 原计划基线(2026-11-13):工序计划量按「开工日→交期」全量均摊,不扣报工、历史日期也保留 ——
+      //   日期格的 `原计划/报工` 与顶部欠产汇总都用它。老后端没这个字段 ⇒ 空对象 ⇒ 自动降级单数显示。
+      row.原计划 = { ...((p && p['原计划']) || {}) }
       row.人工指定 = { ...((p && p['人工指定']) || {}) }
       row.超分配 = p ? Number(p['超分配'] || 0) : 0
       row.工序计划量 = p ? Number(p['工序计划量'] || 0) : 0
@@ -559,9 +804,204 @@ async function loadDayPlan() {
 // ⚠ 2026-10-31 最终口径:日计划默认由系统自动均摊,只允许「就地改某一天」(其余天按剩余量重摊);
 //   不再有「全量手填 + 保存日排产」那套入口。
 
-/** 页签(未完工/已完工/全部)变化:排产明细 + 日排产一起换 */
+/** 页签(未完工/已完工/全部)变化:排产明细 + 日排产一起换(顺带清掉深链定位痕迹:换了页签行集就变了) */
 function onScope() {
+  clearFocus()
   loadScheduled().then(() => loadDayPlan())
+}
+
+// ───────── 深链定位(2026-11-13,契约 CONTRACT.md §3.1)──────────────────────────────
+// 来源:「生产工序进度看板」点某道工序跳过来 ——
+//   /prod/plan/workOrderBoard?line=<生产线>&wo=<工单号>&rowid=<行id>&op=<工序>
+// 本页做四件事:
+//   ① loadSummary() 后按 line **精确匹配** linesSummary 的生产线 → select(该线)(复用既有 select:
+//      loadScheduled + loadDayPlan),不另写一套取数;
+//   ② 定位行:行id 精确匹配 rowid 优先,其次 加工单号===wo(有行号时再按 工单行号 收窄);
+//   ③ 命中:该行高亮(.wb-focus-row)+ scrollIntoView 居中 + 上下文区提示「已定位:工单号#行号 · 工序」;
+//      (2026-11-14 起不再自动展开任何表格 —— 原「工序流转明细」展开区已删除,
+//       定位的那道工序标在「当前工序」格的悬停提示里,见 flowTip)
+//   ④ 参数**用完即摘**(router.replace 只删这 4 个 key),避免 keep-alive 回到本页被旧参数反复复写;
+//      同一页面再次从看板点别的工序进来(只变 query 不重新挂载)⇒ watch(route.query) 重新定位。
+//   ⚠ 找不到行 / 该线不在 linesSummary:ElMessage.warning + 摘参数后照常可用(不白屏、不死循环);
+//     其中「行在别处页签」(看板切了已完工/全部才点的工序)会先切本页既有的「全部」页签再找一次,
+//     真正不存在才 warning(见 consumeFocus 里第 ② 步的注释)。
+const route = useRoute()
+const router = useRouter()
+/** 深链 query 键(契约 §3.1 只这四个) */
+const FOCUS_KEYS = ['line', 'wo', 'rowid', 'op']
+/** 可选兜底:契约没定义行号参数,但发送端若顺带带上 行号/rowno,定位多个同号工单行时用它收窄 */
+const FOCUS_ROWNO_KEYS = ['行号', 'rowno']
+/** 本页路径(hash 路由,route.path 不含 '#');keep-alive 缓存实例里靠它判断这次路由变化是不是本页 */
+const SELF_PATH = '/prod/plan/workOrderBoard'
+/** 高亮行的 row-key 值(空 = 无高亮) */
+const focusKey = ref('')
+/** 深链定位的那道工序(2026-11-14 起:不再展开任何表格,只在「当前工序」悬停提示里标 ★) */
+const focusOp = ref('')
+/** 上下文区提示文案,如「已定位:WO001#2 · 成型」 */
+const focusTip = ref('')
+/** 竞态计数:连续跳入/连点时只让最后一次定位生效,前一次 await 的结果作废 */
+let focusSeq = 0
+/** 正在消费的参数指纹:keep-alive 下 onActivated 与 watch(route.query) 会在同一 tick 各触发一次,
+ *  同一个目标只消费一次(否则同一次跳入会白跑两遍取数/两遍定位) */
+let focusInflight = ''
+/** 排产明细表(定位后从它的 DOM 里找高亮行滚到中间) */
+const schedTable = ref(null)
+
+/**
+ * 行身份 key(2026-11-13):`:row-key` 依赖它,**必须唯一** ——
+ * 正常行 = 行id(plang.id);极端情况下缺 行id 时用 工单号|行号|批次号 兜底,
+ * 否则多行共用 'undefined' 会让 el-table 把不同行当成同一行(勾选/高亮串行)。
+ */
+function rowKeyOf(r) {
+  if (r && r.行id !== undefined && r.行id !== null && r.行id !== '') return String(r.行id)
+  return [r?.加工单号 ?? r?.工单号 ?? '', r?.工单行号 ?? '', r?.批次号 ?? ''].join('|')
+}
+/** 定位行的行级高亮类(只影响样式,不动数据/勾选) */
+function rowClassName({ row }) {
+  return focusKey.value && rowKeyOf(row) === focusKey.value ? 'wb-focus-row' : ''
+}
+/**
+ * 「当前工序」格的悬停提示(2026-11-14):原「工序流转明细」展开表删除后,逐道工序的
+ * 计划量/已审完工/可加工量/待流入量收到这里 —— 每行一道工序,当前工序带 ▶、深链定位的带 ★。
+ * 没有工序台账(没预排产)返回空串 ⇒ title 为空,不弹空提示。
+ */
+function flowTip(row) {
+  return flowChainTip(row && row.工序流转明细, { t: tt, fmt: flowNum, focusOp: focusOp.value })
+}
+/** 清掉定位痕迹(切产线/切片签/重新定位前调用) */
+function clearFocus() {
+  focusKey.value = ''
+  focusOp.value = ''
+  focusTip.value = ''
+}
+/** 取这条路由 query 里的深链参数(空串/undefined 一律视为没传) */
+function focusQueryOf(q) {
+  const out = {}
+  for (const k of [...FOCUS_KEYS, ...FOCUS_ROWNO_KEYS]) {
+    const v = q?.[k]
+    if (v !== undefined && v !== null && String(v) !== '') out[k] = Array.isArray(v) ? String(v[0] ?? '') : String(v)
+  }
+  return out
+}
+function hasFocusQuery(q) {
+  return FOCUS_KEYS.some((k) => {
+    const v = q?.[k]
+    return v !== undefined && v !== null && String(v) !== ''
+  })
+}
+/** 当前路由是否就是本页(keep-alive 下 route 会变成别的页,不能拿别的页的 query 来定位) */
+function onThisPage() {
+  return String(route.path || '').replace(/\/+$/, '') === SELF_PATH
+}
+/** 用完即摘:只删这四个(可选的兜底行号一起删),其余 query(如 ?trace=)原样保留;
+ *  用 replace 不新增历史记录 —— 免得用户按「后退」又回到带深链参数的地址来回触发。 */
+function stripFocusQuery() {
+  const q = { ...route.query }
+  let dirty = false
+  for (const k of [...FOCUS_KEYS, ...FOCUS_ROWNO_KEYS]) {
+    if (k in q) { delete q[k]; dirty = true }
+  }
+  if (!dirty) return
+  try { router.replace({ path: route.path, query: q })?.catch?.(() => { /* 重复导航忽略 */ }) } catch { /* 忽略 */ }
+}
+/** 在已取到的 schedRows 里定位目标行:rowid 精确优先,其次 加工单号(+行号) */
+function findFocusRow(q) {
+  const rows = schedRows.value || []
+  if (q.rowid !== undefined) {
+    const hit = rows.find((r) => String(r.行id) === String(q.rowid))
+    if (hit) return hit
+  }
+  if (q.wo !== undefined) {
+    const same = rows.filter((r) => String(r.加工单号 ?? r.工单号 ?? '') === String(q.wo))
+    if (same.length === 1) return same[0]
+    const ln = q['行号'] ?? q['rowno']
+    if (same.length > 1 && ln !== undefined) {
+      const hit = same.find((r) => String(r.工单行号 ?? '') === String(ln))
+      if (hit) return hit
+    }
+  }
+  return null
+}
+/** 把高亮行滚到表格可视区中间(容器 = 表格自己的滚动区 .el-scrollbar__wrap) */
+function scrollToFocusRow() {
+  const root = schedTable.value?.$el
+  if (!root || !focusKey.value) return
+  const tr = root.querySelector('.el-table__body tr.wb-focus-row')
+    || root.querySelector('tbody tr.wb-focus-row')
+  if (!tr || typeof tr.scrollIntoView !== 'function') return
+  try { tr.scrollIntoView({ block: 'center', inline: 'nearest' }) } catch { /* 老浏览器忽略 */ }
+}
+/** 表格重排会把行位置挪一点 ⇒ nextTick 滚一次,下一帧再校正一次(幂等,不循环) */
+function scheduleScroll() {
+  nextTick(() => {
+    scrollToFocusRow()
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => scrollToFocusRow())
+  })
+}
+/**
+ * 消费深链参数并定位(幂等:没有深链参数直接返回,所以 watch/onActivated/onMounted 都可安全调用)。
+ * 顺序:摘参数 → 骨架就绪 → 按 line 选线 → 定位行 → 高亮/提示/滚动。
+ */
+async function consumeFocus() {
+  if (!hasFocusQuery(route.query)) return
+  const q = focusQueryOf(route.query)
+  // 同一目标去重(keep-alive 激活 + query 变化会同 tick 各触发一次,只消费一次)
+  const sig = JSON.stringify(q)
+  if (focusInflight === sig) return
+  focusInflight = sig
+  const seq = ++focusSeq
+  try {
+    clearFocus()
+    // 用完即摘:先摘再定位 ⇒ 后面的取数/渲染过程中即使发生路由变化,也不会再拿到这份旧参数;
+    //   摘完 route.query 变化会再触发一次 watch,但那时已无深链参数 ⇒ 直接 return(不会递归)
+    stripFocusQuery()
+    // ① 骨架(产线列表)就绪才谈得上「按 line 选线」;onMounted 已 loadAll 时这里不重复请求
+    if (!(lineSummary.value || []).length) await loadSummary()
+    if (seq !== focusSeq) return
+    const findLine = () => (lineSummary.value || []).find((l) => String(l.生产线) === q.line)
+    let target = q.line ? findLine() : null
+    // keep-alive 缓存实例里的骨架可能已过期(别处新建/启用/改名产线)⇒ 先重取一次骨架再判"找不到"
+    if (!target) {
+      await loadSummary()
+      if (seq !== focusSeq) return
+      target = q.line ? findLine() : null
+    }
+    if (!target) {
+      // 该线不在 linesSummary(停用线被过滤/换账套/产线名改过):提示后放弃,页面照常可用
+      ElMessage.warning(tt('未在工单排产中找到该工单行'))
+      return
+    }
+    // ② 选中该线(既有 select:loadScheduled + loadDayPlan),等明细落地再找行
+    await select(target)
+    if (seq !== focusSeq) return
+    let row = findFocusRow(q)
+    // 页签口径差异(2026-11-13):生产工序进度看板自己也有「未完工/已完工/全部」筛选,从它的「已完工/全部」
+    //   点工序跳来时会指到**已完工**的工单行,而本页默认停在「未完工」页签 ⇒ 明细里根本没有那一行。
+    //   这时不给 warning(那会像"功能坏了"),先切到**既有「全部」页签**(纯查看动作,不改任何数据)再找一次;
+    //   仍未命中才 warning。契约 §3.1 的 happy path 不受影响(未完工页签里能命中就不会走这里)。
+    if (!row && scope.value !== '全部') {
+      scope.value = '全部'
+      await select(target)
+      if (seq !== focusSeq) return
+      row = findFocusRow(q)
+    }
+    if (!row) {
+      ElMessage.warning(tt('未在工单排产中找到该工单行'))
+      return
+    }
+    // ③ 高亮 + 上下文提示 + 滚到中间(2026-11-14:不再展开「工序流转明细」;
+    //    q.op 只用于提示文案与「当前工序」悬停提示里的 ★ 标记)
+    focusKey.value = rowKeyOf(row)
+    focusOp.value = q.op || ''
+    const no = row.加工单号 ?? row.工单号 ?? q.wo ?? ''
+    const ln = row.工单行号
+    let tip = tt('已定位') + '：' + no + (ln !== undefined && ln !== null && ln !== '' ? '#' + ln : '')
+    if (q.op) tip += ' · ' + tt(q.op)
+    focusTip.value = tip
+    scheduleScroll()
+  } finally {
+    if (seq === focusSeq) focusInflight = ''
+  }
 }
 
 async function loadAll() {
@@ -683,6 +1123,18 @@ async function printPlanSheet() {
 async function printTask(mode) {
   const rows = checkedSched.value
   if (!rows.length) return
+  // 成型生产任务单的「成型折算后数量」(2026-11-15 用户截图报障):原来直接印 排产数量(成品口径)
+  //   ⇒ 成型换算率 0.5 的单印出 50,应为 25。现按统一函数 moldPlanQty 取**成型工序计划量**
+  //   (与生产工单页同一实现;取不到 detail 时用 当前工序计划量 / 排产数量 逐级回退)。
+  const moldQty = {}
+  if (mode === '成型生产任务单') {
+    await Promise.all(rows.map(async (r) => {
+      try {
+        const d = (await request.post('/px/processTask/detail', { 工单号: r['加工单号'], 工单行id: r['行id'] })).data || {}
+        moldQty[r['行id']] = moldPlanQty(r, d)
+      } catch { moldQty[r['行id']] = moldPlanQty(r, null) }
+    }))
+  }
   const rowsToPrint = rows.map((r) => ({
     单据编号: r.加工单号,
     公司代码: r.公司代码 || '', 工单行号: r.工单行号, // 工单二维码=公司代码@工单号@1000+工单行号(2026-10-09 规则改版)
@@ -691,10 +1143,11 @@ async function printTask(mode) {
     商品名称: r.产品名称 || '',
     规格型号: r.规格型号 || '',
     订单数量: r.需求数量,
-    成型折算后数量: r.排产数量,
+    成型折算后数量: moldQty[r['行id']] ?? moldPlanQty(r, null),
     计划完工日期: r.计划完工日期 || '',
     批号: r.批号 || '', 物料编码: r.物料编码 || '',
-    排产数量: r.排产数量, 生产线: r.生产线 || sel.line || '',
+    排产数量: r.行来源 === '本线工序' ? (r.本线排产数量 ?? r.排产数量) : r.排产数量, 生产线: r.生产线 || sel.line || '',
+    工序: r.当前工序 || '',
   }))
   // 纸面不印打印日期/制单人/线体(2026-10-21 用户口径)⇒ 无选项要传
   const okPrint = await printWorkTaskSheet(mode, rowsToPrint)
@@ -767,12 +1220,34 @@ async function doTransferRevoke() {
 //    **2026-10-18 补**:口径改为「先排产后领料」——本页(排产)是领料的前置:转领料单要求该工单行
 //    已排入产线(scx 非空)且排产数量>0;同一工单行可开多张领料单(见 WorkOrderPickingService)。
 
-onMounted(() => {
-  loadAll()
+// ── 挂载 / keep-alive 激活 / 路由 query 变化:三条入口都走同一个幂等的 consumeFocus ──────────
+//   ⚠ 本页在 PortalLayout 里被 <keep-alive :max="20"> 按 route.path 缓存 ⇒ 从别的页签切回来、
+//     或从「生产工序进度看板」再次点工序进来(同一个 path 只变 query)**不会重新挂载**,
+//     所以必须有 watch(route.query) 与 onActivated 兜住,只在 onMounted 里做会漏掉后续跳入。
+/** 首次 onActivated 紧接着 onMounted 触发(深链的活由 onMounted 负责)⇒ 跳过它,避免同一次进入跑两遍 */
+let firstActivated = true
+
+onMounted(async () => {
   // 外部跳入(生产加工单列表「追溯」):?trace=工单号 直开追溯弹窗
+  //   ⚠ 必须在下面 await 之前同步读:深链的 stripFocusQuery 会 router.replace 重写 query
   const q = new URLSearchParams(location.hash.split('?')[1] || '')
   const tno = q.get('trace')
+  // 先跑完既有首屏取数(骨架+明细+统计+日计划),再消费深链 —— 深链要按 line 选线并定位行,
+  // 必须等 linesSummary 落地;反过来则会与 loadAll 的取数互相覆盖。
+  await loadAll()
+  await consumeFocus()
   if (tno) setTimeout(() => openTrace(tno), 600)
+})
+
+onActivated(() => {
+  if (firstActivated) { firstActivated = false; return }
+  consumeFocus()
+})
+
+watch(() => route.query, () => {
+  // keep-alive 缓存实例:切到别的页签时 route 已变成那页,不能拿它的 query 来定位本页
+  if (!onThisPage()) return
+  consumeFocus()
 })
 </script>
 
@@ -782,6 +1257,14 @@ onMounted(() => {
 .wb-title { font-weight: 600; }
 .wb-top .wb-stats { margin-left: auto; font-weight: 600; }
 .wb-p { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #606266; }
+/* 历史欠产汇总条(2026-11-13 用户口径「当天结束后未完成会进行提示」):浅红底/红边/红字,
+   与页面现有块(4px 圆角、8px 行距)同风格;只占一行、放不下时整块换行,不横向撑破版面。
+   hint 灰字说明「标红格」的含义;明细在 :title 里(悬停看,不弹窗)。 */
+.wb-short-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px;
+  padding: 6px 12px; background: #fef0f0; border: 1px solid #fbc4c4; border-radius: 4px;
+  color: #f56c6c; font-size: 12px; line-height: 1.5; cursor: help; }
+.wb-short-main { font-weight: 700; }
+.wb-short-hint { color: #909399; }
 .wb-body { display: flex; gap: 8px; flex: 1; min-height: 0; }
 .wb-left { width: 210px; flex: none; background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; overflow: auto; }
 .wb-left-head { padding: 8px 10px; font-weight: 600; font-size: 13px; color: #116a5b; border-bottom: 1px solid #e4e7ed; }
@@ -790,13 +1273,17 @@ onMounted(() => {
 .wb-line.active { background: #e6f3ef; }
 .wb-line.off .wb-line-name { color: #909399; }
 .wb-line-name { font-size: 12px; color: #303133; font-weight: 600; display: flex; align-items: center; gap: 6px; }
-.wb-line-sub { font-size: 11px; color: #909399; }
-.wb-line-row { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
+/* 左侧行次行「已报 X · 未完工 Y」(2026-11-12):11px 灰字;左栏固定 210px ⇒ 单行省略,
+   长数字(如 12345)也不换行、不横向撑破;字段缺失时模板整行不渲染 */
+.wb-line-sub { margin-top: 1px; font-size: 11px; color: #909399; line-height: 1.3;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* 左侧行:主数字(=本线排产数量) + 今日已排/日产能小标签;窄栏放不下时换行,不溢出 */
+.wb-line-row { display: flex; align-items: center; justify-content: space-between; gap: 2px 6px; flex-wrap: wrap; margin-top: 2px; }
 .wb-tag { font-size: 11px; padding: 0 6px; border-radius: 3px; cursor: pointer; }
 .wb-tag.open { background: #67c23a; color: #fff; }
 .wb-tag.closed { background: #f56c6c; color: #fff; }
 .wb-tag.off-line { background: #909399; color: #fff; cursor: default; }
-.wb-qty { font-weight: 600; color: #303133; font-size: 12px; }
+.wb-qty { font-weight: 600; color: #303133; font-size: 12px; font-variant-numeric: tabular-nums; }
 .wb-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .wb-ctx { display: flex; align-items: center; gap: 14px; padding: 8px 10px; background: #eef6ff; border: 1px solid #b3d4f5; border-radius: 4px; flex-wrap: wrap; }
 .wb-ctx-label { font-size: 13px; color: #606266; }
@@ -817,11 +1304,16 @@ onMounted(() => {
 .ra-hint { font-size: 12px; font-weight: 600; color: #e6a23c; }
 .ra-tip { flex: 1; min-width: 0; font-size: 12px; font-weight: 600; line-height: 1.6; color: #f56c6c; }
 .ra-note { margin-top: 6px; padding-top: 10px; border-top: 1px dashed #ebeef5; font-size: 12px; line-height: 1.6; color: #909399; }
-.wb-ctx-stats { margin-left: auto; font-size: 12px; color: #1e6fb8; font-weight: 600; }
+/* 顶部「本线排产数量 | 已报完工量 | 未完工量」(2026-11-12 改工序口径):整块不拆行,
+   放不下时由 .wb-ctx 的 flex-wrap 整块换到第二行;窗口再窄才内部省略(不横向撑出滚动条);
+   cursor:help 提示有 tooltip(成品口径未交量合计) */
+.wb-ctx-stats { margin-left: auto; font-size: 12px; color: #1e6fb8; font-weight: 600; white-space: nowrap;
+  cursor: help; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .wb-block { background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 /* 日排产日期列(2026-10-29;2026-10-31:自动均摊 + 双击就地改):上=当天计划,下=当天已审核报工量 */
 .dp-plan { color: #303133; font-weight: 600; line-height: 1.2; cursor: text; }
-/* 2026-10-31 融合显示:当天有报工 ⇒ 格子里显示的是**实际完成数**(绿色);没报工显示计划(深色) */
+/* 2026-10-31 融合显示:当天有报工 ⇒ 绿色(2026-11-13 起格内是 `原计划/报工` 两数,整格标绿);
+   没报工显示计划(深色) */
 .dp-plan.actual { color: #529b2e; }
 /* 2026-11-01:本行排产区间(开工日~计划完工日)之外的空白格画「/」——
    一眼看出那一天**不归本行排**(例:开工日改成 11-02 后,11-01 就是斜杠,而不是空着像漏排) */
@@ -829,6 +1321,9 @@ onMounted(() => {
 .dp-input { width: 66px; }
 /* 人工指定过的格子加粗变色 + 「手」角标;超分配时角标标红(只提示,不拦保存) */
 .dp-plan.manual { color: #b88230; }
+/* 2026-11-13 历史欠产:日期 < 今天 且 报工 < 原计划 ⇒ 整格红色加粗。
+   放在 .actual / .manual **之后**(同优先级靠后生效),保证「既有报工又欠产」的格子是红色而不是绿色/橙色。 */
+.dp-plan.short { color: #f56c6c; font-weight: 700; }
 .dp-hand { margin-left: 2px; padding: 0 2px; font-size: 10px; font-weight: 700; color: #fff;
   background: #e6a23c; border-radius: 3px; vertical-align: top; }
 .dp-hand.over { background: #f56c6c; }
@@ -866,10 +1361,30 @@ onMounted(() => {
 .wb-print-set-form { padding-top: 4px; }
 .wb-print-set-hint { margin-top: 6px; font-size: 12px; line-height: 1.6; color: #909399; }
 .wb-closed { color: #f56c6c; font-weight: 600; }
+/* 按量流转「待流入量」>0 = 还在等上一道流下来,标橙提示 */
+.wb-flow-gap { color: #e6a23c; font-weight: 600; }
+/* 按量流转·逐道明细的展开行样式(2026-11-14 用户口径删除,数字改到「当前工序」悬停提示):
+   已随 <el-table-column type="expand"> 一并撤掉,别再把 .wb-flow-box/.wb-flow-tbl 找回来 */
 .wb-trace-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
 .wb-trace-no { font-size: 16px; font-weight: 700; color: #1e6fb8; }
 .wb-trace-desc { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: #606266; background: #fdf6ec; border: 1px solid #f5dab1; border-radius: 4px; padding: 8px 10px; margin-bottom: 10px; }
 .wb-trace-block { margin-bottom: 12px; }
 .wb-trace-block .wb-block-title { display: block; border-left: 3px solid #1e6fb8; padding-left: 8px; margin-bottom: 6px; }
 .wb-trace-sub { font-size: 12px; color: #909399; margin: 6px 0 4px; }
+
+/* ── 深链定位(2026-11-13,契约 CONTRACT.md §3.1)──────────────────────────────────
+   从「生产工序进度看板」点某道工序跳过来时,告诉用户"定位到哪一行、哪一道工序":
+   ① 上下文区一枚小提示(与上下文条同色系,不抢眼);② 命中行浅蓝底 + 左侧 3px 蓝边。
+   (2026-11-14 展开区删除后,原 ③「展开区里定位那道工序再标一次」不再存在;
+    那道工序改为在「当前工序」悬停提示里打 ★,见 business/woFlowChain.js)
+   全部是静态样式(不用发光动画):截图/打印稳定,也符合本页"信息为主"的风格。 */
+.wb-focus-tip { padding: 1px 8px; background: #ecf5ff; border: 1px solid #b3d4f5; border-radius: 3px;
+  font-size: 12px; font-weight: 600; color: #1e6fb8; white-space: nowrap; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; }
+/* 命中行:选择器要压过 el-table 自带的 hover-row / current-row / striped 底色(那些带 2~3 个类),
+   故这里同时写 :hover 与 .hover-row 两条;固定列(sticky)与滚动区在同一张 table 里,行类一并生效。 */
+:deep(.el-table__body tr.wb-focus-row > td.el-table__cell),
+:deep(.el-table__body tr.wb-focus-row:hover > td.el-table__cell),
+:deep(.el-table__body tr.wb-focus-row.hover-row > td.el-table__cell) { background-color: #ecf5ff; }
+:deep(.el-table__body tr.wb-focus-row > td.el-table__cell:first-child) { box-shadow: inset 3px 0 0 #409eff; }
 </style>

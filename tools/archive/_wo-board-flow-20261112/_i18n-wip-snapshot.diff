@@ -1,0 +1,345 @@
+diff --git a/frontend/src/i18n/locales/de.js b/frontend/src/i18n/locales/de.js
+index ac04a6521..d873f0c1d 100644
+--- a/frontend/src/i18n/locales/de.js
++++ b/frontend/src/i18n/locales/de.js
+@@ -2822,17 +2822,16 @@ export default {
+     '至少保留一个批次': 'Mindestens eine Charge muss bleiben',
+     '删除批次将清空该批次所有判定结果，确定删除吗？': 'Beim Löschen der Charge werden alle ihre Beurteilungsergebnisse entfernt. Trotzdem löschen?',
+     '删除该项目将清除其所有批次的记录，确定删除吗？': 'Beim Löschen dieser Position werden ihre Datensätze in allen Chargen entfernt. Trotzdem löschen?',
+-    "工序在制": "Vorgang in Arbeit",
+-    "该道计划量": "Geplante Menge (Vorgang)",
+-    "该道已完工": "Erledigt (Vorgang)",
+-    "可排产量": "Einplanbare Menge",
+-    "不可排产量": "Nicht einplanbare Menge",
+-    "可排产量 = 可加工量 − 该道已完工(这条线现在能做的量)": "Einplanbare Menge = bearbeitbare Menge − erledigte Menge (was diese Linie jetzt schaffen kann)",
+-    "不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量)": "Nicht einplanbare Menge = geplante Menge − bearbeitbare Menge (noch nicht vom vorherigen Vorgang zugeflossen)",
+-    "上道已完工折成品": "Vorheriger Vorgang erledigt (FG-Basis)",
+-    "最后报工时间": "Letzte Meldung",
+-    "工单当前工序": "Aktueller Vorgang des Auftrags",
+-    "超出可排产量,后端会拒绝(上限 = 可排产量 × 1.01)": "Übersteigt die einplanbare Menge; der Server lehnt ab (max = einplanbare Menge × 1.01)",
++    "上道完工(折成品)": "Vorgang-Ausbringung (umgerechnet)",
++    "待报量": "Noch meldbar",
++    "待流入量": "Zugang ausstehend",
++    "上道完工(折成品) = 上一道已审报工 ÷ 上一道换算率;首道 = 排产数量": "Vorgang-Ausbringung (umgerechnet) = freigegebene Menge des Vorgangs / Umrechnungsfaktor; erster Vorgang = Planmenge",
++    "可加工量 = 上道完工(折成品) × 本工序换算率(本道现在最多能做多少)": "Bearbeitbare Menge = Vorgang-Ausbringung (umgerechnet) x Umrechnungsfaktor",
++    "待报量 = 可加工量 − 本工序已审报工(本道还能报多少)": "Noch meldbar = bearbeitbare Menge - freigegebene Menge dieses Vorgangs",
++    "待流入量 = 本工序计划量 − 可加工量(还等上一道流下来多少)": "Zugang ausstehend = Planmenge - bearbeitbare Menge",
++    "工序流转明细": "Vorgangsfluss-Details",
++    "按量流转:上一道报多少,下一道最多做多少": "Mengenfluss: der nächste Vorgang kann nur so viel wie der vorherige meldet",
++    "已审完工": "Freigegebene Menge",
+   },
+ 
+ }
+diff --git a/frontend/src/i18n/locales/en.js b/frontend/src/i18n/locales/en.js
+index b8d4794bd..89af55a99 100644
+--- a/frontend/src/i18n/locales/en.js
++++ b/frontend/src/i18n/locales/en.js
+@@ -4261,8 +4261,12 @@ export default {
+       'It returns to the pending pool; changing lines = revoke + re-schedule; this line\'s planned lines are voided as well',
+     // 口径拆分(2026-10-07):成品口径(需求/排产/入库/未交量)与工序口径(各道计划量/报工)分开显示
+     '当前工序计划量': "Current operation's planned qty",
++    // 本线排产数量(2026-11-11):「工单排产 / 快速排产②已排产」的数量主列 = 排产数量 × 该道换算率,
+     //   成品口径(排产/入库/未交量)仍按 pl_sl,见列头 tooltip
++    '本线排产数量': 'Line scheduled qty',
++    '本线排产数量 = 排产数量 × 该工序自己的换算率(取该行当前工序的台账计划数量);成品口径请用左侧「订单数量」':
+       'Line scheduled qty = scheduled qty × this operation\'s conversion rate (the current operation\'s planned qty in the process ledger); for the finished-product basis use "Order Qty" on the left',
++    '本线排产数量 = 排产数量 × 该工序自己的换算率（当前工序台账计划数量）;成品口径看「需求数量/入库数量」':
+       'Line scheduled qty = scheduled qty × this operation\'s conversion rate (the current operation\'s planned qty in the ledger); for the finished-product basis see "Demand Qty / Received Qty"',
+     '当前工序完工量': "Current operation's completed qty",
+     '上道工序': 'Previous operation',
+@@ -5696,6 +5700,10 @@ export default {
+     '加载面板配置失败': 'Failed to load the panel configuration',
+     '面板编号无效,请从左侧菜单进入「实验室记录手机登记」': 'Invalid panel code — open "Lab Records Mobile Entry" from the left menu',
+     '保存后单据状态=草稿;审核/归档在电脑端该面板照原流程进行。拍的照会写进「手机照片」字段,电脑端点开即可看。': 'Saved documents stay in Draft status; approve and archive them on the PC panel as usual. Photos are written into the "Mobile Photo" field and can be opened on the PC.',
++    // ---- 生产工单·滚动加载(2026-11-09:分页改滚动加载,首屏 50 行,向下滚动追加下一批)----
++    '已加载': 'Loaded',
++    '向下滚动加载更多': 'Scroll down to load more',
++    '已全部加载': 'All loaded',
+     "可报": "Reportable",
+     "可加工量": "Processable",
+     "本道可报量 = 上一道已审核完工量(按量流转)": "Reportable qty = approved output of the previous process (flow by quantity)",
+@@ -5733,18 +5741,16 @@ export default {
+     '至少保留一个批次': 'Keep at least one batch',
+     '删除批次将清空该批次所有判定结果，确定删除吗？': 'Deleting the batch clears all its judgement results. Delete anyway?',
+     '删除该项目将清除其所有批次的记录，确定删除吗？': 'Deleting this item clears its records for every batch. Delete anyway?',
+-    "工序在制": "Process WIP",
+-    "该道计划量": "Process planned qty",
+-    "该道已完工": "Process completed",
+-    "可排产量": "Schedulable qty",
+-    "不可排产量": "Unschedulable qty",
+-    "可排产量 = 可加工量 − 该道已完工(这条线现在能做的量)": "Schedulable qty = processable qty − completed qty of this process (what this line can do now)",
+-    "不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量)": "Unschedulable qty = planned qty of this process − processable qty (still not flowed from the previous process)",
+-    "上道已完工折成品": "Prev process completed (FG basis)",
+-    "最后报工时间": "Last report time",
+-    "工单当前工序": "WO current process",
+-    "超出可排产量,后端会拒绝(上限 = 可排产量 × 1.01)": "Exceeds the schedulable qty; the server will reject it (max = schedulable qty × 1.01)",
++    "上道完工(折成品)": "Upstream Output (Converted)",
++    "待报量": "Reportable Remaining",
++    "待流入量": "Pending Inflow",
++    "上道完工(折成品) = 上一道已审报工 ÷ 上一道换算率;首道 = 排产数量": "Upstream output (converted) = approved output of the previous process / its conversion rate; first process = scheduled qty",
++    "可加工量 = 上道完工(折成品) × 本工序换算率(本道现在最多能做多少)": "Processable qty = upstream output (converted) x this process conversion rate",
++    "待报量 = 可加工量 − 本工序已审报工(本道还能报多少)": "Reportable remaining = processable qty - approved output of this process",
++    "待流入量 = 本工序计划量 − 可加工量(还等上一道流下来多少)": "Pending inflow = planned qty - processable qty (still to flow in from the previous process)",
++    "工序流转明细": "Process Flow Detail",
++    "按量流转:上一道报多少,下一道最多做多少": "Flow by qty: the next process can only do what the previous one reported",
++    "已审完工": "Approved Output",
+   },
+ 
+ }
+-
+diff --git a/frontend/src/i18n/locales/es.js b/frontend/src/i18n/locales/es.js
+index f78f56279..a4b2d2ee4 100644
+--- a/frontend/src/i18n/locales/es.js
++++ b/frontend/src/i18n/locales/es.js
+@@ -2822,17 +2822,16 @@ export default {
+     '至少保留一个批次': 'Debe quedar al menos un lote',
+     '删除批次将清空该批次所有判定结果，确定删除吗？': 'Eliminar el lote borra todos sus dictámenes. ¿Eliminar de todos modos?',
+     '删除该项目将清除其所有批次的记录，确定删除吗？': 'Eliminar este punto borra sus registros en todos los lotes. ¿Eliminar de todos modos?',
+-    "工序在制": "Proceso en curso",
+-    "该道计划量": "Cant. planificada del proceso",
+-    "该道已完工": "Completado del proceso",
+-    "可排产量": "Cant. programable",
+-    "不可排产量": "Cant. no programable",
+-    "可排产量 = 可加工量 − 该道已完工(这条线现在能做的量)": "Cant. programable = cant. procesable − completado del proceso (lo que esta línea puede hacer ahora)",
+-    "不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量)": "Cant. no programable = cant. planificada − cant. procesable (aún no viene del proceso anterior)",
+-    "上道已完工折成品": "Proceso anterior completado (base PT)",
+-    "最后报工时间": "Último reporte",
+-    "工单当前工序": "Proceso actual de la OF",
+-    "超出可排产量,后端会拒绝(上限 = 可排产量 × 1.01)": "Supera la cant. programable; el servidor lo rechazará (máx = cant. programable × 1.01)",
++    "上道完工(折成品)": "Producción anterior (convertida)",
++    "待报量": "Pendiente de reportar",
++    "待流入量": "Entrada pendiente",
++    "上道完工(折成品) = 上一道已审报工 ÷ 上一道换算率;首道 = 排产数量": "Producción anterior (convertida) = producción aprobada del proceso anterior / su factor; primer proceso = cantidad planificada",
++    "可加工量 = 上道完工(折成品) × 本工序换算率(本道现在最多能做多少)": "Cantidad procesable = producción anterior (convertida) x factor de este proceso",
++    "待报量 = 可加工量 − 本工序已审报工(本道还能报多少)": "Pendiente de reportar = cantidad procesable - producción aprobada de este proceso",
++    "待流入量 = 本工序计划量 − 可加工量(还等上一道流下来多少)": "Entrada pendiente = cantidad planificada - cantidad procesable",
++    "工序流转明细": "Detalle de flujo de procesos",
++    "按量流转:上一道报多少,下一道最多做多少": "Flujo por cantidad: el siguiente proceso solo puede hacer lo reportado por el anterior",
++    "已审完工": "Producción aprobada",
+   },
+ 
+ }
+diff --git a/frontend/src/i18n/locales/fr.js b/frontend/src/i18n/locales/fr.js
+index e89509ce7..0d19600d0 100644
+--- a/frontend/src/i18n/locales/fr.js
++++ b/frontend/src/i18n/locales/fr.js
+@@ -2822,17 +2822,16 @@ export default {
+     '至少保留一个批次': 'Conservez au moins un lot',
+     '删除批次将清空该批次所有判定结果，确定删除吗？': 'Supprimer le lot efface tous ses jugements. Supprimer quand même ?',
+     '删除该项目将清除其所有批次的记录，确定删除吗？': 'Supprimer ce point efface ses enregistrements pour tous les lots. Supprimer quand même ?',
+-    "工序在制": "En-cours opération",
+-    "该道计划量": "Qté prévue de l’opération",
+-    "该道已完工": "Réalisé de l’opération",
+-    "可排产量": "Qté planifiable",
+-    "不可排产量": "Qté non planifiable",
+-    "可排产量 = 可加工量 − 该道已完工(这条线现在能做的量)": "Qté planifiable = qté traitable − réalisé de l’opération (ce que cette ligne peut faire maintenant)",
+-    "不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量)": "Qté non planifiable = qté prévue − qté traitable (pas encore transférée de l’opération précédente)",
+-    "上道已完工折成品": "Opération précédente réalisée (base PF)",
+-    "最后报工时间": "Dernier pointage",
+-    "工单当前工序": "Opération courante de l’OF",
+-    "超出可排产量,后端会拒绝(上限 = 可排产量 × 1.01)": "Dépasse la qté planifiable ; le serveur refusera (max = qté planifiable × 1.01)",
++    "上道完工(折成品)": "Production amont (convertie)",
++    "待报量": "Reste à déclarer",
++    "待流入量": "Entrée en attente",
++    "上道完工(折成品) = 上一道已审报工 ÷ 上一道换算率;首道 = 排产数量": "Production amont (convertie) = production approuvée de l'opération précédente / son taux; première opération = quantité planifiée",
++    "可加工量 = 上道完工(折成品) × 本工序换算率(本道现在最多能做多少)": "Quantité traitable = production amont (convertie) x taux de cette opération",
++    "待报量 = 可加工量 − 本工序已审报工(本道还能报多少)": "Reste à déclarer = quantité traitable - production approuvée de cette opération",
++    "待流入量 = 本工序计划量 − 可加工量(还等上一道流下来多少)": "Entrée en attente = quantité planifiée - quantité traitable",
++    "工序流转明细": "Détail du flux opératoire",
++    "按量流转:上一道报多少,下一道最多做多少": "Flux par quantité : l'opération suivante ne peut traiter que ce que la précédente a déclaré",
++    "已审完工": "Production approuvée",
+   },
+ 
+ }
+diff --git a/frontend/src/i18n/locales/ja.js b/frontend/src/i18n/locales/ja.js
+index e56ecb487..df18d9ab3 100644
+--- a/frontend/src/i18n/locales/ja.js
++++ b/frontend/src/i18n/locales/ja.js
+@@ -3028,17 +3028,16 @@ export default {
+     '至少保留一个批次': 'バッチは最低 1 つ必要です',
+     '删除批次将清空该批次所有判定结果，确定删除吗？': 'バッチを削除すると、このバッチの判定結果がすべて消えます。削除しますか？',
+     '删除该项目将清除其所有批次的记录，确定删除吗？': 'この項目を削除すると、全バッチの記録が消えます。削除しますか？',
+-    "工序在制": "工程仕掛",
+-    "该道计划量": "当工程計画数",
+-    "该道已完工": "当工程完成数",
+-    "可排产量": "割当可能数",
+-    "不可排产量": "割当不可数",
+-    "可排产量 = 可加工量 − 该道已完工(这条线现在能做的量)": "割当可能数 = 加工可能数 − 当工程完成数(このラインで今できる量)",
+-    "不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量)": "割当不可数 = 当工程計画数 − 加工可能数(前工程からまだ流れてきていない量)",
+-    "上道已完工折成品": "前工程完成数(完成品換算)",
+-    "最后报工时间": "最終報告時刻",
+-    "工单当前工序": "指示書の現工程",
+-    "超出可排产量,后端会拒绝(上限 = 可排产量 × 1.01)": "割当可能数を超えています。サーバーで拒否されます(上限 = 割当可能数 × 1.01)",
++    "上道完工(折成品)": "前工程完工(換算後)",
++    "待报量": "報告残",
++    "待流入量": "流入待ち",
++    "上道完工(折成品) = 上一道已审报工 ÷ 上一道换算率;首道 = 排产数量": "前工程完工(換算後) = 前工程の承認済み完成量 ÷ 前工程換算率;最初の工程 = 計画数量",
++    "可加工量 = 上道完工(折成品) × 本工序换算率(本道现在最多能做多少)": "加工可能量 = 前工程完工(換算後) × 本工程換算率",
++    "待报量 = 可加工量 − 本工序已审报工(本道还能报多少)": "報告残 = 加工可能量 − 本工程の承認済み完成量",
++    "待流入量 = 本工序计划量 − 可加工量(还等上一道流下来多少)": "流入待ち = 本工程の計画数量 − 加工可能量(前工程からの流入待ち)",
++    "工序流转明细": "工程流れの明細",
++    "按量流转:上一道报多少,下一道最多做多少": "量ベースの流れ:前工程の報告量だけ次工程で処理可能",
++    "已审完工": "承認済み完成量",
+   },
+ 
+ }
+diff --git a/frontend/src/i18n/locales/ko.js b/frontend/src/i18n/locales/ko.js
+index 03473552a..5d8bda9da 100644
+--- a/frontend/src/i18n/locales/ko.js
++++ b/frontend/src/i18n/locales/ko.js
+@@ -2822,17 +2822,16 @@ export default {
+     '至少保留一个批次': '배치를 최소 하나는 남겨야 합니다',
+     '删除批次将清空该批次所有判定结果，确定删除吗？': '배치를 삭제하면 해당 배치의 모든 판정 결과가 지워집니다. 삭제하시겠습니까?',
+     '删除该项目将清除其所有批次的记录，确定删除吗？': '이 항목을 삭제하면 모든 배치의 기록이 지워집니다. 삭제하시겠습니까?',
+-    "工序在制": "공정 재공",
+-    "该道计划量": "해당 공정 계획량",
+-    "该道已完工": "해당 공정 완료량",
+-    "可排产量": "배정 가능량",
+-    "不可排产量": "배정 불가량",
+-    "可排产量 = 可加工量 − 该道已完工(这条线现在能做的量)": "배정 가능량 = 가공 가능량 − 해당 공정 완료량(이 라인에서 지금 할 수 있는 양)",
+-    "不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量)": "배정 불가량 = 해당 공정 계획량 − 가공 가능량(이전 공정에서 아직 내려오지 않은 양)",
+-    "上道已完工折成品": "이전 공정 완료(완제품 환산)",
+-    "最后报工时间": "최종 보고 시각",
+-    "工单当前工序": "작업지시 현재 공정",
+-    "超出可排产量,后端会拒绝(上限 = 可排产量 × 1.01)": "배정 가능량을 초과했습니다. 서버에서 거부됩니다(상한 = 배정 가능량 × 1.01)",
++    "上道完工(折成品)": "이전 공정 완료(환산)",
++    "待报量": "보고 가능 잔량",
++    "待流入量": "입고 대기량",
++    "上道完工(折成品) = 上一道已审报工 ÷ 上一道换算率;首道 = 排产数量": "이전 공정 완료(환산) = 이전 공정 승인 완료량 ÷ 이전 공정 환산율; 첫 공정 = 계획 수량",
++    "可加工量 = 上道完工(折成品) × 本工序换算率(本道现在最多能做多少)": "가공 가능량 = 이전 공정 완료(환산) × 본 공정 환산율",
++    "待报量 = 可加工量 − 本工序已审报工(本道还能报多少)": "보고 가능 잔량 = 가공 가능량 − 본 공정 승인 완료량",
++    "待流入量 = 本工序计划量 − 可加工量(还等上一道流下来多少)": "입고 대기량 = 본 공정 계획 수량 − 가공 가능량",
++    "工序流转明细": "공정 흐름 상세",
++    "按量流转:上一道报多少,下一道最多做多少": "수량 흐름: 이전 공정 보고량만큼만 다음 공정 가능",
++    "已审完工": "승인 완료량",
+   },
+ 
+ }
+diff --git a/frontend/src/i18n/locales/ru.js b/frontend/src/i18n/locales/ru.js
+index d4da94f58..744903794 100644
+--- a/frontend/src/i18n/locales/ru.js
++++ b/frontend/src/i18n/locales/ru.js
+@@ -2827,17 +2827,16 @@ export default {
+     '至少保留一个批次': 'Должна остаться хотя бы одна партия',
+     '删除批次将清空该批次所有判定结果，确定删除吗？': 'Удаление партии очистит все её оценки. Удалить?',
+     '删除该项目将清除其所有批次的记录，确定删除吗？': 'Удаление этого пункта очистит его записи по всем партиям. Удалить?',
+-    "工序在制": "Операция в работе",
+-    "该道计划量": "Плановое кол-во операции",
+-    "该道已完工": "Выполнено по операции",
+-    "可排产量": "К распределению",
+-    "不可排产量": "Не к распределению",
+-    "可排产量 = 可加工量 − 该道已完工(这条线现在能做的量)": "К распределению = доступно к обработке − выполнено (сколько эта линия может сделать сейчас)",
+-    "不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量)": "Не к распределению = плановое кол-во − доступно к обработке (ещё не поступило с предыдущей операции)",
+-    "上道已完工折成品": "Предыдущая операция выполнена (в ГП)",
+-    "最后报工时间": "Последняя выработка",
+-    "工单当前工序": "Текущая операция заказа",
+-    "超出可排产量,后端会拒绝(上限 = 可排产量 × 1.01)": "Превышает кол-во к распределению; сервер отклонит (макс = кол-во к распределению × 1.01)",
++    "上道完工(折成品)": "Выпуск предыдущей операции (в пересчёте)",
++    "待报量": "Остаток к отчёту",
++    "待流入量": "Ожидается поступление",
++    "上道完工(折成品) = 上一道已审报工 ÷ 上一道换算率;首道 = 排产数量": "Выпуск предыдущей операции (в пересчёте) = подтверждённый выпуск / коэффициент; первая операция = плановое количество",
++    "可加工量 = 上道完工(折成品) × 本工序换算率(本道现在最多能做多少)": "Обрабатываемое количество = выпуск предыдущей операции (в пересчёте) × коэффициент этой операции",
++    "待报量 = 可加工量 − 本工序已审报工(本道还能报多少)": "Остаток к отчёту = обрабатываемое количество − подтверждённый выпуск этой операции",
++    "待流入量 = 本工序计划量 − 可加工量(还等上一道流下来多少)": "Ожидается поступление = плановое количество − обрабатываемое количество",
++    "工序流转明细": "Детали потока операций",
++    "按量流转:上一道报多少,下一道最多做多少": "Поток по количеству: следующая операция может выполнить только отчитанное по предыдущей",
++    "已审完工": "Подтверждённый выпуск",
+   },
+ 
+ }
+diff --git a/frontend/src/i18n/locales/th.js b/frontend/src/i18n/locales/th.js
+index 2dd40cf9c..da54c9039 100644
+--- a/frontend/src/i18n/locales/th.js
++++ b/frontend/src/i18n/locales/th.js
+@@ -2827,17 +2827,16 @@ export default {
+     '至少保留一个批次': 'ต้องเหลืออย่างน้อยหนึ่งล็อต',
+     '删除批次将清空该批次所有判定结果，确定删除吗？': 'การลบล็อตจะล้างผลตัดสินทั้งหมดของล็อตนี้ ยืนยันการลบหรือไม่',
+     '删除该项目将清除其所有批次的记录，确定删除吗？': 'การลบรายการนี้จะล้างบันทึกของทุกล็อต ยืนยันการลบหรือไม่',
+-    "工序在制": "งานระหว่างขั้นตอน",
+-    "该道计划量": "ปริมาณตามแผนของขั้นตอน",
+-    "该道已完工": "เสร็จแล้วของขั้นตอน",
+-    "可排产量": "ปริมาณที่จัดได้",
+-    "不可排产量": "ปริมาณที่จัดไม่ได้",
+-    "可排产量 = 可加工量 − 该道已完工(这条线现在能做的量)": "ปริมาณที่จัดได้ = ปริมาณที่ทำได้ − ที่เสร็จแล้ว (ปริมาณที่ไลน์นี้ทำได้ตอนนี้)",
+-    "不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量)": "ปริมาณที่จัดไม่ได้ = ปริมาณตามแผน − ปริมาณที่ทำได้ (ยังไม่ไหลลงมาจากขั้นตอนก่อนหน้า)",
+-    "上道已完工折成品": "ขั้นตอนก่อนหน้าเสร็จ (เทียบสำเร็จรูป)",
+-    "最后报工时间": "เวลารายงานครั้งล่าสุด",
+-    "工单当前工序": "ขั้นตอนปัจจุบันของใบงาน",
+-    "超出可排产量,后端会拒绝(上限 = 可排产量 × 1.01)": "เกินปริมาณที่จัดได้ เซิร์ฟเวอร์จะปฏิเสธ (สูงสุด = ปริมาณที่จัดได้ × 1.01)",
++    "上道完工(折成品)": "ขั้นตอนก่อนหน้าเสร็จ (แปลงหน่วย)",
++    "待报量": "คงเหลือที่รายงานได้",
++    "待流入量": "รอการโอนเข้า",
++    "上道完工(折成品) = 上一道已审报工 ÷ 上一道换算率;首道 = 排产数量": "ขั้นตอนก่อนหน้าเสร็จ (แปลงหน่วย) = ปริมาณที่อนุมัติของขั้นตอนก่อนหน้า ÷ อัตราแปลง; ขั้นตอนแรก = ปริมาณตามแผน",
++    "可加工量 = 上道完工(折成品) × 本工序换算率(本道现在最多能做多少)": "ปริมาณที่ทำได้ = ขั้นตอนก่อนหน้าเสร็จ (แปลงหน่วย) × อัตราแปลงของขั้นตอนนี้",
++    "待报量 = 可加工量 − 本工序已审报工(本道还能报多少)": "คงเหลือที่รายงานได้ = ปริมาณที่ทำได้ − ปริมาณที่อนุมัติของขั้นตอนนี้",
++    "待流入量 = 本工序计划量 − 可加工量(还等上一道流下来多少)": "รอการโอนเข้า = ปริมาณตามแผน − ปริมาณที่ทำได้",
++    "工序流转明细": "รายละเอียดการโอนขั้นตอน",
++    "按量流转:上一道报多少,下一道最多做多少": "โอนตามปริมาณ: ขั้นตอนถัดไปทำได้เท่าที่ขั้นตอนก่อนหน้ารายงาน",
++    "已审完工": "ปริมาณที่อนุมัติแล้ว",
+   },
+ 
+ }
+diff --git a/frontend/src/i18n/locales/vi.js b/frontend/src/i18n/locales/vi.js
+index fa76fb24e..7fd01f9ea 100644
+--- a/frontend/src/i18n/locales/vi.js
++++ b/frontend/src/i18n/locales/vi.js
+@@ -2827,17 +2827,16 @@ export default {
+     '至少保留一个批次': 'Phải giữ lại ít nhất một lô',
+     '删除批次将清空该批次所有判定结果，确定删除吗？': 'Xóa lô sẽ xóa toàn bộ phán định của lô này. Vẫn xóa?',
+     '删除该项目将清除其所有批次的记录，确定删除吗？': 'Xóa hạng mục này sẽ xóa bản ghi của nó ở tất cả các lô. Vẫn xóa?',
+-    "工序在制": "Công đoạn đang làm",
+-    "该道计划量": "SL kế hoạch công đoạn",
+-    "该道已完工": "Đã hoàn thành công đoạn",
+-    "可排产量": "SL có thể xếp",
+-    "不可排产量": "SL chưa thể xếp",
+-    "可排产量 = 可加工量 − 该道已完工(这条线现在能做的量)": "SL có thể xếp = SL có thể gia công − đã hoàn thành (lượng tuyến này làm được ngay)",
+-    "不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量)": "SL chưa thể xếp = SL kế hoạch − SL có thể gia công (công đoạn trước chưa chuyển xuống)",
+-    "上道已完工折成品": "Công đoạn trước đã xong (quy thành phẩm)",
+-    "最后报工时间": "Lần báo cáo cuối",
+-    "工单当前工序": "Công đoạn hiện tại của lệnh",
+-    "超出可排产量,后端会拒绝(上限 = 可排产量 × 1.01)": "Vượt SL có thể xếp; máy chủ sẽ từ chối (tối đa = SL có thể xếp × 1.01)",
++    "上道完工(折成品)": "Công đoạn trước hoàn thành (quy đổi)",
++    "待报量": "Còn có thể báo cáo",
++    "待流入量": "Chờ chuyển vào",
++    "上道完工(折成品) = 上一道已审报工 ÷ 上一道换算率;首道 = 排产数量": "Công đoạn trước hoàn thành (quy đổi) = SL đã duyệt của công đoạn trước ÷ hệ số quy đổi; công đoạn đầu = SL kế hoạch",
++    "可加工量 = 上道完工(折成品) × 本工序换算率(本道现在最多能做多少)": "SL có thể gia công = công đoạn trước hoàn thành (quy đổi) × hệ số công đoạn này",
++    "待报量 = 可加工量 − 本工序已审报工(本道还能报多少)": "Còn có thể báo cáo = SL có thể gia công − SL đã duyệt của công đoạn này",
++    "待流入量 = 本工序计划量 − 可加工量(还等上一道流下来多少)": "Chờ chuyển vào = SL kế hoạch − SL có thể gia công",
++    "工序流转明细": "Chi tiết luân chuyển công đoạn",
++    "按量流转:上一道报多少,下一道最多做多少": "Luân chuyển theo SL: công đoạn sau chỉ làm được phần công đoạn trước đã báo",
++    "已审完工": "SL hoàn thành đã duyệt",
+   },
+ 
+ }
+diff --git a/frontend/src/i18n/locales/zh-TW.js b/frontend/src/i18n/locales/zh-TW.js
+index 11f83374f..8f85d7048 100644
+--- a/frontend/src/i18n/locales/zh-TW.js
++++ b/frontend/src/i18n/locales/zh-TW.js
+@@ -3002,17 +3002,16 @@ export default {
+     '至少保留一个批次': '至少保留一個批次',
+     '删除批次将清空该批次所有判定结果，确定删除吗？': '刪除批次將清空該批次所有判定結果，確定刪除嗎？',
+     '删除该项目将清除其所有批次的记录，确定删除吗？': '刪除該項目將清除其所有批次的記錄，確定刪除嗎？',
+-    "工序在制": "工序在製",
+-    "该道计划量": "該道計畫量",
+-    "该道已完工": "該道已完工",
+-    "可排产量": "可排產量",
+-    "不可排产量": "不可排產量",
+-    "可排产量 = 可加工量 − 该道已完工(这条线现在能做的量)": "可排產量 = 可加工量 − 該道已完工(這條線現在能做的量)",
+-    "不可排产量 = 该道计划量 − 可加工量(前道还没流下来的量)": "不可排產量 = 該道計畫量 − 可加工量(前道還沒流下來的量)",
+-    "上道已完工折成品": "上道已完工折成品",
+-    "最后报工时间": "最後報工時間",
+-    "工单当前工序": "工單當前工序",
+-    "超出可排产量,后端会拒绝(上限 = 可排产量 × 1.01)": "超出可排產量,後端會拒絕(上限 = 可排產量 × 1.01)",
++    "上道完工(折成品)": "上道完工(折成品)",
++    "待报量": "待報量",
++    "待流入量": "待流入量",
++    "上道完工(折成品) = 上一道已审报工 ÷ 上一道换算率;首道 = 排产数量": "上道完工(折成品) = 上一道已審報工 ÷ 上一道換算率;首道 = 排產數量",
++    "可加工量 = 上道完工(折成品) × 本工序换算率(本道现在最多能做多少)": "可加工量 = 上道完工(折成品) × 本工序換算率(本道現在最多能做多少)",
++    "待报量 = 可加工量 − 本工序已审报工(本道还能报多少)": "待報量 = 可加工量 − 本工序已審報工(本道還能報多少)",
++    "待流入量 = 本工序计划量 − 可加工量(还等上一道流下来多少)": "待流入量 = 本工序計劃量 − 可加工量(還等上一道流下來多少)",
++    "工序流转明细": "工序流轉明細",
++    "按量流转:上一道报多少,下一道最多做多少": "按量流轉:上一道報多少,下一道最多做多少",
++    "已审完工": "已審完工",
+   },
+ 
+ }

@@ -121,7 +121,15 @@
         <el-table-column :label="tt('品名')" prop="品名" min-width="130" show-overflow-tooltip />
         <el-table-column :label="tt('型号')" prop="型号" width="120" show-overflow-tooltip />
         <el-table-column :label="tt('生产状态')" prop="生产状态" width="80" />
-        <el-table-column :label="tt('排产数量')" prop="排产数量" width="85" align="right" />
+        <!-- 本线排产数量(2026-11-11 用户口径):与「工单排产」页同口径 = 排产数量 × 该工序自己的换算率
+             (= 该行当前工序的台账计划数量,后端 today() 返回 `本线排产数量`);
+             后端未升级/老数据取不到时回退显示成品口径的排产数量,不显示成空白。 -->
+        <el-table-column prop="本线排产数量" width="110" align="right">
+          <template #header>
+            <span :title="tt('本线排产数量 = 排产数量 × 该工序自己的换算率（当前工序台账计划数量）;成品口径看「需求数量/入库数量」')">{{ tt('本线排产数量') }}</span>
+          </template>
+          <template #default="{ row }">{{ num(row['本线排产数量'] ?? row['排产数量']) }}</template>
+        </el-table-column>
         <el-table-column :label="tt('需求数量')" prop="需求数量" width="85" align="right" />
         <el-table-column :label="tt('入库数量')" prop="入库数量" width="80" align="right" />
         <!-- 「余量」列已隐藏(2026-11-08 用户口径「直接隐藏吧」):该口径=本工单行需求 − 本行订单占用,
@@ -239,6 +247,10 @@ async function loadPool() {
     poolTable.value?.clearSelection?.()
     // 多行模式:生产工单页已经勾过 ⇒ 进来默认全选,直接点「批量排产」
     if (scoped.value) await selectAllPool()
+    // 单行内嵌模式(2026-11-13 用户口径,附截图):生产工单页点「排产」打开本弹窗时,
+    //   ①待排产池里当前这一行也**默认勾选** —— 与多行模式同一体验:打开即可直接点「排产」,
+    //   不必先手动勾一次(此前单行模式只做了 keyword 收敛,没有默认勾选)。
+    else if (props.embedded && props['工单号']) await selectEmbeddedRows()
   } catch (e) { err(e, '查询失败') } finally { loading.value = false }
 }
 
@@ -248,6 +260,26 @@ async function selectAllPool() {
   const t = poolTable.value
   if (!t) return
   for (const row of pool.value) t.toggleRowSelection(row, true)
+}
+
+/**
+ * 单行内嵌模式:默认勾选「当前工单号(+工单行号)」对应的待排产行(2026-11-13 用户口径)。
+ *
+ * <p>匹配口径与打开本弹窗时 keyword 收敛同一把尺子:
+ * 带工单行号 ⇒ 精确到「工单号 + 行号」(同工单多行时只勾当前那一行);
+ * 不带行号 ⇒ 勾该工单号在池里的全部行(与 keyword=工单号 的收敛结果一致)。
+ */
+async function selectEmbeddedRows() {
+  await nextTick()
+  const t = poolTable.value
+  if (!t) return
+  const no = String(props['工单号'] || '').trim()
+  if (!no) return
+  const xc = props['工单行号']
+  const hasXc = !(xc === null || xc === undefined || xc === '')
+  const rows = pool.value.filter((r) => String(r['加工单号'] || '').trim() === no
+    && (!hasXc || String(r['工单行号'] ?? '').trim() === String(xc).trim()))
+  for (const row of rows) t.toggleRowSelection(row, true)
 }
 
 async function loadStats() {

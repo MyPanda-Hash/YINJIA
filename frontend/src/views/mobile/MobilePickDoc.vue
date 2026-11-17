@@ -4,7 +4,7 @@
   【两种状态,两套动作】
   · **未完成**(还没领完/没提交):扫物料码 → 填领料数量 → 全部领完才能「提交转材料出库单」;
   · **已完成**(已审核过账):这张单变成"可退料"的凭据 —— 扫物料码 → 填**退料**数量 → 提交退料,
-    每次退料生成一张**带退料标志的其他入库单**(库存加回来),可分多次退。
+    每次退料生成一张**生产退料单**(MATERIAL_RET;2026-11-13 起由「其他入库单」改为生产退料单,库存加回来),可分多次退。
 
   【用户口径】
   第三轮(本轮):「退料直接在生产领料界面。可以点开已完成的生产领料数据再次进行扫码。
@@ -62,6 +62,15 @@
           {{ hasReturn ? doc.退料单号 : '—' }}
           <span v-if="hasReturn" class="mp-flag">{{ tt('含退料') }}</span>
         </b>
+        <!-- 补打印生产退料单(2026-11-16):退过料就能补打那张纸;打印格式与生产领料单一致 -->
+        <el-button
+          v-if="hasReturn"
+          text
+          size="small"
+          :loading="printingBack"
+          class="mp-back-print"
+          @click="reprintBackSlip"
+        >{{ tt('补打印') }}</el-button>
       </div>
       <div class="mp-kv">
         <span>{{ tt('领料进度') }}</span>
@@ -69,14 +78,14 @@
       </div>
     </section>
 
-    <!-- 扫码区:未完成=扫料领料;已完成=扫料退料(生成其他入库单)
-         ⚠ 只读模式下(从开单工作台点进来)整块**不渲染**:那里只看明细,不做任何操作 -->
-    <section v-if="!readOnly" class="mp-card">
+    <!-- 扫码区:**只在未完成时**出现(扫料领料)。已完成 = 已过账,本页不再进退料模式
+         (2026-11-18 退料独立到「生产退料」面板;底部给跳转)。只读模式下整块不渲染。 -->
+    <section v-if="!readOnly && !isDone" class="mp-card">
       <div class="mp-sec">
-        <!-- 已完成 = 退料(生成其他入库单);未完成 = 领料。标题跟着状态走,不让人误会 -->
+        <!-- 已完成 = 退料(生成生产退料单);未完成 = 领料。标题跟着状态走,不让人误会 -->
         <span>{{ isDone ? (outAudited ? tt('扫物料码 · 退料') : tt('扫物料码')) : tt('扫物料码 · 领料') }}</span>
         <span v-if="cur" class="mp-sec-ok">{{ cur.编码 }}</span>
-        <span v-if="isDone && outAudited" class="mp-sec-note">{{ tt('这张单已完成:扫码即退料,提交后生成其他入库单') }}</span>
+        <span v-if="isDone && outAudited" class="mp-sec-note">{{ tt('这张单已完成:扫码即退料,提交后生成生产退料单') }}</span>
         <span v-if="isDone && !outAudited" class="mp-sec-note">{{ tt('待仓管审批材料出库单,审批通过后才能退料') }}</span>
       </div>
 
@@ -193,7 +202,11 @@
       >
         <span class="mp-line-dot" :class="{ on: r.数量 > 0 }"></span>
         <div class="mp-line-main">
-          <div class="mp-line-name">{{ r.名称 || r.编码 }}</div>
+          <div class="mp-line-name">
+            {{ r.名称 || r.编码 }}
+            <!-- 半成品(2026-11-16):编码含 **TB,本厂不入库 ⇒ 只显示、不领料、可跳过 -->
+            <span v-if="r.半成品 && !returnMode" class="mp-semi">{{ tt('半成品·免领') }}</span>
+          </div>
           <!-- 🔴 2026-11-04 用户口径:「表头是要带物料编码和规格型号和计量单位的,信息不完全」。
                原来是「编码 · 规格 · 批号」挤成一行小字,手机上一挤就看不全;改成三行标签对,
                编码/规格型号/单位各自成列,缺值显示 — (不省略行,避免看着像"没这个信息")。 -->
@@ -218,7 +231,12 @@
             <b class="num">{{ r.BOM用量 > 0 ? fmtQty(r.BOM用量) : '—' }}</b>
             <i>{{ r.单位 }}</i>
           </div>
-          <div class="mp-q-row" :class="{ ok: r.BOM用量 > 0 && r.数量 >= r.BOM用量, zero: !(r.数量 > 0) }">
+          <!-- 半成品:不领料(2026-11-16),这里不给"已领"数字,免得看着像还没领 -->
+          <div v-if="r.半成品" class="mp-q-row mp-q-semi">
+            <span class="mp-q-lab">{{ tt('已领') }}</span>
+            <b>{{ tt('免领') }}</b>
+          </div>
+          <div v-else class="mp-q-row" :class="{ ok: r.BOM用量 > 0 && r.数量 >= r.BOM用量, zero: !(r.数量 > 0) }">
             <span class="mp-q-lab">{{ tt('已领') }}</span>
             <b class="num">{{ fmtQty(r.数量) }}</b>
             <i>{{ r.单位 }}</i>
@@ -253,13 +271,12 @@
         >
           {{ tt('提交转材料出库单') }}
         </el-button>
-        <!-- 已完成单:分两种状态(2026-11-01)
-             提交只生成**待审批**的材料出库单,库存要等仓管审批才扣;
-             未审批时不能退料(退了等于凭空把料退进仓库),所以这里不给按钮,只提示等审批。 -->
+        <!-- 已完成单:材料出库单还没审批 ⇒ 还没扣库存,不能退(退了等于凭空把料退进仓库)。
+             已审批 ⇒ 退料统一到「生产退料」面板做(2026-11-18 独立成面板,本页不再承担退料)。 -->
         <el-button v-else-if="!outAudited" type="info" size="large" disabled>
           {{ tt('待仓管审批材料出库单') }}
         </el-button>
-        <el-button v-else type="primary" size="large" @click="startReturn">{{ tt('开始退料') }}</el-button>
+        <el-button v-else type="primary" size="large" @click="goReturn">{{ tt('去生产退料') }}</el-button>
       </template>
     </div>
   </div>
@@ -272,12 +289,24 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { parseMaterialCode } from '@/business/scanCode'
+import { focusScanNow } from '@/business/scanFocus'
 import { makeBatchRows, allocateScannedFirst, allocateForQty, pickProgress, fmtQty, round4, isNonFifo } from '@/business/mobilePick'
 import { printWoQr } from '@/business/print-formats'
+import { printSlip } from '@/business/slipPrintFlow'
 import { queueToPrintStation, PRINT_TYPE_PICK_SLIP } from '@/business/printStation'
 
 const route = useRoute()
 const router = useRouter()
+
+/**
+ * 去「生产退料」面板(2026-11-18 退料独立成页)。
+ *
+ * <p>用户口径:「生产退料独立出来,就是已经领料且审核的领料单据,来扫码退料……
+ * 让生产领料不用负责那么多功能」。本页只保留一个跳转,不再自己处理退料。
+ */
+function goReturn() {
+  router.push({ path: '/panelx/list/MOBILE_RETURN', query: { no: String(doc.value?.领料单号 || '').trim() } })
+}
 
 /**
  * 单据主键 —— ⚠ 必须是**响应式**的(2026-10-30 修)。
@@ -307,12 +336,12 @@ const docId = computed(() => Number(route.query.id) || 0)
 const readOnly = computed(() => String(route.query.readOnly || '') === '1')
 
 /**
- * 明细行是否不可点(2026-10-30 用户口径「明细里面只能看不能操作」+「已完成的进去是要生成其他入库单」)。
+ * 明细行是否不可点(2026-10-30 用户口径「明细里面只能看不能操作」+「已完成的进去是要生成生产退料单」)。
  *
  * <p>三种情况都不可点:
  *   ① 只读模式(从开单工作台点进来);
  *   ② 这张单**已完成** —— 领料明细已是过账历史,点一行就往扫码区装料是错的;
- *      已完成单要动就只能走「开始退料」(退料 → 生成其他入库单);
+ *      已完成单要动就只能走「开始退料」(退料 → 生成生产退料单);
  *   ③ 正在退料模式里点的那一行仍可点(否则退料没法按行选)。
  */
 const rowLocked = computed(() => readOnly.value || (isDone.value && !returnMode.value))
@@ -333,6 +362,8 @@ const batchRows = ref([])
 const saving = ref(false)
 const submitting = ref(false)
 const printing = ref(false)
+/** 生产退料单出纸中(与上面「打印二维码」那颗按钮分开,两个动作互不抢 loading) */
+const printingBack = ref(false)
 const errText = ref('')
 const okText = ref('')
 
@@ -516,17 +547,13 @@ async function loadDoc() {
     // 「已完成的进去扫码应该是其他入库才对」)。
     //   原来要先点一下「开始退料」才切模式,而完成态下扫码框默认走的是**领料**分支 ——
     //   用户直接扫就会调错接口(scanMaterial side='pick'),像是"还能领料"。
-    //   领料只应发生在**未完成**的单上;已完成 = 已过账,之后只能退(生成其他入库单)。
-    // 🔴 2026-11-01:只有「已完成 **且** 材料出库单已被仓管审批」才自动进退料模式。
-    //   提交只生成待审批的出库单,库存还没扣;这时进退料等于凭空退料进仓。
-    const done = String(d.状态 || '') === '已完成'
-    if (done && d.出库已审批 === true) {
-      returnMode.value = true
-      returnQty.value = {}
-    } else {
-      returnMode.value = false
-      returnQty.value = {}
-    }
+    //   领料只应发生在**未完成**的单上;已完成 = 已过账,之后只能退(生成生产退料单)。
+    // 🔴 2026-11-18:退料**不再由本页承担** —— 生产领料只管领料。
+    //   用户口径:「生产退料独立出来……让生产领料不用负责那么多功能,操作也方便。」
+    //   ⇒ 本页永远不进退料模式;已完成的单在底部给一个「去生产退料」的跳转。
+    //   (退料相关函数保留在文件里但已无入口,属于待清理的技术债,见代码规范 §E。)
+    returnMode.value = false
+    returnQty.value = {}
   } catch (e) {
     errText.value = errMsgOf(e) || tt('加载单据失败')
   }
@@ -547,6 +574,8 @@ function normalize(l) {
     明细备注: String(l?.明细备注 ?? '').trim(),
     BOM用量: Number(l?.BOM用量) || 0,
     已退数量: round4(l?.已退数量 || 0),
+    // 半成品(后端按编码含 **TB 判定,2026-11-16):只显示不领料、可跳过
+    半成品: !!l?.['半成品'],
   }
 }
 
@@ -561,6 +590,11 @@ function normalize(l) {
  */
 function pickRow(r) {
   if (rowLocked.value) return
+  // 半成品点了不进入扫码/填数(它不入库、不需要领料),只给一句说明
+  if (r.半成品 && !returnMode.value) {
+    errText.value = `${tt('这一行是半成品（编码含 **TB），本厂不入库、不需要领料，直接跳过即可')}：${r.编码}`
+    return
+  }
   curRow.value = r
   okText.value = `${tt('请扫物料码')}: ${r.编码}${r.名称 ? ' · ' + r.名称 : ''}`
 }
@@ -628,6 +662,9 @@ async function scanMaterial(scanBatch) {
     errText.value = errMsgOf(e) || tt('查询物料失败')
   } finally {
     matLoading.value = false
+    // PDA 连扫(2026-11-16):扫完(命中/报错都算)光标回到物料扫码框;
+    //   扫中后要填数量,「写入」成功后 saveQty / cancelLock 里各自再落一次
+    focusScanNow(() => matInput.value, { delay: 120 })
   }
 }
 
@@ -730,7 +767,7 @@ function cancelReturn() {
 }
 
 /**
- * 提交退料:本次选中的所有物料一次生成**一张**退料单(其他入库单,带退料标志)并审核入账。
+ * 提交退料:本次选中的所有物料一次生成**一张**生产退料单(MATERIAL_RET)并审核入账。
  */
 async function submitReturn() {
   const items = Object.entries(returnQty.value)
@@ -740,7 +777,7 @@ async function submitReturn() {
   try {
     await ElMessageBox.confirm(
       `${tt('将退')} ${items.length} ${tt('项物料,合计')} ${fmtQty(returnTotal.value)}。`
-      + tt('提交后生成一张带「退料」标志的其他入库单并入库,库存会增加。确定提交?'),
+      + tt('提交后生成一张生产退料单并入库,库存会增加。确定提交?'),
       tt('退料确认'),
       { confirmButtonText: tt('确定退料'), cancelButtonText: tt('取消'), type: 'warning' },
     )
@@ -757,6 +794,10 @@ async function submitReturn() {
     cur.value = null
     matText.value = ''
     await loadDoc()
+    // 🔴 提交即打印(2026-11-16 用户口径「生产退料也要打印报表,提交的时候打印」):
+    //   纸面 = 生产退料单,与「其他领料/其他退料」同一套版式,只是标题不同
+    const backNo = String(d.退料单号 || '').trim()
+    if (backNo) await printBackSlip(backNo)
   } catch (e) {
     errText.value = errMsgOf(e) || tt('退料失败')
   } finally {
@@ -764,16 +805,54 @@ async function submitReturn() {
   }
 }
 
+/**
+ * 打一张**生产退料单**纸面报表(2026-11-16)。
+ *
+ * <p>用户口径:「其他领料,其他退料和生产退料。都要可以打印报表……打印格式和生产领料一样,只是名称不同」。
+ * 生产退料与「其他退料」落同一张面板(MATERIAL_RET),区别只在标题与派单类型,
+ * 所以这里显式给 kind = MAT_RET(见 business/slipPrint.js 的三种 kind)。
+ *
+ * <p>打印是次要动作:失败只提示,绝不影响已经入库的退料。
+ */
+async function printBackSlip(no) {
+  const docNo = String(no || '').trim()
+  if (!docNo) return
+  printingBack.value = true
+  try {
+    const r = await printSlip({ kind: 'MAT_RET', docNo, source: 'mobilePick.return' })
+    if (r.ok && r.mode === 'station') okText.value = `${tt('已发送到打印电脑')}：${docNo}`
+    else if (r.ok) okText.value = `${tt('已调用本机打印')}：${docNo}`
+    else errText.value = `${tt('打印失败')}：${docNo}${r.message ? ' · ' + r.message : ''}`
+  } finally {
+    printingBack.value = false
+  }
+}
+
+/**
+ * 补打印:抬头「退料单号」旁边那颗按钮。
+ *
+ * <p>多次退料时台账里的退料单号是**逗号分隔的一串**(见 MobilePickController.appendReturnNo),
+ * 取最后一张 = 最近一次退料,与现场"刚退的那张要补打"的直觉一致。
+ */
+async function reprintBackSlip() {
+  const raw = String(doc.value?.退料单号 || '')
+  const no = raw.split(',').map((s) => s.trim()).filter(Boolean).pop() || ''
+  if (!no) { errText.value = tt('这张单还没有退料单号'); return }
+  clearMsg()
+  await printBackSlip(no)
+}
+
 /** 打印工单二维码:优先发打印站点,没在线站点就用本机打印层 */
-async function reprint() {
-  printing.value = true
+async function reprint() {  printing.value = true
   clearMsg()
   try {
     const res = await request.post('/px/mobilePick/reprint', { id: docId.value })
     const payload = (res.data?.data || res.data || {}).打印 || {}
     // 类型 = 生产领料单(2026-11-04):服务端按类型派单,只有勾了这个类型的电脑才会出纸
     const queued = await queueToPrintStation({ ...payload, 类型: PRINT_TYPE_PICK_SLIP, 来源: 'mobilePick.doc' })
-    if (queued && queued.online) { okText.value = tt('已发送到打印电脑'); return }
+    // 2026-11-16 打印缓存:服务端**收了**就算成功(代理掉线时单子进缓存,回来补打),
+    //   所以判 queued 而不是 online —— 否则掉线时手机上再打一遍,现场就是两张纸。
+    if (queued && queued.queued) { okText.value = queued.message || tt('已发送到打印电脑'); return }
     // 没有电脑订阅/开关关着 ⇒ 退回本机打印层(现场至少打得出来)
     if (queued && queued.message) errText.value = queued.message
     await printWoQr(payload)
@@ -924,6 +1003,10 @@ async function submit() {
 .mp-line-dot.on { background: var(--el-color-success); }
 .mp-line-main { flex: 1; min-width: 0; }
 .mp-line-name { font-size: 14px; }
+/* 半成品标记(2026-11-16):编码含 **TB 的行只显示不领料,给个醒目标签免得现场找它扫码 */
+.mp-semi { margin-left: 6px; padding: 0 5px; border-radius: 8px; font-size: 11px; font-weight: 400;
+  color: var(--el-color-warning); background: var(--el-color-warning-light-9); border: 1px solid var(--el-color-warning-light-5); }
+.mp-q-semi b { color: var(--el-color-warning); font-weight: 500; }
 /* 明细行的字段对(2026-11-04):编码/规格型号/单位各占一行,标签灰、值黑。
    手机屏窄,用 grid 两列(标签 68px 固定 + 值自适应),值过长自动换行不溢出。 */
 .mp-line-fields { margin: 4px 0 0; padding: 0; }

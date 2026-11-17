@@ -1,0 +1,311 @@
+{
+  "controls": [
+    {
+      "tag": "INPUT",
+      "cls": "el-input__inner",
+      "value": "",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-input__inner",
+      "value": "",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    },
+    {
+      "tag": "INPUT",
+      "cls": "el-checkbox__original",
+      "value": "on",
+      "around": "",
+      "row": ""
+    }
+  ],
+  "labels": [
+    {
+      "tag": "LABEL",
+      "cls": "req",
+      "parentHTML": "<div data-v-05c1863f=\"\" class=\"field\"><label data-v-05c1863f=\"\" class=\"req\">币种<!--v-if--></label><div data-v-05c1863f=\"\" class=\"query-ref-select\"><div data-v-05c1863f=\"\" class=\"el-select\" style=\"width: 100%;\"><div class=\"el-select__wrapper is-filterable el-too"
+    },
+    {
+      "tag": "DIV",
+      "cls": "field",
+      "parentHTML": "<div data-v-05c1863f=\"\" class=\"fields header-fields udl-fields is-draft\"><div data-v-05c1863f=\"\" class=\"field\"><label data-v-05c1863f=\"\" class=\"req\">单据日期<!--v-if--></label><div class=\"el-input el-input--prefix el-input--suffix el-date-editor el-date-editor--da"
+    },
+    {
+      "tag": "LABEL",
+      "cls": "req",
+      "parentHTML": "<div data-v-05c1863f=\"\" class=\"field\"><label data-v-05c1863f=\"\" class=\"req\">汇率<!--v-if--></label><div data-v-05c1863f=\"\" class=\"el-input-number is-without-controls is-center\"><!--v-if--><!--v-if--><div class=\"el-input\"><!-- input --><!-- prepend slot --><!--v-"
+    },
+    {
+      "tag": "TH",
+      "cls": "",
+      "parentHTML": "<tr data-v-05c1863f=\"\"><th data-v-05c1863f=\"\">序号</th><th data-v-05c1863f=\"\">物料编码</th><th data-v-05c1863f=\"\">物料名称</th><th data-v-05c1863f=\"\">规格型号</th><th data-v-05c1863f=\"\">单位</th><th data-v-05c1863f=\"\">数量</th><th data-v-05c1863f=\"\">数量2</th><th data-v-05c1863f="
+    },
+    {
+      "tag": "SPAN",
+      "cls": "col-hdr-text req",
+      "parentHTML": "<div data-v-05c1863f=\"\" class=\"col-hdr\"><span data-v-05c1863f=\"\" class=\"col-hdr-text req\">仓库</span><span data-v-05c1863f=\"\" class=\"col-hdr-sort\" title=\"点击排序：升序 → 降序 → 取消\">⇅</span><i data-v-05c1863f=\"\" class=\"el-icon col-hdr-ic\"><svg data-v-05c1863f=\"\" xmlns=\"h"
+    }
+  ]
+}

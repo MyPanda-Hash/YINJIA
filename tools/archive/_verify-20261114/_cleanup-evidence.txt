@@ -1,0 +1,37 @@
+# 验收造数清理实录（2026-11-14 23:2x）
+# 执行: java tools/SqlRunner.java <jdbc> yinjia <pass> _cleanup-prod.sql / _cleanup-test.sql
+# 说明: 只删本次验收自建单号；其它既有单据一律不碰；号池已消耗的流水号不回退（正常业务行为，不属脏数据）。
+
+== 正式库 HSDZ_MES（清理脚本 _cleanup-prod.sql）==
+  BEFORE head | SJ-2026-11-0009 | null | 2026-11-14 22:57:40.6877768   （点「新增」产生的空草稿）
+  BEFORE head | SJ-2026-11-0010 | null | 2026-11-14 23:00:18.0123080   （点「新增」产生的空草稿）
+  BEFORE head | SJ-2026-11-0011 | GD-2026-11-0028 | 2026-11-14 23:01:37.2630259   （A2 真落库用单）
+  BEFORE detail rows | SJ-2026-11-0011 | 90
+  BEFORE doc_status | QC_FIRST_INSP | SJ-2026-11-0009
+  BEFORE doc_status | QC_FIRST_INSP | SJ-2026-11-0010
+  BEFORE doc_status | QC_FIRST_INSP | SJ-2026-11-0011
+  AFTER head | 0
+  AFTER detail | 0
+  AFTER doc_status | 0
+  REMAIN top3 | SJ-2026-11-0008
+  REMAIN top3 | SJ-2026-11-0007
+  REMAIN top3 | SJ-2026-11-0006
+  [OK] _cleanup-prod.sql (1 batches)
+
+== 测试库 HSDZ_MES_TEST（清理脚本 _cleanup-test.sql）==
+  BEFORE patrol head | XJ-2026-11-0003 | 2026-11-14 | 2026-11-14 23:18:12.1230061   （B4 用单）
+  BEFORE patrol detail | 3
+  BEFORE firstinsp head | SJ-2026-11-0009 | null | 2026-11-14 23:25:04.6590143   （A1 勾选取证点「新增」的空草稿）
+  AFTER patrol | 0
+  AFTER patrol detail | 0
+  AFTER firstinsp | 0
+  KEPT patrol heads | XJ-2026-11-0001   （实现方测试数据，未动）
+  KEPT patrol heads | XJ-2026-11-0002   （实现方测试草稿，未动）
+  [OK] _cleanup-test.sql (1 batches)
+
+== 只读态临时改动已还原（lead 额外项）==
+  _readonly-set.sql     : UPDATE yj_doc_status SET shr=N'admin', shsj=GETDATE() WHERE panel_code='QC_LINE_PATROL' AND doc_no='XJ-2026-11-0001';  → (1 rows)
+  _readonly-restore.sql : UPDATE yj_doc_status SET shr=NULL, shsj=NULL 同条件; → (1 rows)  [RESTORED]
+  （只动了实现方测试单 XJ-2026-11-0001 的 yj_doc_status 一行，看完只读态立即还原。）
+
+# 验收环境另外确认：正式库 QC_LINE_PATROL 无单据（0 行）——实现方已清零，本次未在正式库造巡线数据。
