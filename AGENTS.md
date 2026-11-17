@@ -1,263 +1,267 @@
 # AGENTS.md — YINJIA-MES 开发规范(AI Agent 必读)
 
-## 项目一句话
+> **本文件只写三样东西**:必须遵守的硬规矩、踩过的坑、文档指针。实现细节一律放进指针文档。
+> **读法**:开工先扫 §1 清单 → 命中哪个主题就去查对应小节 → 报错先查 §5。
 
-YINJIA-MES = light-mes 面板引擎(Vue3) + Spring Boot + SQL Server HSDZ_MES,
-面板/字段全部由数据库元数据(`yj_panel`/`yj_field`)驱动,前后端数据键为中文。
+## 0. 项目一句话
 
-## 🔴 多语言强制规范(2026-08-30 起生效,不可豁免)
+YINJIA-MES = light-mes 面板引擎(Vue3) + Spring Boot + SQL Server `HSDZ_MES`,
+面板/字段全部由数据库元数据(`yj_panel` / `yj_field`)驱动,前后端数据键为中文。
 
-任何**新增面板、字段、UI 功能**的工作,必须同时交付对应的多语言数据,
-否则视为功能未完成。判定标准:`切换到英语/日语后,新功能显示目标语言而非中文`。
+---
 
-### 1. 新增面板(往 yj_panel 插行)时,必须同时:
+## 1. 开工前 30 秒清单
 
-```sql
--- 面板名译名(yj_translation,scope='panel';至少 en,鼓励全语言)
-INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES
-('panel', N'<面板中文名>', 'en', N'<英文名>', 'manual');
--- 重复 ja/ko/es/fr/de/ru/vi/th …
-```
+| 本次要动什么 | 必读 |
+|---|---|
+| 新增面板 / 字段 / UI 文案 | §2.1 多语言 |
+| 建表、改列、写迁移脚本 | §2.2 数据库基线 + §2.3 迁移纪律 |
+| 动正式账套 / 测试账套 | §2.3 两账套 |
+| 动库存、批次、出入库 | §2.4 库存批次追溯 |
+| 动采购链四单字段 | §2.5 采购链四单 |
+| 部署、换 jar、跑迁移 | §2.6 部署与台账 |
+| 提交代码 | §2.7 Git |
+| 改界面、看效果 | §3 环境与服务 + §4 界面验证 |
+| 报错、行为诡异、"上次好好的" | §5 高频错误铁律(10 条) |
 
-### 2. 新增字段(往 yj_field 插行)时,必须同时:
+---
 
-```sql
-INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES
-('field', N'<字段中文标签>', 'en', N'<英文标签>', 'manual');
--- 同一中文标签全局共享译名;已有译名的标签(数量/备注等)无需重复插入
-```
+## 2. 不可豁免的硬约束
 
-### 3. 前端新增 UI 文案时:
+### 2.1 多语言(2026-08-30 起)
 
-- **显示层**一律 `{{ tt('中文原文') }}`(import { tt } from '@/i18n'),
-  并把译名加入 `src/i18n/locales/*.js` 的 biz(至少 en.js)
-- **禁止**在模板里裸写无翻译路径的中文显示(注释除外)
-- 占位符/tooltip/标题同样走 tt()
+任何**新增面板、字段、UI 功能**,必须同时交付多语言数据,否则视为功能未完成。
+**判定标准**:切换英语/日语后,新功能显示目标语言而非中文(原「提交前自检:切换 en 走查新增页面」即此条)。
 
-### 4. 永不触碰的红线(ADR-0001):
+1. **新增面板**(往 `yj_panel` 插行)同批插入面板名译名(`scope='panel'`,至少 `en`):
+   ```sql
+   INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES
+   ('panel', N'<面板中文名>', 'en', N'<英文名>', 'manual');
+   ```
+2. **新增字段**(往 `yj_field` 插行)同批插入字段译名(`scope='field'`,至少 `en`):
+   ```sql
+   INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES
+   ('field', N'<字段中文标签>', 'en', N'<英文标签>', 'manual');
+   ```
+   同一中文标签全局共享译名;已有译名的标签(`数量`/`备注` 等)无需重复插入。
+3. **前端新增 UI 文案**:显示层一律 `{{ tt('中文原文') }}`(`import { tt } from '@/i18n'`),并把译名加进
+   `src/i18n/locales/*.js` 的 biz(至少 `en.js`);**禁止**模板里裸写无翻译路径的中文显示(注释除外);
+   占位符 / tooltip / 标题同样走 `tt()`。
+4. **永不触碰的红线(ADR-0001)**:`dataName` / `buttonName` / 单据状态存储值等**数据键永远中文**,
+   不随语言变化;业务事实数据(客户名 / 单据号 / 用户输入)**不翻译**;机翻只兜底显示层零星词条,
+   结果缓存进 `yj_translation`(`source='mt'`)。
+5. **新增语言**:`INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);` 插行即可,
+   切换器自动出现,词条由机翻初始化、可人工校对升级。
 
-- `dataName`/`buttonName`/单据状态存储值等**数据键永远中文**,不随语言变化
-- 业务事实数据(客户名/单据号/用户输入)**不做翻译**,原样显示
-- 机翻只兜底显示层零星词条,结果缓存进 yj_translation(source='mt')
+> 实现:`TranslationService`(后端缓存+机翻)、`stores/locale.js`(前端真源)、`tools/i18n-*.sql`。
+> 术语与翻译分层见 `GLOSSARY.md`;决策见 `docs/adr/0001-dictionary-only-translation.md`。
 
-### 5. 新增语言:
+### 2.2 数据库基线
 
-```sql
-INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
-```
-插行即可,切换器自动出现,词条由机翻初始化、可人工校对升级。
+1. **新增表必须带中文注明**:`CREATE TABLE` 的迁移脚本必须在**同脚本内**为新表及关键列写
+   `MS_Description` 中文扩展属性(幂等写法参照 `tools/migrate-table-comments.sql`、
+   `tools/migrate-report-template-comments.sql`)。只建表不注明 = 任务未完成;改动已有表结构时鼓励补注。
+2. **建表/改表前先查两份台账**(这是"这张表能不能动"的唯一答案):
+   - **全库表清单** `docs/development/数据库表清单.md` —— 全库表与视图逐张登记
+     (表名/中文名/列数/关联面板,按 `yj_`/`bs_`/`bd_bl_`/`rd_`/`qc_`/`wo_`/已下架/ERP/遗留/备份 十组);
+   - **在册台账** `tools/db-inuse-tables.txt` —— 「确定下来的后台表」(206 张在册 + 3 张例外保留);
+     **不在册即脏数据**(未用表已清 244 张,逐表证据 `tools/archive/_table-audit/`)。
+   - 第 9 组 `legacy`(`dm_`/`s_`/拼音缩写)仍被面板引用的(`dm_ck`/`kucun`/`mate`/`inh`/`outh`/
+     `Porder`/`order_bs`)—— 改动前须评估面板影响;
+   - 第 7 组(已下架 `pr_*`/部分 `wo_*`)与第 10 组(`RENAME_*`/`*_bak_*`/`tmp_*`/`t1`/`t2`,
+     已清零,体检 10 项棘轮基线 0)—— **禁止新代码引用**;
+   - 新增表前缀按清单 §0 选;单据必须 `bd_` 头 + `bl_` 行(或 `*_head` / `*_detail`)成对且带
+     `asp_user1/2` + `asp_time1/2`,并在上表登记。
+3. 表结构变更后重跑清单末尾两条刷新命令,并随任务提交。
+4. **数据库规范**:`docs/development/数据库规范.md` —— 建表/改列/加面板字段的硬规矩 +
+   `tools/verify/DbNormAudit.java` 13 项体检 + `tools/db-legacy-whitelist.txt` 冻结与棘轮登记。
+   **新增表/列/字段必须满足该规范;体检 FAIL 视为任务未完成**。移交前在 `tools/` 下跑
+   `java -cp lib/mssql-jdbc.jar verify/DbNormAudit.java`(需 `YINJIA_SQL_PASS`,两个账套都跑)。
 
-## 🔴 数据库注明与全量部署规范(2026-09-14 起生效,不可豁免)
+### 2.3 迁移纪律与两账套
 
-1. **新增表必须带中文注明**:凡是 CREATE TABLE 的迁移脚本,必须同脚本内为
-   新表及关键列写入 `MS_Description` 中文扩展属性(幂等写法参照
-   `tools/migrate-table-comments.sql` 与 `tools/migrate-report-template-comments.sql`)。
-   只建表不注明 = 任务未完成。改动已有表结构时鼓励补注。
-
-   **全库表清单 = `docs/development/数据库表清单.md`**(全库表与视图逐张登记:
-   表名/中文名/列数/关联面板,按 yj_/bs_/bd_bl_/rd_/qc_/wo_/已下架/ERP/遗留/备份 十组)。
-   **在册台账 = `tools/db-inuse-tables.txt`**(2026-09-29 后台表定册:206 张在册 + 3 张例外保留;
-   不在册即脏数据 —— 未用表已清 244 张,判定口径与逐表证据见清单 §0.1 与 `tools/archive/_table-audit/`)。
-   建表或改表前**先查这两份**确认前缀归属与「这张表能不能动」:
-   - 第 9 组 `legacy`(dm_/s_/拼音缩写)仍被面板引用的(`dm_ck`/`kucun`/`mate`/`inh`/`outh`/`Porder`/`order_bs`)——改动前须评估面板影响;
-   - 第 7 组(已下架 `pr_*`/部分 `wo_*`,2026-09-29 已连同面板元数据清理)与第 10 组
-     (`RENAME_*`/`*_bak_*`/`tmp_*`/`t1`/`t2`,已清零,体检 10 项棘轮基线 0)——**禁止新代码引用**;
-   - 新增表前缀按清单 §0 选,单据必须 `bd_` 头 + `bl_` 行(或 `*_head`/`*_detail`)成对且带 `asp_user1/2`+`asp_time1/2`,
-     并在 `tools/db-inuse-tables.txt` 登记。
-   表结构变更后重跑清单末尾两条命令刷新并随任务提交。
-2. **部署默认增量**❗(2026-10-25 修订,取代 2026-09-14 的「默认全量」口径):**服务器已在生产、有真实业务数据**
-   ⇒ 常规更新一律走「增量迁移 + 换 jar」(`deploy/部署说明.md` 二、B;入口 `deploy-production.bat`,
-   内部转 `deploy-incremental.bat`;先 `CHECK` 只读体检 → 再 `GO`),**禁止默认全量恢复**。
-   - **全量恢复**只允许三种场景:①首次安装空服务器;②演示/演练环境;③**明确确认「服务器现有数据可整库丢弃」**的重建。
-     走全量时 `deploy-all.bat GO` / `GO DB` **必须带 `CONFIRM-FULL-REPLACE`**,否则脚本一开始即
-     `RESULT: FAIL-FULL-REPLACE-NOT-CONFIRMED` 并退出,不停应用、不动库;`GO APP`(只换 jar)不受限。
-   - **仅当确实要走全量**时,才适用下面这套前置清理(增量部署**不需要**清本地研发数据,也不要用本地库覆盖服务器):
-     - **🔴 打包/出备份之前,必须确认「研发管理模块没有数据」**(2026-10-17 用户口径:「上传的时候,
-       研发管理的模块应该是没有数据的」)—— 研发区(RD_*)是演示与批量造数待得最多的地方,
-       全量恢复会把它们连审批留痕一起带进服务器正式账。自查(必须 `[PASS]`):
-       `cd tools` → `java -Dstdout.encoding=UTF-8 -cp lib\mssql-jdbc.jar verify\RdAreaEmptyAudit.java HSDZ_MES`
-       (逐张研发表列行数,非 0 会点名是哪几张、各多少行;顺手把 `HSDZ_MES_TEST` 也跑一遍最省心);
-       清理入口:`YINJIA_SQL_DB=HSDZ_MES_TEST java -cp lib\mssql-jdbc.jar DbSync.java run
-       cleanup-rd-testledger-20261016.sql`(该脚本自带库名硬闸门,**只允许在测试账套执行**)。
-       ⚠ 保留项别顺手清:`rd_sinter_tolerance`(烧结公差**标准库**)、`rd_sample_no_*`(已下架面板留档)、
-       `rd_dev_task_bak_*`、`yj_share_file`/`yj_share_file_cat`(共享文件库=真实资料)、号池 `s_allno`。
-       ⚠ 2026-09-21 部署包那版「只留演示数据(2 个演示产品 + 四文件 + 责任人已分发)」的口径**已被本口径取代**。
-     - 打部署备份**之前**,还必须清掉本地库里其余的测试数据
-       (按 `migrate-golive-cleanup.sql` 模式,待产出),保证全量推上去的是干净账;
-     - 备份必须在部署当时新打(`BACKUP DATABASE ... WITH FORMAT, INIT`),
-       禁止拿 `deploy/` 里的历史 .bak 直接用。
-   - 两种路线都必须:`tools/db-migrations.txt` 清单同步更新(**清单唯一权威**;旧文档里提过的
-     `deploy/push-migrations.bat` 已在 b9eca8e 的 deploy 重构中删除,勿再引用);
-     服务器先 `CHECK` 再 `GO`,失败按 `RESULT: FAIL-*` 停手,**不要**图快重跑整包。
-   - **部署必须记账(2026-11-01 起生效,不可豁免)**:每次部署(含 `GO APP` / `GO DB` / 回滚)都要在
-     **`deploy/部署台账.md`**(append-only,「服务器跑到哪一版」的唯一答案)追加一行 + 一节详细记录,
-     必填**三条指纹**(`app.jar` SHA256 / 前端入口 `index-*.js` / `yj_schema_log` 行数)、迁移条数、
-     **所有被剔除的脚本及理由**、验收证据、回滚点(`.bak` 全名 + 旧 jar 名);
-     格式与字段口径见 **`docs/development/部署记录规范.md`**,执行手册见 `deploy/部署说明.md`。
-     只写"部署完成"、只写"预期值"都不算记录;台账里的数字必须能被服务器命令复核。
-
-## 🔴 库存批次追溯:正式上线前必须验证(2026-10-19 起生效,不可豁免)
-
-**唯一基线 = `docs/development/上线前必验-库存批次追溯.md`。** 背景:当前库存**不按批次号追溯**
-(金蝶无批次商品统一填默认批号 `PC0000`,MES 按 `(物料,仓库,批号)` 分账 ⇒ 470 行负结存里
-**只有 2 个组合是真缺货**,其余是批次错配的假象)。用户 2026-10-19 口径:验收期**先不按批次追溯、
-保证无批次也能正常出库、先过验收**;但**正式上线当天必须**:① 按上线日重新导入金蝶期初;
-② 所有出库**必填批次号**;③ 日期在前的**先出库**、**可按批次多批出库**、出库**按批次号核销**。
-
-1. **动库存明细前先自问**:本次改动是否涉及**正式上线**?涉及则必须先跑通该文档 §五 的
-   5.1~5.4 四条验收标准,并在汇报里写明结论。
-2. **触发范围**(任一条命中即必须重读该文档):`StockLedgerService` / `StockFlowService` /
-   `kucun` / `inh` / `outh` / `v_stock_*` 视图 / `InvCostService` / `StockMonthCloseService` /
-   `StockWarnService` / 六张出入库单据面板的批号字段与必填性 / 期初导入 / 金蝶库存同步。
-3. **验收期的权宜之计要留痕**:凡是为了"先过验收"而**忽略批次**的写法(如出库校验改按
-   `(物料,仓库)` 合计判断),必须在代码注释里标注 `// 【上线前改写】` 并指向该文档,
-   否则上线切换时会被当成"正确实现"保留下来。
-4. **库存数量的真源 = 金蝶真实账套(2026-11-10 起)**:每 5 分钟一轮里**先跑库存、再跑档案/订单**
-   —— 两个步骤同一个入口 `deploy/sync.mjs`(库存实现 `deploy/sync-stock.mjs` 的 `runStockSync`,
-   也可单独 `node sync-stock.mjs`;计划任务只有一个 `JdySalOrderSync`)。
-   库存那步把金蝶 `inv_inventory_ims` 的现存量**覆盖进 `kucun.yl`**,逐键差异落
-   `erp_stock_snapshot`、每轮日志落 `erp_stock_sync_log`。口径/闸门/回滚见
-   **`docs/development/金蝶库存同步-以金蝶为准.md`**。动库存代码前必须知道两条:
-   ① **只认"已转ERP + 金蝶人工审核"**(2026-11-10 用户确认 A 口径):MES 审核仍会立刻记账,
-   但那是临时值 —— 下一轮同步以金蝶为准抹平它;**调拨单/盘点单不在转ERP 白名单里,目前对库存完全无效**;
-   ② `v_stock_balance`(库存状况表/首页现存量TOP/流程看板)仍是**流水口径**,与 `kucun` 数额不同,
-   对账时别拿它当"库存数量"。
-
-## 🔴 采购链四单字段与显示字段基线(2026-10-03 起生效,不可豁免)
-
-**唯一基线 = `docs/development/采购链四单字段与显示字段.md`** —— 登记
-**送料暂收单 `QC_RECV`(来料暂收单)/ 来料检验单 `QC_INSP` / 暂收退回单 `QC_RETURN` /
-采购入库单 `PURCHASE_IN`** 的「字段名 · 显示名 · 顺序 · 参照源 · 可见性」。
-
-1. **拉取云端仓库更新后必看这一份**:先跑一条命令的回归闸
-   `cd tools && java -cp lib\mssql-jdbc.jar verify\FourDocAudit.java HSDZ_MES`(测试账套传 `HSDZ_MES_TEST`)——
-   它逐面板比对现役 `yj_field` 与基线快照 `tools/fourdoc-baseline.tsv`,全 0 才 `[PASS]`;
-   `[FAIL]` 或 `DbSync` 重放过历史脚本后,再按该文档 **§8** 重跑取证并 `git diff` 本文档 ——
-   **无 diff** = 四单字段与顺序未变,可放心;**有 diff** = 逐条确认是有意改动还是回归,
-   有意则连同迁移脚本提交,意外则回退更新并排查。
-   ⚠ 2026-10-05 就是"整链重放 79 条历史脚本"把四单盖回上一代登记(参照源越界、QC_RECV 少 10 行、
-   隐藏列全被翻开),当时 §四 仍 12/12 ✅ —— **只有基线比对/文档 diff 抓得住**;回正脚本
-   `tools/migrate-fourdoc-baseline-restore-20261008.sql`(配套 `migrate-fourdoc-bloodline-cols-20261008.sql`
-   补回被链外操作弄丢的物理列),事故经过见两个脚本头部注释。
-2. **改动这四单任何字段的任务,先读该文档,改完必须回写**(重跑生成脚本,不得手改文档),
-   同批重跑 `node tools/archive/_gen-fourdoc-restore.mjs` 刷新 ①回正脚本 ②`tools/fourdoc-baseline.tsv`,
-   并单独一个 commit;`§四 顺序核验汇总` 必须 12/12 全 ✅。
-3. 顺序口径(别凭印象推):
-   - **表单页表头** = `place` 含 `header`,**或恰为 `query`** 的全部字段,按 `seq` 升序
-     (同 `seq` 按 `yj_field.id`);`query,detail` 的字段**不进表头**;
-   - **列表页明细表格列** = `place` 含 `detail` 且 `visible=1 且 hidden=0`,按 `seq` 升序。
-4. 改 `yj_field` 的**参照源**时按该文档 **§5** 核对:`ref_field` 取的是**目标面板的字段名(label)**
-   而不是物理列名(例:参照 `QC_RECV` 写 `单号`,不是 `单据编号`);批量 UPDATE 必须带窄条件 +
-   行数守卫 + 末尾"越界数 = 0"自检 —— 2026-09-24 的 `migrate-sl-supplier-ref.sql` 就是行内注释
-   吞掉同行筛选条件,把两个面板每一行字段的参照源刷成了 GFDA(事故与修复见 §5.3)。
-
-## 架构速查
-
-- 术语表:`GLOSSARY.md`(翻译表/翻译分层/字典翻事实不翻)
-- 决策记录:`docs/adr/0001-dictionary-only-translation.md`
-- 多语言实现:`TranslationService`(后端缓存+机翻)、`stores/locale.js`(前端真源)、
-  `tools/i18n-*.sql`(翻译表迁移脚本)
-- 提交前自检:切换 en 后走查新增页面,列头/标签/按钮/提示全部英文
-
-## 🔴 Git 提交规范(2026-09-03 起生效,不可豁免)
-
-**每次任务修改完成,必须创建独立 git commit**(方便追踪与回滚)。规则:
-1. **单任务单提交**:一个任务(功能/修复/文档/迁移)一个 commit,不要把多个任务混在一个提交里;
-   中途的一次性探针/临时检查脚本属任务产物,放 `tools/archive/`(以 `_` 开头)一并提交;
-   tools 根层只留迁移链与正式工具(分类见 `tools/README.md`)。
-2. **消息格式**:`<type>: <中文摘要>`,type ∈ feat/fix/docs/refactor/chore/db/i18n;
-   摘要写清楚任务内容(可带要点),如 `feat: 参照字段双模(≤20下拉/>20弹窗)`。
-3. **提交前检查**:① `git status` 确认本次任务文件(不夹带其它任务改动);② 敏感信息不入库
-   (`.env`、AK/密码——提交前 `git grep` 扫一次);③ 涉代码改动先 `npm run build` / `mvn package` 通过;
-   ④ 涉数据库改动确认幂等脚本已执行验证。
-4. **本地工作区干净才能换任务**:一个任务 commit 后才开始下一个;推不推送不限,本地 commit 即达标。
-5. **推送前先对齐远端**:`git fetch` 看是否落后;落后先 `git merge origin/main`(有冲突按任务处理
-   并单独提交),再 `git push`。**禁止 `--force` / `--force-with-lease` 覆盖远端**(2026-09-16
-   曾被强推替换过一批提交);推送后按四单规则跑一次回归闸。
-6. 规范变更本身也按此提交(如本文件更新 = 一个 docs commit)。
-
-## 🔴 验证与收尾:开发机服务(2026-09-22 起生效)
-
-**环境前提:JDK 25**(`backend/pom.xml` = `<java.version>25</java.version>`,class major 69)。本机系统默认已是 25(`java`/`javac`/`mvn` 直接可用)。仓库脚本一律**优先取 `JAVA_HOME`**,其次探测 `C:\Program Files\Java\jdk-25` / `D:\Program Files\Java\jdk-25` / `%USERPROFILE%\.jdk\jdk-25\jdk-25.0.2`;**新写脚本沿用这套探测,不要写死路径**。环境沿革、回滚与排障(`mvn` 报「不支持发行版本 25」)见 `docs/development/环境与数据库.md`「开发机环境」。
-
-改完**要看效果**的活儿(界面/版面/交互/导出),先确认开发机服务在跑,**没开就一并开**,
-别只跑构建就下结论;纯只读排查(看代码/查库)不必折腾服务。
-
-| 用途 | 命令 | 地址 |
-|---|---|---|
-| 后端(正式账套 HSDZ_MES) | `tools/scripts/start-prod.ps1` | http://127.0.0.1:8090 |
-| 前端热更(改完即刷) | `frontend/start-vite.bat` | http://localhost:5173 |
-
-- `start-prod.ps1` **自身幂等**:8090 已在跑就只打印「正式实例已在运行」并 exit 0,`-Stop` 才停 ——
-  所以「没开就开、开着就跳过」不需要额外判断,直接跑它即可。
-- **收尾时服务保持运行,不要停**(用户常要立刻看效果);汇报里给出 URL 并注明「服务是我起的」。
-- 起长驻进程**别阻塞当前流程**(后台起);**不要重启已在跑的服务**(会打断用户正在看的会话)。
-- 🔴 **前端改动「在哪个地址生效」要分清(2026-10-04 用户报障踩坑)**:
-  - **5173(vite)= 源码即时生效**;源码一改就是它新。
-  - **8090 是 `java -jar target\yinjia-mes-backend-0.1.0.jar`,前端是打包进 jar 的
-    `BOOT-INF/classes/static`** —— 源码改了它**不会**变,仍是上次 packaging 那次的前端。
-    用户报「面板数据是空的 / 保存后还是空的」而库里有数据时,**先查他看的是哪一版**:
-    `node tools/archive/_probe-qc-insp-carry/_q-served-build.mjs http://127.0.0.1:8090 --api`
-    (列该实例首页 chunk 关键字 + 接口 detail 键/行数)。
-  - 要让 8090 用上新前端:`npm run build` → 同步 `backend/src/main/resources/static`
-    → 停 8090 → `jar uf target\yinjia-mes-backend-0.1.0.jar -C <stage> BOOT-INF`(stage 内放
-    `BOOT-INF/classes/static`)→ 重启 `tools/scripts/start-prod.ps1`;完事再跑一次上面的取证脚本复核。
-    纯前端改动**同时要提交** `backend/src/main/resources/static`(仓库跟踪它,是部署包的前端来源,
-    按习惯单独一个 `chore: 前端静态产物同步(...)` 提交)。
-  - 🔴 **后端 class 更隐蔽,而且"下架类迁移"必踩(2026-10-16 用户报「生产工单丢失了部分实现」)**:
-    执行了下架/删表迁移之后,**正在跑的旧 jar 里代码还在查那张表** ⇒ 接口 500
-    `Invalid object name 'dbo.qc_cut_insp_head'`,界面表现是「某一段整片空白」,而**源码与数据库两头看都对**
-    ⇒ 极易误判成"代码丢了/被回退"。判据只有一条 —— **扫现役 jar**:
-    `java -Dstdout.encoding=UTF-8 tools/archive/_wo-trace-500-20261016/_JarClassScan.java`(**必须 [PASS]**)。
-    修法:停 → 重打包 → 起(`tools/scripts/rebuild-prod.ps1`);**只改后端 class** 时用
-    `jar uf` 只覆盖 `BOOT-INF/classes`(**排除 `static`**),这样前端一个字节不动、界面不会莫名变化。
-    事故全过程与取证脚本见 `tools/archive/_wo-trace-500-20261016/README.md`(踩坑台账 G12)。
-
-## 🔴 界面验证一律用 ego 浏览器(2026-11-06 起生效,不可豁免)
-
-用户口径:「以后测试和点击都默认在 ego 浏览器上操作。写入 skill」。
-
-- **看效果 / 点击 / 填表 / 走流程 / 截图取证** ⇒ 先 `skill('ego-browser')`,再用
-  `.dsh/skills/ego-browser-default/SKILL.md` 里那套固定写法(`taskSpace` + `page.goto` +
-  截图前 `setWindowBounds normal`);**不要**让用户自己点,也不要用 curl 假装点了 UI。
-- 证据要可复跑:脚本放 `C:/Users/Lenovo/ego/<task-space>/round-NN.mjs`,脚本与截图拷进
-  `tools/archive/_<任务>-<日期>/` 随任务提交。
-- 地址优先级:**先 5173(vite,源码即时生效)**,再看 8090(jar 内 static);登录工厂
-  `YJ` = 正式库、`YJ_TEST` = 测试库(接口里传库名如 `HSDZ_MES_TEST` 会静默落回正式库)。
-- 只读排查(看代码/查库/算哈希)不需要开浏览器。
-
-## 🔴 两账套(正式库 / 测试库)纪律(2026-09-22 起生效,不可豁免)
-
-系统有**两个账套**,登录页「登录工厂」选择即切换(ADR-0003,已接通):
+系统有**两个账套**,登录页「登录工厂」选择即切换(ADR-0003):
 
 | 登录工厂 | 库 | 用途 |
 |---|---|---|
 | YINJIA-MES | `HSDZ_MES`(正式) | **只录真实业务** |
-| YINJIA-MES·测试库 | `HSDZ_MES_TEST`(测试) | 演示/试用/批量造数 |
+| YINJIA-MES·测试库 | `HSDZ_MES_TEST`(测试) | 演示 / 试用 / 批量造数 |
 
-> ⚠️ **测试库不是"另一个数据库",它是正式库的一份快照副本** —— 这两条务必记住:
-
-1. **一切库变更必须两个账套都执行**(先正式、后测试;脚本均幂等)。只跑一个 = 任务未完成。
-   命令:`tools/` 下 `YINJIA_SQL_DB=HSDZ_MES_TEST java -cp lib\mssql-jdbc.jar DbSync.java`。
-2. **测试库会陈旧,而且"补迁移"修不好它**:它是某个时间点的正式库快照,同名对象可能与正式库**结构不同源**(实测 `bl_dispatch` 在测试库是英文列、正式库是中文列,`IF OBJECT_ID(...) IS NULL CREATE TABLE` 因此永远 no-op,补迁移只会一路报「列名无效」;完整对照见 `docs/development/环境与数据库.md`「测试库」节)。
-   **判定与处置**:对同一面板查询,正式库 200 而测试库报 `列名 'x' 无效` ⇒ 测试库结构陈旧,
-   **不要逐张表去补**,直接重建:
+1. **一切库变更必须两个账套都执行**(先正式、后测试;脚本必须幂等)。**只跑一个 = 任务未完成**。
+2. **迁移链唯一权威 = `tools/db-migrations.txt`**;执行用 `tools/` 下
+   `YINJIA_SQL_DB=HSDZ_MES_TEST java -cp lib/mssql-jdbc.jar DbSync.java`
+   (`lib\mssql-jdbc.jar` 为 Windows 开发机写法,macOS 用 `lib/mssql-jdbc.jar` 相对路径即可)。
+   `DbSync` 三模式:`sync`(默认增量) / `baseline`(只登记不执行) / `run <脚本>`(强制跑一条)。
+   **判断能不能 baseline 要先有证据**:用 `tools/archive/_verify-migration-claims.mjs` 逐条核对脚本
+   声明的对象(表/列/视图/面板/字段)是否已存在。
+3. **`yj_schema_log` 按内容哈希记账** ⇒ 改动任何 `tools/*.sql` 的字节,下次就会被判"未执行"而重跑
+   (历史脚本重跑会撞 schema 演进、甚至重复灌演示数据)。**改了脚本就主动重跑一次**(幂等)把哈希对齐,
+   生产 + 测试库各一次。
+4. **测试库会陈旧,"补迁移"修不好它**:它是某个时间点的正式库快照,同名对象可能与正式库**结构不同源**
+   (实测 `bl_dispatch` 在测试库是英文列、正式库是中文列 ⇒ `IF OBJECT_ID(...) IS NULL CREATE TABLE`
+   永远 no-op,补迁移只会一路报「列名无效」)。
+   **判定**:同一面板查询,正式库 200 而测试库报「列名 'x' 无效」⇒ 结构陈旧,**不要逐表补,直接重建**:
    ```powershell
-   # 需 SQL sysadmin(本机 PANDA\x1787 即是);会覆盖测试库数据,先确认可弃
-   powershell -ExecutionPolicy Bypass -File tools\scripts\make-test-db.ps1
+   powershell -ExecutionPolicy Bypass -File tools\scripts\make-test-db.ps1   # 需 SQL sysadmin,会覆盖测试库数据
    ```
-   ⚠ 重建会 `ALTER DATABASE … SINGLE_USER WITH ROLLBACK IMMEDIATE`,**踢掉 8090 应用连测试库的连接池**
-   (正式库池不受影响,应用不停;Hikari 会自愈)。详见 `docs/development/环境与数据库.md`「测试库」节。
-3. **迁移链卫生**:`yj_schema_log` 是「哪些脚本已执行」的唯一凭据,`DbSync` 按**内容哈希**判断是否重跑 ⇒
-   **改动任何 `tools/*.sql` 的字节都会让它下次被"重跑"**(历史脚本重跑会撞 schema 演进、甚至重复灌演示数据)。
-   三种模式:`sync`(默认增量)/ `baseline`(**只登记不执行**,用于把"已应用但没登记"的脚本补上)/ `run <脚本>`(强制跑一条)。
-   **判断「能不能 baseline」要先有证据**:用 `tools/archive/_verify-migration-claims.mjs` 逐条核对
-   脚本声明的对象(表/列/视图/面板/字段)在目标库是否已存在(用法见该文件头)。
-4. 新增/改动迁移脚本后,**必须**对两个账套验证一遍(至少 `DbSync` 跑到「执行 0、失败 0」)。
+   ⚠ 重建会 `ALTER DATABASE … SINGLE_USER WITH ROLLBACK IMMEDIATE`,踢掉 8090 连测试库的连接池
+   (正式库池不受影响、应用不停,Hikari 自愈)。详见 `docs/development/环境与数据库.md`「测试库」节。
 
-## 🔴 高频错误与铁律(2026-11-18 汇总,均来自本会话真实翻车)
+### 2.4 库存批次追溯(正式上线前必须验证,2026-10-19 起)
 
-> 每条都是"踩过 + 有代价"的:现象 → 根因 → 铁律。新任务开工前扫一眼,能省掉整轮返工。
+**唯一基线 = `docs/development/上线前必验-库存批次追溯.md`。**
+背景:当前库存**不按批次号追溯**(金蝶无批次商品统一填默认批号 `PC0000`,MES 按 `(物料,仓库,批号)`
+分账 ⇒ 470 行负结存里**只有 2 个组合是真缺货**,其余是批次错配的假象)。用户口径:验收期**先不按批次**、
+保证无批次也能正常出库、先过验收;但**正式上线当天必须**:① 按上线日重新导入金蝶期初;
+② 所有出库**必填批次号**;③ 日期在前的**先出库**、**可按批次多批出库**、出库**按批次号核销**。
+
+1. **动库存明细前先自问**:本次改动是否涉及正式上线?涉及则先跑通该文档 §五 的 5.1~5.4 四条验收标准,
+   并在汇报里写明结论。
+2. **触发范围**(命中即必须重读该文档):`StockLedgerService` / `StockFlowService` / `kucun` / `inh` /
+   `outh` / `v_stock_*` 视图 / `InvCostService` / `StockMonthCloseService` / `StockWarnService` /
+   六张出入库单据面板的批号字段与必填性 / 期初导入 / 金蝶库存同步。
+3. **验收期的权宜之计要留痕**:为"先过验收"而忽略批次的写法(如出库校验改按 `(物料,仓库)` 合计),
+   必须在代码注释里标 `// 【上线前改写】` 并指向该文档,否则上线切换时会被当成"正确实现"保留。
+4. **库存数量真源 = 金蝶真实账套(2026-11-10 起)**:每 5 分钟一轮,**先跑库存、再跑档案/订单**,
+   同入口 `deploy/sync.mjs`(库存实现 `deploy/sync-stock.mjs` 的 `runStockSync`,也可单独
+   `node sync-stock.mjs`;计划任务只有一个 `JdySalOrderSync`)。库存那步把金蝶 `inv_inventory_ims`
+   现存量**覆盖进 `kucun.yl`**,逐键差异落 `erp_stock_snapshot`、每轮日志落 `erp_stock_sync_log`。
+   口径/闸门/回滚见 `docs/development/金蝶库存同步-以金蝶为准.md`。动库存代码前必须知道两条:
+   ① **只认"已转ERP + 金蝶人工审核"**(2026-11-10 用户确认 A 口径):MES 审核仍立刻记账,但那是临时值,
+   下一轮同步以金蝶为准抹平;**调拨单/盘点单不在转ERP 白名单里,目前对库存完全无效**;
+   ② `v_stock_balance`(库存状况表/首页现存量TOP/流程看板)仍是**流水口径**,与 `kucun` 数额不同,
+   对账时别拿它当"库存数量"。
+
+### 2.5 采购链四单字段基线(2026-10-03 起)
+
+**唯一基线 = `docs/development/采购链四单字段与显示字段.md`** —— 登记**送料暂收单 `QC_RECV` /
+来料检验单 `QC_INSP` / 暂收退回单 `QC_RETURN` / 采购入库单 `PURCHASE_IN`** 的「字段名 · 显示名 ·
+顺序 · 参照源 · 可见性」。
+
+1. **拉取云端仓库更新后必看这份**:先跑回归闸
+   `cd tools && java -cp lib/mssql-jdbc.jar verify/FourDocAudit.java HSDZ_MES`(测试账套传 `HSDZ_MES_TEST`)——
+   逐面板比对现役 `yj_field` 与基线快照 `tools/fourdoc-baseline.tsv`,全 0 才 `[PASS]`。
+   `[FAIL]` 或 `DbSync` 重放过历史脚本后,按该文档 §8 重跑取证并 `git diff` 该文档:**无 diff** = 四单未变;
+   **有 diff** = 逐条确认是有意改动还是回归,有意则连同迁移脚本提交,意外则回退并排查。
+   ⚠ 2026-10-05 就是"整链重放 79 条历史脚本"把四单盖回上一代登记(参照源越界、`QC_RECV` 少 10 行、
+   隐藏列全被翻开),而当时的顺序核验汇总依然全绿 —— **只有基线比对 / 文档 diff 抓得住**;
+   回正脚本 `tools/migrate-fourdoc-baseline-restore-20261008.sql`(配套
+   `migrate-fourdoc-bloodline-cols-20261008.sql` 补回被链外操作弄丢的物理列)。
+2. **改动这四单任何字段的任务**:先读该文档,改完必须回写(重跑生成脚本,不得手改文档),
+   同批重跑 `node tools/archive/_gen-fourdoc-restore.mjs` 刷新 ①回正脚本 ②`tools/fourdoc-baseline.tsv`,
+   并单独一个 commit;`§四 顺序核验汇总` 必须 12/12 全 ✅。
+3. **顺序口径(别凭印象推)**:
+   - 表单页表头 = `place` 含 `header`,**或恰为 `query`** 的全部字段,按 `seq` 升序(同 `seq` 按 `yj_field.id`);
+     `query,detail` 的字段**不进表头**;
+   - 列表页明细表格列 = `place` 含 `detail` 且 `visible=1` 且 `hidden=0`,按 `seq` 升序。
+4. 改**参照源**按该文档 §5 核对:`ref_field` 取的是**目标面板的字段名(label)**而不是物理列名
+   (例:参照 `QC_RECV` 写 `单号`,不是 `单据编号`);批量 UPDATE 必须带窄条件 + 行数守卫 +
+   末尾「越界数 = 0」自检 —— 2026-09-24 的 `migrate-sl-supplier-ref.sql` 就是行内注释吞掉同行筛选条件,
+   把两个面板每行字段的参照源刷成了 GFDA。
+
+### 2.6 部署与台账
+
+1. **部署默认增量**(2026-10-25 修订,取代 2026-09-14 的「默认全量」):**服务器已在生产、有真实业务数据**
+   ⇒ 常规更新一律「增量迁移 + 换 jar」,入口 `deploy-production.bat`(内部转 `deploy-incremental.bat`,
+   先 `CHECK` 只读体检 → 再 `GO`),**禁止默认全量恢复**。
+   - macOS / 当前主用工具链 = `deploy/winrm/deploy_src.py`(拉取 → 构建 → 备份 → 换 jar → 重启;
+     `--app-only` 只换 jar,`--check` 只体检)。**它不跑 SQL**,迁移必须另跑
+     `deploy/winrm/run_migrations.py`。
+   - **全量恢复**只允许三种场景:①首次安装空服务器;②演示/演练环境;③**明确确认「服务器现有数据可整库丢弃」**的重建。
+     走全量时 `deploy-all.bat GO` / `GO DB` **必须带 `CONFIRM-FULL-REPLACE`**,否则脚本一开始即
+     `RESULT: FAIL-FULL-REPLACE-NOT-CONFIRMED` 退出,不停应用、不动库;`GO APP`(只换 jar)不受限。
+   - **仅当确实要走全量**才适用前置清理(增量部署**不需要**清本地研发数据,也不要用本地库覆盖服务器):
+     - **🔴 打包/出备份前必须确认「研发管理模块没有数据」**(2026-10-17 用户口径):研发区(`RD_*`)
+       是演示与批量造数最多的地方,全量恢复会把它们连审批留痕一起带进正式账。自查必须 `[PASS]`:
+       `cd tools` → `java -Dstdout.encoding=UTF-8 -cp lib/mssql-jdbc.jar verify/RdAreaEmptyAudit.java HSDZ_MES`
+       (顺手把 `HSDZ_MES_TEST` 也跑一遍);清理入口
+       `YINJIA_SQL_DB=HSDZ_MES_TEST java -cp lib/mssql-jdbc.jar DbSync.java run cleanup-rd-testledger-20261016.sql`
+       (该脚本自带库名硬闸门,**只允许在测试账套执行**)。
+       ⚠ 保留项别顺手清:`rd_sinter_tolerance`(烧结公差标准库)、`rd_sample_no_*`(已下架面板留档)、
+       `rd_dev_task_bak_*`、`yj_share_file` / `yj_share_file_cat`(共享文件库=真实资料)、号池 `s_allno`。
+     - 本地库里其余测试数据按「全量前清空」处理(当前无现成脚本,按 `migrate-golive-cleanup.sql` 的思路
+       现场判断,勿凭空引用已不存在的脚本);
+     - 备份必须在部署当时新打(`BACKUP DATABASE ... WITH FORMAT, INIT`),**禁止**拿 `deploy/` 里的历史 `.bak`。
+   - 两种路线都必须:**先 `CHECK` 再 `GO`**,失败按 `RESULT: FAIL-*` 停手,**不要**图快重跑整包。
+2. **部署必须记账(2026-11-01 起,不可豁免)**:每次部署(含只换 jar / 跑迁移 / 回滚)都要在
+   **`deploy/部署台账.md`**(append-only,「服务器跑到哪一版」的唯一答案)追加一行 + 一节详细记录,必填
+   **三条指纹**(`app.jar` SHA256 / 前端入口 `index-*.js` / `yj_schema_log` 行数)、迁移条数、
+   **所有被剔除的脚本及理由**、验收证据、回滚点(`.bak` 全名 + 旧 jar 名)。
+   只写"部署完成"或只写"预期值"都不算记录;台账里的数字必须能被服务器命令复核。
+   格式见 `docs/development/部署记录规范.md`,执行手册见 `deploy/部署说明.md`。
+
+### 2.7 Git 提交
+
+每次任务修改完成,**必须创建独立 commit**(方便追踪与回滚)。
+
+1. **单任务单提交**:一个任务(功能/修复/文档/迁移)一个 commit;中途的一次性探针/临时脚本属任务产物,
+   放 `tools/archive/`(以 `_` 开头)一并提交;`tools/` 根层只留迁移链与正式工具(分类见 `tools/README.md`)。
+2. **消息格式** `<type>: <中文摘要>`,type ∈ `feat`/`fix`/`docs`/`refactor`/`chore`/`db`/`i18n`;
+   摘要写清任务内容,如 `feat: 参照字段双模(≤20下拉/>20弹窗)`。
+3. **提交前检查**:① `git status` 确认只含本次任务文件;② 敏感信息不入库(`.env`、AK/密码 ——
+   提交前 `git grep` 扫一次);③ 涉代码改动先 `npm run build` / `mvn package` 通过;
+   ④ 涉数据库改动确认幂等脚本已执行验证。
+4. **本地工作区干净才能换任务**:一个任务 commit 后才开始下一个(推不推送不限)。
+5. **推送前先对齐远端**(`git fetch` 看是否落后;落后先 rebase/merge,有冲突按任务处理并单独提交);
+   **禁止 `--force` / `--force-with-lease` 覆盖远端**(2026-09-16 曾被强推替换过一批提交);
+   推送后按四单规则跑一次回归闸。
+
+---
+
+## 3. 环境与服务(开发机)
+
+**环境前提:JDK 25**(`backend/pom.xml` = `<java.version>25</java.version>`,class major 69)。
+仓库脚本一律**优先取 `JAVA_HOME`**;Windows 再探测 `C:\Program Files\Java\jdk-25` 等,macOS 用
+`~/.local/jdk/home`。**新写脚本沿用这套探测,不要写死路径**。环境沿革与排障(如 `mvn` 报
+「不支持发行版本 25」)见 `docs/development/环境与数据库.md`「开发机环境」。
+
+改完**要看效果**的活儿(界面/版面/交互/导出),先确认开发机服务在跑,**没开就一并开**;
+纯只读排查(看代码/查库)不必起服务。
+
+| 用途 | 命令 | 地址 |
+|---|---|---|
+| 后端(正式账套 `HSDZ_MES`) | `tools/scripts/start-prod.ps1` | http://127.0.0.1:8090 |
+| 前端热更(改完即刷) | `frontend/start-vite.bat` | http://localhost:5173 |
+
+- `start-prod.ps1` **自身幂等**:8090 已在跑就只打印「正式实例已在运行」并 exit 0,`-Stop` 才停 ——
+  「没开就开、开着就跳过」不需要额外判断。
+- **收尾时服务保持运行,不要停**(用户常要立刻看效果);汇报里给 URL 并注明「服务是我起的」。
+  起长驻进程别阻塞流程;**不要重启已在跑的服务**(会打断用户正在看的会话)。
+- 🔴 **前端改动「在哪个地址生效」要分清**:`5173`(vite) = 源码即时生效;`8090` 是
+  `java -jar target/yinjia-mes-backend-0.1.0.jar`,前端是打包进 jar 的 `BOOT-INF/classes/static`
+  —— **源码改了它不会变**。用户报「面板数据是空的 / 保存后还是空的」而库里明明有数据时,
+  先查他看的是哪一版:`node tools/archive/_probe-qc-insp-carry/_q-served-build.mjs http://127.0.0.1:8090 --api`。
+- 让 8090 用上新前端:`npm run build` → 同步 `backend/src/main/resources/static` → 停 8090 →
+  `jar uf target/yinjia-mes-backend-0.1.0.jar -C <stage> BOOT-INF` → 重启。纯前端改动**同时要提交**
+  `backend/src/main/resources/static`(仓库跟踪它,是部署包的前端来源,按习惯单独一个
+  `chore: 前端静态产物同步(...)` 提交)。
+- 🔴 **后端 class 更隐蔽,「下架类迁移」必踩**:执行了下架/删表迁移后,**正在跑的旧 jar 里代码还在查
+  那张表** ⇒ 接口 500 `Invalid object name 'dbo.xxx'`,界面表现是「某一段整片空白」,而源码与数据库
+  两头看都对 ⇒ 极易误判成"代码丢了/被回退"。判据只有一条:**扫现役 jar**
+  `java -Dstdout.encoding=UTF-8 tools/archive/_wo-trace-500-20261016/_JarClassScan.java`(必须 `[PASS]`)。
+  修法:停 → 重打包 → 起(`tools/scripts/rebuild-prod.ps1`);只改后端 class 时用 `jar uf` 只覆盖
+  `BOOT-INF/classes`(排除 `static`),前端一字节不动。事故全过程见
+  `tools/archive/_wo-trace-500-20261016/README.md`(踩坑台账 G12)。
+
+---
+
+## 4. 界面验证一律用 ego 浏览器(2026-11-06 起)
+
+用户口径:「以后测试和点击都默认在 ego 浏览器上操作」。
+
+- **看效果 / 点击 / 填表 / 走流程 / 截图取证** ⇒ 先 `skill('ego-browser')`,用
+  `.dsh/skills/ego-browser-default/SKILL.md` 那套固定写法(`taskSpace` + `page.goto` +
+  截图前 `setWindowBounds normal`);**不要**让用户自己点,也不要用 curl 假装点了 UI。
+- **证据要可复跑**:脚本写 `_scratch/ego-<目标>-<时间>/round-NN.mjs`(每轮新文件,不覆盖),
+  结束后 `task.finish({ keep: [] })`;脚本与截图拷进 `tools/archive/_<任务>-<日期>/` 随任务提交。
+- **地址优先级**:先 `5173`(vite,源码即时生效),再看 `8090`(jar 内 static)。登录工厂 `YJ` = 正式库、
+  `YJ_TEST` = 测试库(接口里直接传库名如 `HSDZ_MES_TEST` 会静默落回正式库)。
+- 只读排查(看代码 / 查库 / 算哈希)不需要开浏览器。
+- **验证取值方式**见 §5 ⑥(读数读值):本次翻车最多的就是"选择器命中错元素 / 读错节点"。
+
+---
+
+## 5. 高频错误铁律(2026-11-18 汇总,均来自真实翻车)
 
 ### ① 元数据:**label ≠ 物理列名**,一律从 `yj_field` 取 `col_name`
 
@@ -268,97 +272,97 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
 | 表单管理人(出货检验计划) | `管理人` | 查库按 label 查 → 查出空表,误判"没数据" |
 | 主要性能描述 | `特殊性能描述` | 种库步骤 `COL_LENGTH` 判错列 → 0 条入账 |
 
-- **铁律**:写库/建字段/迁移取列名,一律 `def.byLabel("X").col()`(后端)或先查
+- 写库/建字段/迁移取列名,一律 `def.byLabel("X").col()`(后端)或先查
   `SELECT col_name FROM yj_field WHERE panel_code=? AND label=?`;`SET [label]` 这种写法禁止出现。
-- **铁律**:凡是包了 `try/catch` 的写库动作,失败必须 `log.warn` 带面板/单号/列/异常四件事,
+- 包了 `try/catch` 的写库动作,失败必须 `log.warn` 带**面板 / 单号 / 列 / 异常**四件事,
   否则"静默失败"会被当成功交付。
 
 ### ② 只改元数据不改渲染层 = 白改
 
-- 现象:字段 `data_type` 已改「标准库」,界面仍是纯输入框、没有「⧉ 标准库维护」。
-- 根因:渲染层按**配置里的 `type`** 决定控件,元数据只提供候选。
-- **铁律**:改控件形态要**两处同改** —— `yj_field.data_type/dict_sql` + 前端 config `type`;
-  改完必须 ego 实测看到控件变了,不能只看库。
+字段 `data_type` 改成「标准库」后界面仍是纯输入框、没有「⧉ 标准库维护」——
+渲染层按**配置里的 `type`** 决定控件,元数据只提供候选。
+⇒ 改控件形态要**两处同改**:`yj_field.data_type/dict_sql` + 前端 config `type`;改完必须 ego 实测看到控件变了。
 
 ### ③ 虚拟字段会覆盖表内值
 
-- 现象:已审单纸面「审核人」显示 `admin`(账号),而库里写的是姓名。
-- 根因:`QueryService` 默认用 `yj_doc_status.shr` 覆盖纸面「审核人」。
-- **铁律**:新加"纸面签名格"必须确认是否需要进 `isTwoLevelSignPanel()` 例外,否则永远显示账号;
-  同理 `ButtonService.save()` 会 `body.remove("审核人")`,叫这个名字的字段收不到值。
+已审单纸面「审核人」显示 `admin`(账号)而库里是姓名,根因是 `QueryService` 默认用
+`yj_doc_status.shr` 覆盖纸面「审核人」。
+⇒ 新加"纸面签名格"必须确认是否需要进 `isTwoLevelSignPanel()` 例外;同理 `ButtonService.save()` 会
+`body.remove("审核人")`,叫这个名字的字段收不到值。
 
 ### ④ 前端"自动带入"监视器会覆盖库值
 
-- 现象:库已是「柴善银」,界面显示「系统管理员」。
-- 根因:`PanelxList.EDITOR_STAMP_FIELDS` 每次打开草稿把当前登录人写进纸面。
-- **铁律**:改成"固定值"的字段要同时清三处 —— 前端 stamp 监视器、后端 `putEditorCols`、
-  保存末尾那段 `UPDATE`。**三处缺一,界面对了库里也会被改回**。
+库已是「柴善银」、界面显示「系统管理员」,根因是 `PanelxList.EDITOR_STAMP_FIELDS` 每次打开草稿
+把当前登录人写进纸面。
+⇒ 改"固定值"要同时清三处:**前端 stamp 监视器、后端 `putEditorCols`、保存末尾那段 `UPDATE`**。
+三处缺一,界面对了库里也会被改回。
 
 ### ⑤ 迁移脚本:五个必查项
 
-1. **批编译期列名**:`IF COL_LENGTH(...) IS NOT NULL BEGIN ... END` **挡不住**列名解析
-   (列不存在照样 207) ⇒ 必须 `sp_executesql` **动态拼串**。
+1. **批编译期列名**:`IF COL_LENGTH(...) IS NOT NULL BEGIN ... END` **挡不住**列名解析(列不存在照样 207)
+   ⇒ 必须 `sp_executesql` **动态拼串**。
 2. **两账套 schema 不同步**:测试库可能缺列/缺面板 ⇒ 自检写**三态**(不存在=提示跳过 /
    存在但没改成功=RAISERROR / 成功=通过),不要一刀切。
 3. **编码列长度**:`yj_std_lib.item_code` 只有 **60 字** —— 长正文塞进去报 8152 截断;
    正文只进 `content`,编码用序号(`PF0001…`)。
-4. **注释里的斜杠加双星**:写 `/**某字段**` 会形成嵌套注释 ⇒ `Missing end comment mark`;
-   中文文档描述字段时不要用那种写法。
-5. **改了脚本字节就要重跑**:`yj_schema_log` 按内容哈希记账,改一个字符下次就被判"未执行";
-   幂等脚本重跑一次即可对齐(生产 + 测试库各一次)。
+4. **注释里的斜杠加双星**:写 `/**某字段**` 会形成嵌套注释 ⇒ `Missing end comment mark`。
+5. **改了脚本字节就要重跑**(幂等对齐哈希,见 §2.3 第 3 条)。
 
 ### ⑥ 验证铁律:**读数读值**,不要读文本节点
 
-本会话因此**误判 3 次、白跑 3 次部署**,教训最贵:
+一次会话因此**误判 3 次、白跑 3 次部署**:
 
 - `el-input` / `textarea` 的**值不进 `innerText`** ⇒ 用 `innerText` 判断"有没有值"永远是空。
-  **铁律**:验表单值读控件 `value`(或 `.el-input__inner` 的 value),不要读文本。
+  **验表单值读控件 `value`**(或 `.el-input__inner` 的 value)。
 - 同名文案在页面**多处存在**(列表表头 vs 纸面格)⇒ `body.indexOf('字段名')` 会读到列表。
-  **铁律**:先限定容器再取,如纸面 `[class*="rsp-"]` / `.approval-sheet`,列表另算。
+  **先限定容器再取**(纸面 `[class*="rsp-"]` / `.approval-sheet`,列表另算)。
 - 选择器要认**组件族**:`DocSheet` 用 `.as-*`(立项申请/实施计划),`RecordSheetPanels` 用
   `.rs-*` / `rsp-*`(产品文件/记录表)。用错族得到 0 元素,却容易被当成"功能没出来"。
-- **铁律**:报告"没生效"之前,先证明选择器命中了正确元素(打印命中数量 + `outerHTML` 片段)。
+- 报告"没生效"之前,先证明选择器命中了正确元素(打印命中数量 + `outerHTML` 片段)。
 
 ### ⑦ 并发仓库:禁止整文件覆盖
 
-- 现象:`git checkout <my-commit> -- src/recordSheetConfigs.js` 把**别人并发提交**的改动抹掉,
-  4 条守卫立刻变红。
-- **铁律**:冲突时**只看差异、只搬自己的 hunk**;`git checkout <ref> -- <file>` 仅用于
-  "确认该文件只有我改过"的场合,否则禁用。判断方式:`git diff origin/main --stat -- <file>`。
-- **铁律**:`git push` 被拒 ⇒ 先 `git add/commit` 再 `git pull --rebase`
-  (有未提交改动时 rebase 直接拒绝);`git commit -m` 里不要放反引号、尖括号标签、`$()`
-  (会被 shell 吞),一律 `git commit -F <文件>`。
+`git checkout <my-commit> -- <file>` 会把**别人并发提交**的改动抹掉(实测抹掉 `INSP_FREQ_OQC`,4 条守卫变红)。
+⇒ 冲突时**只看差异、只搬自己的 hunk**;`git checkout <ref> -- <file>` 仅在"确认该文件只有我改过"时用
+(判断:`git diff origin/main --stat -- <file>`)。
+`git push` 被拒 ⇒ 先 `add/commit` 再 `pull --rebase`(有未提交改动时 rebase 直接拒绝);
+`git commit -m` 里不要放反引号、尖括号标签、`$()`(会被 shell 吞),一律 `git commit -F <文件>`。
 
 ### ⑧ 守卫测试自己也会错
 
-- `vue.indexOf('.as-ro-text {')` 会先命中 `.approval-sheet .as-ro-text {` ⇒ 断言假红。
-  **铁律**:匹配整条规则用 `'\n' + selector + ' {'`;断言配置片段时配 `assert count === 1`。
+- `vue.indexOf('.x {')` 会先命中 `.parent .x {` ⇒ 断言假红。匹配整条规则用 `'\n' + selector + ' {'`,
+  断言配置片段配 `assert count === 1`。
 - 同一段配置可能在文件里出现多次(如 4 行的 `info: [...]`)⇒ 替换锚点必须带**唯一上下文**
-  (`staticTitle` / `panelCode` 那几行),否则 `assert count==1` 会在别处误伤。
-- 用 Python heredoc 改文件时,四个连续单引号、中文箭头等会把字符串截断 ⇒ 断言块用三引号或双引号;
+  (`staticTitle` / `panelCode` 那几行)。
+- 用 Python heredoc 改文件时,连续多个单引号、中文箭头等会把字符串截断 ⇒ 断言块用三引号或双引号;
   改完立刻 `node -e "import(...)"` 或 `grep` 复核落盘内容。
 
 ### ⑨ 造数与清理
 
-- 要验证"审批后才写入"这类链路,允许在**空白面板**造单,但必须:
-  选 0 单据的面板 → 走完整流程 → 查库取证 → **立即删干净**(head/detail/status/trail 四张)。
-  本会话即用 `RD_ANTIBACT`(当时 0 张)验证数据记录表审核人回填,验完全删。
-- **铁律**:造数前记录本轮单号,交付时贴"已清理"的行数证据。
+验证"审批后才写入"这类链路,允许在**空白面板**造单,但必须:选 0 单据的面板 → 走完整流程 →
+查库取证 → **立即删干净**(head / detail / status / trail 四张)。
+造数前记录本轮单号,交付时贴"已清理"的行数证据。
 
 ### ⑩ 布局类缺陷:别只改数据
 
-- 现象:实施计划「测试方案」长文本压住下一行。
-- 根因:`.as-sub { flex:1; min-height:0 }` 等分固定行高,文本无溢出约束。
-- **铁律**:纸面格子一律**按内容自然高度**(`flex:0 0 auto` + 合理 `min-height`),
-  行容器用 `min-height` 而非固定 `height`;修完用**注入长文本**实测(把等长原文写进 DOM 再量
-  boundingBox),不要只依赖短内容截图。
+实施计划「测试方案」长文本压住下一行,根因是 `.as-sub { flex:1; min-height:0 }` 等分固定行高、
+文本无溢出约束。
+⇒ 纸面格子一律**按内容自然高度**(`flex:0 0 auto` + 合理 `min-height`),行容器用 `min-height`
+而非固定 `height`;修完用**注入长文本**实测(把等长原文写进 DOM 再量 boundingBox),不要只依赖短内容截图。
 
-## 架构速查(续:规范与台账指针)
+---
 
-- 通用设计资产库(供其它项目 agent 参考实现):`https://github.com/MyPanda-Hash/CHENGXIAO`(9 专题+代码片段+表结构)
-- **DATABASE 规范**:**`docs/development/数据库规范.md`**(建表/改列/加面板字段的硬规矩 + `tools/verify/DbNormAudit.java` 13 项体检 + `tools/db-legacy-whitelist.txt` 冻结与棘轮登记);**新增表/列/字段必须满足该规范,体检 FAIL 视为任务未完成**;移交前跑 `java -cp lib\mssql-jdbc.jar verify/DbNormAudit.java`(在 tools 目录下,需 `YINJIA_SQL_PASS`,两个账套)
-- **数据库表清单**:**`docs/development/数据库表清单.md`**(全库表 + 视图逐张登记 + §0 命名与归属规范 + §0.1 在册表登记;建表/改表/查表先看它,刷新命令见文档末尾)
-- **在册表台账**:**`tools/db-inuse-tables.txt`**(「确定下来的后台表」:206 张在册 + 3 张例外保留;不在册即脏数据;判定口径与逐表证据 `tools/archive/_table-audit/`、清理迁移 `tools/migrate-drop-unused-tables.sql`)
-- **代码规范与防臃肿**:**`docs/development/代码规范与防臃肿.md`**(A 分层边界/B 契约数据驱动/C 文件红线/D 反复制粘贴/E 清理与技术债台账/F 自动化防线);新代码必须满足该规范,违背即视为任务未完成
-- **工单排产看板数量口径**:**`docs/development/工单排产看板-本线任务量口径.md`**(左侧每线数字 = 顶部统计 = 右侧明细,三处同源;**改这三处数字/台账查询前必读**;台账唯一权威键 = 工单行id,存量订正迁移 `tools/migrate-wo-ledger-rowid-align-20261112.sql`)
-- **踩坑台账**:`docs/development/开发与质量.md` §5.5(前端导出/探针专项:jsPDF px 单位、html2canvas、`$el` fragment 锚点、离屏克隆全宽截图、PS 命令通道 CJK 键、`char(2)` 尾空格等)**涉 PDF 生成/截图导出/CDP 探针/PS 工具脚本/定长列比较,先读该节再动手,违者即重复事故**
+## 6. 文档索引(唯一一份)
+
+| 主题 | 文档 |
+|---|---|
+| 术语 / 翻译分层 | `GLOSSARY.md`、`docs/adr/0001-dictionary-only-translation.md` |
+| 数据库规范 / 表清单 / 在册台账 | `docs/development/数据库规范.md`、`docs/development/数据库表清单.md`、`tools/db-inuse-tables.txt` |
+| 代码规范与防臃肿(A 分层/B 契约/C 文件红线/D 反复制/E 技术债/F 自动化) | `docs/development/代码规范与防臃肿.md`(新代码必须满足,违背即未完成) |
+| 环境与数据库 / 测试库 / 开发机环境 | `docs/development/环境与数据库.md` |
+| 部署记录规范 / 执行手册 / 台账 | `docs/development/部署记录规范.md`、`deploy/部署说明.md`、`deploy/部署台账.md` |
+| 库存批次追溯 / 金蝶库存同步 | `docs/development/上线前必验-库存批次追溯.md`、`docs/development/金蝶库存同步-以金蝶为准.md` |
+| 采购链四单字段基线 | `docs/development/采购链四单字段与显示字段.md` |
+| 工单排产看板数量口径(三处同源;台账唯一权威键 = 工单行 id) | `docs/development/工单排产看板-本线任务量口径.md` |
+| 开发与质量踩坑台账(§5.5 前端导出/探针:jsPDF px、html2canvas、`$el` fragment、离屏克隆全宽截图、CJK 键、`char(2)` 尾空格) | `docs/development/开发与质量.md`(**涉 PDF/截图导出/CDP 探针/PS 工具/定长列比较,先读该节**) |
+| 通用设计资产库(供其它项目参考) | `https://github.com/MyPanda-Hash/CHENGXIAO` |
