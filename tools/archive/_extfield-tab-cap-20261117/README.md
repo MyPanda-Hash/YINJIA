@@ -94,5 +94,7 @@ node tools/archive/_extfield-tab-cap-20261117/_verify-extfield-tab-cap.mjs
 
 - 本次 `start-prod` 的增量同步报 `migrate-qc-proc-insp-batch-table-20261111.sql` 自检失败
   (`出货检验功能记录表(批次矩阵)迁移自检失败`),与本任务无关,未处理。
-- 重打 jar 时工作区里还有**别的任务**未提交的后端改动(`PushGenerateHandler` / `ButtonService` /
-  `QueryService` / `deploy/sync.mjs`),因此 8090 现在跑的 jar 里也包含它们(本任务未提交它们)。
+- 重打 jar 时工作区是干净的;之后**别的任务**在同一工作区改起了 `PushGenerateHandler` /
+  `ButtonService` / `QueryService` / `deploy/sync.mjs` 与若干前端文件(时间戳 9:41 之后)。
+  本次打包是 9:32:24(`app.jar` SHA256 `42B07C0C…`),所以这些 WIP **没有**进 jar/static,
+  8090 跑的就是本任务的产物;它们也未包含在本任务的提交里。
