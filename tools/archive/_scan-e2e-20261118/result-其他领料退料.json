@@ -1,0 +1,42 @@
+[
+    {
+        "Name":  "其他领料·提交成功",
+        "Ok":  true,
+        "Detail":  "code=200 success"
+    },
+    {
+        "Name":  "其他领料·拿到其他出库单号",
+        "Ok":  true,
+        "Detail":  "单号=OO-2026-11-0009"
+    },
+    {
+        "Name":  "其他退料·提交成功",
+        "Ok":  true,
+        "Detail":  "code=200 success"
+    },
+    {
+        "Name":  "其他退料·拿到生产退料单号",
+        "Ok":  true,
+        "Detail":  "单号=TL-2026-11-0011"
+    },
+    {
+        "Name":  "其他领料·补打印取数可读",
+        "Ok":  true,
+        "Detail":  "code=200 success"
+    },
+    {
+        "Name":  "其他领料·补打印明细有行",
+        "Ok":  true,
+        "Detail":  "行数=1"
+    },
+    {
+        "Name":  "其他退料·补打印取数可读",
+        "Ok":  true,
+        "Detail":  "code=200 success"
+    },
+    {
+        "Name":  "WARN 其他领料·空清单提交后端没拦(生成空单)",
+        "Ok":  true,
+        "Detail":  "单号=OO-2026-11-0010"
+    }
+]

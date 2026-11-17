@@ -1,0 +1,92 @@
+[
+    {
+        "Name":  "扫码混料·扫工单可带出工单行",
+        "Ok":  true,
+        "Detail":  "code=200 ok(裸对象)"
+    },
+    {
+        "Name":  "扫码混料·工单行带产品/排产数量",
+        "Ok":  true,
+        "Detail":  "产品=A-48-16 排产=1000.0"
+    },
+    {
+        "Name":  "扫码混料·物料清单可带出",
+        "Ok":  true,
+        "Detail":  "行数=5 ok(裸对象)"
+    },
+    {
+        "Name":  "扫码混料·物料清单带用量",
+        "Ok":  true,
+        "Detail":  "首行=YJ-YKRS-001 用量=0.0304"
+    },
+    {
+        "Name":  "扫码混料·第1笔落库",
+        "Ok":  true,
+        "Detail":  "code=200 success 行id=13"
+    },
+    {
+        "Name":  "扫码混料·第2笔落库",
+        "Ok":  true,
+        "Detail":  "code=200 success"
+    },
+    {
+        "Name":  "扫码混料·同料重复扫累加到同一行",
+        "Ok":  true,
+        "Detail":  "实际用量=32.0"
+    },
+    {
+        "Name":  "扫码混料·未保存草稿=2 行",
+        "Ok":  true,
+        "Detail":  "行数=2"
+    },
+    {
+        "Name":  "扫码混料·撤回一笔",
+        "Ok":  true,
+        "Detail":  "删除行数=1"
+    },
+    {
+        "Name":  "扫码混料·撤回后草稿=1 行",
+        "Ok":  true,
+        "Detail":  "行数=1"
+    },
+    {
+        "Name":  "扫码混料·整单保存成功",
+        "Ok":  true,
+        "Detail":  "code=200 单号=PL2611170001 success"
+    },
+    {
+        "Name":  "扫码混料·单号形如 PL+日期+流水",
+        "Ok":  true,
+        "Detail":  "单号=PL2611170001"
+    },
+    {
+        "Name":  "扫码混料·保存行数=2",
+        "Ok":  true,
+        "Detail":  "行数=2 合计="
+    },
+    {
+        "Name":  "扫码混料·无草稿再保存被拒",
+        "Ok":  true,
+        "Detail":  "code=409 msg=这张工单行还没有已扫的料,不能整单保存"
+    },
+    {
+        "Name":  "扫码混料·补打印列表能列出该单",
+        "Ok":  true,
+        "Detail":  "条数=1"
+    },
+    {
+        "Name":  "扫码混料·按单号取抬头+明细",
+        "Ok":  true,
+        "Detail":  "code=200 success"
+    },
+    {
+        "Name":  "扫码混料·单据明细有 2 行",
+        "Ok":  true,
+        "Detail":  "行数=2"
+    },
+    {
+        "Name":  "扫码混料·记一次打印(补打印)",
+        "Ok":  true,
+        "Detail":  "code=200 success"
+    }
+]

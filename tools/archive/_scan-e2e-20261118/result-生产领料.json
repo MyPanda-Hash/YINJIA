@@ -1,0 +1,92 @@
+[
+    {
+        "Name":  "生产领料·扫工单可定位",
+        "Ok":  true,
+        "Detail":  "code=200"
+    },
+    {
+        "Name":  "生产领料·定位到两张单(组装+混料)",
+        "Ok":  true,
+        "Detail":  "单据=2 类型=组装+混料"
+    },
+    {
+        "Name":  "生产领料·拿到组装单 id",
+        "Ok":  true,
+        "Detail":  "id=840"
+    },
+    {
+        "Name":  "生产领料·单据详情可读",
+        "Ok":  true,
+        "Detail":  "code=200 success"
+    },
+    {
+        "Name":  "生产领料·领料明细有行",
+        "Ok":  true,
+        "Detail":  "行数=3"
+    },
+    {
+        "Name":  "生产领料·可领项已排除半成品",
+        "Ok":  true,
+        "Detail":  "可领=2 半成品=1"
+    },
+    {
+        "Name":  "生产领料·扫半成品被拒(提示半成品)",
+        "Ok":  true,
+        "Detail":  "code=409 msg=物料 A-48-16**TB 是半成品(编码含 **TB),本厂不入库、不需要领料:这一行只作展示,直接跳过即可"
+    },
+    {
+        "Name":  "生产领料·扫物料 YJ-KBL-012",
+        "Ok":  true,
+        "Detail":  "可用上限=1977.0 success"
+    },
+    {
+        "Name":  "生产领料·填数量 YJ-KBL-012 = 5.8",
+        "Ok":  true,
+        "Detail":  "可以提交=False success"
+    },
+    {
+        "Name":  "生产领料·扫物料 YJ-XWR-058",
+        "Ok":  true,
+        "Detail":  "可用上限=4000.0 success"
+    },
+    {
+        "Name":  "生产领料·填数量 YJ-XWR-058 = 1000",
+        "Ok":  true,
+        "Detail":  "可以提交=True success"
+    },
+    {
+        "Name":  "生产领料·提交成功",
+        "Ok":  true,
+        "Detail":  "code=200 success"
+    },
+    {
+        "Name":  "生产领料·提交生成出库行数\u003e0",
+        "Ok":  true,
+        "Detail":  "出库行数=2 单号=LL-2026-11-0031"
+    },
+    {
+        "Name":  "生产领料·提交后状态=已完成",
+        "Ok":  true,
+        "Detail":  "状态=已完成"
+    },
+    {
+        "Name":  "生产领料·出库单待仓管审批",
+        "Ok":  true,
+        "Detail":  "出库已审批=False"
+    },
+    {
+        "Name":  "生产领料·混料单明细可读",
+        "Ok":  true,
+        "Detail":  "行数=5"
+    },
+    {
+        "Name":  "生产领料·混料单扫物料可读",
+        "Ok":  true,
+        "Detail":  "可用上限=0.0 success"
+    },
+    {
+        "Name":  "生产领料·无库存物料被库存闸门拦(YJ-YKRS-001)",
+        "Ok":  true,
+        "Detail":  "code=409 msg=库存不足:物料 YJ-YKRS-001 当前可用 0.0,本次要填 1.0;请减少数量或先补货"
+    }
+]
