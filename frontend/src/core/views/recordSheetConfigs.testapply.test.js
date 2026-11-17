@@ -148,12 +148,21 @@ test('产品文件**六张单**的右上角都是固定表单编号（2026-11-06
   //   规格书:YJ-QR-153 组装工艺清单:YJ-QR-144 出货检验计划表:YJ-QR-145
   //   这些右上角固定的编号你也没有改全，这些又不影响流程就是显示而已」
   // ⇒ 六张单一个都不能漏（上一版只改了 4 张，组装/出货检验两张还在显示流水号 AP-…/IP-…）
+  // 2026-11-17 用户重新给了对照表（1117问题 #1）：
+  //   产品信息表 YJ-QR-152 / 烧结工艺管控清单 YJ-QR-146 / 烧结配方管控清单 YJ-QR-154 /
+  //   X烧结工艺清单 YJ-QR-157 / 规格书 YJ-QR-153 / 组装工艺清单 YJ-QR-144 / 出货检验计划表 YJ-QR-145
+  //   ⇒ 烧结去掉了 -1 后缀；X烧结由"与烧结同号"改为 157；配方管控清单补 154（页级覆盖）。
   assert.equal(recordSheetConfigs.RD_PROD_INFO.docNoStatic, 'YJ-QR-152', '产品信息表')
-  assert.equal(recordSheetConfigs.RD_MOLD_PROC.docNoStatic, 'YJ-QR-146-1', '烧结工艺清单')
-  assert.equal(recordSheetConfigs.RD_X_SINTER.docNoStatic, 'YJ-QR-146-1', 'X烧结工艺清单')
+  assert.equal(recordSheetConfigs.RD_MOLD_PROC.docNoStatic, 'YJ-QR-146', '烧结工艺管控清单')
+  assert.equal(recordSheetConfigs.RD_X_SINTER.docNoStatic, 'YJ-QR-157', 'X烧结工艺清单')
   assert.equal(recordSheetConfigs.RD_SPEC_DOC.docNoStatic, 'YJ-QR-153', '规格书')
   assert.equal(recordSheetConfigs.RD_ASM_PROC.docNoStatic, 'YJ-QR-144', '组装工艺清单')
   assert.equal(recordSheetConfigs.RD_INSP_PLAN.docNoStatic, 'YJ-QR-145', '出货检验计划表')
+  // 烧结配方管控清单 = RD_MOLD_PROC 的第 2 页（页级 docNoStatic 覆盖面板级）
+  const formulaPage = (recordSheetConfigs.RD_MOLD_PROC.pages || [])
+    .find((pg) => pg && pg.staticTitle === '炭棒配方管控清单')
+  assert.ok(formulaPage, '烧结配方页必须存在')
+  assert.equal(formulaPage.docNoStatic, 'YJ-QR-154', '烧结配方管控清单（页级编号）')
 })
 /**
  * 2026-11-06 用户报障：「把规格书的第一页的字体大小统一一下，应该是草稿状态显示的问题」。

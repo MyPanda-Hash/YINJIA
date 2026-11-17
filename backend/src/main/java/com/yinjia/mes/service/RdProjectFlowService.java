@@ -193,8 +193,17 @@ public class RdProjectFlowService {
         Map<String, List<Map<String, Object>>> out = new LinkedHashMap<>();
         if (docNos.isEmpty()) return out;
         StringBuilder stageCols = new StringBuilder();
+        // 2026-11-17 修「项目流程管控与实际流程不符」：
+        //   plannedStages 原来**只数「计划内容」一格** —— 实测 LXB-2026-11-0005 的三个阶段
+        //   只填了 计划开始/计划完成、计划内容留空 ⇒ plannedStages=0 ⇒ 流程第 7 步「填写项目实施计划」
+        //   显示"未开始"，而第 9 步「审批通过并归档」却是已完成 —— 同一条时间轴自相矛盾。
+        //   判据改成与纸面 hasPhaseContent 同一口径：计划内容 / 计划开始 / 计划完成 / 责任人 /
+        //   实际完成 **任一非空**即算这一阶段填过（阶段框只有这 5 个字段，见 docSheetConfigs）。
         for (int i = 1; i <= 10; i++) {
-            stageCols.append(", ISNULL([阶段").append(i).append("_计划内容],N'') AS s").append(i).append('p');
+            stageCols.append(", ISNULL(CONVERT(varchar(19),[阶段").append(i).append("_计划内容],120),N'') AS s").append(i).append('p');
+            stageCols.append(", ISNULL(CONVERT(varchar(19),[阶段").append(i).append("_计划开始],120),N'') AS s").append(i).append('b');
+            stageCols.append(", ISNULL(CONVERT(varchar(19),[阶段").append(i).append("_计划完成],120),N'') AS s").append(i).append('e');
+            stageCols.append(", ISNULL([阶段").append(i).append("_责任人],N'') AS s").append(i).append('o');
             stageCols.append(", ISNULL(CONVERT(varchar(19),[阶段").append(i).append("_实际完成],120),N'') AS s").append(i).append('d');
         }
         List<Map<String, Object>> rows = jdbc.queryForList(
@@ -213,8 +222,11 @@ public class RdProjectFlowService {
             int planned = 0, done = 0;
             for (int i = 1; i <= 10; i++) {
                 Object content = r.remove("s" + i + "p");
+                Object begin = r.remove("s" + i + "b");
+                Object due = r.remove("s" + i + "e");
+                Object owner = r.remove("s" + i + "o");
                 Object actual = r.remove("s" + i + "d");
-                if (content != null && !String.valueOf(content).isBlank()) planned++;
+                if (anyNonBlank(content, begin, due, owner, actual)) planned++;
                 if (actual != null && !String.valueOf(actual).isBlank()) done++;
             }
             r.put("plannedStages", planned);
@@ -222,6 +234,15 @@ public class RdProjectFlowService {
             out.computeIfAbsent(str(r.get("docNo")), k -> new ArrayList<>()).add(r);
         }
         return out;
+    }
+
+    /** 任一把非空白即 true（阶段"是否填过"的判据，与前端 hasPhaseContent 同口径） */
+    private static boolean anyNonBlank(Object... vals) {
+        if (vals == null) return false;
+        for (Object v : vals) {
+            if (v != null && !String.valueOf(v).isBlank()) return true;
+        }
+        return false;
     }
 
     /** 项目进度查询是否已有该项目的行:文档编号/立项单号 → [进度单号 + 状态] */

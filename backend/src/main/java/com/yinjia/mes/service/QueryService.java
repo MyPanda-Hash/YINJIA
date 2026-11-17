@@ -112,7 +112,13 @@ public class QueryService {
      */
     private static boolean isTwoLevelSignPanel(String panelCode) {
         return panelCode != null && (ButtonService.ADMIN_L2_PANELS.contains(panelCode)
-                || ButtonService.SINGLE_LEVEL_INSP_PANELS.contains(panelCode));
+                || ButtonService.SINGLE_LEVEL_INSP_PANELS.contains(panelCode)
+                // 2026-11-17 组装工艺管控清单（1117问题 #6 追加）：新增的纸面「审核人」是**表内真值列**
+                //   （yj_field label 审核人 → 物理列 备用3，审批通过时由 ButtonService.writeFieldByLabel
+                //    写入**姓名**）。若走下面的默认覆盖，会被 yj_doc_status.shr 换成**账号**
+                //    （实测界面显示 "admin"），既丢了姓名也把账号当人名。
+                //   与质量单据同一处理：表内有值就用表内，为空才退回 shr 兜底。
+                || "RD_ASM_PROC".equals(panelCode));
     }
 
     private final PanelRegistry registry;

@@ -342,6 +342,10 @@ public class ButtonService {
         body.remove("更新时间");
         body.remove("审核人");
         body.remove("审核时间");
+        // 组装工艺管控清单：表单管理人**固定柴善银**（2026-11-17 用户口径
+        //   「这个表单管理员应该是柴善银，是固定的」）—— 覆盖 2026-10-28「=当前编辑人」那条，
+        //   服务端强制写死：前端无论是旧缓存、默认值还是绕过保存，落库都只可能是柴善银。
+        if ("RD_ASM_PROC".equals(def.code())) body.put("表单管理人", "柴善银");
         // 立项申请(2026-10-08 研发流程图③④):「对接人/项目责任人」是流程动作写下的只读格
         // (字段在 yj_field 已 editable=0,这里再剥一次 —— 前端题面能改的键,服务端一律不收),
         // 否则绕过按钮直接保存就能"自封责任人"。
@@ -1274,8 +1278,10 @@ public class ButtonService {
         // 与上面编辑人同一套口径:前端只保证纸面显示与保存报文带上,落库一律以本次保存人为准 ——
         // 否则用户把这一格改回别人名字就能伪造"谁管的这张表"。
         if ("RD_ASM_PROC".equals(def.code())) {
+            // 2026-11-17：值改为**固定柴善银**（用户口径「是固定的」），不再按本次保存人回写。
+            //   保留这段 UPDATE 的作用是"防止前端旧缓存把它改回别人"—— 每次保存都钉一次固定值。
             jdbc.update("UPDATE rd_asm_proc_head SET 表单管理人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
-                    realNameOf(user), no);
+                    ASM_PROC_FORM_MANAGER, no);
         }
         // 纯落款「编制」格的创建人预填(2026-11-02):见 prefillPreparerName 注释。
         // 落库后执行 ⇒ 同一次保存即可在纸面上看到;只在为空时写,不覆盖已有/用户已确认的值。
@@ -1298,7 +1304,10 @@ public class ButtonService {
     private void putEditorCols(PanelRegistry.PanelDef def, String table, Map<String, Object> cols, String user) {
         String name = realNameOf(user);
         if ("RD_PROD_INFO".equals(def.code()) && tableCols(table).contains("编辑人")) cols.put("编辑人", name);
-        if ("RD_ASM_PROC".equals(def.code()) && tableCols(table).contains("表单管理人")) cols.put("表单管理人", name);
+        // 组装工艺：表单管理人**固定柴善银**（2026-11-17 用户口径），不再跟当前编辑人
+        if ("RD_ASM_PROC".equals(def.code()) && tableCols(table).contains("表单管理人")) {
+            cols.put("表单管理人", ASM_PROC_FORM_MANAGER);
+        }
     }
 
     /**
@@ -3827,6 +3836,10 @@ public class ButtonService {
         if (SINGLE_LEVEL_INSP_PANELS.contains(def.code())) {
             writeBackSignCell(def, no, "审核人", "审核时间", operator);
         }
+        // 数据记录表(实验室 8 张)：审核人**审核后生成**（1117问题 #5）
+        writeDataRecAuditor(def, no, operator);
+        // 组装工艺管控清单：新增的「审核人」格 = 审批通过人（1117问题 #6「产品负责人审核后自动填充」）
+        if ("RD_ASM_PROC".equals(def.code())) writeFieldByLabel(def, no, "审核人", signNameOf(operator));
         // 规格书(RD_SPEC_DOC):「审核」格 = **审批通过的人**（2026-11-06 用户口径
         // 「审核的是在审批人审批之后，把对应的审批人的账号和日期回填进去」）。
         // 规格书不走两级审批（「一级审批就回填」）⇒ 落点就在这条单节点通过路径上。
@@ -3850,8 +3863,12 @@ public class ButtonService {
             if (!level.isEmpty()) applyGrade(def.code(), no, level, operator);
             // 2026-10-28 用户口径:「立项申请可以由管理员在审批定级的时候确定一个对接人进行分发，
             //   后续也默认是这个对接人，除非进行修改」⇒ 审批弹窗里一并选对接人,与定级同一动作完成分发。
-            // 载荷不带对接人则跳过(兼容旧前端/老单:仍可用侧栏「定级分发」补发)。
+            // 2026-11-17 用户口径(1117问题 #3):「冯总审核后直接跳转到秀丽分发，**不要下拉选择二级审核人**」
+            //   ⇒ 载荷没带对接人时**默认分发给陈秀丽**（chenxiuli），不再留空等人工补发；
+            //     已分发给别人的（旧单/改过）由前端把原值带上，不会被这里覆盖。
+            //   ⚠ 默认写在服务端而不只写前端：接口直连/旧前端/其他入口调审批也不会漏分发。
             String liaison = pickOf(formData, "对接人");
+            if (liaison.isEmpty()) liaison = RD_DEFAULT_LIAISON_ACCOUNT;
             if (!liaison.isEmpty()) assignLiaison(def.code(), no, liaison, operator);
         }
         // 测试申请单:审批时可以**一并分发测试负责人**(2026-10-29 用户口径
@@ -4362,6 +4379,21 @@ public class ButtonService {
      *       (「批准」格不再写,历史值保留)。</li>
      * </ul>
      */
+    /**
+     * 「数据记录表」一族（实验室 8 张：碱性/矿物质/抗菌/阻垢/RO保护/浸泡/滴落/功能性滤效）。
+     *
+     * <p>2026-11-17 用户口径（1117问题 #5）：「审核人需审核后生成，不能自动填充」。
+     * 这些表纸面表尾/头部有一格「审核人」（物理列 `表单审核人`），原先前端 docDefaults 建单就
+     * 预填「秀丽」⇒ 草稿态就已经"签了名"。现在：**审批通过时由本类回填、弃审/驳回时清空**，
+     * 前端不再预填（docDefaults 里那 8 条已删）。</p>
+     *
+     * <p>⚠ 物理列名是「表单审核人」—— 叫「审核人」的那一列会被 {@code save()} 的
+     * {@code body.remove("审核人")} 静默丢弃（那是 yj_doc_status.shr 的虚拟字段）。</p>
+     */
+    public static final java.util.Set<String> DATA_REC_AUDITOR_PANELS = java.util.Set.of(
+            "RD_ALKALINE", "RD_MINERAL", "RD_ANTIBACT", "RD_SCALE",
+            "RD_RO_PROTECT", "RD_SOAK", "RD_DROP_PREC", "RD_FILTER_EFF");
+
     public static final java.util.Set<String> SINGLE_LEVEL_INSP_PANELS =
             // QC_LINE_PATROL（成型车间巡线记录表）2026-11-17 追加：用户口径（Excel #13）
             //   「无审批流（要求程志/李光从账户写报表提交 → 刘磊账户审核）」
@@ -4529,6 +4561,25 @@ public class ButtonService {
      *   审核=一级审批通过的人、批准=超级管理员(出厂检验报告、首件/制程检验单纸面第一格印
      *   「检验员」/「检验人」,语义同为编制)。
      */
+    /**
+     * 立项申请审批通过后**自动分发**的对接人账号（2026-11-17 用户口径，1117问题 #3）：
+     * 「冯总审核后直接跳转到秀丽分发，不要下拉选择二级审核人」。
+     *
+     * <p>陈秀丽 = `chenxiuli`（研发审核角色；同时也是产品信息表的一级审核人）。</p>
+     */
+    private static final String RD_DEFAULT_LIAISON_ACCOUNT = "chenxiuli";
+
+    /**
+     * 组装工艺管控清单（RD_ASM_PROC）纸面「表单管理人」的**固定值**（2026-11-17 用户口径）：
+     * 「这个表单管理员应该是柴善银，是**固定的**」—— 覆盖 2026-10-28「=当前编辑人」那条。
+     *
+     * <p>⚠ 三处写入点必须同时固定，漏一处就会被"当前编辑人"覆盖回去：
+     * ① 前端 PanelxList 的 EDITOR_STAMP_FIELDS（纸面显示）；
+     * ② putEditorCols（空白草稿分支落库）；
+     * ③ saveDoc 末尾那段 UPDATE（正常保存落库）。</p>
+     */
+    private static final String ASM_PROC_FORM_MANAGER = "柴善银";
+
     private static final java.util.Set<String> TWO_LEVEL_PANELS = twoLevelPanels();
 
     /** 两级面板集合 = RD_PROD_INFO / RD_SAMPLE_EXT(一级选人)+ 质量单据一族(二级固定超级管理员) */
@@ -4711,10 +4762,81 @@ public class ButtonService {
     }
 
     /**
+     * 数据记录表：审批通过 → 回填纸面「表单审核人」= 审批通过人（2026-11-17 用户口径，1117问题 #5）。
+     *
+     * <p>用户原话：「审核人需审核后生成，不能自动填充」。原来前端建单即预填「秀丽」，
+     * 草稿态就有签名；现在只有**真正审批通过**这一步才写。</p>
+     */
+    private void writeDataRecAuditor(PanelRegistry.PanelDef def, String no, String account) {
+        String col = dataRecAuditorCol(def);
+        if (col == null || no == null || no.isBlank()) return;
+        try {
+            jdbc.update("UPDATE " + def.headTable()
+                    + " SET [" + col + "] = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    signNameOf(account), currentUserName(), no);
+        } catch (Exception e) {
+            log.warn("[数据记录表] 回填表单审核人失败 {} {}: {}", def.code(), no, e.toString());
+        }
+    }
+
+    /**
+     * 「表单审核人」这一格在**该面板**的物理列名。
+     *
+     * <p>⚠ 必须走 yj_field 元数据取 col_name，**不能直接写 `[表单审核人]`**：
+     * 实测这 8 张表的 label「表单审核人」映射到物理列 **`备用1`**
+     * （见 tools/migrate-rd-datarec-reviewer-2026-09-30.sql 把审核人落进备用列池）。
+     * 直接按 label 拼列名会报「列名无效」，而本方法外层是 try/catch ⇒ 会被静默吞掉，
+     * 表现为「审批通过了但纸面审核人还是空」——比报错更难查（2026-11-17 首次上线即踩到）。</p>
+     *
+     * @return 物理列名；面板不在集合内或该格未登记则 null
+     */
+    private String dataRecAuditorCol(PanelRegistry.PanelDef def) {
+        if (def == null || !DATA_REC_AUDITOR_PANELS.contains(def.code())) return null;
+        PanelRegistry.FieldDef f = def.byLabel("表单审核人");
+        if (f == null || f.col() == null || f.col().isBlank()) return null;
+        return f.col();
+    }
+
+    /**
+     * 按**字段 label** 写单格值（列名从 yj_field 元数据取，绝不拼 label）。
+     *
+     * <p>为什么要这个通用方法：本系统的纸面 label 与物理列常年不同名
+     * （数据记录表 表单审核人→备用1、组装工艺 审核人→备用3）。
+     * 直接按 label 拼列名会「列名无效」，而调用方多包 try/catch ⇒ 静默失败，极难查。</p>
+     */
+    private void writeFieldByLabel(PanelRegistry.PanelDef def, String no, String label, String value) {
+        if (def == null || no == null || no.isBlank() || def.headTable() == null) return;
+        PanelRegistry.FieldDef f = def.byLabel(label);
+        if (f == null || f.col() == null || f.col().isBlank()) return;
+        try {
+            jdbc.update("UPDATE " + def.headTable() + " SET [" + f.col() + "] = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", value, currentUserName(), no);
+        } catch (Exception e) {
+            log.warn("[签核格] 写 {} 失败 {} {}: {}", label, def.code(), no, e.toString());
+        }
+    }
+
+    /** 数据记录表：弃审/驳回 → 清空「表单审核人」（签名随审批作废，与 writeDataRecAuditor 成对） */
+    private void clearDataRecAuditor(PanelRegistry.PanelDef def, String no) {
+        String col = dataRecAuditorCol(def);
+        if (col == null || no == null || no.isBlank()) return;
+        try {
+            jdbc.update("UPDATE " + def.headTable() + " SET [" + col + "] = NULL"
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        } catch (Exception e) {
+            log.warn("[数据记录表] 清空表单审核人失败 {} {}: {}", def.code(), no, e.toString());
+        }
+    }
+
+    /**
      * 清「审核 / 批准」两格(驳回或弃审 → 回草稿:签名随审批作废)。
      * **编制格不清** —— 谁编的单没变;重新提交时会按新的提交人刷新。
      */
     private void clearAuditSignCells(PanelRegistry.PanelDef def, String no) {
+        // 数据记录表：签名随审批作废（1117问题 #5）。挂在**这个入口**而不是 4 个调用点，
+        // 是因为弃审/驳回/撤回共 4 条路都汇到这里，逐处挂必漏。
+        clearDataRecAuditor(def, no);
         if (def == null || (!QC_DOC_PREPARER.containsKey(def.code()) && !SINGLE_LEVEL_INSP_PANELS.contains(def.code()))) return;
         try {
             // ⚠ 2026-11-13:不能盲写「审批人/审批时间」—— 出货检验表观(qc_asm_insp_head)当年没有两级审批,

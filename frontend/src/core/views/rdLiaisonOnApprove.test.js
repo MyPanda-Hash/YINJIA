@@ -60,12 +60,18 @@ test('「定级分发」按钮的放行条件不再要求"对接人为空"（否
     'canGradeDispatch 里不能再带 liaison.isEmpty()')
 })
 
-test('审批弹窗带对接人下拉，并默认带出当前对接人', () => {
-  assert.match(panelx, /const apvLiaison = ref\(''\)/)
-  assert.match(panelx, /apvLiaison\.value = String\(rdFlow\.liaison \|\| ''\)/,
-    '打开弹窗要默认选中已有对接人（"后续也默认是这个对接人"）')
-  assert.match(panelx, /v-model="apvLiaison"/, '弹窗里要真的有这个控件')
+test('审批弹窗的对接人：2026-11-17 起固定陈秀丽（不再下拉选人）', () => {
+  // 2026-11-17 用户口径（1117问题 #3）：「冯总审核后直接跳转到秀丽分发，**不要下拉选择二级审核人**」
+  //   ⇒ 弹窗里改成固定文本，不再渲染 el-select；值仍随 formData 提交(后端另有兜底默认)。
+  assert.match(panelx, /const apvLiaison = ref\(''\)/, '提交用的 ref 仍保留')
+  assert.match(panelx, /const RD_DEFAULT_LIAISON = 'chenxiuli'/, '默认对接人 = 陈秀丽')
+  assert.match(panelx, /apvLiaison\.value = String\(rdFlow\.liaison \|\| RD_DEFAULT_LIAISON\)/,
+    '打开弹窗：已分发的沿用原值，新单默认 chenxiuli')
   assert.match(panelx, /对接人: apvLiaison\.value/, '提交时随 formData 发出去')
+  const at = panelx.indexOf("tt('审批通过并定级')")
+  const seg = panelx.slice(at, at + 2200)
+  assert.doesNotMatch(seg, /v-model="apvLiaison"[\s\S]{0,80}el-select/, '弹窗里不得再有对接人下拉')
+  assert.match(seg, /dq-fixed/, '改为固定文本展示')
 })
 
 // ── ② 研发管理员取消「保存即归档」，改走审批流 ──────────────────────────

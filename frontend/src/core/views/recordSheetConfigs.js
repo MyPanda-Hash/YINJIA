@@ -89,7 +89,7 @@ import { SPEC_TEST_LIB } from './specTestLib.js'
  *    见 tools/gen/gen-asm-proc-lib.cjs 的实测输出)。 */
 const RD_ASM_PROC_DT0 = [
       { lib: 'asm.proc',   // 标准库:组装工艺 4 变体(裸棒/机器包布/复合半成品/成品)
-        page: 2,
+        page: 1, // 2026-11-17 页序重排：工艺清单页（原 2）
         bar: '关键控制清单',
         filterKey: '表区', filterVal: '关键控制清单',
         // 工艺形态 已在「产品基本信息」区有一格(见 sections),表头不再重复一条变体切换行
@@ -130,7 +130,7 @@ const RD_ASM_PROC_DT0 = [
  *  由 dt.pageTitle 出居中标题(与 RD_SPEC_DOC 的「修订记录」页同一做法)。
  *  列宽按 1040 总宽配平(与另两页的报告头/表格同宽,打印时三页左右缘对齐)。 */
 const RD_ASM_PROC_DT_REVISION = {
-  page: 0,
+  page: 2, // 2026-11-17 页序重排：修订记录挪到最右（原 0）
   pageTitle: '修订记录',
   filterKey: '表区', filterVal: '修订记录',
   // 本页无「产品基本信息」区,变体切换行在这里既不驱动本页标题(本页出 pageTitle 居中大标题)
@@ -165,7 +165,7 @@ const RD_ASM_PROC_DT_REVISION = {
  *    (改 label 会同时漂移 RD_ASM_BOM/RD_SPEC_DOC 两处数据键,2026-09-18 已定不改;
  *     这里靠 yj_field.alias 在显示层改名,见 migrate-asm-proc-redesign-2026-09-20.sql §4)。 */
 const RD_ASM_PROC_DT_BOM = {
-  page: 1,
+  page: 0, // 2026-11-17 页序重排：BOM 表升为首个页签（原 1）
   bar: 'BOM表',
   filterKey: '表区', filterVal: '物料清单',
   // 本页有「产品基本信息」区且其中已有 工艺形态 一格 ⇒ 表头不再重复一条变体切换行
@@ -1195,9 +1195,12 @@ export const recordSheetConfigs = {
     // 受影响的只有跨这几条内部竖线的格子,且幅度极小(产品名称 170→175、炭棒规格1/2/3 70→70/78/77);
     // B:C/D:G/H:I/J:K 这些**块宽一分未动**,其它行的格子宽度逐像素不变。
     grid: [98, 68, 68, 64, 52, 58, 58, 75, 52, 94, 93],
-    // 2026-11-06 用户口径 A：烧结工艺清单（炭棒工艺管控清单）= YJ-QR-146-1（固定表单编号）
-    head: { title: 7, infoLabel: 2, infoValue: 2, docnoPrefix: '单据编号', docNoKey: '单据编号' },
-    docNoStatic: 'YJ-QR-146-1',
+    // 2026-11-17 用户口径(1117问题 #1)：右上角一律印**固定文件编号**、且前缀写「文件编号」
+    //   （用户原话「重新改-编号有变动 / **不要写单据编号**」）——不是单据号；
+    //   对照表给的是「烧结工艺管控清单 YJ-QR-146 / 烧结配方管控清单 YJ-QR-154」
+    //   ⇒ 去掉原来的 -1 后缀，并给第 2 页(配方管控清单)单独一个号(页级 docNoStatic 覆盖顶层)。
+    head: { title: 7, infoLabel: 2, infoValue: 2, docnoPrefix: '文件编号', docNoKey: '单据编号' },
+    docNoStatic: 'YJ-QR-146',
     // ── 页签:三页**各用各的原始版式**(合并时曾统一成 11 列并把页 2 跨列重排,已恢复原设计)──
     // showHead:true —— 页 1/页 2 原本都是**独立一张单据**(工艺管控清单 / 配方管控清单),各自有自己的报告头;
     // 并入同一张单后仍照原样各渲染各的报告头。页 0(修订记录)不出报告头:设计与组装那页一样,
@@ -1210,7 +1213,8 @@ export const recordSheetConfigs = {
     pages: [
       { title: '成型工艺清单', grid: [98, 68, 68, 64, 52, 58, 58, 75, 52, 94, 93], showHead: true },
       // 原页 3 的 13 列网格;报告头三段跨度合计 = 13,右缘与 产品基本信息/配方表/配料要求 平齐
-      { title: '成型配方', grid: [76, 45, 82, 64, 39, 39, 39, 110, 48, 48, 91, 58, 41], head: { title: 7, infoLabel: 2, infoValue: 4 }, showHead: true, staticTitle: '炭棒配方管控清单' },
+      // 页级 docNoStatic 覆盖顶层：这一页是「烧结配方管控清单」= YJ-QR-154（顶层给的是工艺管控清单 146）
+      { title: '成型配方', grid: [76, 45, 82, 64, 39, 39, 39, 110, 48, 48, 91, 58, 41], head: { title: 7, infoLabel: 2, infoValue: 4 }, showHead: true, staticTitle: '炭棒配方管控清单', docNoStatic: 'YJ-QR-154' },
       // 修订记录页不出报告头(设计只有一行居中大标题 + 一行表头,由 dt.pageTitle 出标题)
       { title: '修订记录', headMode: 'report', showHead: false, grid: [98, 68, 68, 64, 52, 58, 58, 75, 52, 94, 93] },
     ],
@@ -1317,9 +1321,10 @@ export const recordSheetConfigs = {
     ],
     grid: [81, 52, 88, 70, 50, 50, 57, 122, 60, 50, 50, 50],
     // 报告头三段跨度 7+2+3 = 12
-    // 2026-11-06 用户口径 A：X烧结工艺清单 = YJ-QR-146-1（截图里与烧结工艺清单同一个号）
-    head: { title: 7, infoLabel: 2, infoValue: 3, docnoPrefix: '单据编号', docNoKey: '单据编号' },
-    docNoStatic: 'YJ-QR-146-1',
+    // 2026-11-17 用户口径(1117问题 #1 对照表)：X烧结工艺清单 = **YJ-QR-157**
+    //   （11-06 那版按截图填了 146-1，与烧结工艺清单同号；本次按用户给的清单改正）
+    head: { title: 7, infoLabel: 2, infoValue: 3, docnoPrefix: '文件编号', docNoKey: '单据编号' },
+    docNoStatic: 'YJ-QR-157',
     pages: [
       { title: 'X烧结配方工艺管控清单', grid: [81, 52, 88, 70, 50, 50, 57, 122, 60, 50, 50, 50], showHead: true },
       // 修订记录页不出报告头(同 RD_MOLD_PROC 页2:只有居中大标题 + 一行表头,由 dt.pageTitle 出标题)
@@ -1552,7 +1557,7 @@ export const recordSheetConfigs = {
     // 2026-11-06 用户口径 A（截图「11.5 问题点汇总」第 1 条）：「产品文件右上角全部是文件编号，固定的」
     //   产品信息表 = YJ-QR-152。单据自身编号（PI-…）仍在左侧选单栏与产品文件列表里；
     //   两张单靠「产品编号」关联（用户口径：「单据之间就通过产品编号来关联就行和现在一样」）。
-    head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
+    head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '文件编号', docNoKey: '单据编号' },
     docNoStatic: 'YJ-QR-152',
     sections: [
       // 一、产品基本信息 = 设计 B25:E27 三行(产品编号|客户项目名称、客户料号|产品管控等级、产品功能类别|产品形态)
@@ -1594,7 +1599,10 @@ export const recordSheetConfigs = {
         //   原来是各占一整行(vspan:3),现在合成一对:左「产品形态」下拉、右「应用场景」文本。
         { pairs: [
           { label: '产品形态', key: '产品形态', type: 'select' },
-          { label: '应用场景', key: '应用场景', type: 'text' },
+          // 2026-11-17（1117问题 #7）：应用场景改成标准库下拉（元数据已 data_type=标准库/prod.scene，
+          //   见 migrate-prod-info-scene-stdlib-20261117.sql）。此处 type 必须同步改 select，
+          //   否则渲染层按 text 出纯输入框、标准库维护入口不出现（实测踩到）。
+          { label: '应用场景', key: '应用场景', type: 'select' },
         ]},
       ]},
       // 二、规格与尺寸:产品整体尺寸一行 + 炭棒尺寸一行(各整行,值区 vspan 3)
@@ -1612,16 +1620,22 @@ export const recordSheetConfigs = {
         // 2026-10-29 新版设计提示词改成「…±公差」口径(带公差是该格的实际填法);
         // 保留 2026-10-16 用户要的「33*12*110」示例作括号补充,两句话在同一行里都能看到。
         { pairs: [
-          { label: '产品整体尺寸', key: '产品整体尺寸', type: 'text', vspan: 3, ph: '（外径*内径*长）±公差，如 33*12*110±0.5' },
+          // 2026-11-17 用户口径（1117问题 #7，对照《产品信息表（固定）》目标版式）：
+          //   这一格按「外径±公差 / 内径±公差 / 长度±公差」三段写（目标版式里的红字提示）。
+          //   ⚠ 仍然**一格**：拆成三个物理列会破坏 `产品整体尺寸` 这个数据键
+          //     （devProduct.parseCarbonSize 按 外径*内径*长度 拆它、导入也写它），
+          //     所以用占位词把三段写法讲清楚，不动数据契约。
+          { label: '产品整体尺寸', key: '产品整体尺寸', type: 'text', vspan: 3,
+            ph: '外径±公差 / 内径±公差 / 长度±公差（例 33*12*110±0.5）' },
         ]},
         { pairs: [
-          // 2026-11-06 用户口径：「烧结工艺清单的炭棒规格的外、内、长、提示词去掉，到时候导入只有数字就行了」
-          //   —— 三格不再带 placeholder（外径mm±公差 / 内径mm±公差 / 长度mm±公差），
-          //   只留数字输入框：导入时直接写数字，不会被提示词误导成"要连单位一起填"。
+          // 2026-11-17（1117问题 #7）恢复三格提示词：目标版式这两行都是「外径±公差mm / 内径±公差mm /
+          //   长度±公差」三格并排。此前 2026-11-06 曾按「导入只有数字」去掉提示词，
+          //   本次用户重新给了带提示的版式 ⇒ 以新口径为准（填写体验优先，导入仍可直接写数字）。
           { label: '炭棒尺寸', cells: [
-            { key: '炭棒外径' },
-            { key: '炭棒内径' },
-            { key: '炭棒长度' },
+            { key: '炭棒外径', ph: '外径±公差mm' },
+            { key: '炭棒内径', ph: '内径±公差mm' },
+            { key: '炭棒长度', ph: '长度±公差' },
           ], vspan: 3 },
         ]},
       ]},
@@ -1691,6 +1705,11 @@ export const recordSheetConfigs = {
      *   materialPickLabel 只改纸面上的字,对应设计图右侧那句「直接导入采购物料清单」。
      *   数量不由引用带入(商品档案没有用量口径,凭空填 1 会是错数据)。
      */
+    // 2026-11-17 用户口径（1117问题 #7）：「（产品BOM表）默认就是新增一行数据行」
+    //   面板级 seedRows：进入草稿编辑且明细为空时自动铺 1 行（机制见 RecordSheetPanels 的
+    //   「明细预置(seedRows)」）。本面板明细只有 BOM 一张表，不存在"铺到别的页"的副作用
+    //   （多表面板才需要按表区分，见 RD_MOLD_PROC 那段的警告）。
+    seedRows: [{ 序号: 1 }],
     dataTables: [
       {
         tablesAfterBar: '三、产品BOM表',
@@ -1731,28 +1750,37 @@ export const recordSheetConfigs = {
     // 与成型工艺管控清单(RD_MOLD_PROC)同一套;字段见 migrate-asm-proc-redesign-2026-09-20.sql §3。
     grid: [130, 260, 130, 260],
     // 2026-11-06 用户口径 A：组装工艺清单 = YJ-QR-144（固定表单编号；单据号 AP-… 仍在选单栏/产品文件列表）
-    head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
+    head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '文件编号', docNoKey: '单据编号' },
     docNoStatic: 'YJ-QR-144',
     info: [
       // 2026-10-28 用户口径「组装工艺的表单管理人修改为编辑人的账号姓名」:
       //   只读,值 = 当前编辑人 —— 新建/选产品编号/编辑任何内容时由前端带入,
       //   保存时由后端 ButtonService 按登录人回写(见 docDefaults + PanelxList 的 EDITOR_STAMP_FIELDS)。
       { label: '表单管理人', key: '表单管理人', type: 'text', readonly: true },
+      // 2026-11-17 用户口径（1117问题 #6）：「增加一个审核人：**产品负责人审核后自动填充**」。
+      //   只读格（yj_field.editable=0，落库列 备用3，见 migrate-asm-proc-auditor-20261117.sql）；
+      //   值由 ButtonService 在**审批通过**时写入 = 审批通过人（签名+无日期，与同面板落款口径一致）。
+      { label: '审核人', key: '审核人', type: 'text', readonly: true },
       { label: '密级', key: '密级', type: 'text' },
       { label: '使用范围', key: '使用范围', type: 'text' },
       { label: '版本号', key: '版本号', type: 'text' },
     ],
+    // 2026-11-17 用户口径（1117问题 #6）：「修订记录放最右边」。
+    //   原页序 修订记录/BOM表/工艺清单 → **BOM表/工艺清单/修订记录**。
+    //   ⚠ 页序一变，下面 sections/dataTables 上的 `page:` 必须同步重编
+    //     （BOM 1→0、工艺 2→1、修订记录 0→2）；漏改一处的表现是"区块跑到别的页签"或整页空白。
     pages: [
-      // 页 0:设计 sheet「修订记录」只有 B6:G6 一行居中大标题 + B7 表头 ⇒ 不出报告头,
-      // 由 dt.pageTitle 出标题(RD_SPEC_DOC 的修订记录页即此做法)。
-      { title: '修订记录', headMode: 'report', showHead: false, grid: [130, 260, 130, 260] },
       { title: '组装BOM表', headMode: 'report', showHead: true, grid: [130, 260, 130, 260],
         staticTitle: '组装工艺控制-BOM表' },
       { title: '组装工艺清单', headMode: 'report', showHead: true, grid: [130, 260, 130, 260],
         staticTitle: '组装工艺控制-组装/包装关键控制清单' },
+      // 末页：设计 sheet「修订记录」只有 B6:G6 一行居中大标题 + B7 表头 ⇒ 不出报告头,
+      // 由 dt.pageTitle 出标题(RD_SPEC_DOC 的修订记录页即此做法)。
+      { title: '修订记录', headMode: 'report', showHead: false, grid: [130, 260, 130, 260] },
     ],
     // 设计两张表的 B9:G9 都是「产品基本信息」,格子相同 ⇒ 同一份声明给两页(各声明 page)。
-    sections: [RD_ASM_PROC_INFO_SEC(1), RD_ASM_PROC_INFO_SEC(2)],
+    // 页序重排后同步：BOM 页 = 0、工艺清单页 = 1（见上面 pages 的注释）
+    sections: [RD_ASM_PROC_INFO_SEC(0), RD_ASM_PROC_INFO_SEC(1)],
     // 4 个关键控制清单变体(设计《关键控制清单--标准库》4 个 sheet)各有各的纸面标题。
     // 变体内容**不在配置里** —— 内容源是 asm.proc 标准库(勾选即整表替换),
     // 这里只为"按头字段切标题"声明骨架;variants 的键必须与 工艺形态 字典 / asm.proc 的 item_code 一致。
@@ -2169,7 +2197,7 @@ export const recordSheetConfigs = {
     ],
     grid: [144, 144, 144, 144, 294, 165, 152],
     // 2026-11-06 用户口径 A：出货检验计划表 = YJ-QR-145（固定表单编号；单据号 IP-… 仍在选单栏）
-    head: { title: 5, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
+    head: { title: 5, infoLabel: 1, infoValue: 1, docnoPrefix: '文件编号', docNoKey: '单据编号' },
     docNoStatic: 'YJ-QR-145',
     // 表头三行照设计 r5/r6/r7 逐格对位(每行 3 对 = 7 格;产品编号/产品功能类别/编写人 的值格跨 C:D):
     //   r5 [产品编号 | 客户项目名称 | 使用范围]

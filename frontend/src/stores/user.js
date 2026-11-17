@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { apiLogin, apiGetUserInfo } from '@/business/api'
 import { pickCurrentFactory } from '@core/auth/factory'
+import { useTabsStore } from '@/stores/tabs'
 
 export const useUserStore = defineStore('user', {
   state: () => {
@@ -32,6 +33,12 @@ export const useUserStore = defineStore('user', {
       // 页面级虚拟面板的动作词(2026-10-16):订单结转/快速排产/工单排产/生产工单,code → perms csv。
       // 管理员=每码 '*'。判定走 core/auth/panelAccess.canDo(与后端 requireButton 同源)。
       pagePerms: ui?.pagePerms && typeof ui.pagePerms === 'object' ? ui.pagePerms : {},
+      // **单据面板**权限词（2026-11-17）：panel_code → perms csv。
+      // 为什么要它：pagePerms 只有页面级虚拟面板（看板/流程管控那批），
+      // 真实单据面板（RD_SPEC_DOC 等）不在里面 —— 产品文件列表的「批准」按钮
+      // 曾因此对非管理员恒不显示（数据库勾了 specapprove 也没用）。
+      // 只用于**显示层判显隐**；真闸门在服务端 PanelPermissionService。
+      panelPerms: ui?.panelPerms && typeof ui.panelPerms === 'object' ? ui.panelPerms : {},
       // 供应商会话(2026-10-24):后端在登录/会话还原时,凡 yj_supplier_account 里的账号都会把
       // visiblePanels 裁到只剩 SUPPLIER_PRINT 并下发 supplierCode(= 绑定的供应商编码)。
       // 前端据此把界面收成「供应商门户」(无侧栏、只有采购打印一页),路由守卫也认这个键。
@@ -69,6 +76,15 @@ export const useUserStore = defineStore('user', {
       localStorage.setItem('mes_token', res.token)
       localStorage.setItem('mes_user', JSON.stringify(res.user))
       localStorage.setItem('mes_login_date', today)
+      // 换账号必须清页签（2026-11-17 用户报障）：
+      //   「使用一个账号打开一些面板的时候，中途退出，切换账号进来的时候还是在对应的面板」。
+      //   根因不是路由（登出确实回 #/login、登录确实 replace('/dashboard')），而是
+      //   **pinia 的页签 store 活在内存里**：登出只清了 token/userInfo，tabs 与 active 原样留着，
+      //   PortalLayout 重新挂载后 TabsBar 仍渲染上一个账号的面板页签、并把 active 指回那一页。
+      //   closeAll() = 只留 affix（我的桌面）+ active='/dashboard'，正是换账号要的干净状态。
+      //   ⚠ 登出与登录**两处都清**：登出清是为了不留痕；登录清是为了兜住
+      //   「401 被动登出 / 直接改 localStorage / 另一个标签页登录」这些没走 logout() 的路径。
+      try { useTabsStore().closeAll() } catch { /* 无 pinia 实例（单测）时忽略 */ }
       // 账套以**登录响应**为准(后端把令牌声明里的 factory 一并返回):
       // 顶栏/桌面显示的名字必须等于"正在被查询的那个库",不能由可陈旧的缓存说了算。
       // 账套清单可能还没加载(直接调 API 登录的场景),先记 code,名字由 fetchFactories 补齐。
@@ -92,6 +108,7 @@ export const useUserStore = defineStore('user', {
       this.viewAllPanels = Array.isArray(u?.viewAllPanels) ? u.viewAllPanels : []
       this.selfAuditPanels = Array.isArray(u?.selfAuditPanels) ? u.selfAuditPanels : []
       this.pagePerms = u?.pagePerms && typeof u.pagePerms === 'object' ? u.pagePerms : {}
+      this.panelPerms = u?.panelPerms && typeof u.panelPerms === 'object' ? u.panelPerms : {}
       this.supplierCode = typeof u?.supplierCode === 'string' ? u.supplierCode : ''
       this.supplierName = u?.supplierName || ''
       this.canConfigSupplierAccount = !!u?.canConfigSupplierAccount
@@ -112,6 +129,9 @@ export const useUserStore = defineStore('user', {
       this.warnPanels = Array.isArray(p.warnPanels) ? p.warnPanels : []
       this.selfAuditPanels = Array.isArray(p.selfAuditPanels) ? p.selfAuditPanels : []
       this.pagePerms = p.pagePerms && typeof p.pagePerms === 'object' ? p.pagePerms : {}
+      // 同 fetchPerms 的其它字段：后端 /perms 一并下发，缺了这里会导致
+      // 「点一次刷新权限，规格书批准按钮消失」（2026-11-17）
+      this.panelPerms = p.panelPerms && typeof p.panelPerms === 'object' ? p.panelPerms : this.panelPerms || {}
       this.supplierCode = typeof p.supplierCode === 'string' ? p.supplierCode : ''
       this.supplierName = p.supplierName || ''
       // /auth/perms 不下发该布尔位时保持原值(只有登录/userinfo 是它的真源)
@@ -119,7 +139,7 @@ export const useUserStore = defineStore('user', {
       this.supplierPanelPerms = p.supplierPanelPerms && typeof p.supplierPanelPerms === 'object' ? p.supplierPanelPerms : {}
       if (p.supplierCode !== undefined) this.supplierCode = typeof p.supplierCode === 'string' ? p.supplierCode : this.supplierCode
       if (this.userInfo) {
-        this.userInfo = { ...this.userInfo, roleCode: this.roleCode, isAdmin: this.isAdmin, visiblePanels: this.visiblePanels, approvePanels: this.approvePanels, fieldPanels: this.fieldPanels, warnPanels: this.warnPanels, selfAuditPanels: this.selfAuditPanels, pagePerms: this.pagePerms, supplierCode: this.supplierCode, supplierName: this.supplierName, canConfigSupplierAccount: this.canConfigSupplierAccount, supplierPanelPerms: this.supplierPanelPerms }
+        this.userInfo = { ...this.userInfo, roleCode: this.roleCode, isAdmin: this.isAdmin, visiblePanels: this.visiblePanels, approvePanels: this.approvePanels, fieldPanels: this.fieldPanels, warnPanels: this.warnPanels, selfAuditPanels: this.selfAuditPanels, pagePerms: this.pagePerms, panelPerms: this.panelPerms, supplierCode: this.supplierCode, supplierName: this.supplierName, canConfigSupplierAccount: this.canConfigSupplierAccount, supplierPanelPerms: this.supplierPanelPerms }
         localStorage.setItem('mes_user', JSON.stringify(this.userInfo))
       }
     },
@@ -173,12 +193,16 @@ export const useUserStore = defineStore('user', {
       this.warnPanels = []
       this.selfAuditPanels = []
       this.pagePerms = {}
+      this.panelPerms = {}
       this.supplierCode = ''
       this.supplierName = ''
       this.canConfigSupplierAccount = false
       this.supplierPanelPerms = {}
       localStorage.removeItem('mes_token')
       localStorage.removeItem('mes_user')
+      // 页签一并清空（同 login() 的注释）：否则同一浏览器里换账号会继承上一个账号的页签与 active，
+      // 表现就是「切换账号进来还停在原来那个面板」。
+      try { useTabsStore().closeAll() } catch { /* 无 pinia 实例（单测）时忽略 */ }
     },
 
   },

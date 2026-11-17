@@ -43,17 +43,22 @@ test('① 走报告头的 5 张都在配置里,产品文件列表是自定义视
 })
 
 test('② 报告头那格的标识声明为「单据编号」(不是缺省的「编号」)', () => {
-  // ⚠ 2026-11-11 例外：产品变更申请表(RD_CHANGE)按用户口径
-  //   「文件编码挪到右上角，替换单据编号，而且是固定的」——
-  //   那格改为印**受控表单编号** YJ-QR-130（docNoStatic），标识文案随之改成「文件编码」。
-  //   它不再是"本单单据号"，所以不适用本条规则；其余 4 张保持不变。
+  // 2026-11-17 用户口径（1117问题 #1）：「重新改-编号有变动 / **不要写单据编号**」
+  //   ⇒ 规则改为按"这一格印什么"分流：
+  //     · 声明了 docNoStatic（受控表单编号，如 YJ-QR-152）→ 标识必须是「文件编号」；
+  //     · 没声明（仍印本单单号）→ 保持「单据编号」（缺省 true 会印「编号：」，也不行）。
+  //   2026-11-11 曾把 RD_CHANGE 单独列为例外，现在这条规则把它也覆盖了（不必再写例外）。
   const EXEMPT_FIXED_CODE = new Set(['RD_CHANGE'])
   const problems = []
   for (const p of NEEDS_HEAD) {
-    if (EXEMPT_FIXED_CODE.has(p)) continue
-    const v = recordSheetConfigs[p].head?.docnoPrefix
-    if (v !== '单据编号') {
-      problems.push(`${p} head.docnoPrefix=${JSON.stringify(v)},应为 '单据编号'(缺省 true 会印「编号：」)`)
+    const cfg = recordSheetConfigs[p]
+    const v = cfg.head?.docnoPrefix
+    const want = cfg.docNoStatic ? '文件编号' : '单据编号'
+    // RD_CHANGE 走「文件编码」的既有口径，保持不动
+    const expected = EXEMPT_FIXED_CODE.has(p) ? '文件编码' : want
+    if (v !== expected) {
+      problems.push(`${p} head.docnoPrefix=${JSON.stringify(v)},应为 ${JSON.stringify(expected)}`
+        + (cfg.docNoStatic ? `（该面板已声明 docNoStatic=${cfg.docNoStatic}）` : ''))
     }
   }
   assert.deepEqual(problems, [], '\n' + problems.join('\n'))

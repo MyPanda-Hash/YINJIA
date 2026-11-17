@@ -176,7 +176,11 @@ export function buildFlow(p, names = {}, now = '') {
   const candidateText = candidates.length
     ? candidates.slice(0, 3).map((c) => `${s(c.no)}${s(c.docNo) ? `（文档编号 ${s(c.docNo)}）` : '（文档编号空）'}`).join('、')
     : ''
-  put('planFill', !!plan && planned > 0, {
+  // 2026-11-17：已归档/已审核的实施计划**必然填过**（否则它不可能被提交归档）。
+  // 这与 planned>0 是两条互证的证据，取或关系 —— 防「计划字段口径再变一次」时流程又自相矛盾
+  // （原故障：第 7 步"未开始"，第 9 步"已归档"）。
+  const planFilled = !!plan && (planned > 0 || s(planSt.archived) === 'Y' || !!s(planSt.shr))
+  put('planFill', planFilled, {
     at: plan ? plan.updatedAt : '',
     actor: plan ? person(plan.createdBy, names) : '',
     detail: !plan
@@ -185,13 +189,13 @@ export function buildFlow(p, names = {}, now = '') {
         : '责任人确认收到后系统自动建计划草稿；尚未建单')
       : planned > 0
         ? `计划 ${planNo}：已填 ${planned} 个阶段${Number(plan.doneStages || 0) > 0 ? `（已完成 ${plan.doneStages}）` : ''}`
-        : `计划 ${planNo} 已建单，阶段内容还没填`,
+        : `计划 ${planNo}：已提交归档（阶段按 计划内容/计划开始/计划完成/责任人 任一填写即算已填）`,
   })
 
   // ⑧ 提交审批(计划)
   const planSubmit = lastTrail(trail, 'RD_PLAN', 'SUBMIT')
   const planSubmitted = !!planSubmit || s(planSt.pending) === 'Y' || !!s(planSt.shr) || s(planSt.archived) === 'Y'
-  put('planSubmit', !!(plan && planned > 0 && planSubmitted), {
+  put('planSubmit', !!(planFilled && planSubmitted), {
     at: planSubmit ? planSubmit.at : s(planSt.pendingAt) || s(planSt.shsj),
     actor: planSubmit ? person(planSubmit.operator, names) : person(planSt.pendingBy, names),
     detail: s(planSt.pending) === 'Y' ? `提交人：${person(planSt.pendingBy, names) || '-'}，待审批`
