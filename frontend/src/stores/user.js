@@ -32,6 +32,12 @@ export const useUserStore = defineStore('user', {
       // 页面级虚拟面板的动作词(2026-10-16):订单结转/快速排产/工单排产/生产工单,code → perms csv。
       // 管理员=每码 '*'。判定走 core/auth/panelAccess.canDo(与后端 requireButton 同源)。
       pagePerms: ui?.pagePerms && typeof ui.pagePerms === 'object' ? ui.pagePerms : {},
+      // **单据面板**权限词（2026-11-17）：panel_code → perms csv。
+      // 为什么要它：pagePerms 只有页面级虚拟面板（看板/流程管控那批），
+      // 真实单据面板（RD_SPEC_DOC 等）不在里面 —— 产品文件列表的「批准」按钮
+      // 曾因此对非管理员恒不显示（数据库勾了 specapprove 也没用）。
+      // 只用于**显示层判显隐**；真闸门在服务端 PanelPermissionService。
+      panelPerms: ui?.panelPerms && typeof ui.panelPerms === 'object' ? ui.panelPerms : {},
       // 供应商会话(2026-10-24):后端在登录/会话还原时,凡 yj_supplier_account 里的账号都会把
       // visiblePanels 裁到只剩 SUPPLIER_PRINT 并下发 supplierCode(= 绑定的供应商编码)。
       // 前端据此把界面收成「供应商门户」(无侧栏、只有采购打印一页),路由守卫也认这个键。
@@ -92,6 +98,7 @@ export const useUserStore = defineStore('user', {
       this.viewAllPanels = Array.isArray(u?.viewAllPanels) ? u.viewAllPanels : []
       this.selfAuditPanels = Array.isArray(u?.selfAuditPanels) ? u.selfAuditPanels : []
       this.pagePerms = u?.pagePerms && typeof u.pagePerms === 'object' ? u.pagePerms : {}
+      this.panelPerms = u?.panelPerms && typeof u.panelPerms === 'object' ? u.panelPerms : {}
       this.supplierCode = typeof u?.supplierCode === 'string' ? u.supplierCode : ''
       this.supplierName = u?.supplierName || ''
       this.canConfigSupplierAccount = !!u?.canConfigSupplierAccount
@@ -119,7 +126,7 @@ export const useUserStore = defineStore('user', {
       this.supplierPanelPerms = p.supplierPanelPerms && typeof p.supplierPanelPerms === 'object' ? p.supplierPanelPerms : {}
       if (p.supplierCode !== undefined) this.supplierCode = typeof p.supplierCode === 'string' ? p.supplierCode : this.supplierCode
       if (this.userInfo) {
-        this.userInfo = { ...this.userInfo, roleCode: this.roleCode, isAdmin: this.isAdmin, visiblePanels: this.visiblePanels, approvePanels: this.approvePanels, fieldPanels: this.fieldPanels, warnPanels: this.warnPanels, selfAuditPanels: this.selfAuditPanels, pagePerms: this.pagePerms, supplierCode: this.supplierCode, supplierName: this.supplierName, canConfigSupplierAccount: this.canConfigSupplierAccount, supplierPanelPerms: this.supplierPanelPerms }
+        this.userInfo = { ...this.userInfo, roleCode: this.roleCode, isAdmin: this.isAdmin, visiblePanels: this.visiblePanels, approvePanels: this.approvePanels, fieldPanels: this.fieldPanels, warnPanels: this.warnPanels, selfAuditPanels: this.selfAuditPanels, pagePerms: this.pagePerms, panelPerms: this.panelPerms, supplierCode: this.supplierCode, supplierName: this.supplierName, canConfigSupplierAccount: this.canConfigSupplierAccount, supplierPanelPerms: this.supplierPanelPerms }
         localStorage.setItem('mes_user', JSON.stringify(this.userInfo))
       }
     },
@@ -173,6 +180,7 @@ export const useUserStore = defineStore('user', {
       this.warnPanels = []
       this.selfAuditPanels = []
       this.pagePerms = {}
+      this.panelPerms = {}
       this.supplierCode = ''
       this.supplierName = ''
       this.canConfigSupplierAccount = false

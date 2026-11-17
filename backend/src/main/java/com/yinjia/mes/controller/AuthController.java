@@ -130,6 +130,14 @@ public class AuthController {
             // 本人自审权限面板(2026-10-28):管理员=全部;普通用户=角色勾了「本人自审」的面板。
             // 前端据此把「审批通过」对提交人本人放开;真闸门 ButtonService.canSelfAudit(同词)。
             user.put("selfAuditPanels", selfAuditPanelsFull(admin, u.get("role_id"), username));
+            // 单据面板权限词（2026-11-17 修「规格书批准按钮不见了」）：
+            //   pagePerms 只覆盖 PagePanelRegistry 的**页面级虚拟面板**（看板/流程管控那批），
+            //   真实单据面板（RD_SPEC_DOC 等）从来不在里面 —— 而 ProductDocListSheet 的
+            //   canApprove() 读的正是 pagePerms.RD_SPEC_DOC ⇒ 恒 undefined ⇒ 非管理员永远
+            //   看不到那颗「批准」按钮（哪怕库里已勾了 specapprove 词）。
+            //   这里补一张**角色已授权面板**的 code → perms 全表；管理员给 "*"。
+            //   只读下发、不改任何闸门：真闸门仍是 PanelPermissionService（服务端逐词判定）。
+            user.put("panelPerms", panelPermsOf(admin, u.get("role_id")));
             // 页面级面板权限词(2026-10-16):订单结转/快速排产/工单排产/生产工单四个**看板页面**不是
             // 单据面板,按钮不能走面板元数据(yj_button)—— 由本表下发 code → perms csv,前端 canDo 判显隐;
             // 真闸门在服务端 PanelPermissionService.requirePanelView/requireButton(同一份 yj_role_panel.perms)。
@@ -311,6 +319,8 @@ public class AuthController {
         // 本人自审(2026-10-28):管理员=全部;普通用户 = 角色勾了「本人自审」的面板 ∪「我是唯一审批人」的面板。
         // 前端据此把「审批通过」对**提交人本人**放开(展示层);真闸门在 ButtonService.canSelfAudit(同一判据)。
         user.put("selfAuditPanels", selfAuditPanelsFull(admin, u.get("role_id"), username));
+        // 单据面板权限词（同 login()：pagePerms 不含真实单据面板，见 panelPermsOf 注释）
+        user.put("panelPerms", panelPermsOf(admin, u.get("role_id")));
         user.put("pagePerms", pagePermsOf(admin, u.get("role_id")));
         // 供应商权限配置(2026-10-25):与 {@link #login} 同源下发,否则刷新页面后入口又消失
         boolean canConfigSupplier = !admin && canConfigSupplierAccount(u.get("role_id"));
@@ -429,6 +439,35 @@ public class AuthController {
      * 管理员 = 每个页面面板都给 `*`(通配"全部动作",与 fieldPanels 的 admin 口径一致)。
      * 未授权的页面给空串(前端按"拿不到权限 = 不放行"处理,宁可看不到按钮也别点出 403)。
      */
+    /**
+     * 角色已授权的**单据面板**权限词：panel_code → perms csv。
+     *
+     * <p>为什么另开一个方法（2026-11-17）：{@link #pagePermsOf} 只遍历
+     * {@code PagePanelRegistry.codes()}（页面级虚拟面板：我的桌面/订单结转/快速排产/流程管控…），
+     * 真实单据面板（RD_SPEC_DOC / QC_FIRST_INSP …）**一个都不在里面**。
+     * 而产品文件列表的「批准」按钮按 {@code pagePerms.RD_SPEC_DOC} 判显隐 ⇒ 恒为空 ⇒
+     * 非管理员看不到按钮，与数据库里勾没勾 specapprove 无关（本次报障的真正根因）。</p>
+     *
+     * <p>管理员给 {@code {"*":"*"}}（与 pagePerms 的 admin 口径一致，前端 isAdmin 分支仍保留）。</p>
+     *
+     * <p>⚠ 只用于**显示层判显隐**；任何写操作的闸门必须在服务端
+     * {@code PanelPermissionService.requireAnyPerm/requireButton} 再判一次。</p>
+     */
+    private Map<String, Object> panelPermsOf(boolean admin, Object roleId) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        if (admin) {
+            out.put("*", "*");
+            return out;
+        }
+        if (roleId == null) return out;
+        for (Map<String, Object> r : jdbc.queryForList(
+                "SELECT panel_code, perms FROM yj_role_panel WHERE role_id = ?", roleId)) {
+            Object perms = r.get("perms");
+            out.put(String.valueOf(r.get("panel_code")), perms == null ? "" : String.valueOf(perms));
+        }
+        return out;
+    }
+
     private Map<String, Object> pagePermsOf(boolean admin, Object roleId) {
         Map<String, String> granted = new HashMap<>();
         if (!admin && roleId != null) {
