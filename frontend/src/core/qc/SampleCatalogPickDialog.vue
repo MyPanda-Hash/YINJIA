@@ -55,7 +55,7 @@
     >
       <el-table-column type="selection" width="42" reserve-selection />
       <el-table-column :label="tt('检测元素')" prop="检测元素" width="116" show-overflow-tooltip />
-      <el-table-column :label="tt('内部检出限')" prop="内部检出限" width="110" show-overflow-tooltip />
+      <el-table-column :label="tt('标准方法检出限')" prop="标准方法检出限" width="130" show-overflow-tooltip />
       <el-table-column :label="tt('检测误差')" prop="检测误差" width="88" show-overflow-tooltip />
       <el-table-column :label="tt('测试方法')" prop="测试方法" width="96" show-overflow-tooltip />
       <el-table-column :label="tt('测试周期')" prop="测试周期" width="88" show-overflow-tooltip />
@@ -96,7 +96,7 @@ const PANEL_CODE = 'SAMPLE_REG'
 /** 前端搜索命中的列(契约 §4.2:检测元素 / 测试方法 / 检测标准) */
 const SEARCH_KEYS = ['检测元素', '测试方法', '检测标准']
 /** 目录行 → 检验委托单行表对象的键(= 行表 yj_field.label;「收费」的 label 带单位,见 §3.3) */
-const ROW_KEYS = ['检测元素', '内部检出限', '检测误差', '测试方法', '测试周期', '收费（一个样/元）', '检测标准', '检测标准备注']
+const ROW_KEYS = ['检测元素', '标准方法检出限', '检测误差', '测试方法', '测试周期', '收费（一个样/元）', '检测标准', '检测标准备注']
 /** 「收费」可能出现的两种键(目录是档案面板,历史/新库都认) */
 const FEE_KEYS = ['收费（一个样/元）', '收费']
 

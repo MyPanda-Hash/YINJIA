@@ -4938,10 +4938,16 @@ migrate-mix-batch-20261118.sql
 #   新建单据默认带入当前登录人姓名(ButtonService.putSenderDefault/…InHead);两账套已执行;幂等
 migrate-insp-commission-sender-20261117.sql
 
+# 2026-11-17 送样登记表(SAMPLE_REG)内部检测目录改版:整批换成「提供系统更新版2026.11.17.xls」(54 项 + 外送部分 = 55 行);
+#   「内部检出限」数据键改名为「标准方法检出限」(物理列沿用,同「收费」的 label≠col 先例);「检测误差」全表清空;
+#   「硬度」被「总硬度」取代(置作废);en 译名 1 条;两账套已执行;幂等(按 检测元素 逐行 upsert)
+migrate-sample-catalog-rev-20261117.sql
+
 # 2026-11-17 样品检验汇总表(页面级虚拟面板 INSP_SUMMARY;用户口径「按一个时间范围,去导出有多少人
 #   送了啥样品测试啥,安排检测工作」):授权给能看检验委托单/送样登记表的角色(view,query,export)+ 面板名
 #   10 语言译名;页面 /qc/inspSummary,取数 POST /api/px/inspSummary/summary(只读现算);两账套已执行;幂等
 migrate-insp-summary-20261117.sql
+
 # 2026-11-17 紧急放行申请单 QC_JJF(YJ-QR-92)版面改造 + 二级审批落地:
 #   ① qc_jjf 补 [责任部门](=责任人所属部门,后端自动写,纸面只读);② 物料编码 参照→文本(手动录入);
 #   ③ 责任人/单据日期 置只读(自动生成填写人员与时间);④ 「三、检测结果」字段注销(物理列保留);
