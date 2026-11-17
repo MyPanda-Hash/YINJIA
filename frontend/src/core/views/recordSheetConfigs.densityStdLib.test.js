@@ -44,7 +44,9 @@ test('① 密度管控要求 = 标准库下拉格（type:select ⇒ 才有下拉
   assert.equal(hit.length, 1, 'RD_MOLD_PROC 里应有且只有一个「密度管控要求」数据格')
   assert.equal(hit[0].type, 'select',
     '必须是 select：「标准库设置选项」在纸面上就落在这个分支（普通文本框只有 ⌄标准库 勾选，没有维护入口）')
-  assert.equal(hit[0].span, 2, '版式宽度不变（原值）')
+  // 2026-11-17 Excel #6：span 2→4 —— 该行原只用 11 列、后 2 列（85+128=213px）空着，
+  // 「管控要求」只有 173px 装不下标准库下拉的完整文本（截图中被截成 `*密度下限外0…`）。
+  assert.equal(hit[0].span, 4, '与标签格「管控要求」同宽（4 列），整行 1+4+4+4=13 铺满')
   assert.equal(hit[0].ph, '密度范围：~', '占位符不变（标准库条目照这个形状写）')
 })
 
@@ -76,7 +78,9 @@ test('④ 纸面配置里 密度管控要求 仍挂在「密度管控」块的�
   assert.ok(labelIdx > 0, '应有「密度管控」块名标签格（rowspan 2）')
   assert.ok(keyIdx > labelIdx, '「密度管控要求」数据格应在块名标签格之后')
   const between = src.slice(labelIdx, keyIdx)
-  assert.match(between, /label: '管控要求', span: 2/, '「管控要求」标签格仍在（与值格同列对齐）')
+  // 2026-11-17 Excel #6：span 本该 2 → 4 —— 该行原只用 11 列、后 2 列（85+128=213px）空着，
+  // 「管控要求」只有 173px 装不下标准库下拉的完整文本（截图中被截成 `*密度下限外0…`）。
+  assert.match(between, /label: '管控要求', span: 4/, '「管控要求」标签格仍在（与值格同列对齐）')
   assert.equal((between.match(/\{ grid: \[/g) || []).length, 1,
     '标签行与值行之间只隔一次换行 —— 值格不许被搬出「密度管控」块')
 })

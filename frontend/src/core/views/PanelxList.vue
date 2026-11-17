@@ -3003,12 +3003,28 @@ const changeSigners = computed(() => String(cur.value?.['会签人'] ?? '')
 const iAmChangeSigner = computed(() => changeSigners.value.includes(String(user.account || user.userName || '')))
 const isChangeInitiator = computed(() => user.isAdmin === true
   || (!!user.realName && String(cur.value?.['申请人'] ?? '') === String(user.realName)))
+/** 内部样品单的月份标题前缀：`2026年11月内部`（优先单号里的年月，退回当前月） */
+const sampleMonthTitle = computed(() => {
+  const no = String(cur.value?.['单据编号'] || curDocNo.value || '')
+  const m = no.match(/(\d{4})-(\d{2})-/)
+  const now = new Date()
+  const y = m ? m[1] : String(now.getFullYear())
+  const mo = m ? String(Number(m[2])) : String(now.getMonth() + 1)
+  return `${y}年${mo}月内部`
+})
 const docSheetConfig = computed(() => {
   // 2026-11-06 样品二级目录两张单（各自版式，见 docSheetConfigs 的 sampleExt/IntSheetCfg）
   // 非开发样品申请单（2026-11-17 Excel #14）：用户口径「复制一份样品-外部开发样品单页面及入口」
   //   ⇒ 纸面版式**逐字复用** sampleExtSheetCfg，不另写一套。
   if (panelCode.value === 'RD_SAMPLE_EXT' || panelCode.value === 'RD_SAMPLE_ND') return sampleExtSheetCfg
-  if (panelCode.value === 'RD_SAMPLE_INT') return sampleIntSheetCfg
+  // 2026-11-17 用户口径（Excel #4 第 3 条）：
+  //   「新增单据时默认填充 ****年**月 内部（开发样品申请单） 表名称」
+  //   ⇒ 标题前半段按**这张单所属月份**动态生成（A1 是每月一张单，所以标题也跟着月度走）。
+  //   月份优先从单号 SPN-YYYY-MM-NNNN 取（头表 单据日期 常为空，实测 SPN-2026-11-0004/0005 都是 null），
+  //   取不到再落到当前月 —— 新建未保存时就是当前月，符合"新增时默认填充"。
+  if (panelCode.value === 'RD_SAMPLE_INT') {
+    return { ...sampleIntSheetCfg, titlePart1: sampleMonthTitle.value }
+  }
   return qcSheetCfgs[panelCode.value] || (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg)
 })
 

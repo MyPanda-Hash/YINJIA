@@ -383,9 +383,14 @@ const RD_MOLD_PROC_SEC0 = [
           { key: '内径mm', span: 2 },
           { key: '内径公差', span: 3 },
         ]},
+        // 2026-11-17 Excel #6「密度管控-管控要求下面的内容显示不完全」（截图中红箭头指向该格，
+        //   显示成 `*密度下限外0…` 被截断）。
+        //   根因：本行 span 只用了 11 列，**后 2 列（85+128=213px）空着没用**，
+        //   而「管控要求」只有 span2≈173px —— 装不进一个标准库下拉的完整文本。
+        //   改 span 2→4（≈355px），整行 1+4+4+4=13 列正好铺满，下限/上限各 4 列不变。
         { grid: [
           { label: '密度管控', rowspan: 2 },
-          { label: '管控要求', span: 2 },
+          { label: '管控要求', span: 4 },
           { label: '实际密度管控下限', span: 4 },
           { label: '实际密度管控上限', span: 4 },
         ]},
@@ -398,7 +403,9 @@ const RD_MOLD_PROC_SEC0 = [
           //   (新增/编辑/停用走 StdLibManager,不用找开发)。
           //   ⚠ 旁边两格「实际密度管控下限/上限」**故意不动**:用户口径「两个区域不变动」,
           //     它们仍是手填的密度值,计算只吃这两格(core/mold/recipeSheet.js paramsFromHead)。
-          { key: '密度管控要求', span: 2, ph: '密度范围：~', type: 'select' },
+          // span 与上方标签格「管控要求」一致（2→4，2026-11-17 Excel #6）：
+          //   标签 2 列而值 4 列会错位；两边同宽才不会出现"标签在左、输入框跑到别处"。
+          { key: '密度管控要求', span: 4, ph: '密度范围：~', type: 'select' },
           { key: '实际密度管控下限', span: 4 },
           { key: '实际密度管控上限', span: 4 },
         ]},
@@ -508,12 +515,14 @@ const RD_MOLD_FORMULA = {
           // el-select(remote + filterable + allow-create):打字才联网、候选封顶 50、档案里没有的编码照旧能手打;
           // 选中后仍走 onDetailTextCommit 把 物料名称/物料种类 一并带出。口径见 core/panel/invCarry.js。
           { key: '物料编号', label: '物料编号', span: 4, w: 181, type: 'inv-code' },
-          { key: '物料名称', label: '物料名称', span: 3, w: 172 },
+          { key: '物料名称', label: '物料名称', span: 3, w: 164 },
           // 2026-11-17：三列都显式给宽（原来只靠 span 分 grid 余量，设计添加量只剩 41px）
           //   58px 可容 `100.00%`（最长）；单支含量给 66px 容 `77.04`；比例给 91px 不变。
           { key: '实际添加比例', label: '实际添加\n比例%', w: 91 },
           { key: '单支物料含量', label: '单支\n物料含量g', w: 66 },
-          { key: '设计添加量', label: '设计添加\n量', w: 62 },
+          // 70px：容得下最长值 `100.00%`（7 字符 ≈49px）+ 内边距 + 居中余量。
+          // 2026-11-17 Excel #8 截图里这一列只有 41px ⇒ `5.70%` 被压成 5/7./0/0/% 五竖行。
+          { key: '设计添加量', label: '设计添加\n量', w: 70 },
         ]},
     ],
     tailSections: [
