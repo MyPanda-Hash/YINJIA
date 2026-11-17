@@ -1,0 +1,40 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== 01-survey.sql ==
+  | 1 | id | bigint | 8 | 19 | 0 | 0 | 
+  | 2 | 单据编号 | nvarchar | 120 | 0 | 0 | 1 | 
+  | 3 | 工单号 | nvarchar | 120 | 0 | 0 | 1 | 
+  | 4 | 工单行id | bigint | 8 | 19 | 0 | 1 | 
+  | 5 | 工单行号 | int | 4 | 10 | 0 | 1 | 
+  | 6 | 配方单号 | nvarchar | 120 | 0 | 0 | 1 | 
+  | 7 | 配方版本 | nvarchar | 60 | 0 | 0 | 1 | 
+  | 8 | 序号 | nvarchar | 40 | 0 | 0 | 1 | 
+  | 9 | 物料种类 | nvarchar | 100 | 0 | 0 | 1 | 
+  | 10 | 物料编号 | nvarchar | 120 | 0 | 0 | 1 | 
+  | 11 | 物料名称 | nvarchar | 200 | 0 | 0 | 1 | 
+  | 12 | 配料比 | decimal | 9 | 18 | 8 | 1 | 
+  | 13 | 单支物料含量 | decimal | 9 | 18 | 8 | 1 | 
+  | 14 | 设计添加量 | decimal | 9 | 18 | 8 | 1 | 
+  | 15 | 计划用量 | decimal | 9 | 18 | 8 | 1 | 
+  | 16 | 实际用量 | decimal | 9 | 18 | 8 | 1 | 
+  | 17 | 标记 | nvarchar | 60 | 0 | 0 | 1 | 
+  | 18 | asp_user1 | nvarchar | 40 | 0 | 0 | 1 | 
+  | 19 | asp_time1 | datetime | 8 | 23 | 3 | 1 | 
+  | 20 | asp_user2 | nvarchar | 40 | 0 | 0 | 1 | 
+  | 21 | asp_time2 | datetime | 8 | 23 | 3 | 1 | 
+  | 22 | asp_user3 | nvarchar | 40 | 0 | 0 | 1 | 
+  | 23 | asp_time3 | datetime | 8 | 23 | 3 | 1 | 
+  | 24 | asp_cancel | varchar | 1 | 0 | 0 | 1 | 
+  | 25 | asp_user4 | nvarchar | 40 | 0 | 0 | 1 | 
+  | 26 | asp_time4 | datetime | 8 | 23 | 3 | 1 | 
+  | 27 | asp_print | int | 4 | 10 | 0 | 1 | 
+  | 28 | 物料批次 | nvarchar | 120 | 0 | 0 | 1 | 
+  | 0 | 0 | 
+  | 429 | GD-2026-10-0222 | 1 | S062 | A+级烧结炭棒/滤芯 | null | 5.0 | null | 
+  | 428 | GD-2026-10-0221 | 1 | S031-1 | S阻垢炭棒/滤芯 | 1号车间 | 100.0 | null | 
+  | 427 | GD-2026-10-0220 | 2 | S032-3 | S阻垢炭棒/滤芯 | null | 60.0 | null | 
+  | id | 
+  | role_id | 
+  | panel_code | 
+  | can_approve | 
+  | perms | 
+[OK] 01-survey.sql (1 batches)

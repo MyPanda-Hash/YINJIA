@@ -1,16 +1,17 @@
 /**
- * mixScan.test.js — 扫码混料纯逻辑单测(2026-11-18)
+ * mixScan.test.js — 扫码混料纯逻辑单测(2026-11-18;第四轮随两页结构改版)
  *
  * 每条断言都指向具体生产逻辑,改坏必红:
  *   · parseWorkOrderQr   → 工单码 `公司代码@工单号@(1000+行号)` 的解析与减 1000
- *   · expandBom          → 应投量 = 标准用量 × 排产数量 + 损耗量
- *   · applyScan          → **只按编码匹配**(批号不参与过滤)、累加与 remain 计算
- *   · checkScaleReading  → 脏值(-1)/过期/跳动 的拦截
- *   · scaleReadingOf     → /dc/monitor 扁平 points 的形状归一(重量点位 / 状态 / 设备码)
- *   · mixProgress        → 「全部扫完才能整单保存」的判据
- *   · buildScanPayload   → POST /px/mix/scan 的字段名(与后端正文字段逐一对应)
- *   · buildMixSlipPayload→ 混料单纸面载荷(表头/部门标签/签名 + 计划→请领、实际→实发)
- *   · 页面静态检查       → 文案都有英文译名;原生扫码只走 window.YjNative(2026-11-17 报障回归)
+ *   · toMixRows         → 后端 /px/mix/task 的明细 → 页面行(应投/实投/待投/已确认)
+ *   · toSavedRows       → 已保存单据(/px/mix/doc,纸面口径字符串)→ 只读明细行
+ *   · applyConfirm      → **覆盖写入**(不是累加)、只按编码匹配、超投标记
+ *   · checkScaleReading → 脏值(-1)/过期/跳动 的拦截
+ *   · scaleReadingOf    → /dc/monitor 扁平 points 的形状归一(重量点位 / 状态 / 设备码)
+ *   · mixProgress       → 「全部物料确认完毕才能提交」的判据
+ *   · buildScanPayload  → 确认写入 POST /px/mix/scan 的字段名(与后端正文字段逐一对应)
+ *   · buildMixSlipPayload → 混料单纸面载荷(《成型配料记录》横板 A4)
+ *   · 页面静态检查       → 两个页面的文案都有英文译名;原生扫码只走 window.YjNative
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -19,8 +20,9 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   parseWorkOrderQr,
-  expandBom,
-  applyScan,
+  toMixRows,
+  toSavedRows,
+  applyConfirm,
   checkScaleReading,
   scaleReadingOf,
   mixProgress,
@@ -88,72 +90,91 @@ test('parseWorkOrderQr:手敲的单号/产品名片段不走这里,交给页面�
   assert.equal(parseWorkOrderQr('烧结炭棒').reason, 'no-order')
 })
 
-test('expandBom:应投 = 标准用量 × 排产数量 + 损耗量', () => {
-  const bom = [
-    { 子件代码: 'YJ-TJHZ-001', 子件名称: '雅可比CS', 子件单位: 'kg', 标准用量: 0.086, 损耗量: 0 },
-    { 子件代码: 'YJ-YKRS-005', 子件名称: '活性炭', 子件单位: 'kg', 标准用量: 0.021, 损耗量: 0.5 },
-  ]
-  const lines = expandBom(bom, 1000)
-  assert.equal(lines.length, 2)
-  assert.equal(lines[0].required, 86)     // 0.086*1000
-  assert.equal(lines[1].required, 21.5)   // 0.021*1000 + 0.5
-  assert.equal(lines[0].picked, 0)
-  assert.equal(lines[0].remain, 86)
+// ═══════════ 行模型(后端取数 → 页面行)═══════════
+
+/** 后端 /px/mix/task 的明细形状(应投/实投由服务端按物料清单算好) */
+const taskLines = () => ([
+  { 行id: 11, 物料编号: 'YJ-TJHZ-001', 物料名称: '雅可比CS', 规格型号: '80-200', 单位: 'kg', 应投: 86.172, 实投: 0, 待投: 86.172, 物料批次: '', 已确认: false },
+  { 行id: 0, 物料编号: 'YJ-YKRS-005', 物料名称: '活性炭', 规格型号: '椰壳', 单位: 'kg', 应投: 21.042, 实投: 0, 待投: 21.042, 物料批次: '', 已确认: false },
+])
+
+test('toMixRows:后端明细 → 页面行(编码/规格/单位/应投/实投/待投全部带过来)', () => {
+  const rows = toMixRows(taskLines())
+  assert.equal(rows.length, 2)
+  assert.equal(rows[0].编码, 'YJ-TJHZ-001')
+  assert.equal(rows[0].名称, '雅可比CS')
+  assert.equal(rows[0].规格, '80-200')
+  assert.equal(rows[0].单位, 'kg')
+  assert.equal(rows[0].应投, 86.172)
+  assert.equal(rows[0].待投, 86.172)
+  assert.equal(rows[1].行id, 0)
+  assert.equal(rows[1].已确认, false)
 })
 
-test('expandBom:排产数量 0 → 应投只剩损耗量', () => {
-  const lines = expandBom([{ 子件代码: 'M-1', 标准用量: 3, 损耗量: 2 }], 0)
-  assert.equal(lines[0].required, 2)
+test('toMixRows:后端缺字段/空数组不炸(页面按空明细走)', () => {
+  assert.deepEqual(toMixRows(null), [])
+  assert.deepEqual(toMixRows([]), [])
+  const row = toMixRows([{}])[0]
+  assert.equal(row.编码, '')
+  assert.equal(row.应投, 0)
+  assert.equal(row.实投, 0)
+  assert.equal(row.已确认, false)
 })
 
-test('expandBom:没有子件代码的行被跳过;小数按 4 位收敛', () => {
-  const lines = expandBom([
-    { 子件代码: '', 标准用量: 1 },
-    { 子件代码: 'M-1', 标准用量: 0.1, 损耗量: 0 },
-  ], 3)
-  assert.equal(lines.length, 1)
-  assert.equal(lines[0].required, 0.3)  // 0.1*3 无浮点尾差
+test('toSavedRows:纸面口径的字符串重量 → 只读明细的数字行', () => {
+  const rows = toSavedRows([
+    { 序号: '1', 物料编号: 'YJ-TJHZ-001', 物料名: '雅可比CS', 应投重量: '86.172', 实投重量: '86.172', 物料批次: '20261118001', 添加比例: '80.38%', 规格型号: '80-200', 单位: 'kg' },
+  ])
+  assert.equal(rows[0].编码, 'YJ-TJHZ-001')
+  assert.equal(rows[0].名称, '雅可比CS')
+  assert.equal(rows[0].应投, 86.172)
+  assert.equal(rows[0].实投, 86.172)
+  assert.equal(rows[0].批号, '20261118001')
+  assert.equal(rows[0].比例, '80.38%')
+  assert.equal(rows[0].单位, 'kg')
 })
 
-test('applyScan:只按编码匹配 —— 批号不参与过滤', () => {
-  const lines = expandBom([{ 子件代码: 'M-001', 标准用量: 1 }], 5)
-  // 码里批号与库里完全无关,仍应命中
-  const r = applyScan(lines, { code: 'M-001', batch: '20261014001' }, 2)
+test('applyConfirm:确认 = **覆盖**写入(不是累加 —— 2026-11-18 第四轮口径)', () => {
+  const rows = toMixRows(taskLines())
+  applyConfirm(rows, { code: 'YJ-TJHZ-001', qty: 86.172 })
+  assert.equal(rows[0].实投, 86.172)
+  assert.equal(rows[0].待投, 0)
+  assert.equal(rows[0].已确认, true)
+  // 再确认一次同样的料 ⇒ 以最后一次秤值为准(如果累加这里会是 172.344)
+  applyConfirm(rows, { code: 'YJ-TJHZ-001', qty: 80 })
+  assert.equal(rows[0].实投, 80)
+  assert.equal(rows[0].待投, 6.172)
+})
+
+test('applyConfirm:只按编码匹配 —— 码里的批号不参与过滤,但会记到行上', () => {
+  const rows = toMixRows(taskLines())
+  const r = applyConfirm(rows, { code: 'YJ-YKRS-005', qty: 21, batch: '20261118002' })
   assert.equal(r.ok, true)
-  assert.equal(r.index, 0)
-  assert.equal(lines[0].picked, 2)
-  assert.equal(lines[0].remain, 3)
+  assert.equal(r.index, 1)
+  assert.equal(rows[1].批号, '20261118002')
 })
 
-test('applyScan:多次扫码累加', () => {
-  const lines = expandBom([{ 子件代码: 'M-001', 标准用量: 1 }], 10)
-  applyScan(lines, { code: 'M-001', batch: '' }, 3)
-  applyScan(lines, { code: 'M-001', batch: '' }, 4)
-  assert.equal(lines[0].picked, 7)
-  assert.equal(lines[0].remain, 3)
-})
-
-test('applyScan:编码不在物料清单里 → miss,不改动任何行', () => {
-  const lines = expandBom([{ 子件代码: 'M-001', 标准用量: 1 }], 5)
-  const r = applyScan(lines, { code: 'X-999', batch: '' }, 2)
+test('applyConfirm:编码不在物料清单里 → miss,不改动任何行', () => {
+  const rows = toMixRows(taskLines())
+  const r = applyConfirm(rows, { code: 'X-999', qty: 2 })
   assert.equal(r.ok, false)
   assert.equal(r.reason, 'miss')
-  assert.equal(lines[0].picked, 0)
+  assert.equal(rows[0].实投, 0)
 })
 
-test('applyScan:数量 <=0 或非数字 → no-qty', () => {
-  const lines = expandBom([{ 子件代码: 'M-001', 标准用量: 1 }], 5)
-  assert.equal(applyScan(lines, { code: 'M-001' }, 0).reason, 'no-qty')
-  assert.equal(applyScan(lines, { code: 'M-001' }, -1).reason, 'no-qty')
-  assert.equal(applyScan(lines, { code: 'M-001' }, 'abc').reason, 'no-qty')
+test('applyConfirm:数量 <=0 或非数字 → no-qty', () => {
+  const rows = toMixRows(taskLines())
+  assert.equal(applyConfirm(rows, { code: 'YJ-TJHZ-001' }, 0).reason, 'no-qty')
+  assert.equal(applyConfirm(rows, { code: 'YJ-TJHZ-001' }, -1).reason, 'no-qty')
+  assert.equal(applyConfirm(rows, { code: 'YJ-TJHZ-001' }, 'abc').reason, 'no-qty')
 })
 
-test('applyScan:超投不拦死,但 remain 为负且标 exceed', () => {
-  const lines = expandBom([{ 子件代码: 'M-001', 标准用量: 1 }], 5)
-  const r = applyScan(lines, { code: 'M-001' }, 8)
+test('applyConfirm:超投不拦死,但待投为负且标 exceed', () => {
+  const rows = toMixRows(taskLines())
+  const r = applyConfirm(rows, { code: 'YJ-TJHZ-001', qty: 90 })
   assert.equal(r.ok, true)
   assert.equal(r.exceed, true)
-  assert.equal(lines[0].remain, -3)
+  assert.equal(rows[0].待投, -3.828)
 })
 
 test('checkScaleReading:正常稳定读数通过', () => {
@@ -222,29 +243,27 @@ test('scaleReadingOf:非 normal 状态不算稳定(报警/超限不取值)', () 
   assert.equal(r.stable, false)
 })
 
-test('mixProgress:每行都记过才能整单保存', () => {
-  const lines = expandBom([
-    { 子件代码: 'M-001', 标准用量: 1 },
-    { 子件代码: 'M-002', 标准用量: 1 },
-  ], 5)
-  assert.deepEqual(mixProgress(lines),
-    { total: 2, done: 0, allDone: false, anyDone: false, remainCount: 2 })
-  applyScan(lines, { code: 'M-001' }, 1)
-  assert.deepEqual(mixProgress(lines),
-    { total: 2, done: 1, allDone: false, anyDone: true, remainCount: 1 })
-  applyScan(lines, { code: 'M-002' }, 1)
-  assert.deepEqual(mixProgress(lines),
-    { total: 2, done: 2, allDone: true, anyDone: true, remainCount: 0 })
+test('mixProgress:每一行都确认过才可提交', () => {
+  const rows = toMixRows(taskLines())
+  assert.deepEqual(mixProgress(rows).ok, false)
+  assert.equal(mixProgress(rows).total, 2)
+  assert.equal(mixProgress(rows).done, 0)
+  applyConfirm(rows, { code: 'YJ-TJHZ-001', qty: 86 })
+  assert.equal(mixProgress(rows).done, 1)
+  assert.deepEqual(mixProgress(rows).missing, ['YJ-YKRS-005'])
+  applyConfirm(rows, { code: 'YJ-YKRS-005', qty: 21 })
+  assert.equal(mixProgress(rows).ok, true)
+  assert.deepEqual(mixProgress(rows).missing, [])
 })
 
-test('mixProgress:空清单不算 allDone', () => {
-  assert.equal(mixProgress([]).allDone, false)
-  assert.equal(mixProgress(null).allDone, false)
+test('mixProgress:空清单不算 ok(没有可确认的料也不能提交空单)', () => {
+  assert.equal(mixProgress([]).ok, false)
+  assert.equal(mixProgress(null).ok, false)
 })
 
 test('buildScanPayload:字段名与后端 /px/mix/scan 一致,含 计划用量 与 实际用量', () => {
-  const order = { orderNo: 'GD-2026-10-0089', lineNo: 3, lineId: 88, productCode: 'A-32-01', productName: '炭棒' }
-  const line = { code: 'YJ-TJHZ-001', name: '雅可比CS', uom: 'kg', required: 226.18 }
+  const order = { 工单号: 'GD-2026-10-0089', 工单行号: 3, 工单行id: 88, 产品编码: 'A-32-01', 产品名称: '炭棒' }
+  const line = { 编码: 'YJ-TJHZ-001', 名称: '雅可比CS', 单位: 'kg', 应投: 226.18 }
   const body = buildScanPayload({ order, line, qty: 226.1849, batch: '20261118001' })
   assert.equal(body.工单号, 'GD-2026-10-0089')
   assert.equal(body.工单行号, 3)
@@ -260,12 +279,12 @@ test('buildScanPayload:字段名与后端 /px/mix/scan 一致,含 计划用量 �
 
 test('buildScanPayload:没有行 id 时不下发该字段(后端 longOrNull 会兜底)', () => {
   const body = buildScanPayload({
-    order: { orderNo: 'GD-1', lineNo: 1, lineId: 0 },
-    line: { code: 'M-1', required: 1 },
+    order: { 工单号: 'GD-1', 工单行号: 1, 工单行id: 0 },
+    line: { 编码: 'M-1', 应投: 1 },
     qty: 1,
   })
   assert.equal(body.工单行id, undefined)
-  assert.equal(body.物料批次, '')   // 取秤提交(没扫到码)时批次为空,不是 undefined
+  assert.equal(body.物料批次, '')   // 没扫到码(手输数量)时批次为空,不是 undefined
 })
 
 test('buildMixSlipPayload:专用纸表 = 《成型配料记录》横板 A4 的抬头 + 物料行', () => {
@@ -315,14 +334,32 @@ test('MIX_PAPER:纸样口径固定(标题/文件编码/横板 A4)', () => {
   assert.equal(MIX_PAPER.纸张.h, '210mm')
 })
 
-test('扫码混料页面:每个 tt() 文案都有英文译名(建页时漏过一遍,钉死别再漏)', () => {
+test('扫码混料两个页面(列表 + 明细):每个 tt() 文案都有英文译名', () => {
   const here = dirname(fileURLToPath(import.meta.url))
-  const vue = readFileSync(join(here, '../views/mobile/MobileMixScan.vue'), 'utf8')
   const en = readFileSync(join(here, '../i18n/locales/en.js'), 'utf8')
-  const keys = [...vue.matchAll(/tt\('([^']+)'\)/g)].map((m) => m[1])
-  assert.ok(keys.length > 30, '页面文案不该被抽空')
-  const missing = [...new Set(keys)].filter((k) => !en.includes(`'${k}'`) && !en.includes(`"${k}"`))
-  assert.deepEqual(missing, [], '这些文案缺英文译名: ' + missing.join(' / '))
+  const pages = ['MobileMixScan.vue', 'MobileMixDoc.vue']
+  let total = 0
+  for (const page of pages) {
+    const vue = readFileSync(join(here, '../views/mobile/', page), 'utf8')
+    const keys = [...vue.matchAll(/tt\('([^']+)'\)/g)].map((m) => m[1])
+    total += keys.length
+    const missing = [...new Set(keys)].filter((k) => !en.includes(`'${k}'`) && !en.includes(`"${k}"`))
+    assert.deepEqual(missing, [], `${page} 这些文案缺英文译名: ` + missing.join(' / '))
+  }
+  assert.ok(total > 50, '两个页面的文案不该被抽空')
+})
+
+test('扫码混料明细页:扫物料码只解锁(走 scanMaterial),确认才走 scan 落库', () => {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const vue = readFileSync(join(here, '../views/mobile/MobileMixDoc.vue'), 'utf8')
+  // 「解锁」与「确认」是两个动作(2026-11-18 第四轮用户口径),别又合并成一个
+  assert.match(vue, /\/px\/mix\/scanMaterial/, '扫物料码必须走 /px/mix/scanMaterial(只校验不落库)')
+  assert.match(vue, /\/px\/mix\/scan`|'\/px\/mix\/scan'/, '「确认」才走 /px/mix/scan 写入')
+  assert.match(vue, /\/px\/mix\/save/, '提交走 /px/mix/save')
+  // 全部确认完毕才能提交:按钮按 progress.ok 置灰
+  assert.match(vue, /:disabled="!progress\.ok"/, '提交按钮必须按「全部确认完毕」置灰')
+  // 秤值要真的被读(不是只显示)
+  assert.match(vue, /scaleReadingOf/, '电子秤读数必须参与取数')
 })
 
 test('扫码混料扫码:只走 YjNative 桥,不再用 @capacitor-mlkit(手搓壳没装这个原生插件)', () => {

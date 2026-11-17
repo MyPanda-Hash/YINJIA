@@ -17,24 +17,31 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 手机扫码 · **扫码混料**的接口(2026-11-18)。
+ * 手机扫码 · **扫码混料**的接口(2026-11-18;第四轮改成与「生产领料」同一套两页结构)。
  *
  * <h3>用户口径(原话)</h3>
  * 「然后在手机扫码里面加一个扫码混料的面版。逻辑:扫工单码,带出一级BOM(就是物料清单,
  *  之前生产领料的是组装物料清单),逐项扫物料码,自动获取电子秤的数量……提交保存一笔,
  *  全部扫完,整单保存。保存后自动打印,并且保留单据,重新扫码后进入可以补打印。」
  *
- * <h3>端点一览</h3>
+ * <p>第四轮(2026-11-18):「扫码混料,应该和生产领料一样也是跳转到单据的明细里面再开始扫物料码,
+ * 解锁对应的物料码,然后根据连接电子秤的取数,点击确认。再扫其他的物料解锁,根据电子秤再确认。
+ * 全部物料确认完毕后,才可以提交。设计要和生产领料一致。」</p>
+ *
+ * <h3>端点一览(★ = 第四轮新增,与 {@code /api/px/mobilePick/*} 一一对应)</h3>
  * <pre>
- *   GET  /api/px/mix/lines      扫工单码 → 工单行(plang)
- *   GET  /api/px/mix/bom        工单行的产品 → 一级BOM(物料清单 mate)
- *   GET  /api/px/mix/draft      本工单行还没整单保存的已扫料(重进页面恢复)
- *   GET  /api/px/mix/docs       本工单已保存的混料单(补打印入口)
- *   GET  /api/px/mix/doc?docNo= 一张混料单的抬头 + 明细(打印/明细页)
- *   POST /api/px/mix/scan       提交保存一笔(落 wo_mixing_list,标记 N)
- *   POST /api/px/mix/undo       撤回一笔(只删未保存的行)
- *   POST /api/px/mix/save       整单保存(取混料单号 + 标记 Y)
- *   POST /api/px/mix/printed    记一次打印(asp_print + 1,补打印也算)
+ *   GET  /api/px/mix/lines       扫工单码 → 工单行(plang)          〔列表页定位〕
+ *   GET  /api/px/mix/open    ★   未完成:已确认料、还没提交的工单行 〔列表页「未完成」组〕
+ *   GET  /api/px/mix/docs        已完成:已保存的混料单(可按关键字) 〔列表页「已完成」组 / 补打印〕
+ *   GET  /api/px/mix/task    ★   单据明细页取数(抬头 + 明细应投/实投) 〔对应 /mobilePick/doc〕
+ *   POST /api/px/mix/scanMaterial ★ 扫物料码**解锁**(只校验不落库)  〔对应 /mobilePick/scanMaterial〕
+ *   POST /api/px/mix/scan        确认:把秤值**写入**该物料行        〔对应 /mobilePick/setQty〕
+ *   POST /api/px/mix/undo        撤回本项(只删未提交的行)
+ *   POST /api/px/mix/save        提交(全部确认后才允许)→ 取混料单号〔对应 /mobilePick/submit〕
+ *   GET  /api/px/mix/doc         一张混料单的抬头 + 明细(纸面 / 只读明细页)
+ *   POST /api/px/mix/printed     记一次打印(补打印也算)
+ *   GET  /api/px/mix/bom         一级BOM(物料清单)原样行〔老客户端兼容,明细页已由 /task 承接〕
+ *   GET  /api/px/mix/draft       本工单行未提交的已确认料〔老客户端兼容〕
  * </pre>
  *
  * <h3>权限</h3>
@@ -61,6 +68,57 @@ public class MixScanController {
     public MixScanController(MixScanService mix, PanelPermissionService perm) {
         this.mix = mix;
         this.perm = perm;
+    }
+
+    /**
+     * 列表页「**未完成**」组:已经确认过料、还没提交的工单行(草稿行标记 N)。
+     *
+     * <p>对应「生产领料」的 {@code GET /px/mobilePick/list} 的 open 组 —— 混料单号要等提交才生成,
+     * 所以这里的身份是「工单号 + 工单行号」,页面上显示「未生成」。
+     *
+     * @param keyword 可选:工单号 / 产品编码 / 产品名称 / 物料编号的片段
+     */
+    @GetMapping("/open")
+    public Map<String, Object> open(@RequestParam(required = false) String keyword) {
+        perm.requirePanelView(PagePanelRegistry.MIX_SCAN);
+        List<Map<String, Object>> list = mix.openDocs(keyword);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("list", list);
+        out.put("条数", list.size());
+        return out;
+    }
+
+    /**
+     * **单据明细页**取数:工单行 + 物料清单(应投)+ 已确认的实投,一次给齐。
+     *
+     * <p>与 {@code GET /px/mobilePick/doc?id=} 同位:页面拿这一份就能画抬头、解锁区与明细。
+     *
+     * @param orderNo 工单号
+     * @param lineNo  工单行号
+     */
+    @GetMapping("/task")
+    public ApiResult<Map<String, Object>> task(@RequestParam String orderNo,
+                                               @RequestParam(required = false, defaultValue = "0") int lineNo) {
+        perm.requirePanelView(PagePanelRegistry.MIX_SCAN);
+        return ApiResult.ok(mix.taskOf(orderNo, lineNo));
+    }
+
+    /**
+     * 扫物料码 → **解锁该项**(只校验、不落库)。
+     *
+     * <p>与 {@code POST /px/mobilePick/scanMaterial} 同位:命中才把数量框放出来,
+     * 数量默认填电子秤读数,点「确认」才走 {@code /scan} 落库。
+     *
+     * @param body {工单号, 工单行号, 物料编号}
+     */
+    @PostMapping("/scanMaterial")
+    public ApiResult<Map<String, Object>> scanMaterial(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.MIX_SCAN);
+        String woNo = body.get("工单号") == null ? "" : String.valueOf(body.get("工单号"));
+        Object rawLine = body.get("工单行号");
+        int lineNo = rawLine instanceof Number n ? n.intValue() : 0;
+        String code = body.get("物料编号") == null ? "" : String.valueOf(body.get("物料编号"));
+        return ApiResult.ok(mix.scanMaterial(woNo, lineNo, code));
     }
 
     /**
@@ -107,16 +165,18 @@ public class MixScanController {
     }
 
     /**
-     * 重新扫同一张工单码后,列出它已保存的混料单(补打印入口)。
+     * 重新扫同一张工单码 / 查关键字后,列出**已保存**的混料单(列表页「已完成」组 + 补打印入口)。
      *
-     * @param orderNo 工单号
+     * @param orderNo 工单号(可选;不传 = 不限工单)
      * @param lineNo  工单行号(可选;不传 = 该工单全部行)
+     * @param keyword 可选:单据编号 / 工单号 / 产品编码 / 产品名称的片段
      */
     @GetMapping("/docs")
-    public Map<String, Object> docs(@RequestParam String orderNo,
-                                    @RequestParam(required = false, defaultValue = "0") int lineNo) {
+    public Map<String, Object> docs(@RequestParam(required = false) String orderNo,
+                                    @RequestParam(required = false, defaultValue = "0") int lineNo,
+                                    @RequestParam(required = false) String keyword) {
         perm.requirePanelView(PagePanelRegistry.MIX_SCAN);
-        List<Map<String, Object>> list = mix.docsOf(orderNo, lineNo);
+        List<Map<String, Object>> list = mix.docsOf(orderNo, lineNo, keyword);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("list", list);
         out.put("条数", list.size());

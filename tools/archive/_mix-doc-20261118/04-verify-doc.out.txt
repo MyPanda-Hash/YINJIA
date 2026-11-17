@@ -1,0 +1,8 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== 04-verify-doc.sql ==
+  | 18 | PL2611170001 | GD-2026-11-0015 | 1 | 1 | YJ-TJHZ-001 | 20261118001 | 86.17200000 | 86.17200000 | Y | 1 | admin | 
+  | 19 | PL2611170001 | GD-2026-11-0015 | 1 | 2 | YJ-YKRS-005 | 20261118002 | 21.04200000 | 21.04200000 | Y | 1 | admin | 
+  | 0 | 
+  | N | 2 | 
+  | Y | 12 | 
+[OK] 04-verify-doc.sql (3 batches)

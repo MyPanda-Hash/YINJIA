@@ -180,6 +180,18 @@ public final class PagePanelRegistry {
      * </ul>
      *
      * <p>动作:view/query(看工单与清单)、save(逐笔保存 + 整单保存)、print(保存后自动打印 + 补打印)。
+     *
+     * <p>🔴 2026-11-18 第四轮(用户口径「扫码混料,应该和生产领料一样也是跳转到单据的明细里面再开始
+     * 扫物料码,解锁对应的物料码,然后根据连接电子秤的取数,点击确认……全部物料确认完毕后,才可以提交。
+     * 设计要和生产领料一致」)⇒ 页面拆成**与生产领料同构的两页**:
+     * <ul>
+     *   <li>{@code MobileMixScan.vue}(列表)= 生产领料的 {@code MobilePickList.vue}:
+     *       查询单据 + 扫工单码定位 + 未完成({@code /px/mix/open})/ 已完成({@code /px/mix/docs})两组;</li>
+     *   <li>{@code MobileMixDoc.vue}(明细)= 生产领料的 {@code MobilePickDoc.vue}:
+     *       {@code /px/mix/task} 取抬头 + 明细,{@code /px/mix/scanMaterial} **只解锁**,
+     *       秤值进数量框后点「确认」才 {@code /px/mix/scan} 写入,{@code /px/mix/save} 提交并自动打印。</li>
+     * </ul>
+     * 权限词不变(view/query/save/print),授权行不必重刷。
      */
     public static final String MIX_SCAN = "MIX_SCAN";
 

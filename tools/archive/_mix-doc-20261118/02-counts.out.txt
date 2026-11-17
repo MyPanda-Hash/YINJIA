@@ -1,0 +1,10 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== 02-counts.sql ==
+  | 0 | 0 | 
+  | 0 | 
+  | MOBILE_PICK | view,query,create,pick,print | 15 | 
+  | MOBILE_PICK | view,query,create,pick,print,submit | 4 | 
+  | MOBILE_PICK | view,query,create,pick,submit,print | 1 | 
+  | MIX_SCAN | view,query,save,print | 20 | 
+  | 429 | 
+[OK] 02-counts.sql (5 batches)
