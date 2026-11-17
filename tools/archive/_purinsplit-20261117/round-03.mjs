@@ -1,54 +1,50 @@
-const task = await taskSpace('purin-multiwh-20261117')
+const task = await taskSpace('purin-whcalc')
 const page = task.page('p1')
 
-const fac = await page.evaluate(() => ({
-  text: (document.querySelector('.topbar, .sys-topbar, header')?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 80),
-  testDb: (document.body.textContent || '').includes('测试库'),
-}))
-console.log('factory=' + JSON.stringify(fac))
+// 第二行子行:选仓库 C仓
+await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const vis = (el) => !!(el.offsetParent || el.getClientRects().length)
+  const dlg = [...document.querySelectorAll('.el-dialog')].filter(vis).pop()
+  const a = [...dlg.querySelectorAll('tr.pmw-alloc-row')].filter(vis)
+  a[1].querySelectorAll('.el-select')[0]?.querySelector('.el-select__wrapper')?.click()
+  await sleep(700)
+  const boxes = [...document.querySelectorAll('.el-select-dropdown')].filter((d) => d.offsetParent)
+  const items = boxes.length ? [...boxes[boxes.length - 1].querySelectorAll('.el-select-dropdown__item')] : []
+  items.find((i) => (i.textContent || '').trim() === 'C仓')?.click()
+  await sleep(500)
+})
+// 第二行子行:选仓位(C仓下第一个)
+await page.evaluate(async () => {
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+  const vis = (el) => !!(el.offsetParent || el.getClientRects().length)
+  const dlg = [...document.querySelectorAll('.el-dialog')].filter(vis).pop()
+  const a = [...dlg.querySelectorAll('tr.pmw-alloc-row')].filter(vis)
+  a[1].querySelectorAll('.el-select')[1]?.querySelector('.el-select__wrapper')?.click()
+  await sleep(800)
+  const boxes = [...document.querySelectorAll('.el-select-dropdown')].filter((d) => d.offsetParent)
+  const items = boxes.length ? [...boxes[boxes.length - 1].querySelectorAll('.el-select-dropdown__item')] : []
+  const names = items.map((i) => (i.textContent || '').trim())
+  items[0]?.click()
+  await sleep(400)
+  window.__binPicked = names[0] || ''
+})
+const picked = await page.evaluate(() => window.__binPicked || '')
+console.log('BIN=' + picked)
 
-if (!fac.testDb) {
-  await page.evaluate(() => { localStorage.removeItem('mes_token'); localStorage.removeItem('mes_user'); localStorage.removeItem('mes_factory') })
-  await page.reload({ timeout: 60000 })
-  await page.waitForTimeout(3000)
-  await page.evaluate(async () => {
-    const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
-    const sel = [...document.querySelectorAll('.el-select')].find((s) => (s.textContent || '').includes('YINJIA-MES'))
-    sel?.querySelector('.el-select__wrapper, input')?.click()
-    await sleep(700)
-    const opt = [...document.querySelectorAll('.el-select-dropdown__item')].find((o) => (o.textContent || '').includes('测试库'))
-    opt?.click()
-    await sleep(300)
-    const setVal = (el, v) => {
-      const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
-      s.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }))
-    }
-    const ins = [...document.querySelectorAll('input')]
-    const u = ins.find((i) => (i.placeholder || '').includes('账号'))
-    const p = ins.find((i) => (i.placeholder || '').includes('密码'))
-    if (u) setVal(u, 'admin')
-    if (p) setVal(p, '123456')
-    ;[...document.querySelectorAll('button')].find((b) => (b.textContent || '').includes('进入系统'))?.click()
-  })
-  await page.waitForTimeout(8000)
-}
-
-await page.goto('http://localhost:5173/#/panelx/form/PURCHASE_IN?code=PI-2026-11-0008', { timeout: 60000 })
+// 确定
+await page.evaluate(() => {
+  const vis = (el) => !!(el.offsetParent || el.getClientRects().length)
+  const dlg = [...document.querySelectorAll('.el-dialog')].filter(vis).pop()
+  ;[...dlg.querySelectorAll('.el-dialog__footer button')].find((b) => (b.textContent || '').trim() === '确定')?.click()
+})
 await page.waitForTimeout(8000)
-
-try {
-  const w = await page.cdp('Browser.getWindowForTarget', {})
-  if (w && w.windowId) await task.cdp('Browser.setWindowBounds', { windowId: w.windowId, bounds: { windowState: 'normal' } })
-} catch (e) { console.log('restore skip: ' + e.message) }
-
-const tb = await page.evaluate(() => {
+const out = await page.evaluate(() => {
   const vis = (el) => !!(el.offsetParent || el.getClientRects().length)
   return {
-    hash: location.hash,
-    toolbar: [...document.querySelectorAll('.tools .tb-group')].filter(vis).map((g) => (g.querySelector('.tb-main')?.textContent || '').trim()),
-    rows: [...document.querySelectorAll('.detail .el-table__body-wrapper tr.el-table__row')].filter(vis).length,
-    testDb: (document.body.textContent || '').includes('测试库'),
+    msgs: [...document.querySelectorAll('.el-message')].filter(vis).map((m) => (m.textContent || '').trim()),
+    rows: [...document.querySelectorAll('.el-table__body-wrapper tr.el-table__row')].filter(vis).length,
   }
 })
-console.log('TOOLBAR=' + JSON.stringify(tb, null, 2))
-await page.screenshot({ path: 'C:/Users/Lenovo/ego/purin-multiwh-20261117/m1-form.png' })
+console.log('AFTER=' + JSON.stringify(out))
+await page.screenshot({ path: 'C:/Users/Lenovo/ego/purin-whcalc/c2-after-split.png' })

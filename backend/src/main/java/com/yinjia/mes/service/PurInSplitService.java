@@ -373,11 +373,15 @@ public class PurInSplitService {
             String binName = "";
             if (!binCode.isEmpty()) {
                 try {
-                    Map<String, Object> bin = jdbc.queryForMap("SELECT 仓位编码, 仓位名称 FROM bs_wh_loc"
-                            + " WHERE 仓位编码 = ? AND (仓库 = ? OR 仓库编码 = ?)", binCode, whName, whCode);
-                    binName = str(bin.get("仓位名称"));
+                    // ⚠ bs_wh_loc **没有「仓位名称」列**(2026-11-17 实测:SQL 207 列名 '仓位名称' 无效 ⇒
+                    //   弹窗一选仓位就报"服务异常")。这里只校验仓位归属并取编码,名称就用编码——
+                    //   bl_purchase_in.仓位名称 是可空展示列,各页面本来也都按 仓位编码 显示。
+                    Map<String, Object> bin = jdbc.queryForMap("SELECT 仓位编码 FROM bs_wh_loc"
+                            + " WHERE 仓位编码 = ? AND (仓库 = ? OR 仓库编码 = ?) AND ISNULL(停用, 0) = 0",
+                            binCode, whName, whCode);
+                    binCode = str(bin.get("仓位编码"));
                 } catch (EmptyResultDataAccessException e) {
-                    problems.add("仓位「" + binCode + "」不属于仓库「" + whName + "」");
+                    problems.add("仓位「" + binCode + "」不属于仓库「" + whName + "」或已停用");
                     continue;
                 }
             }

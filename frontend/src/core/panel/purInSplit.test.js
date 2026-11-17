@@ -120,6 +120,22 @@ test('② 弹窗:每行 ▾ 加一行仓库子行,合计不超过可入库数量
   assert.ok(/:disabled="!canSubmit"/.test(dlg), '校验不过时不许提交')
 })
 
+test('② 自动计算:最后一条仓库子行 = 可入库数量 − 其它行(禁用输入),并拦同仓重复', () => {
+  const dlg = src('./../views/PurInMultiWhDialog.vue')
+  assert.ok(/function recalcRemainder\(/.test(dlg), '缺自动计算(最后一行吃余量)')
+  assert.ok(/recalcRemainder\(L\)/.test(dlg), '加行/删行/改数量后要重算余量')
+  assert.ok(/@change="recalcRemainder\(row\.L\)"/.test(dlg), '改前面的行要触发重算')
+  assert.ok(/:disabled="row\.i === row\.L\.allocs\.length - 1"/.test(dlg), '最后一行是自动行,不允许手填')
+  assert.ok(/同一行不能出现重复的仓库（仓位）/.test(dlg), '同仓同仓位重复要拦(否则金蝶收到两条一样的分录)')
+})
+
+test('② 仓位:服务端只校验归属,不再查 bs_wh_loc.仓位名称(该列不存在,2026-11-17 实测 SQL 207)', () => {
+  const svc = src('./../../../../backend/src/main/java/com/yinjia/mes/service/PurInSplitService.java')
+  assert.ok(!/SELECT 仓位编码, 仓位名称 FROM bs_wh_loc/.test(svc), '不能查不存在的列')
+  assert.ok(/SELECT 仓位编码 FROM bs_wh_loc/.test(svc), '仓位校验只取编码')
+  assert.ok(/或已停用/.test(svc), '停用的仓位也要拦')
+})
+
 test('② 回退 + 缩进:按 [源行id] 归组,拆过的行再打开还是"父行 + 缩进的子行",并能合并回一行', () => {
   const dlg = src('./../views/PurInMultiWhDialog.vue')
   assert.ok(/purInWhGroups\(/.test(dlg), '打开时先取拆分组锚点(源行id 不是面板字段,通用取数带不出来)')

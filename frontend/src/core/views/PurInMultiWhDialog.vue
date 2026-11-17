@@ -81,8 +81,11 @@
         <el-table-column :label="tt('数量')" width="140">
           <template #default="{ row }">
             <span v-if="row.kind === 'line'" class="pmw-cur">{{ fmt(row.L.row['实收数量']) }}</span>
+            <!-- 最后一行是"自动"行:数量 = 可入库数量 − 其它行,不用手填(用户口径「填写要做到自动计算」) -->
             <el-input-number v-else v-model="row.a['数量']" :min="0" :max="maxOf(row.L)" :controls="false"
-                             size="small" style="width: 100%" />
+                             size="small" :disabled="row.i === row.L.allocs.length - 1"
+                             :title="row.i === row.L.allocs.length - 1 ? tt('自动 = 可入库数量 − 其它仓库') : ''"
+                             style="width: 100%" @change="recalcRemainder(row.L)" />
           </template>
         </el-table-column>
         <el-table-column :label="tt('已分配 / 剩余')" width="140" align="right">
@@ -198,6 +201,13 @@ const problem = computed(() => {
     if (!hasId(L)) return tt('请先保存单据，再拆分仓库')
     const bad = list.findIndex((a) => !String(a['仓库'] || '').trim() || numOr0(a['数量']) <= 0)
     if (bad >= 0) return tt('第 {n} 个仓库子行还没填仓库或数量').replace('{n}', String(bad + 1))
+    // 同一行拆到"同一个仓库 + 同一个仓位"没有意义,而且会让金蝶收到两条一模一样的行
+    const seen = new Set()
+    for (const a of list) {
+      const k = String(a['仓库'] || '').trim() + '|' + String(a['仓位编码'] || '').trim()
+      if (seen.has(k)) return tt('同一行不能出现重复的仓库（仓位）')
+      seen.add(k)
+    }
     if (!merging) {
       if (remainingOf(L) < 0) return tt('该行各仓库数量合计不能超过可入库数量')
       if (remainingOf(L) > 0 && !String(L.row['仓库'] || '').trim()) {
@@ -252,7 +262,9 @@ async function onOpen() {
           数量: numOr0(g['实收数量']),
         }))
       : []
-    lines.push({ key: String(gid || r.id || 'new' + i), seq: i + 1, row: r, allocs, groupRows })
+    const L = { key: String(gid || r.id || 'new' + i), seq: i + 1, row: r, allocs, groupRows }
+    recalcRemainder(L)
+    lines.push(L)
   }
   try {
     const src = await loadWhBinSources(engine)
@@ -261,6 +273,19 @@ async function onOpen() {
   } catch (e) {
     ElMessage.warning(tt('仓库档案读取失败，请刷新后重试'))
   }
+}
+
+/**
+ * 自动计算:每一行的**最后一条**仓库子行是"剩余行",数量 = 可入库数量 − 其它子行合计。
+ * 用户只填前面的行,最后一行自动跟上(2026-11-17 用户口径「这个填写要做到自动计算」);
+ * 增加/删除子行、改前面行的数量都会重算它,所以合计永远正好等于可入库数量。
+ */
+function recalcRemainder(L) {
+  const list = L?.allocs || []
+  if (!list.length) return
+  const last = list[list.length - 1]
+  const others = list.slice(0, -1).reduce((s, a) => s + Math.max(0, numOr0(a['数量'])), 0)
+  last['数量'] = Math.max(0, Math.round((maxOf(L) - others) * 10000) / 10000)
 }
 
 /** ▾:给这一行再加一个仓库子行(第一行默认原仓库 + 整行数量,后面加的从 0 起,用户自己分) */
@@ -275,10 +300,12 @@ function addAlloc(L) {
     仓位编码: first ? String(L.row['仓位编码'] || '') : '',
     数量: first ? maxOf(L) : 0,
   })
+  recalcRemainder(L)
 }
 
 function removeAlloc(L, index) {
   L.allocs.splice(index, 1)
+  recalcRemainder(L)
 }
 
 /** 「合并回一行」= 回退:只留第一个仓库子行(数量取整组合计),确定后服务端把子行合回父行 */

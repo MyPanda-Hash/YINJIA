@@ -3056,6 +3056,8 @@ export default {
     '该行各仓库数量合计不能超过可入库数量': 'Die Summe je Zeile darf die Zugangsmenge nicht überschreiten',
     '该行还剩 {n} 没有分配，且原行没有仓库，请分完或先给原行选仓库': 'Zeile hat noch {n} nicht zugewiesen und die Originalzeile hat kein Lager; alles zuweisen oder zuerst ein Lager wählen',
     '合并回一行': 'Zu einer Zeile zusammenführen',
+    '自动 = 可入库数量 − 其它仓库': 'Auto = Zugangsmenge − andere Lager',
+    '同一行不能出现重复的仓库（仓位）': 'Dasselbe Lager (Fach) darf in einer Zeile nicht doppelt vorkommen',
   },
 
 }
