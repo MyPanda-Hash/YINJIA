@@ -32,6 +32,12 @@ function codeOf(source) {
     const m = String(name).match(/[A-Za-z]{1,4}-[0-9][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*/)
     if (m && m[0]) return m[0]
   }
+  // 兜底：扫所有值（键名不可靠）
+  for (const v of Object.values(source || {})) {
+    if (v === null || v === undefined) continue
+    const m = String(v).match(/[A-Za-z]{1,4}-[0-9][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*/)
+    if (m && m[0]) return m[0]
+  }
   return ''
 }
 
@@ -67,4 +73,11 @@ test('实现里这两条链路都在（防只剩其一）', () => {
   assert.doesNotMatch(vue, /match\(\/\^\(\[A-Za-z0-9\]/, '不得再只看开头（生产实测编码在名字后面）')
   assert.match(vue, /props\.head\['文档编号'\] = code \+ ymd/, '规则 = 客户编码 + 日期')
   assert.match(vue, /String\(d\.getFullYear\(\)\)[\s\S]{0,120}padStart\(2, '0'\)/, '日期 YYYYMMDD')
+})
+
+test('键名不可靠时按值兜底（客户参照行实测踩到）', () => {
+  // 实测弹窗里可以看到 A-60，但按 客户编码/dm/客户名称 逐个取名都落空
+  assert.equal(codeOf({ 某列A: '浙江德凌电器有限公司', 某列B: 'A-60', 电话: '18658439031' }), 'A-60')
+  // 全行都没有编码形态 ⇒ 仍不填
+  assert.equal(codeOf({ 某列A: '青岛伊可普电器有限公司', 电话: '18658439031' }), '')
 })

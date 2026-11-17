@@ -1472,6 +1472,18 @@ function applyApprovalDocNo(source) {
       const m = String(name).match(CODE_IN_NAME)
       if (m && m[0]) { code = m[0]; break }
     }
+    // 最后兜底：**扫这一行的所有字段值**。
+    //   客户参照行的键名不可靠 —— 实测弹窗里明明有一列值是 `A-60`，
+    //   但按「客户编码 / dm / 客户名称…」逐个取名都落空（行对象键名与列标题不一定同名），
+    //   于是 app 侧永远算不出编码 ⇒ 立项编号空白。扫值则与键名无关，命中率最高。
+    //   只认「字母段+连字符+数字」形态，手机号/纯中文不会误命中。
+    if (!code) {
+      for (const v of Object.values(source || {})) {
+        if (v === null || v === undefined) continue
+        const m = String(v).match(CODE_IN_NAME)
+        if (m && m[0]) { code = m[0]; break }
+      }
+    }
   }
   if (!code) return
   const d = new Date()
