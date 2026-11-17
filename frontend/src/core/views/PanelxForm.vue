@@ -394,6 +394,7 @@ import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import { applyCalcRules } from '@core/panel/calcRules'
+import { blankRowOf } from '@core/panel/detailRows'
 import { sumKeepScale } from '@core/panel/sumTotals'
 import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
@@ -1049,12 +1050,8 @@ function tabHint(tab) {
 
 function addDetailRow(tab) {
   const rows = detailData[tab.key] || (detailData[tab.key] = [])
-  const row = {}
-  for (const dr of tab.fields || []) {
-    if (dr.dataType === '小数' || dr.dataType === '整数') row[dr.dataName] = dr.defaultValue ?? 0
-    else if (dr.dataType === '是否') row[dr.dataName] = dr.defaultValue ?? false
-    else row[dr.dataName] = dr.defaultValue ?? ''
-  }
+  // 新行默认值统一走 blankRowOf(2026-11-17):必填的数量字段留空、非必填的才预填 0
+  const row = blankRowOf(tab.fields)
   if (tab.subTable) row['子表材料'] = []
   // 材料明细：新增行自动归属当前选中的产成品（子件BOM=产品编码），保证联动过滤精确
   if (tab.key === 'materials' && selectedProduct.value) row['子件BOM'] = selectedProduct.value
@@ -1064,11 +1061,7 @@ function addDetailRow(tab) {
 
 function addSubRow(row, tab) {
   if (!row['子表材料']) row['子表材料'] = []
-  const sr = {}
-  for (const sr of tab.subTable.fields || []) {
-    if (sr.dataType === '小数' || sr.dataType === '整数') sr[sr.dataName] = sr.defaultValue ?? 0
-    else sr[sr.dataName] = sr.defaultValue ?? ''
-  }
+  const sr = blankRowOf(tab.subTable.fields)
   row['子表材料'].push(sr)
 }
 

@@ -42,3 +42,32 @@ export function ensureDetailRows(head, fallbackKey = '') {
   if (!Array.isArray(head.detail[key])) head.detail[key] = []
   return head.detail[key]
 }
+
+/**
+ * 按字段定义造一行空白明细 —— **新增行默认值的唯一出处**。
+ *
+ * 【2026-11-17 用户口径】「只有不合格数量可以出现自动填 0 的情况」:
+ *   必填的数量字段**不预填 0**(留空),非必填的数量仍按老口径预填 0。
+ *
+ * 为什么必须这样(实测踩到):原来所有 小数/整数 一律 `defaultValue ?? 0`,于是来料检验单
+ * 「新增数据」造出来的行,**合格数量是 0 而不是空**;`0` 过了"必填"这一关(空值才拦,
+ * `String(0)` 不为空),用户点「审核 / 提交审批」时静默保存就把 0 落了库 ——
+ * 审核后按「合格数量 > 0 分流入库」的规则,这张检验单一行都进不了采购入库,链就断在这里。
+ * 留空之后:红星在、必填拦得住、审核闸门(ButtonService.ensureInspOkQtyFilledForAudit)也看得见。
+ *
+ * @param {Array} fields 明细页签的字段定义(`dataName` / `dataType` / `isRequired` / `defaultValue`)
+ */
+export function blankRowOf(fields = []) {
+  const row = {}
+  for (const f of fields || []) {
+    if (!f || !f.dataName) continue
+    if (f.dataType === '小数' || f.dataType === '整数') {
+      row[f.dataName] = f.defaultValue ?? (f.isRequired ? '' : 0)
+    } else if (f.dataType === '是否') {
+      row[f.dataName] = f.defaultValue ?? false
+    } else {
+      row[f.dataName] = f.defaultValue ?? ''
+    }
+  }
+  return row
+}

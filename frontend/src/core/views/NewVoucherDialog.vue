@@ -121,6 +121,7 @@ import RefPickDialog from './RefPickDialog.vue'
 import { tt } from '@/i18n'
 import { applyDocDefaults } from '@core/panel/docDefaults'
 import { applyCalcRules } from '@core/panel/calcRules'
+import { blankRowOf } from '@core/panel/detailRows'
 
 const engine = usePanelRuntime()
 const { user } = useAppContext()
@@ -250,13 +251,8 @@ watch(detailData, applyCalc, { deep: true })
 
 function addDetailRow(tab) {
   const rows = detailData[tab.key] || (detailData[tab.key] = [])
-  const row = {}
-  for (const dr of tab.fields || []) {
-    if (dr.dataType === '小数' || dr.dataType === '整数') row[dr.dataName] = dr.defaultValue ?? 0
-    else if (dr.dataType === '是否') row[dr.dataName] = dr.defaultValue ?? false
-    else if (dr.dataType === '日期') row[dr.dataName] = dr.defaultValue ?? ''
-    else row[dr.dataName] = dr.defaultValue ?? ''
-  }
+  // 新行默认值统一走 blankRowOf(2026-11-17):必填的数量字段留空、非必填的才预填 0
+  const row = blankRowOf(tab.fields)
   if (tab.subTable) row['子表材料'] = []
   rows.push(row)
   return row

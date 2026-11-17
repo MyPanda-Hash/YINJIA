@@ -2791,6 +2791,7 @@ import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaul
 import { parseSamplingQty } from '@core/insp/samplingQty'
 import { applyInspectorDefault } from '@core/qc/qcInspector'
 import { applyCalcRules } from '@core/panel/calcRules'
+import { blankRowOf } from '@core/panel/detailRows'
 import { sumKeepScale } from '@core/panel/sumTotals'
 import { qtyDecimalsOf, formatQtyByUnit, floorTo } from '@core/panel/unitPrecision'
 import { SHEET_MARGIN, SHEET_MM, SHEET_PAGE_H, SHEET_PAGE_W, planSheetPages, sheetPrintBody } from '@core/panel/sheetPrintHtml'
@@ -10293,13 +10294,10 @@ function onDetailCellDblclick(row, column, event, b) {
 }
 
 function newDetailRow(tabKey) {
-  const row = {}
-  for (const field of detailTabDefOf(tabKey)?.fields || []) {
-    if (field.dataType === '小数' || field.dataType === '整数') row[field.dataName] = field.defaultValue ?? 0
-    else if (field.dataType === '是否') row[field.dataName] = field.defaultValue ?? false
-    else row[field.dataName] = field.defaultValue ?? ''
-  }
-  return row
+  // 新行默认值统一走 blankRowOf(2026-11-17 用户口径「只有不合格数量可以出现自动填 0 的情况」):
+  // 必填的数量字段留空、非必填的才预填 0 —— 来料检验单「合格数量」原来被预填成 0,
+  // 而 0 又算"已填",必填校验与审核闸门都被它绕过(审完一行都进不了采购入库)。
+  return blankRowOf(detailTabDefOf(tabKey)?.fields || [])
 }
 
 function addInlineDetailRow(b) {
