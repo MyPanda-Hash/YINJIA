@@ -119,6 +119,9 @@ export const useUserStore = defineStore('user', {
       this.warnPanels = Array.isArray(p.warnPanels) ? p.warnPanels : []
       this.selfAuditPanels = Array.isArray(p.selfAuditPanels) ? p.selfAuditPanels : []
       this.pagePerms = p.pagePerms && typeof p.pagePerms === 'object' ? p.pagePerms : {}
+      // 同 fetchPerms 的其它字段：后端 /perms 一并下发，缺了这里会导致
+      // 「点一次刷新权限，规格书批准按钮消失」（2026-11-17）
+      this.panelPerms = p.panelPerms && typeof p.panelPerms === 'object' ? p.panelPerms : this.panelPerms || {}
       this.supplierCode = typeof p.supplierCode === 'string' ? p.supplierCode : ''
       this.supplierName = p.supplierName || ''
       // /auth/perms 不下发该布尔位时保持原值(只有登录/userinfo 是它的真源)

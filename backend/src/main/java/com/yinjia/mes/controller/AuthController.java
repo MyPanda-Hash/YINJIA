@@ -180,6 +180,9 @@ public class AuthController {
         out.put("fieldPanels", user.get("fieldPanels"));
         out.put("warnPanels", user.get("warnPanels"));
         out.put("selfAuditPanels", user.get("selfAuditPanels"));
+        // 单据面板权限词（2026-11-17）：这里必须一起下发，否则前端 refreshPerms()
+        // 会把 panelPerms 丢掉 —— 用户点一次「刷新权限」，产品文件列表的「批准」按钮就又没了。
+        out.put("panelPerms", user.get("panelPerms"));
         out.put("pagePerms", user.get("pagePerms"));
         out.put("supplierCode", user.get("supplierCode"));
         out.put("supplierPanelPerms", user.get("supplierPanelPerms"));

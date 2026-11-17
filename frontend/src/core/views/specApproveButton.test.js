@@ -46,3 +46,11 @@ test('user store 必须保存 panelPerms（登录 + 会话还原都要）', () =
   assert.match(store, /this\.panelPerms = u\?\.panelPerms/, 'setUser 要带')
   assert.match(store, /panelPerms: this\.panelPerms/, '持久化到 userInfo 要带')
 })
+
+test('刷新权限（/auth/perms）也必须带 panelPerms，否则点一次刷新按钮就消失', () => {
+  assert.match(auth, /out\.put\("panelPerms", user\.get\("panelPerms"\)\)/, '/perms 接口要返回 panelPerms')
+  const at = store.indexOf('async fetchPerms(')
+  assert.ok(at > 0, '缺 fetchPerms')
+  const seg = store.slice(at, at + 1600)
+  assert.match(seg, /this\.panelPerms = p\.panelPerms/, 'fetchPerms 要同步 panelPerms')
+})
