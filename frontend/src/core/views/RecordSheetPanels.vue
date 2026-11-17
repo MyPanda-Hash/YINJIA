@@ -939,6 +939,26 @@
               </td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
+            <!-- 表格最下层的「整表共用一格」(2026-11-17 用户口径:出货检验计划表的
+                 「不合格应对措施放置表格最下层,因为当前的不合格措施都是一样的」)。
+                 数据仍逐行存(带入检验单/保存链路都按行取),这一格只做"显示合并、编辑同步":
+                 取第一行非空值显示,改一次写回本表全部行(见 footerFieldValue/setFooterFieldValue)。 -->
+            <tr v-if="dt.footerField">
+              <td :colspan="totalSpan(dt)" class="rsp-footer-field">
+                <div class="rff-label">{{ tt(dt.footerField.label) }}</div>
+                <el-input
+                  v-if="editable"
+                  :model-value="footerFieldValue(dt)"
+                  type="textarea"
+                  :autosize="{ minRows: dt.footerField.rows || 2, maxRows: 12 }"
+                  size="small"
+                  class="rs-t-in rs-wrap-in rff-in"
+                  @update:model-value="(v) => setFooterFieldValue(dt, v)"
+                />
+                <div v-else class="rs-txt rsp-cell rsp-pre">{{ footerFieldValue(dt) || ' / ' }}</div>
+              </td>
+              <td v-if="editable" class="rsp-op-pad"></td>
+            </tr>
             <!-- 页脚须知(仪器使用记录表) -->
             <tr v-if="dt.footerNote">
               <td :colspan="totalSpan(dt)" class="rsp-footnote">{{ tt(dt.footerNote) }}</td>
@@ -1929,7 +1949,9 @@ import { OPTION_CAP, invSearchOptions } from '@/core/mold/recipeRows'
 
 /** 标准库型下拉列(2026-10-19:出货检验计划表的「检查频率」)——options 来自 yj_std_lib,可在弹窗里维护 */
 const stdLibOpts = ref({})   // { libCode: [content, ...] }(复用下方既有 stdLibVisible/stdLibCode)
-const STD_LIB_CODES = ['INSP_FREQ']
+// INSP_FREQ      = 四张检验单共用(制程/首件/组装成品)的检查频率库
+// INSP_FREQ_OQC  = 出货检验计划表专属(2026-11-17 用户口径「下拉框的数据过多」,出货口径 6 条)
+const STD_LIB_CODES = ['INSP_FREQ', 'INSP_FREQ_OQC']
 
 function colOptions(c) {
   if (c && c.stdLib && stdLibOpts.value[c.stdLib]) return stdLibOpts.value[c.stdLib]
@@ -1952,8 +1974,13 @@ async function loadStdLibs() {
     try {
       const res = await request.get('/stdlib/list', { params: { lib, all: 1 } })
       const rows = (res?.data ?? res ?? []).filter((r) => r.enabled !== 0 && r.enabled !== false)
+      // 按 seq 重排(2026-11-17):接口是 ORDER BY item_code(字母/拼音序),与维护界面排好的
+      // seq(10/20/30…) 不是一回事 —— 入库顺序才是业务想要的下拉顺序(如出货口径:
+      // 1%/一个生产批次 → 1PCS/一个生产批次 → 1PCS/一个工单 → 型式检验…)。
+      // 后端 StdLibController.list 的注释也写明「调用方要用 seq 自行重排」。
+      const ordered = [...rows].sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0))
       const opts = []
-      for (const r of rows) {
+      for (const r of ordered) {
         const v = typeof r.content === 'string' ? r.content.trim() : ''
         if (v && !opts.includes(v)) opts.push(v)
       }
@@ -4524,6 +4551,43 @@ function rowsOf(dt) {
   return list
 }
 /**
+ * 整表共用一格(dt.footerField,2026-11-17 出货检验计划表的「不合格应对措施」)。
+ *
+ * <p>契约:**显示合并、存储逐行**。值仍在每一行的同名数据键上(带入检验单、标准库勾选、
+ * 规格书自动填充、保存 upsert 四条链路都按行取/写这一格),这一整格只做两件事:</p>
+ * <ul>
+ *   <li>显示 —— 取本表**第一行非空值**(存量单据 55 行的措施完全相同,取哪行都一样);</li>
+ *   <li>编辑 —— 写回本表**全部行**,让"改一次全表一致"成立,也保证新行/旧行不会出现两套文本。</li>
+ * </ul>
+ * <p>⚠ 不要改成"只写第一行":那样其余行保存的是旧文本,带入检验单时会带出旧措施。</p>
+ */
+function footerFieldRowsOf(dt) {
+  return dt?.footerField?.key ? rowsOf(dt) : []
+}
+function footerFieldValue(dt) {
+  const key = dt?.footerField?.key
+  if (!key) return ''
+  for (const r of rowsOf(dt)) {
+    const v = r ? r[key] : ''
+    if (v !== undefined && v !== null && String(v).trim()) return String(v)
+  }
+  return ''
+}
+function setFooterFieldValue(dt, v) {
+  const key = dt?.footerField?.key
+  if (!key) return
+  const rows = footerFieldRowsOf(dt)
+  // 本表一行都没有时无处可写(表格空着)⇒ 不 silently 丢输入:先补一行再写。
+  if (!rows.length) {
+    addRow(dt)
+    for (const r of footerFieldRowsOf(dt)) r[key] = v
+    emit('dirty')
+    return
+  }
+  for (const r of rows) r[key] = v
+  emit('dirty')
+}
+/**
  * 加一行。
  * @param {object} dt 数据表配置
  * @param {object} [afterRow] 行内「＋」带上来的**本行** —— 有值就插在它正下方(2026-10-29 用户口径
@@ -4538,6 +4602,9 @@ function addRow(dt, afterRow) {
   // 新行必须带上当前下拉值:否则它会飘在"空组"里,切到别组就看不见、重开也可能归错组
   const g = groupBy.value
   if (g?.detailKey) stampGroup(row, g.detailKey, currentGroupValue())
+  // 整表共用一格(dt.footerField,如 不合格应对措施):新行必须带上同一份文本 ——
+  // 否则这一行保存时是空的,带入检验单/导出时该行就没有应对措施(见 footerFieldValue 注释)。
+  if (dt.footerField?.key) row[dt.footerField.key] = footerFieldValue(dt)
   // 序号自动编:dataTables 里声明 autoSeqBar 的表(成型配方表)按**本表区**已有行数续编。
   // 原来只认面板级 cfg.autoSeq 且用全表 touch().length 计数——多表区共用一张明细表时
   // 会串号(配方行数被工序/BOM 行数带偏),故改为按表区过滤后计数。
@@ -6842,6 +6909,33 @@ body.approval-printing .rs-mold-pick { display: none !important; }
   line-height: 1.8;
   padding: 8px 12px;
   background: #fff;
+}
+/**
+ * 表格最下层的「整表共用一格」(2026-11-17 用户口径:出货检验计划表「不合格应对措施放置表格最下层」)。
+ *
+ * <p>版式:紧贴明细行下方的一条满宽合并行 —— 小标题(不合格应对措施)一行 + 内容一段。
+ * 边框与 .rs-td / .rsp-footnote 同一套 1px #7f7f7f,所以下接的表尾注仍用 border-top:none 与之合成一条线。</p>
+ * <p>⚠ 内容字级/行距照纸面口径(12.5px/1.7),编辑态与只读态同高:编辑时看到的行数与间距就是打印出来的样子。</p>
+ */
+.rsp-footer-field {
+  border: 1px solid #7f7f7f;
+  background: #fff;
+  text-align: left;
+  vertical-align: top;
+  padding: 6px 12px 8px;
+}
+.rff-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.5;
+  margin-bottom: 2px;
+}
+.rff-in :deep(.el-textarea__inner) {
+  font-size: 12.5px;
+  line-height: 1.7;
+  font-family: inherit;
+  padding: 2px 4px;
 }
 
 /* ═══ 矿化:表+图并排(复刻 Excel 表格在左、散点图在右) ═══ */
