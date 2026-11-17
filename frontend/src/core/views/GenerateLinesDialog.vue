@@ -40,6 +40,14 @@
           %<span class="gl-tip">{{ tt('（本次生效；最高 50%，额度按来源行数量算）') }}</span>
         </span>
         <span class="gl-tip">{{ tt('勾选要生单的明细行并填写本次数量；未勾选的行不会进入新单据') }} · {{ tt('未勾选的明细行置灰、不能填写') }}</span>
+        <!-- 弹窗最顶部的**总全选**(2026-11-18 用户口径「批量生单和合单生单弹窗最顶部都没有全选按钮」):
+             一次作用于**所有来源单的全部行**,不必逐单点行头那两个链接;三态勾选框 + 行数,状态一眼可见 -->
+        <span class="gl-pick-all">
+          <el-checkbox :model-value="allPicked" :indeterminate="partialPicked" :disabled="!selectableTotal"
+                       @change="onPickAllChange">{{ tt('全选') }}</el-checkbox>
+          <el-button link size="small" :disabled="!count" @click="unpickAllDocs">{{ tt('取消全选') }}</el-button>
+          <span class="gl-picked">{{ tt('已选') }} {{ count }} {{ tt('行') }}</span>
+        </span>
       </div>
 
       <div v-for="doc in docs" :key="doc.sourceNo" class="gl-doc">
@@ -253,6 +261,29 @@ const count = computed(() => {
   return n
 })
 
+/* ── 弹窗最顶部的总全选(2026-11-18 用户口径)────────────────────────
+   「批量生单和合单生单弹窗最顶部都没有全选按钮」—— 原来只有每张来源单行头的
+   「全选/取消全选」,合单一次勾七八张单要点七八次。这里给一个跨全部来源单的总开关:
+   · 口径与单张的 selectAll 完全一致(只勾**可选**的行,上限按当前超送比例算),
+     所以顶部全选不会把草稿单/已打印隔离行/无可生单量行放进来;
+   · 三态:全勾=✓、部分勾=—、一个都没勾=空;可勾行数为 0 时禁用。 */
+const selectableTotal = computed(() => {
+  let n = 0
+  for (const d of docs.value) for (const r of d.lines || []) if (selectable(d, r)) n++
+  return n
+})
+/** 已勾且**仍然可选**的行数(超送比例调小后,原来勾上的行可能变得不可选) */
+const pickedSelectable = computed(() => {
+  let n = 0
+  for (const d of docs.value) {
+    const set = picksOfDoc(d)
+    for (const r of d.lines || []) if (set.has(r.lineKey) && selectable(d, r)) n++
+  }
+  return n
+})
+const allPicked = computed(() => selectableTotal.value > 0 && pickedSelectable.value >= selectableTotal.value)
+const partialPicked = computed(() => pickedSelectable.value > 0 && !allPicked.value)
+
 /** 统一取勾选集合(组件里存数组,纯函数既收 Set 也收数组) */
 const picksOfDoc = (doc) => picksOf(pickedByDoc[doc.sourceNo])
 /** 未勾选的行置灰(2026-11-17 客户口径):每张来源单一张表,各按自己的勾选集合判;禁填见模板 pickRowLocked */
@@ -285,6 +316,16 @@ function selectAll(doc) {
   pickedByDoc[doc.sourceNo] = keys
 }
 function selectNone(doc) { pickedByDoc[doc.sourceNo] = [] }
+
+/** 顶部总全选 / 总取消:对**所有来源单**逐个套用单张的办法(数量同样按剩余量预填) */
+function pickAllDocs() {
+  for (const doc of docs.value) selectAll(doc)
+}
+function unpickAllDocs() {
+  // 只清勾选,不动已填的本次数量(清数量是底部「清空」的事)
+  for (const doc of docs.value) selectNone(doc)
+}
+function onPickAllChange(on) { if (on) pickAllDocs(); else unpickAllDocs() }
 
 /** 全送:每张单按剩余量填满并勾上(隔离行同样只在可送上限内,用户仍可取消) */
 function fillRemaining() {
@@ -454,6 +495,8 @@ async function confirm() {
 .gl-batch { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: #46586e; }
 .gl-lock { color: #b88230; font-size: 12px; }
 .gl-doc-pick { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+/* 顶部总全选:贴在提示条右侧,与每单行头的「全选」同一视觉语言(靠右、次级按钮) */
+.gl-pick-all { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding-left: 8px; }
 .gl-picked { color: #5d6c67; font-size: 12.5px; }
 .gl-empty { color: #909399; }
 .gl-foot { margin-right: auto; font-size: 12.5px; color: #46586e; }

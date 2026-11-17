@@ -118,3 +118,20 @@ test('销售订单的生单只用「生成销售出库单」', () => {
   assert.match(list, /!hiddenGenerateActions\.value\.includes\(action\)/,
     '隐藏要落在 toolbarGroups 的动作过滤上(数据键与后端能力保留给订单结转/选单)')
 })
+
+test('弹窗最顶部有总全选(批量生单 / 合单生单共用)', () => {
+  // 【用户原话 2026-11-18】「批量生单和合单生单弹窗最顶部都没有全选按钮。」
+  // 原来只有每张来源单行头的「全选/取消全选」⇒ 合单勾七八张单要点七八次;顶部要一个总开关。
+  const head = dialog.slice(dialog.indexOf('class="gl-bar"'), dialog.indexOf('class="gl-doc"'))
+  assert.ok(head.length > 100, '取不到顶部条,说明 gl-bar / gl-doc 的类名变了')
+  assert.match(head, /class="gl-pick-all"/, '顶部条里要有总全选控件')
+  assert.match(head, /tt\('全选'\)/, '顶部全选文案要走 tt()(英文界面不掉回中文)')
+  assert.match(head, /unpickAllDocs/, '顶部还要能一键取消全选')
+  assert.match(head, /allPicked/, '总全选要有"已全勾"状态,不能只是一个无状态的按钮')
+  assert.match(head, /partialPicked/, '部分勾选要能显示成三态的中间态')
+  // 口径必须复用单张的 selectAll:只勾可选行(草稿单/已打印隔离行/无可生单量行不许被总全选放进来)
+  assert.match(dialog, /function pickAllDocs\(\) \{\s*\n\s*for \(const doc of docs\.value\) selectAll\(doc\)/,
+    '总全选必须逐单复用 selectAll,不能另写一套勾选逻辑')
+  assert.match(dialog, /function unpickAllDocs\(\) \{[\s\S]{0,200}?selectNone\(doc\)/,
+    '总取消全选只清勾选(复用 selectNone),不动已填的本次数量')
+})
