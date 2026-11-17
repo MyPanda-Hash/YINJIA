@@ -4984,3 +4984,7 @@ migrate-prod-info-scene-stdlib-20261117.sql
 migrate-asm-proc-fixed-manager-20261117.sql
 # 2026-11-17 数据记录表：把「表单审核人」纠正为真实审批人姓名（历史预填值/空白一并修）
 migrate-datarec-auditor-from-shr-20261117.sql
+# 2026-11-17 核验补漏（具体问题点 行10）：炭棒工艺管控清单加「审核人」格（备用3，审批后自动生成）
+migrate-mold-proc-auditor-20261117.sql
+# 2026-11-17 核验补漏（产品信息表 行22）：主要性能描述改标准库
+migrate-prod-info-perf-stdlib-20261117.sql

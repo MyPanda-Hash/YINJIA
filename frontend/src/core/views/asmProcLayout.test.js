@@ -63,7 +63,9 @@ test('③ 审核人：纸面有这一格（只读）、库里有列、审批通�
   assert.match(mig, /yj_translation[\s\S]*N'审核人'[\s\S]*N'Reviewer'/, '缺 en 译名（AGENTS 强制）')
   // 后端回填：必须走 byLabel 取物理列（不能拼 label）
   assert.match(btn, /private void writeFieldByLabel\(/, '缺 writeFieldByLabel')
-  assert.match(btn, /if \("RD_ASM_PROC"\.equals\(def\.code\(\)\)\) writeFieldByLabel\(def, no, "审核人"/, '审批通过未回填审核人')
+  // 2026-11-17 深夜核验：回填条件扩成「组装 + 炭棒工艺管控清单」两张（具体问题点 行10）
+  assert.match(btn, /"RD_ASM_PROC"\.equals\(def\.code\(\)\) \|\| "RD_MOLD_PROC"\.equals\(def\.code\(\)\)[\s\S]{0,80}writeFieldByLabel\(def, no, "审核人"/,
+    '审批通过未回填审核人')
 })
 
 test('④ 表单管理人固定柴善银：前端默认 + 后端强制 + 历史回填，三处都要有', () => {
@@ -81,8 +83,7 @@ test('④ 表单管理人固定柴善银：前端默认 + 后端强制 + 历史�
 })
 
 test('⑤ 审核人 = 审批通过人：代码回填 + 历史单按 shr 补（账号→姓名）', () => {
-  assert.match(btn, /if \("RD_ASM_PROC"\.equals\(def\.code\(\)\)\) writeFieldByLabel\(def, no, "审核人"/,
-    '审批通过时回填')
+  assert.match(btn, /writeFieldByLabel\(def, no, "审核人", signNameOf\(operator\)\)/, '审批通过时回填')
   const mgrMig = readFileSync(
     new URL('../../../../tools/migrate-asm-proc-fixed-manager-20261117.sql', import.meta.url), 'utf8')
   // shr 存账号，纸面要人名 ⇒ 走 yj_user.real_name，取不到退回账号（宁可显示账号也不留空）

@@ -118,7 +118,9 @@ public class QueryService {
                 //    写入**姓名**）。若走下面的默认覆盖，会被 yj_doc_status.shr 换成**账号**
                 //    （实测界面显示 "admin"），既丢了姓名也把账号当人名。
                 //   与质量单据同一处理：表内有值就用表内，为空才退回 shr 兜底。
-                || "RD_ASM_PROC".equals(panelCode));
+                || "RD_ASM_PROC".equals(panelCode)
+                // 2026-11-17 炭棒工艺管控清单同理（「具体问题点」行10 补的审核人格）
+                || "RD_MOLD_PROC".equals(panelCode));
     }
 
     private final PanelRegistry registry;

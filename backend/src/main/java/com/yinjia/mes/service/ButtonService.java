@@ -3839,7 +3839,12 @@ public class ButtonService {
         // 数据记录表(实验室 8 张)：审核人**审核后生成**（1117问题 #5）
         writeDataRecAuditor(def, no, operator);
         // 组装工艺管控清单：新增的「审核人」格 = 审批通过人（1117问题 #6「产品负责人审核后自动填充」）
-        if ("RD_ASM_PROC".equals(def.code())) writeFieldByLabel(def, no, "审核人", signNameOf(operator));
+        // 组装工艺 / 炭棒工艺管控清单：新增的「审核人」格 = 审批通过人
+        //   （1117问题 #6「产品负责人审核后自动填充」+「具体问题点」行10「炭棒工艺管控起单…
+        //    右上角加多一行审核人，审核完成后自动生成」）
+        if ("RD_ASM_PROC".equals(def.code()) || "RD_MOLD_PROC".equals(def.code())) {
+            writeFieldByLabel(def, no, "审核人", signNameOf(operator));
+        }
         // 规格书(RD_SPEC_DOC):「审核」格 = **审批通过的人**（2026-11-06 用户口径
         // 「审核的是在审批人审批之后，把对应的审批人的账号和日期回填进去」）。
         // 规格书不走两级审批（「一级审批就回填」）⇒ 落点就在这条单节点通过路径上。
