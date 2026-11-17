@@ -4932,3 +4932,5 @@ migrate-asm-proc-auditor-20261117.sql
 migrate-prod-info-scene-stdlib-20261117.sql
 # 2026-11-17 1117问题 #6 追加：组装工艺 表单管理人固定柴善银 + 补历史单据审核人（按 shr，账号→姓名）
 migrate-asm-proc-fixed-manager-20261117.sql
+# 2026-11-17 数据记录表：把「表单审核人」纠正为真实审批人姓名（历史预填值/空白一并修）
+migrate-datarec-auditor-from-shr-20261117.sql

@@ -67,3 +67,30 @@ test('回填必须走 yj_field 的物理列名，不能直接拼 [表单审核�
   assert.match(btn, /SET \[" \+ col \+ "\] = \?/, '回填用解析出的列')
   assert.match(btn, /SET \[" \+ col \+ "\] = NULL/, '清空用解析出的列')
 })
+
+test('8 张数据记录表全部覆盖（用户口径「所有的数据记录表」）', () => {
+  // 生产实测：label「表单审核人」存在于 8 张 RD_* 记录表（物理列都是 备用1）。
+  // 这里钉住集合与"审核后填入审批人姓名"的语义，防止将来新增记录表漏配。
+  for (const p of REC) {
+    assert.ok(btn.includes('"' + p + '"'), `${p} 必须在 DATA_REC_AUDITOR_PANELS 里`)
+  }
+  assert.match(btn, /signNameOf\(account\)/, '回填要用姓名，不是账号')
+})
+
+test('历史数据按 shr 纠正为审批人姓名（含清掉早期预填的「秀丽」）', () => {
+  const mig = readFileSync(
+    new URL('../../../../tools/migrate-datarec-auditor-from-shr-20261117.sql', import.meta.url), 'utf8')
+  // ① 已审批 → 纠正成审批人姓名（shr → yj_user.real_name，取不到退回账号）
+  assert.match(mig, /JOIN yj_doc_status s ON s\.panel_code = @p/, '要按 panel 关联单据状态')
+  assert.match(mig, /LEFT JOIN yj_user u ON u\.username = s\.shr/, 'shr → 用户姓名')
+  assert.match(mig, /real_name/, '取 real_name')
+  assert.match(mig, /ISNULL\(NULLIF\(LTRIM\(RTRIM\(u\.real_name\)\)/, '姓名取不到退回账号')
+  // ② 未审批 → 清空（审核人只在审批后存在）
+  assert.match(mig, /SET h\.\[备用1\] = NULL/, '未审批要清空')
+  // 8 张表都要在清单里
+  for (const t of ['rd_alkaline_head', 'rd_mineral_head', 'rd_antibact_head', 'rd_scale_head',
+    'rd_ro_protect_head', 'rd_soak_head', 'rd_drop_prec_head', 'rd_filter_eff_head']) {
+    assert.ok(mig.includes(t), `迁移漏了 ${t}`)
+  }
+  assert.match(mig, /sp_executesql/, '逐表执行用动态 SQL')
+})
