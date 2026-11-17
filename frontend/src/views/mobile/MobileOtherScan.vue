@@ -27,9 +27,13 @@
 -->
 <template>
   <div class="mo-scan">
-    <div class="mo-head">
-      <div class="mo-title">{{ tt(titleText) }}</div>
-      <div class="mo-sub">{{ tt(subText) }}</div>
+    <!-- 2026-11-18:头部与「生产领料 / 生产退料」同一套(标题 + 接口地址 + 说明) -->
+    <div class="mo-top">
+      <div class="mo-head">
+        <span class="mo-title">{{ tt(titleText) }}</span>
+        <span v-if="baseUrl" class="mo-base" :title="baseUrl">{{ baseUrl }}</span>
+      </div>
+      <span class="mo-sub">{{ tt(subText) }}</span>
     </div>
 
     <div class="mo-scanbar">
@@ -203,6 +207,10 @@ const props = defineProps({
 
 /** 原生相机扫码(只在壳里出现,判据与其他手机扫码页一致:壳注入了 window.YjNative.scan) */
 const nativeScan = hasNativeScan()
+/** 接口地址(与生产领料/退料顶部同一行只读展示;网页版没有壳就为空) */
+const baseUrl = (() => {
+  try { return (window.YjNative && window.YjNative.getBaseUrl && window.YjNative.getBaseUrl()) || '' } catch { return '' }
+})()
 
 // 经手人/领用人 = 当前登录人(单头那一栏不该空着,现场出问题要能追到人)
 const userStore = useUserStore()
@@ -572,12 +580,30 @@ async function submit() {
 </script>
 
 <style scoped>
-.mo-scan { max-width: 900px; padding: 14px 16px 26px; }
-.mo-head { margin-bottom: 12px; }
-.mo-title { font-size: 18px; font-weight: 600; }
-.mo-sub { margin-top: 4px; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.6; }
+/* 2026-11-18:版面口径与「生产领料」(MobilePickList.vue) 一致 —— 灰底 + 48px 顶栏 + 卡片 */
+.mo-scan {
+  box-sizing: border-box; width: 100%; max-width: 1180px; margin: 0 auto;
+  padding: 0 0 16px; background: var(--el-bg-color-page); min-height: calc(100vh - 130px);
+}
+.mo-top {
+  display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 12px;
+  background: var(--el-bg-color); border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.mo-head { display: flex; flex-direction: column; min-width: 0; }
+.mo-title { font-size: 16px; font-weight: 600; }
+.mo-base {
+  max-width: 42vw; font-size: 11px; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mo-sub {
+  flex: 1; min-width: 0; margin-left: 4px; font-size: 12px; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 /* 扫码行(2026-11-17 与生产领料/扫码混料对齐):输入框 + 查询 + 扫码 同一行,44px 命中区 */
-.mo-scanbar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.mo-scanbar {
+  display: flex; align-items: center; gap: 8px; margin: 10px 12px 0; padding: 12px;
+  background: var(--el-bg-color); border: 1px solid var(--el-border-color-lighter); border-radius: 8px;
+}
 .mo-scanbar :deep(.el-input) { flex: 1; min-width: 0; }
 .mo-scanbar :deep(.el-input__wrapper) { min-height: 44px; }
 .mo-scanbar :deep(.el-input__inner) { font-size: 16px; }   /* 16px 以下 iOS 会自动放大 */

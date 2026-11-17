@@ -1,37 +1,37 @@
 <!--
-  MobileReturnList.vue — 手机扫码 · 生产退料(2026-11-18 独立成页)
+  MobileReturnList.vue — 手机扫码 · 生产退料(2026-11-18 独立成页;2026-11-18 第二轮:加扫码退料 + 版面与「生产领料」对齐)
 
-  【用户口径(原话)】
-  「我还想生产退料独立出来,就是已经领料且审核的领料单据,来扫码退料。其实就是独立出来一个面版,
-   让生产领料不用负责那么多功能,操作也方便。」
+  【用户口径】
+  「我还想生产退料独立出来,就是已经领料且审核的领料单据,来扫码退料。……」
+  「生产退料也要可以扫码退料而且前端页面要和生产领料对齐,两个界面有差距,其他的扫码也要和领料对齐。」
+  「如果领料退料扫的是工单码,就要弹窗选择是混料还是组装。如果是领料单上的二维码就直接跳转。」
 
-  ⇒ 本页 = 生产领料的退料部分**整块搬出来**:
-    ① 上面列出「已完成 + 材料出库单已审核」的领料单(没审批的不能退:库存还没扣,退了等于凭空加库存);
-    ② 选中一张 → 扫物料码 → 看这一项还能退多少(= 已领 − 已退)→ 填数量 → 加入本次退料清单;
-    ③ 提交 → 生成一张**生产退料单**(业务类型「生产退料」)。
+  ⇒ 本页 = 生产领料那套"查询单据 → 扫码定位 → 扫物料作业"的同构版本:
+    ① 顶部标题栏(与生产领料同一套:标题 / 接口地址 / 说明 / 刷新);
+    ② 「查询单据」卡:关键词查询 + **扫码定位**(扫领料单纸面二维码按 @A/@M 直接跳;扫工单码弹窗选 组装/混料);
+    ③ 「可退单据」列表(只列已完成且材料出库单已审核的);
+    ④ 选中一张 → 扫物料码 → 填退料数量 → 提交生成生产退料单。
 
-  数据全部走既有接口(/px/mobilePick/returnables、returnScan、submitReturn),
+  数据全部走既有接口(/px/mobilePick/locate、returnables、returnScan、submitReturn),
   本页只负责把"查单 → 扫码 → 提交"这条动线摆顺,不重复实现退料规则。
-
-  ⚠ 生产领料单据页里的退料入口已同时删除 —— 退料只有这一个入口,现场不用再记"去哪退"。
 -->
 <template>
   <div class="mr">
-    <div class="mr-head">
-      <span class="mr-title">{{ tt('生产退料') }}</span>
-      <span class="mr-sub">{{ tt('只列已领料且材料出库单已审核的单据；扫物料码 → 填退料数量 → 提交生成生产退料单') }}</span>
+    <div class="mr-top">
+      <div class="mr-head">
+        <span class="mr-title">{{ tt('生产退料') }}</span>
+        <span v-if="baseUrl" class="mr-base" :title="baseUrl">{{ baseUrl }}</span>
+      </div>
+      <span class="mr-sub">{{ tt('查询单据 → 扫码定位 → 扫物料码 → 提交退料') }}</span>
+      <el-button class="mr-refresh" size="small" :loading="loading" @click="refreshAll">{{ tt('刷新') }}</el-button>
     </div>
 
-    <div v-if="errText" class="mr-err">{{ errText }}</div>
-    <div v-if="okText" class="mr-ok">{{ okText }}</div>
+    <div v-if="errText" class="mr-err mr-err-top">{{ errText }}</div>
+    <div v-if="okText" class="mr-ok mr-err-top">{{ okText }}</div>
 
-    <!-- ① 可退单据列表 -->
+    <!-- ① 查询单据(与「生产领料」同一套:关键词查询 + 扫码定位) -->
     <section class="mr-card">
-      <div class="mr-sec">
-        <span>{{ tt('可退单据') }}</span>
-        <span class="mr-sec-num">{{ list.length }}</span>
-        <el-button text size="small" class="mr-refresh" :loading="loading" @click="load">{{ tt('刷新') }}</el-button>
-      </div>
+      <div class="mr-sec">{{ tt('查询单据') }}</div>
       <div class="mr-row">
         <el-input
           v-model="keyword"
@@ -41,6 +41,30 @@
           @keyup.enter="load"
         />
         <el-button type="primary" size="large" :loading="loading" @click="load">{{ tt('查询') }}</el-button>
+      </div>
+      <div class="mr-row mr-row-gap">
+        <el-input
+          ref="locateInput"
+          v-model="locateText"
+          :placeholder="tt('扫领料单码 / 工单号,或输入后点打开')"
+          size="large"
+          clearable
+          @keyup.enter="openByCode(locateText)"
+        />
+        <el-button size="large" :loading="locateLoading" @click="openByCode(locateText)">{{ tt('打开单据') }}</el-button>
+        <el-button v-if="nativeScan" size="large" @click="scanInto">{{ tt('扫码') }}</el-button>
+      </div>
+      <div class="mr-hint">
+        {{ tt('扫领料单纸面二维码 → 直接打开对应那张(混料/组装);扫工单码 → 弹窗选混料还是组装;') }}
+        {{ tt('只列已领料且材料出库单已审核的单据') }}
+      </div>
+    </section>
+
+    <!-- ② 可退单据列表 -->
+    <section class="mr-card">
+      <div class="mr-sec">
+        <span>{{ tt('可退单据') }}</span>
+        <span class="mr-sec-num">{{ list.length }}</span>
       </div>
 
       <div v-if="!list.length" class="mr-empty">{{ tt('没有可退的领料单（需要先领料、且材料出库单被仓管审核）') }}</div>
@@ -72,7 +96,7 @@
       </div>
     </section>
 
-    <!-- ② 退料作业 -->
+    <!-- ③ 退料作业 -->
     <section v-if="cur" class="mr-card">
       <div class="mr-sec">
         <span>{{ tt('退料作业') }}</span>
@@ -135,17 +159,21 @@
         </el-button>
       </div>
     </section>
+
+    <!-- 扫工单码(分不出组装/混料)时的选择框;扫领料单纸面二维码不会走到这里 -->
+    <PickKindDialog v-model="kindVisible" :docs="kindDocs" @pick="(d) => openDocById(d.id)" />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated, onDeactivated } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import request from '@core/request'
-import { fmtQty, round4 } from '@/business/mobilePick'
+import { fmtQty, round4, locateQueryOf } from '@/business/mobilePick'
 import { focusScanNow } from '@/business/scanFocus'
+import PickKindDialog from './PickKindDialog.vue'
 
 const route = useRoute()
 
@@ -164,6 +192,19 @@ const matText = ref('')
 const mat = ref(null)          // 扫到的物料(可退量等)
 const qty = ref(0)
 const lines = ref([])          // 本次要退的 [{code,name,spec,unit,qty,can}]
+
+/** 扫码定位框(与「生产领料」对齐:扫领料单码/工单号直接打开) */
+const locateInput = ref(null)
+const locateText = ref('')
+const locateLoading = ref(false)
+/** 工单码分不出组装/混料 ⇒ 弹窗选(de-bounce 同一工单只弹一次) */
+const kindVisible = ref(false)
+const kindDocs = ref([])
+
+const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan)
+const baseUrl = (() => {
+  try { return (window.YjNative && window.YjNative.getBaseUrl && window.YjNative.getBaseUrl()) || '' } catch { return '' }
+})()
 
 const canAdd = computed(() => {
   if (!mat.value) return false
@@ -191,6 +232,12 @@ async function load() {
   }
 }
 
+/** 刷新:列表 + 提示一并刷新(与生产领料的「刷新」同一动作) */
+async function refreshAll() {
+  await load()
+  okText.value = tt('已刷新')
+}
+
 function select(d) {
   if (cur.value && cur.value.id === d.id) return
   // ⚠ must keep the doc: resetWork(false) clears cur —— 早先这里传了 false,
@@ -211,6 +258,106 @@ function resetWork(keepDoc = true) {
   okText.value = ''
   if (!keepDoc) cur.value = null
 }
+
+// ══════════════ 扫码定位(2026-11-18:扫领料单码/工单号 → 直接进退料) ══════════════
+
+/**
+ * 按扫到/输入的码打开**可退的那张单**。
+ *
+ * 口径(用户原话):「如果领料退料扫的是工单码,就要弹窗选择是混料还是组装。
+ * 如果是领料单上的二维码就直接跳转」—— 领料单纸面二维码第 4 段是 @A/@M,
+ * 解析出来当 kind 传给后端,后端只回那一张;工单码没有标记 ⇒ 回两张 ⇒ 弹窗让人选。
+ */
+async function openByCode(raw) {
+  const q = locateQueryOf(raw)
+  clearMsg()
+  if (!q.wo) { errText.value = tt('请先扫描或输入工单号'); return }
+  locateLoading.value = true
+  try {
+    const params = { woNo: q.wo }
+    if (q.line > 0) params.line = q.line
+    if (q.kind) params.kind = q.kind
+    const res = await request.get('/px/mobilePick/locate', { params })
+    const d = res.data?.data || res.data || {}
+    // ⚠ 先看「单据[]」再判 found:命中整组时 found=true 且带 2 张单(组装在前),
+    //   先判 found 会把工单码永远当组装单打开、弹窗出不来(2026-11-18 实测)。
+    const docs = Array.isArray(d.单据) ? d.单据 : []
+    if (docs.length > 1) {          // 同一工单行的组装 + 混料 ⇒ 让人选
+      kindDocs.value = docs
+      kindVisible.value = true
+      return
+    }
+    if (d.found) { await openDocById(d.id); return }
+    if (d.hint === 'voided') { errText.value = tt('这张单据已作废,不能再打开') + ' (' + q.wo + ')'; return }
+    errText.value = tt('没有找到这个工单/单据') + ' (' + q.wo + ')'
+  } catch (e) {
+    errText.value = errMsgOf(e) || tt('查询失败')
+  } finally {
+    locateLoading.value = false
+    focusScanNow(() => locateInput.value, { delay: 150 })
+  }
+}
+
+/**
+ * 按台账 id 打开可退单。
+ *
+ * <p>「可退」有硬闸门:领料单**已完成**且它的**材料出库单已被仓管审核**(库存才真扣了)。
+ * 扫码定位拿到的可能是一张还没审批的单 —— 那就只提示,不能进退料作业区。
+ */
+async function openDocById(id) {
+  if (!id) return
+  await load()
+  const hit = list.value.find((x) => String(x.id) === String(id))
+  if (!hit) {
+    errText.value = tt('这张单还不能退:需要先完成领料、且材料出库单被仓管审核')
+    return
+  }
+  select(hit)
+}
+
+/** 扫码(PDA/相机):扫到的码交给 openByCode */
+function applyScan(code) {
+  const text = String(code || '').trim()
+  if (!text) return
+  locateText.value = text
+  openByCode(text)
+}
+
+let scanPending = false
+let scanTimer = null
+
+function scanInto() {
+  if (!(window.YjNative && typeof window.YjNative.scan === 'function')) {
+    errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入')
+    return
+  }
+  // ⚠ 壳里同一时刻只能有一个扫码会话:连点两下只认最后一次
+  if (scanPending) return
+  scanPending = true
+  if (scanTimer) clearTimeout(scanTimer)
+  scanTimer = setTimeout(() => { scanPending = false }, 30000)
+  try { window.YjNative.scan() } catch { scanPending = false; errText.value = tt('调不起相机,请改用输入框扫码枪或手工输入') }
+}
+
+function onScanResult(code, ok) {
+  scanPending = false
+  if (scanTimer) { clearTimeout(scanTimer); scanTimer = null }
+  if (!ok || !String(code || '').trim()) {
+    errText.value = tt('没有识别到二维码,请重试;也可以直接用扫码枪扫进下面的输入框')
+    return
+  }
+  applyScan(code)
+}
+
+function bindScan() {
+  if (typeof window !== 'undefined') window.__yjScanResult = onScanResult
+}
+
+onDeactivated(() => {
+  if (typeof window !== 'undefined' && window.__yjScanResult === onScanResult) window.__yjScanResult = null
+  if (scanTimer) { clearTimeout(scanTimer); scanTimer = null }
+  scanPending = false
+})
 
 /** 扫物料码:后端按「已领 − 已退」算本次可退 */
 async function scan() {
@@ -294,6 +441,7 @@ async function submit() {
 }
 
 onMounted(async () => {
+  bindScan()
   // 从「生产领料」单据页跳过来时带 ?no=领料单号 ⇒ 直接把那张单查出来并选中
   const no = String(route.query.no || '').trim()
   if (no) keyword.value = no
@@ -302,25 +450,68 @@ onMounted(async () => {
     const hit = list.value.find((d) => String(d.领料单号 || '').trim() === no)
     if (hit) select(hit)
   }
-  // PDA 连扫(2026-11-16):进页面就把光标放到物料扫码框
-  focusScanNow(() => scanInput.value, { delay: 350 })
+  // PDA 连扫(2026-11-16):进页面先落在「扫码定位」框(与生产领料一致),选单后再进物料框
+  focusScanNow(() => locateInput.value, { delay: 350 })
+})
+
+/** keep-alive 从别的页签回来:重新挂扫码桥 + 光标回扫码框(2026-11-18 与生产领料统一) */
+onActivated(() => {
+  bindScan()
+  focusScanNow(() => (cur.value ? scanInput.value : locateInput.value), { delay: 250 })
 })
 </script>
 
 <style scoped>
-.mr { max-width: 900px; padding: 14px 16px 26px; }
-.mr-head { margin-bottom: 12px; }
-.mr-title { font-size: 18px; font-weight: 600; }
-.mr-sub { display: block; margin-top: 4px; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.6; }
-.mr-err, .mr-ok { margin-bottom: 10px; padding: 8px 10px; border-radius: 4px; font-size: 13px; }
+/* 版面口径与「生产领料」(MobilePickList.vue) 保持一致:
+   375 宽不横向滚动、命中区 ≥44px、数量右对齐等宽数字、无装饰动画。 */
+.mr {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 0 16px;
+  background: var(--el-bg-color-page);
+  min-height: calc(100vh - 130px);
+}
+.mr * { box-sizing: border-box; }
+
+.mr-top {
+  display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 12px;
+  background: var(--el-bg-color); border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.mr-head { display: flex; flex-direction: column; min-width: 0; }
+.mr-title { font-size: 16px; font-weight: 600; }
+.mr-base {
+  max-width: 42vw; font-size: 11px; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mr-sub {
+  flex: 1; min-width: 0; margin-left: 4px; font-size: 12px; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mr-refresh { flex: none; }
+
+.mr-err, .mr-ok { margin: 8px 12px 0; padding: 8px 10px; border-radius: 4px; font-size: 13px; }
 .mr-err { color: var(--el-color-danger); background: var(--el-color-danger-light-9); }
 .mr-ok { color: var(--el-color-success); background: var(--el-color-success-light-9); }
-.mr-card { border: 1px solid var(--el-border-color-light); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; }
-.mr-sec { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--el-text-color-regular); margin-bottom: 8px; }
-.mr-sec-num { display: inline-block; min-width: 20px; text-align: center; padding: 0 6px; border-radius: 10px; background: var(--el-color-primary-light-9); color: var(--el-color-primary); font-size: 12px; }
-.mr-refresh { margin-left: auto; }
-.mr-row { display: flex; gap: 10px; }
-.mr-row :deep(.el-input) { flex: 1; }
+
+.mr-card {
+  margin: 10px 12px 0; padding: 12px;
+  background: var(--el-bg-color); border: 1px solid var(--el-border-color-lighter); border-radius: 8px;
+}
+.mr-sec { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.mr-sec-num {
+  display: inline-block; min-width: 20px; text-align: center; padding: 0 6px; border-radius: 10px;
+  background: var(--el-color-primary-light-9); color: var(--el-color-primary); font-size: 12px; font-weight: 400;
+}
+.mr-row { display: flex; align-items: center; gap: 8px; }
+.mr-row-gap { margin-top: 8px; }
+.mr-row :deep(.el-input) { flex: 1; min-width: 0; }
+.mr-row :deep(.el-button) { height: 44px; min-width: 64px; margin-left: 0; }
+.mr-row :deep(.el-input__wrapper) { min-height: 44px; }
+.mr-row :deep(.el-input__inner) { font-size: 16px; }   /* 16px 以下 iOS 会自动放大 */
+.mr-hint { margin-top: 8px; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.6; }
+
 .mr-empty { padding: 16px 0; text-align: center; font-size: 13px; color: var(--el-text-color-secondary); }
 .mr-doc { padding: 9px 8px; border-bottom: 1px dashed var(--el-border-color-lighter); border-radius: 4px; cursor: pointer; }
 .mr-doc:hover { background: var(--el-fill-color-lighter); }
@@ -350,6 +541,7 @@ onMounted(async () => {
 .mr-line-qty { font-size: 14px; color: var(--el-color-warning); font-variant-numeric: tabular-nums; }
 .mr-foot { display: flex; gap: 10px; margin-top: 14px; }
 .mr-foot :deep(.el-button) { flex: 1; }
+.mono { font-variant-numeric: tabular-nums; }
 @media (max-width: 480px) {
   .mr-qty { flex-wrap: wrap; }
   .mr-qty :deep(.el-input-number) { width: 120px; }
