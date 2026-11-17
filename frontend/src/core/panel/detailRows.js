@@ -46,23 +46,30 @@ export function ensureDetailRows(head, fallbackKey = '') {
 /**
  * 按字段定义造一行空白明细 —— **新增行默认值的唯一出处**。
  *
- * 【2026-11-17 用户口径】「只有不合格数量可以出现自动填 0 的情况」:
- *   必填的数量字段**不预填 0**(留空),非必填的数量仍按老口径预填 0。
+ * 【2026-11-17 用户口径,两轮】
+ *   ① 「只有不合格数量可以出现自动填 0 的情况」;
+ *   ② 「新增明细行的时候会打入数据默认填 0，这个可能会帮助跳过检验」。
+ *   ⇒ 新行里**小数(数量/金额)一律留空**,只有「不合格数量 / 不良数量」照旧预填 0
+ *     (全合格是常态,用户明确允许);**整数保持 0**(序号/件数语义,如"加工顺序",空着反而没法排)。
  *
- * 为什么必须这样(实测踩到):原来所有 小数/整数 一律 `defaultValue ?? 0`,于是来料检验单
- * 「新增数据」造出来的行,**合格数量是 0 而不是空**;`0` 过了"必填"这一关(空值才拦,
- * `String(0)` 不为空),用户点「审核 / 提交审批」时静默保存就把 0 落了库 ——
- * 审核后按「合格数量 > 0 分流入库」的规则,这张检验单一行都进不了采购入库,链就断在这里。
- * 留空之后:红星在、必填拦得住、审核闸门(ButtonService.ensureInspOkQtyFilledForAudit)也看得见。
+ * 为什么小数不能预填 0(实测踩到的链路):
+ *   原来所有 小数/整数 一律 `defaultValue ?? 0`,于是来料检验单「新增数据」造出来的行
+ *   **送检数量 / 合格数量都是 0**;`0` 过了"必填"这一关(空值才拦,`String(0)` 不为空),
+ *   用户点「审核 / 提交审批」时静默保存就把 0 落了库 —— 一张"送检 0 / 合格 0"的检验单
+ *   照样能审过去,而审核后按「合格数量 > 0 分流入库」的规则一行都进不了采购入库:
+ *   看着"检验完事了",其实这批料没进系统也没退料 —— 就是用户说的"帮助跳过检验"。
+ *   留空之后:红星在、必填拦得住、审核闸门(ButtonService.ensureInspOkQtyFilledForAudit)也看得见。
  *
- * @param {Array} fields 明细页签的字段定义(`dataName` / `dataType` / `isRequired` / `defaultValue`)
+ * @param {Array} fields 明细页签的字段定义(`dataName` / `dataType` / `defaultValue`)
  */
 export function blankRowOf(fields = []) {
   const row = {}
   for (const f of fields || []) {
     if (!f || !f.dataName) continue
-    if (f.dataType === '小数' || f.dataType === '整数') {
-      row[f.dataName] = f.defaultValue ?? (f.isRequired ? '' : 0)
+    if (f.dataType === '小数') {
+      row[f.dataName] = f.defaultValue ?? (ZERO_PREFILL_NUMERIC.has(f.dataName) ? 0 : '')
+    } else if (f.dataType === '整数') {
+      row[f.dataName] = f.defaultValue ?? 0
     } else if (f.dataType === '是否') {
       row[f.dataName] = f.defaultValue ?? false
     } else {
@@ -71,3 +78,10 @@ export function blankRowOf(fields = []) {
   }
   return row
 }
+
+/**
+ * 允许新行预填 0 的小数字段(用户 2026-11-17 口径:「只有不合格数量可以出现自动填 0 的情况」)。
+ * 其余小数(送检数量 / 合格数量 / 单价 / 损耗 / 损耗率 …)一律留空,必须人工填 ——
+ * 否则 0 会被当成"已填",一张没做检验的单也能审核通过(见 blankRowOf 注释里的链路)。
+ */
+const ZERO_PREFILL_NUMERIC = new Set(['不合格数量', '不良数量'])

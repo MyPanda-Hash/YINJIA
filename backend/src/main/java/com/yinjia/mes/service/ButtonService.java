@@ -1616,24 +1616,44 @@ public class ButtonService {
     }
 
     /**
-     * 来料检验单审核前的必填兜底(2026-11-17):按**库里的行**复核每行「合格数量」非空。
+     * 来料检验单审核前的必填兜底(2026-11-17):按**库里的行**复核
+     * 「合格数量非空 + 送检数量 > 0 + 合格+不合格 ≤ 送检」。
      *
      * <p>保存路径已经拦一道({@link #ensureInspOkQtyPresent}),但「保存为草稿」按用户口径豁免必填,
      * 草稿仍可被直接审核 ⇒ 审核是最后一道闸门。且审核下游(生单)正是按 合格数量 分流入库、
      * 按 不合格数量 分流退料,空了会生成 0 数量入库单/空退料,数据链就断了。</p>
+     *
+     * <p>2026-11-17 第二轮用户口径:「新增明细行的时候会打入数据默认填 0,这个可能会帮助跳过检验」——
+     * 前端新行已不再预填 0({@code blankRowOf}),但"送检数量 0 / 合格数量 0"的行一旦落库,
+     * 审核时照样能过、审完既不进采购入库也不退料 ⇒ 这里补两条:送检数量必须 &gt; 0(没有送检数量的行
+     * 请删掉,别混进检验),数量守恒(合格+不合格 ≤ 送检)按库里的行再核一遍(草稿可能绕过了保存校验)。</p>
      */
     private void ensureInspOkQtyFilledForAudit(PanelRegistry.PanelDef def, String no) {
         if (def.lineTable() == null || def.lineTable().isBlank()) return;
         // ⚠ 必须排除软删行(asp_cancel='Y'):保存会"软删旧行 + 插新行",界面看不到旧行(getFormDescriptor 滤掉),
         //   但不过滤的话旧行(合格数量还是 NULL)会先撞上这道闸门 —— 实测"补了合格数量还是审不过"。
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT [合格数量] FROM " + def.lineTable()
+                "SELECT [合格数量], [不合格数量], [送检数量] FROM " + def.lineTable()
                         + " WHERE [单据编号] = ? AND ISNULL(asp_cancel, 'N') <> 'Y' ORDER BY id", no);
         for (int i = 0; i < rows.size(); i++) {
-            Object v = rows.get(i).get("合格数量");
-            if (v == null || String.valueOf(v).isBlank()) {
-                throw new IllegalStateException("明细第 " + (i + 1) + " 行合格数量不能为空，请先补全再审核"
+            int line = i + 1;
+            Map<String, Object> row = rows.get(i);
+            Object sent = row.get("送检数量");
+            if (sent == null || String.valueOf(sent).isBlank() || numOf(sent) <= 0) {
+                throw new IllegalStateException("明细第 " + line + " 行送检数量必须大于 0，请先补全"
+                        + "（没有送检数量的行不参与检验，请直接删掉）");
+            }
+            Object ok = row.get("合格数量");
+            if (ok == null || String.valueOf(ok).isBlank()) {
+                throw new IllegalStateException("明细第 " + line + " 行合格数量不能为空，请先补全"
                         + "（审核后按 合格数量 / 不合格数量 分流入库与退料）");
+            }
+            double okQty = numOf(ok);
+            double badQty = numOf(row.get("不合格数量"));
+            double sentQty = numOf(sent);
+            if (okQty + badQty > sentQty + 1e-9) {
+                throw new IllegalStateException("明细第 " + line + " 行 合格数量(" + trimZero(okQty)
+                        + ")+不合格数量(" + trimZero(badQty) + ") 超过送检数量(" + trimZero(sentQty) + ")，请核对后再审核");
             }
         }
     }
@@ -3521,6 +3541,10 @@ public class ButtonService {
         // 这里按**库里的单据**核表头+明细必填 —— 不点保存直接点提交审批时,载荷里只有单号,
         // 保存那两道载荷校验等于没跑(见 ensureDocRequiredFilled 方法注释)。
         ensureDocRequiredFilled(def, no, "提交审批");
+        // 来料检验单:送检数量必须 > 0、合格数量非空、数量守恒(2026-11-17 第二轮口径
+        // 「新增明细行会默认填 0,这个可能会帮助跳过检验」)。审核路径同一道闸门;
+        // 提交审批这里也核一遍,别让「0 送检 / 0 合格」的单先混进审批流。
+        if ("QC_INSP".equals(def.code())) ensureInspOkQtyFilledForAudit(def, no);
         // 工序报工单:报工的**整行校验**前移到「提交审批」(2026-11-01 用户口径:
         //   「这个需要在提交审批处来进行校验而不是点击审批通过的时候出现校验」/「当前这个也是」)。
         //   校验内容 = 审核同一份判据(行锚点 / 工序在本行工艺路线内 / 不跳序 / 数量上限 /
@@ -3602,6 +3626,8 @@ public class ButtonService {
         int node = pendingNodeOf(def.code(), no);
         // 文档级必填(2026-11-17):一级/二级通过前都核一遍(库里数据可能被修改申请改过)
         ensureDocRequiredFilled(def, no, "审批通过");
+        // 来料检验单的「送检数量 > 0 / 合格数量非空 / 数量守恒」在审批通过前再核一遍(同审核口径)
+        if ("QC_INSP".equals(def.code())) ensureInspOkQtyFilledForAudit(def, no);
         if (node == 2) return approveSecond(def, no, operator, formData);
         Map<String, Object> st = docStatusOf(def.code(), no);
         if (!"审批中".equals(st.get("status"))) throw new IllegalStateException("仅审批中状态可审批通过");

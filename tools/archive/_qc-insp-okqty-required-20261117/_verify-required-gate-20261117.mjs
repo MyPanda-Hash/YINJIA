@@ -48,6 +48,20 @@ const aud = await call('审核', { 编号: no })
 ok(aud.body?.code !== 200 && String(aud.body.message || '').includes('不能为空'),
   '草稿(必填没填)直接「审核」被拦', aud.body?.message || '')
 
+// ②b 「送检数量 0 / 合格数量 0」的行不许混过检验(2026-11-17 第二轮口径:默认 0 会帮助跳过检验)
+const zeroRes = await call('保存为草稿', {
+  ...head, 编号: '', detail: { items: [{ 物料编码: 'YJ-XH-002', 送检数量: 0, 合格数量: 0 }] },
+})
+const zeroNo = zeroRes.body?.data?.编号
+if (zeroNo) made.push(zeroNo)
+ok(!!zeroNo, '准备一张「送检 0 / 合格 0」的草稿', zeroNo || JSON.stringify(zeroRes.body).slice(0, 120))
+const zeroAud = await call('审核', { 编号: zeroNo })
+ok(zeroAud.body?.code !== 200 && String(zeroAud.body.message || '').includes('送检数量必须大于 0'),
+  '「送检 0 / 合格 0」的草稿审核被拦(别让它"跳过检验")', zeroAud.body?.message || '')
+const zeroSub = await call('提交审批', { 编号: zeroNo })
+ok(zeroSub.body?.code !== 200 && String(zeroSub.body.message || '').includes('送检数量'),
+  '「送检 0 / 合格 0」的草稿提交审批同样被拦', zeroSub.body?.message || '')
+
 // ③ 补齐必填 → 保存 → 提交审批 → 审批通过 全部通过
 const save = await call('保存', { ...head, 编号: no, detail: { items: [{ 物料编码: 'YJ-XH-002', 送检数量: 10, 合格数量: 8, 不合格数量: 2 }] } })
 ok(save.body?.code === 200, '补齐必填后「保存」通过', save.body?.message || '')
