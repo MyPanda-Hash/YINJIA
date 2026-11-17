@@ -3032,6 +3032,8 @@ export default {
     '删除缓存': 'Xóa khỏi bộ đệm',
     '确定删除这条缓存吗?删掉后不再补打': 'Xóa phiếu này khỏi bộ đệm? Sẽ không in bù nữa',
     '确定清空打印缓存吗?清空后这些单子不再补打': 'Xóa toàn bộ bộ đệm in? Các phiếu này sẽ không được in bù',
+    // 2026-11-17 客户口径:未勾选的明细行置灰且不能填(四个打印/生单弹窗同一句)
+    '未勾选的明细行置灰、不能填写': 'Các dòng không được chọn sẽ bị làm mờ và không thể nhập',
   },
 
 }

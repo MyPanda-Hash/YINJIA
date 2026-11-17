@@ -3027,6 +3027,8 @@ export default {
     '删除缓存': 'Cache-Eintrag löschen',
     '确定删除这条缓存吗?删掉后不再补打': 'Diesen Cache-Eintrag löschen? Er wird nicht mehr gedruckt',
     '确定清空打印缓存吗?清空后这些单子不再补打': 'Den gesamten Druckcache leeren? Diese Belege werden nicht mehr gedruckt',
+    // 2026-11-17 客户口径:未勾选的明细行置灰且不能填(四个打印/生单弹窗同一句)
+    '未勾选的明细行置灰、不能填写': 'Nicht ausgewählte Zeilen sind ausgegraut und können nicht bearbeitet werden',
   },
 
 }

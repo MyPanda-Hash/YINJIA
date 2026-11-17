@@ -6293,6 +6293,8 @@ export default {
     '删除缓存': 'Delete cached job',
     '确定删除这条缓存吗?删掉后不再补打': 'Delete this cached job? It will not be printed',
     '确定清空打印缓存吗?清空后这些单子不再补打': 'Clear the whole print cache? These jobs will not be printed',
+    // 2026-11-17 客户口径:未勾选的明细行置灰且不能填(四个打印/生单弹窗同一句)
+    '未勾选的明细行置灰、不能填写': 'Unchecked lines are greyed out and cannot be edited',
   },
 
 }

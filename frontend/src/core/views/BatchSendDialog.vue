@@ -63,7 +63,10 @@
       <!-- ① 上层:采购订单明细(原行)。「数量」= 订单数量 **已扣掉已打印量**(那部分被隔离到下层去了) -->
       <!-- 2026-11-13 用户口径「不要滚动，一次显示全部」:表不再固定高度(height/max-height 会出内层滚动条),
            全部行一次铺开;弹窗放到 96vw 宽。 -->
-      <el-table ref="tableRef" :data="rows" row-key="lineKey" border size="small" @selection-change="onPicked">
+      <!-- 未勾选的行置灰 + 行内不可填(2026-11-17 客户口径「没有勾选为灰色而且不能有输入」;
+           灰类见 core/selection/pickRowStyle.js,样式在 styles/index.css) -->
+      <el-table ref="tableRef" :data="rows" row-key="lineKey" border size="small"
+                :row-class-name="rowClassRows" @selection-change="onPicked">
         <el-table-column type="selection" width="42" :selectable="rowSelectable" />
         <el-table-column prop="行号" :label="tt('行号')" width="55" />
         <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="120" show-overflow-tooltip />
@@ -85,6 +88,7 @@
         <el-table-column v-if="showWhBin" :label="tt('仓库')" width="130">
           <template #default="{ row }">
             <el-select v-model="whOf[row.lineKey]" size="small" filterable clearable
+                       :disabled="pickRowLocked(pickedKeys, row.lineKey)"
                        :placeholder="tt('选择仓库')" style="width: 120px" @change="onWhChange(row)">
               <el-option v-for="w in whSrc.warehouses" :key="w.code || w.name" :label="w.name" :value="w.name" />
             </el-select>
@@ -93,7 +97,7 @@
         <el-table-column v-if="showWhBin" :label="tt('仓位')" width="130">
           <template #default="{ row }">
             <el-select v-model="binOf[row.lineKey]" size="small" filterable clearable
-                       :disabled="!whOf[row.lineKey]"
+                       :disabled="!whOf[row.lineKey] || pickRowLocked(pickedKeys, row.lineKey)"
                        :placeholder="whOf[row.lineKey] ? tt('选择仓位') : tt('先选仓库')" style="width: 120px">
               <el-option v-for="b in binsOfLine(row)" :key="b.code" :label="b.code" :value="b.code" />
             </el-select>
@@ -102,14 +106,15 @@
         <el-table-column :label="tt('本次送料数量')" width="150">
           <template #default="{ row }">
             <el-input-number v-model="qtyOf[row.lineKey]" :min="0" :max="capOf(row)" :controls="false"
-              :disabled="!(capOf(row) > 0)" :precision="precisionOf(row)" style="width: 130px" />
+              :disabled="!(capOf(row) > 0) || pickRowLocked(pickedKeys, row.lineKey)"
+              :precision="precisionOf(row)" style="width: 130px" />
           </template>
         </el-table-column>
         <el-table-column prop="计量单位" :label="tt('计量单位')" width="85" />
       </el-table>
       <div class="bsd-foot">
         <span>{{ tt('已选') }} <b>{{ picked.length }}</b> {{ tt('行') }} · {{ tt('本次合计') }}: <b>{{ totalQty }}</b></span>
-        <span class="bsd-tip">{{ tt('只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%，超送量按计量单位取整）') }}</span>
+        <span class="bsd-tip">{{ tt('只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%，超送量按计量单位取整）') }} · {{ tt('未勾选的明细行置灰、不能填写') }}</span>
       </div>
 
       <!-- ② 下层:已打印的隔离行(2026-10-04 用户口径「打印后的那一行是已经从原来数量隔离出来的,
@@ -123,7 +128,7 @@
           <span class="bsd-tip">{{ tt('勾选即按该批次号生单；勾到多个批次号会按号分成多张单据') }}</span>
         </div>
         <el-table ref="printedRef" :data="printedRows" row-key="lineKey" border size="small"
-          @selection-change="onPrintedPicked">
+          :row-class-name="rowClassPrinted" @selection-change="onPrintedPicked">
           <el-table-column type="selection" width="42" :selectable="rowSelectable" />
           <el-table-column prop="批次号" :label="tt('批次号')" min-width="150" show-overflow-tooltip />
           <el-table-column prop="行号" :label="tt('行号')" width="55" />
@@ -135,6 +140,7 @@
           <el-table-column v-if="showWhBin" :label="tt('仓库')" width="130">
             <template #default="{ row }">
               <el-select v-model="whOf[row.lineKey]" size="small" filterable clearable
+                         :disabled="pickRowLocked(printedKeys, row.lineKey)"
                          :placeholder="tt('选择仓库')" style="width: 120px" @change="onWhChange(row)">
                 <el-option v-for="w in whSrc.warehouses" :key="w.code || w.name" :label="w.name" :value="w.name" />
               </el-select>
@@ -143,7 +149,7 @@
           <el-table-column v-if="showWhBin" :label="tt('仓位')" width="130">
             <template #default="{ row }">
               <el-select v-model="binOf[row.lineKey]" size="small" filterable clearable
-                         :disabled="!whOf[row.lineKey]"
+                         :disabled="!whOf[row.lineKey] || pickRowLocked(printedKeys, row.lineKey)"
                          :placeholder="whOf[row.lineKey] ? tt('选择仓位') : tt('先选仓库')" style="width: 120px">
                 <el-option v-for="b in binsOfLine(row)" :key="b.code" :label="b.code" :value="b.code" />
               </el-select>
@@ -152,7 +158,8 @@
           <el-table-column :label="tt('本次送料数量')" width="150">
             <template #default="{ row }">
               <el-input-number v-model="qtyOf[row.lineKey]" :min="0" :max="capOf(row)" :controls="false"
-                :disabled="!(capOf(row) > 0)" :precision="precisionOf(row)" style="width: 130px" />
+                :disabled="!(capOf(row) > 0) || pickRowLocked(printedKeys, row.lineKey)"
+                :precision="precisionOf(row)" style="width: 130px" />
             </template>
           </el-table-column>
           <el-table-column :label="tt('状态')" width="90" align="center">
@@ -183,6 +190,8 @@ import { usePanelRuntime } from '@core/panel-runtime'
 import { buildBatchSendLines, defaultPickKeys, sumPickedQty, overAllowance } from '@core/selection/batchSendLines'
 // 生单时的「仓库 / 仓位」预填(2026-11-13 用户口径):取数/级联候选/提交键都在这一份纯函数里
 import { binsOfWarehouse, defaultBinOf, loadWhBinSources, whBinPayload } from '@core/selection/genWhBin'
+// 未勾选的行置灰 + 不可填(2026-11-17 客户口径;四个打印/生单弹窗共用同一份,见该模块头注释)
+import { pickRowClass, pickRowLocked } from '@core/selection/pickRowStyle'
 
 const engine = usePanelRuntime()
 
@@ -270,6 +279,10 @@ function rowSelectable(row) {
 const pickedKeys = computed(() => new Set(picked.value.map((r) => r.lineKey)))
 /** 下层(已打印行)勾选的键 */
 const printedKeys = computed(() => new Set(printedPicked.value.map((r) => r.lineKey)))
+/** 未勾选的行置灰(2026-11-17 客户口径):上下两层各按自己的勾选集合判定。
+ *  置灰只解决"看着一样",禁填由模板里的 pickRowLocked() 负责 —— 两件事必须成对,缺一个就是本条反馈。 */
+const rowClassRows = computed(() => pickRowClass(pickedKeys.value))
+const rowClassPrinted = computed(() => pickRowClass(printedKeys.value))
 /** 本次合计:只算**已勾选**的行(两层都算;未勾选行即使填了量也不送,合计必须与生单结果一致) */
 const totalQty = computed(() =>
   sumPickedQty(rows.value, pickedKeys.value, qtyOf) + sumPickedQty(printedRows.value, printedKeys.value, qtyOf))
@@ -385,7 +398,8 @@ function syncPick(keys) {
   prefillNewlyPicked()
 }
 
-/** 上层勾选变化:新勾上而"本次送料数量"还是 0 的行按剩余量预填;取消勾选**不吞**已填数量(重勾还能用) */
+/** 上层勾选变化:新勾上而"本次送料数量"还是 0 的行按剩余量预填;取消勾选**不吞**已填数量(重勾还能用)。
+ *  未勾选期间该行置灰且输入框禁用(2026-11-17 客户口径),填过的数留着但改不动 —— 重勾即恢复可编辑。 */
 function onPicked(list) {
   picked.value = list || []
   prefillNewlyPicked()

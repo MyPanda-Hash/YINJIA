@@ -39,7 +39,7 @@
                            size="small" style="width: 62px" />
           %<span class="gl-tip">{{ tt('（本次生效；最高 50%，额度按来源行数量算）') }}</span>
         </span>
-        <span class="gl-tip">{{ tt('勾选要生单的明细行并填写本次数量；未勾选的行不会进入新单据') }}</span>
+        <span class="gl-tip">{{ tt('勾选要生单的明细行并填写本次数量；未勾选的行不会进入新单据') }} · {{ tt('未勾选的明细行置灰、不能填写') }}</span>
       </div>
 
       <div v-for="doc in docs" :key="doc.sourceNo" class="gl-doc">
@@ -66,7 +66,10 @@
         </div>
         <!-- 2026-11-13 用户口径「不要滚动，一次显示全部」:表不再限高(max-height 会出内层滚动条),
              全部行一次铺开;弹窗本身放到 96vw 宽,列宽收窄以免横向滚动。 -->
+        <!-- 未勾选的行置灰 + 行内不可填(2026-11-17 客户口径「没有勾选为灰色而且不能有输入」):
+             灰类见 core/selection/pickRowStyle.js,样式在 styles/index.css;每张来源单各按自己的勾选集合判 -->
         <el-table :data="doc.lines" row-key="lineKey" border size="small"
+                  :row-class-name="rowClassOfDoc(doc)"
                   :empty-text="tt('该单据没有可生单的明细行')">
           <el-table-column width="42" align="center">
             <template #default="{ row }">
@@ -89,6 +92,7 @@
           <el-table-column v-if="showWhBin" :label="tt('仓库')" width="130">
             <template #default="{ row }">
               <el-select v-model="whOf[row.lineKey]" size="small" filterable clearable
+                         :disabled="pickRowLocked(picksOfDoc(doc), row.lineKey)"
                          :placeholder="tt('选择仓库')" style="width: 120px" @change="onWhChange(row)">
                 <el-option v-for="w in whSrc.warehouses" :key="w.code || w.name" :label="w.name" :value="w.name" />
               </el-select>
@@ -97,7 +101,8 @@
           <el-table-column v-if="showWhBin" :label="tt('仓位')" width="130">
             <template #default="{ row }">
               <el-select v-model="binOf[row.lineKey]" size="small" filterable clearable
-                         :disabled="!whOf[row.lineKey]" :placeholder="whOf[row.lineKey] ? tt('选择仓位') : tt('先选仓库')"
+                         :disabled="!whOf[row.lineKey] || pickRowLocked(picksOfDoc(doc), row.lineKey)"
+                         :placeholder="whOf[row.lineKey] ? tt('选择仓位') : tt('先选仓库')"
                          style="width: 120px">
                 <el-option v-for="b in binsOfLine(row)" :key="b.code" :label="b.code" :value="b.code" />
               </el-select>
@@ -109,7 +114,9 @@
           <el-table-column :label="tt('本次数量')" width="140">
             <template #default="{ row }">
               <el-input-number v-model="qtyOf[row.lineKey]" :min="0" :max="capOf(row, ratioPct)" :controls="false"
-                               :precision="2" :disabled="!selectable(doc, row)" style="width: 120px" />
+                               :precision="2"
+                               :disabled="!selectable(doc, row) || pickRowLocked(picksOfDoc(doc), row.lineKey)"
+                               style="width: 120px" />
             </template>
           </el-table-column>
           <el-table-column v-if="meta.batchFlow" :label="tt('状态')" width="86" align="center">
@@ -150,6 +157,8 @@ import {
 } from '@core/selection/pushGenerateLines'
 // 生单时的「仓库 / 仓位」预填(2026-11-13 用户口径):取数、级联候选、提交键都在这一份纯函数里
 import { binsOfWarehouse, defaultBinOf, loadWhBinSources, whBinPayload } from '@core/selection/genWhBin'
+// 未勾选的行置灰 + 不可填(2026-11-17 客户口径;四个打印/生单弹窗共用同一份,见该模块头注释)
+import { pickRowClass, pickRowLocked } from '@core/selection/pickRowStyle'
 
 const engine = usePanelRuntime()
 
@@ -246,6 +255,8 @@ const count = computed(() => {
 
 /** 统一取勾选集合(组件里存数组,纯函数既收 Set 也收数组) */
 const picksOfDoc = (doc) => picksOf(pickedByDoc[doc.sourceNo])
+/** 未勾选的行置灰(2026-11-17 客户口径):每张来源单一张表,各按自己的勾选集合判;禁填见模板 pickRowLocked */
+const rowClassOfDoc = (doc) => pickRowClass(picksOfDoc(doc))
 
 function isPicked(doc, row) { return picksOfDoc(doc).has(row.lineKey) }
 /** 只读单据(非已审核)整张不可勾;没有可生单量的行也不可勾 */

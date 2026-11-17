@@ -28,8 +28,9 @@
           </el-radio-group>
         </span>
       </div>
-      <!-- 这句话是口径本身,别删:用户最容易误解的就是"是不是改了订单数量" -->
-      <div class="pup-tip">{{ tt('勾选要打印的明细行，并填写本次打印数量；只影响这张报表，不改动订单数据') }}</div>
+      <!-- 这句话是口径本身,别删:用户最容易误解的就是"是不是改了订单数量";
+           末句是 2026-11-17 客户口径(未勾选的行置灰且不可填)的说明 -->
+      <div class="pup-tip">{{ tt('勾选要打印的明细行，并填写本次打印数量；只影响这张报表，不改动订单数据') }} · {{ tt('未勾选的明细行置灰、不能填写') }}</div>
       <!-- 超送上限(2026-11-09 用户口径:和材料码一样,已送/已打印/剩余可打都要有) -->
       <div class="pup-quota-tip">
         {{ tt('打印上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回 − 已打印（超送量按计量单位取整）') }}
@@ -77,8 +78,10 @@
         </el-button>
       </div>
 
+      <!-- 未勾选的行置灰 + 行内不可填(2026-11-17 客户口径「没有勾选为灰色而且不能有输入」):
+           灰类见 core/selection/pickRowStyle.js,样式在 styles/index.css -->
       <el-table ref="tableRef" :data="rows" row-key="__key" border size="small" :height="mainTableHeight"
-        @selection-change="onPicked">
+        :row-class-name="rowClassOf" @selection-change="onPicked">
         <el-table-column type="selection" width="42" />
         <el-table-column prop="行号" :label="tt('行号')" width="64" />
         <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="120" show-overflow-tooltip />
@@ -99,7 +102,8 @@
         <el-table-column :label="tt('本次打印数量')" width="132">
           <template #default="{ row }">
             <el-input-number v-model="qtyOf[row.__key]" :min="0" :max="capOf(row) ?? undefined"
-              :precision="precisionOf(row)" :controls="false" style="width: 112px" @change="onQtyChange(row)" />
+              :precision="precisionOf(row)" :controls="false" :disabled="pickRowLocked(pickedKeys, row.__key)"
+              style="width: 112px" @change="onQtyChange(row)" />
           </template>
         </el-table-column>
         <!-- 单价/小计只属于"有金额"版式:无金额版纸面本来就没这两列,弹窗跟着收起,避免看成两张报表 -->
@@ -297,6 +301,8 @@ import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { sumKeepScale } from '@core/panel/sumTotals'
 import { puOrderLineAmount } from '@core/panel/puPrintAmount'
+// 未勾选的行置灰 + 不可填(2026-11-17 客户口径;四个打印/生单弹窗共用同一份,见该模块头注释)
+import { pickRowClass, pickRowLocked } from '@core/selection/pickRowStyle'
 
 const engine = usePanelRuntime()
 
@@ -370,6 +376,8 @@ const rows = computed(() => lines.value.map((l, i) => ({ ...l, __key: keyOf(l, i
  */
 const mainTableHeight = computed(() => Math.min(42 + rows.value.length * 42, 480))
 const pickedKeys = computed(() => new Set(picked.value.map((r) => r.__key)))
+/** 未勾选的行置灰(2026-11-17 客户口径):行键是 __key(数据库 id / 行号派生的稳定键),与 row-key 同源 */
+const rowClassOf = computed(() => pickRowClass(pickedKeys.value, (r) => r.__key))
 const title = computed(() => {
   const base = showAmount.value ? tt('打印采购订单') : tt('打印订单无金额')
   return props.docNo ? `${base} · ${props.docNo}` : base

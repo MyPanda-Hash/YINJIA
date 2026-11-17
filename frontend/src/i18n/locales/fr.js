@@ -3027,6 +3027,8 @@ export default {
     '删除缓存': 'Supprimer du cache',
     '确定删除这条缓存吗?删掉后不再补打': 'Supprimer ce document du cache ? Il ne sera plus imprimé',
     '确定清空打印缓存吗?清空后这些单子不再补打': 'Vider tout le cache ? Ces documents ne seront plus imprimés',
+    // 2026-11-17 客户口径:未勾选的明细行置灰且不能填(四个打印/生单弹窗同一句)
+    '未勾选的明细行置灰、不能填写': 'Les lignes non cochées sont grisées et non modifiables',
   },
 
 }

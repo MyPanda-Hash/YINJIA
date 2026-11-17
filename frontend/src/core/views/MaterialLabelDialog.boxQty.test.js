@@ -105,8 +105,9 @@ test('⑦ 按打印记录带入后:只锁「本次打印数量」,「每箱数�
   assert.ok(/lockedBySource/.test(qtyBlock), '「本次打印数量」带入后仍要锁')
   const boxBlock = mainTable.slice(mainTable.indexOf("tt('每箱数量')"))
   assert.ok(!/lockedBySource/.test(boxBlock), '「每箱数量」不能吃 lockedBySource(带入后必须能填)')
-  assert.ok(/:disabled="!\(Number\(qtyOf\[row\.id\] \|\| 0\) > 0\)"/.test(boxBlock),
-    '每箱数量的可填条件只剩"本行有本次打印数量"')
+  // 2026-11-17 客户口径「没有勾选为灰色而且不能有输入」:可填条件多了一条"本行已勾选"(勾选仍是权威)
+  assert.ok(/:disabled="!\(Number\(qtyOf\[row\.id\] \|\| 0\) > 0\) \|\| pickRowLocked\(pickedKeys, row\.id\)"/.test(boxBlock),
+    '每箱数量的可填条件 = 本行有本次打印数量 且 本行已勾选')
   const suppBoxBlock = suppTable.slice(suppTable.indexOf("tt('每箱数量')"))
   assert.ok(!/lockedBySource/.test(suppBoxBlock), '补登行的每箱数量同样不受带入锁定')
 })

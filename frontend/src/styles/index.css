@@ -287,6 +287,27 @@ body .rs-tool .el-icon {
   }
 }
 
+/* ===== 明细勾选：未勾选的行置灰（2026-11-17 客户反馈）=====
+   客户原话：「没有勾选的单据明细没有做区分，还是可填。」
+   修改方案：「没有勾选为灰色而且不能有输入。所有打印和生单都要有。关于明细勾选的」
+   ⇒ 四个「勾选明细行 → 出单据 / 出纸」的弹窗统一（分批送料 / 统一生单·合单生单 /
+     打印材料码 / 打印采购订单）：行类名 .yj-pick-row-off 由 core/selection/pickRowStyle.js
+     经 el-table 的 row-class-name 打进 <tr>，行内控件由 pickRowLocked() 判 disabled。
+   为什么写在全局而不是各组件里：行是 el-table 内部渲染的 <tr>，组件 scoped 样式必须 :deep
+   才够得着；四个组件各抄一份 CSS 正是"下次漏一处"的温床 —— 一处定义，四处生效。
+   颜色走 element 的填充/文字变量 ⇒ 暗色皮肤跟着变，不写死。 */
+.el-table .el-table__row.yj-pick-row-off > td.el-table__cell {
+  background: var(--el-fill-color-lighter, #f5f7fa) !important;
+}
+.el-table .el-table__row.yj-pick-row-off > td.el-table__cell,
+.el-table .el-table__row.yj-pick-row-off > td.el-table__cell .cell {
+  color: var(--el-text-color-placeholder, #a8abb2);
+}
+/* 悬停也得保持"这行没勾"的观感，否则鼠标一过就跟已勾选的行一样亮 */
+.el-table .el-table__row.yj-pick-row-off:hover > td.el-table__cell {
+  background: var(--el-fill-color-light, #f0f2f5) !important;
+}
+
 /* ===== 移动端全局（≤768px）===== */
 @media (max-width: 768px) {
   /* 弹窗宽度：覆盖 el-dialog 内联 --el-dialog-width（固定 420/440/560/760px 一律收窄） */
