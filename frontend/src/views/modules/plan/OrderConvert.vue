@@ -69,8 +69,11 @@
 
     <!-- 待结转表(分页渲染:一页最多 pageSize 行,数据再多也不卡) -->
     <div class="oc-table">
+      <!-- 点整行即勾选(2026-11-17 用户口径「不需要只选择一定要点那个小方框,而是可以点击这一行来选择」):
+           row-click 翻转勾选(判据在 business/rowSelect.js:复选框/交货日期选择器/本次转单数量输入框
+           这些格内控件点了不翻),前面那个复选框降级成状态显示 + 表头全选。 -->
       <el-table ref="tableRef" :data="pagedRows" size="small" border height="100%" row-key="rowKey" v-loading="loading"
-                @selection-change="onCheck">
+                @selection-change="onCheck" @row-click="onRowClick">
         <el-table-column type="selection" width="42" reserve-selection />
         <el-table-column :label="tt('订单资料')" width="240" fixed>
           <template #default="{ row }">
@@ -196,6 +199,7 @@ import { useReportColumns } from '@core/report/useReportColumns'
 import DateRangeQuery from '@core/ui/DateRangeQuery.vue'
 import ColumnSettingsDialog from '@core/views/ColumnSettingsDialog.vue'
 import { applyRouteDefaults } from '@/business/routeDefaults'
+import { toggleRowOnRowClick } from '@/business/rowSelect'
 
 /**
  * 页面级权限(2026-10-16):本页挂页面面板 ORDER_CONVERT
@@ -427,6 +431,17 @@ async function askJumpToLatest() {
   await loadAll()
 }
 function onCheck(r) { checked.value = r }
+
+/**
+ * 点整行 = 勾选/取消勾选(2026-11-17 用户口径)。
+ * <p>判据在 @/business/rowSelect.js:点复选框自己那一下、以及格内控件
+ * (交货日期选择器 / 本次转单数量输入框)都不翻勾选 —— 用户点它们是要改数,不是选行。
+ * 翻转走 el-table 自己的 toggleRowSelection(本表 reserve-selection 跨页保留勾选,
+ * 另存数组会跟表格内部状态打架)。</p>
+ */
+function onRowClick(row, column, event) {
+  toggleRowOnRowClick(tableRef.value, row, event)
+}
 
 /** 保存交期:把行内修正的预计交货日期回写销售订单行 */
 async function saveDates() {

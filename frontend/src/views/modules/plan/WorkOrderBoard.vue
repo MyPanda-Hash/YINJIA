@@ -170,8 +170,12 @@
                :row-class-name  → 命中的行挂 .wb-focus-row(浅蓝底 + 左侧 3px 蓝边)
                (:row-key 只用来让 el-table 认行身份 —— 同号工单行多批时不串行;此前它还喂
                 expand-row-keys,2026-11-14 展开区删除后已无此用途) -->
+          <!-- 点整行即勾选(2026-11-17 用户口径「不需要只选择一定要点那个小方框,而是可以点击这一行来选择」):
+               row-click 翻转勾选;行内日排产格(.dp-plan,点它是就地改当天数量)与复选框本身不翻
+               (判据 business/rowSelect.js)。 -->
           <el-table ref="schedTable" :data="schedRows" size="small" border height="100%" empty-text=""
                     :row-key="rowKeyOf" :row-class-name="rowClassName"
+                    @row-click="onRowClick"
                     @selection-change="(r) => (checkedSched = r)">
             <el-table-column type="selection" width="42" />
             <!-- 按量流转·逐道明细(2026-11-12 方案A 的展开行)**已于 2026-11-14 删除**:
@@ -465,6 +469,7 @@ import { qtyText, isOverCapacity, dayColState, isToday, isPast, isOutOfPlanRange
   dayCellView, historyShortfalls, shortfallTotals } from '@/business/dayPlan'
 // 逐道工序的悬停提示文本(2026-11-14:原「工序流转明细」展开区删除后,数字收到「当前工序」格)
 import { flowChainTip } from '@/business/woFlowChain'
+import { toggleRowOnRowClick } from '@/business/rowSelect'
 import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
@@ -846,6 +851,15 @@ let focusSeq = 0
 let focusInflight = ''
 /** 排产明细表(定位后从它的 DOM 里找高亮行滚到中间) */
 const schedTable = ref(null)
+
+/**
+ * 点整行 = 勾选/取消勾选(2026-11-17 用户口径「不需要只选择一定要点那个小方框,而是可以点击这一行来选择」)。
+ * <p>判据在 @/business/rowSelect.js:复选框自己那一下不重复处理,**行内日排产格 .dp-plan 不翻**
+ * (点那一格是就地改当天计划数量,顺手翻勾选会让人以为点错了),其余单元格点了即翻。</p>
+ */
+function onRowClick(row, column, event) {
+  toggleRowOnRowClick(schedTable.value, row, event, { extra: '.dp-plan' })
+}
 
 /**
  * 行身份 key(2026-11-13):`:row-key` 依赖它,**必须唯一** ——
