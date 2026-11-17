@@ -3056,13 +3056,14 @@ export default {
     '拆出来': 'Số dòng sau khi tách',
     '未选': 'Chưa chọn',
     '点每行前面的 ▾ 增加一行仓库；同一行各仓库数量合计不能超过「可入库数量」，没分完的留在原行': 'Nhấn ▾ trước mỗi dòng để thêm dòng kho; tổng theo dòng không được vượt số lượng có thể nhập (phần còn lại giữ ở dòng gốc)',
-    '同一行要拆至少两个仓库：再点一次 ▾': 'Một dòng cần ít nhất hai kho: nhấn ▾ thêm lần nữa',
     '第 {n} 个仓库子行还没填仓库或数量': 'Dòng kho con {n} chưa có kho hoặc số lượng',
     '该行各仓库数量合计不能超过可入库数量': 'Tổng theo dòng không được vượt số lượng có thể nhập',
     '该行还剩 {n} 没有分配，且原行没有仓库，请分完或先给原行选仓库': 'Dòng còn {n} chưa phân bổ và dòng gốc chưa có kho; hãy phân bổ hết hoặc chọn kho trước',
     '合并回一行': 'Gộp lại một dòng',
     '同一行不能出现重复的仓库（仓位）': 'Không được trùng kho (vị trí) trên cùng một dòng',
     '剩余 {n} 会留在原行（原仓库）': 'Phần còn lại {n} giữ ở dòng gốc (kho gốc)',
+    '只填一个仓库：直接把这一行的仓库设为它（不拆行）': 'Chỉ một kho: gán trực tiếp cho dòng này (không tách dòng)',
+    '第 1 个仓库子行还没选仓库': 'Dòng kho con 1 chưa chọn kho',
   },
 
 }

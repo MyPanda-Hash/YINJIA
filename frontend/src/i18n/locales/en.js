@@ -6320,13 +6320,14 @@ export default {
     '拆出来': 'Resulting rows',
     '未选': 'None',
     '点每行前面的 ▾ 增加一行仓库；同一行各仓库数量合计不能超过「可入库数量」，没分完的留在原行': 'Click ▾ in front of a line to add a warehouse row; the sum per line must not exceed the receivable qty — the rest stays on the original line',
-    '同一行要拆至少两个仓库：再点一次 ▾': 'A line needs at least two warehouses: click ▾ again',
     '第 {n} 个仓库子行还没填仓库或数量': 'Warehouse sub-row {n} is missing a warehouse or qty',
     '该行各仓库数量合计不能超过可入库数量': 'The total per line cannot exceed the receivable qty',
     '该行还剩 {n} 没有分配，且原行没有仓库，请分完或先给原行选仓库': 'Line still has {n} unallocated and no warehouse on the original line; allocate it all or pick a warehouse for the line first',
     '合并回一行': 'Merge back into one line',
     '同一行不能出现重复的仓库（仓位）': 'The same warehouse (bin) cannot appear twice on one line',
     '剩余 {n} 会留在原行（原仓库）': 'The remaining {n} stays on the original line (original warehouse)',
+    '只填一个仓库：直接把这一行的仓库设为它（不拆行）': 'Only one warehouse: it is set on this line directly (no split)',
+    '第 1 个仓库子行还没选仓库': 'Warehouse sub-row 1 has no warehouse selected',
   },
 
 }

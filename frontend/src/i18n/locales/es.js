@@ -3051,13 +3051,14 @@ export default {
     '拆出来': 'Filas resultantes',
     '未选': 'Sin seleccionar',
     '点每行前面的 ▾ 增加一行仓库；同一行各仓库数量合计不能超过「可入库数量」，没分完的留在原行': 'Haga clic en ▾ delante de una línea para añadir una fila de almacén; la suma por línea no puede superar la cantidad recepcionable (el resto queda en la línea original)',
-    '同一行要拆至少两个仓库：再点一次 ▾': 'Una línea necesita al menos dos almacenes: haga clic en ▾ otra vez',
     '第 {n} 个仓库子行还没填仓库或数量': 'La subfila de almacén {n} no tiene almacén o cantidad',
     '该行各仓库数量合计不能超过可入库数量': 'La suma por línea no puede superar la cantidad recepcionable',
     '该行还剩 {n} 没有分配，且原行没有仓库，请分完或先给原行选仓库': 'La línea tiene {n} sin asignar y la línea original no tiene almacén; asígnelo todo o elija un almacén primero',
     '合并回一行': 'Unir en una línea',
     '同一行不能出现重复的仓库（仓位）': 'El mismo almacén (ubicación) no puede repetirse en una línea',
     '剩余 {n} 会留在原行（原仓库）': 'Los {n} restantes quedan en la línea original (almacén original)',
+    '只填一个仓库：直接把这一行的仓库设为它（不拆行）': 'Solo un almacén: se asigna directamente a esta línea (sin dividir)',
+    '第 1 个仓库子行还没选仓库': 'La subfila de almacén 1 no tiene almacén',
   },
 
 }

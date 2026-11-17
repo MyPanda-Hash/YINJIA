@@ -114,9 +114,9 @@ test('② 弹窗:每行 ▾ 加一行仓库子行,合计不超过可入库数量
   assert.ok(/addAlloc\(/.test(dlg) && /@click="addAlloc\(row\.L\)"/.test(dlg), '每行 ▾ 要能加一行仓库子行')
   assert.ok(/maxOf\(/.test(dlg) && /可入库数量/.test(dlg), '要有"可入库数量"这一列作为上限')
   assert.ok(/remainingOf\(L\) < 0/.test(dlg) && /不能超过可入库数量/.test(dlg), '超过上限要拦')
-  assert.ok(/withRemainder\(/.test(dlg), '没分完的余量要补回原行(否则服务端合计不等于实收数量)')
+  assert.ok(/payloadOf\(/.test(dlg), '没分完的余量要补回原行(否则服务端合计不等于实收数量)')
   assert.ok(/splitPurInMultiWh\(/.test(dlg), '提交走 splitPurInMultiWh(整批一次)')
-  assert.ok(/同一行要拆至少两个仓库/.test(dlg), '只填一个仓库要说明"不会拆行"')
+  assert.ok(/只填一个仓库：直接把这一行的仓库设为它（不拆行）/.test(dlg), '只填一个仓库要说明"直接设仓库、不拆行"')
   assert.ok(/:disabled="!canSubmit"/.test(dlg), '校验不过时不许提交')
 })
 
@@ -125,10 +125,23 @@ test('② 数量:上下都能改,不做自动分配;超过可入库数量才提�
   // 第六轮用户口径「上下都可以改,只要提示不超过总数量。不用自动计算了」
   assert.ok(!/recalcRemainder/.test(dlg), '自动分配已按用户口径撤掉')
   assert.ok(!/disabled="row\.i === row\.L\.allocs\.length - 1"/.test(dlg), '最后一行也要能改')
-  assert.ok(/@change="recalcRemainder/.test(dlg) === false, '不该再有自动重算')
   assert.ok(/该行各仓库数量合计不能超过可入库数量/.test(dlg), '超过总数量要提示')
   assert.ok(/剩余 \{n\} 会留在原行（原仓库）/.test(dlg), '填少了只是一句非阻断提示(余量留原行)')
   assert.ok(/同一行不能出现重复的仓库（仓位）/.test(dlg), '同仓同仓位重复要拦(否则金蝶收到两条一样的分录)')
+})
+
+test('② 只填一个仓库也能确定:直接把这一行的仓库设为它(不拆行)', () => {
+  const dlg = src('./../views/PurInMultiWhDialog.vue')
+  // 用户报障「为什么确定不了」:只填了一行(D仓 5)时被"至少两个仓库"拦住
+  assert.ok(!/同一行要拆至少两个仓库/.test(dlg), '不再拿"至少两个仓库"拦单行')
+  assert.ok(/const needsApply = \(L\) => \(L\?\.allocs \|\| \[\]\)\.length >= 1/.test(dlg),
+    '填了 1 行也算要提交')
+  assert.ok(/只填一个仓库：直接把这一行的仓库设为它（不拆行）/.test(dlg), '要说明单行=直接设仓库')
+  assert.ok(/if \(allocs\.length >= 2\) \{/.test(dlg), '余量补齐只在"真要拆"时做(否则单行会被补成两行)')
+  const svc = src('./../../../../backend/src/main/java/com/yinjia/mes/service/PurInSplitService.java')
+  assert.ok(/private void applySingle\(/.test(svc), '服务端要支持"单仓库=直接设仓库"')
+  assert.ok(/if \(allocs\.size\(\) == 1\)/.test(svc) && /applySingle\(no, lineId, allocs\.get\(0\), user\)/.test(svc),
+    'multiWh 里单仓库要走 applySingle')
 })
 
 test('② 仓位:服务端只校验归属,不再查 bs_wh_loc.仓位名称(该列不存在,2026-11-17 实测 SQL 207)', () => {
@@ -145,14 +158,14 @@ test('② 回退 + 缩进:按 [源行id] 归组,拆过的行再打开还是"父�
   assert.ok(/gid !== Number\(r\.id\)\) continue/.test(dlg), '子行不能单独成行(否则缩进就没了)')
   assert.ok(/groupRows/.test(dlg), '每行要带整组行,可入库数量按整组合计算')
   assert.ok(/mergeBack\(/.test(dlg) && /合并回一行/.test(dlg), '要有「合并回一行」(回退)入口')
-  assert.ok(/isGrouped\(/.test(dlg) && /needsApply/.test(dlg), '拆过的行只留一个仓库 = 合并回一行,也要提交')
+  assert.ok(/needsApply/.test(dlg), '拆过的行只留一个仓库(合并)也要提交')
   // 服务端:组锚点查询 + 合并 = 子行软删 + 父行数量/金额合回 + 占用链回流
   const svc = src('./../../../../backend/src/main/java/com/yinjia/mes/service/PurInSplitService.java')
   assert.ok(/public List<Map<String, Object>> groups\(/.test(svc), '服务端要能按单据返回组锚点')
   assert.ok(/mergeChildren\(/.test(svc) && /asp_cancel\] = 'Y'/.test(svc), '合并要把子行软删(不物理删)')
   assert.ok(/target_line_key/.test(svc) && /\[link_status\] = 'RELEASED'/.test(svc),
     '合并要把子行的占用链释放')
-  assert.ok(/allocs\.size\(\) < 2/.test(svc), '只给一个仓库 = 走合并(回退),不再要求"至少两个仓库"')
+  assert.ok(/applySingle\(/.test(svc), '只给一个仓库 = 直接设仓库(applySingle),不再要求"至少两个仓库"')
   assert.ok(/\[源行id\]/.test(svc), '拆行要写组锚点')
   const ctrl = src('./../../../../backend/src/main/java/com/yinjia/mes/controller/PxController.java')
   assert.ok(/@GetMapping\("\/purIn\/groups"\)/.test(ctrl), '控制器要有组锚点查询')

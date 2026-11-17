@@ -3052,13 +3052,14 @@ export default {
     '拆出来': 'Lignes obtenues',
     '未选': 'Non défini',
     '点每行前面的 ▾ 增加一行仓库；同一行各仓库数量合计不能超过「可入库数量」，没分完的留在原行': 'Cliquez sur ▾ devant une ligne pour ajouter une ligne entrepôt ; la somme par ligne ne doit pas dépasser la quantité réceptionnable (le reste demeure sur la ligne d’origine)',
-    '同一行要拆至少两个仓库：再点一次 ▾': 'Une ligne nécessite au moins deux entrepôts : cliquez à nouveau sur ▾',
     '第 {n} 个仓库子行还没填仓库或数量': 'La sous-ligne entrepôt {n} n’a pas d’entrepôt ou de quantité',
     '该行各仓库数量合计不能超过可入库数量': 'La somme par ligne ne peut pas dépasser la quantité réceptionnable',
     '该行还剩 {n} 没有分配，且原行没有仓库，请分完或先给原行选仓库': 'La ligne a {n} non affecté et aucune ligne d’origine avec entrepôt ; affectez tout ou choisissez d’abord un entrepôt',
     '合并回一行': 'Refusionner en une ligne',
     '同一行不能出现重复的仓库（仓位）': 'Le même entrepôt (emplacement) ne peut pas apparaître deux fois sur une ligne',
     '剩余 {n} 会留在原行（原仓库）': 'Le reste ({n}) demeure sur la ligne d’origine (entrepôt d’origine)',
+    '只填一个仓库：直接把这一行的仓库设为它（不拆行）': 'Un seul entrepôt : il est appliqué directement à cette ligne (pas de division)',
+    '第 1 个仓库子行还没选仓库': 'La sous-ligne entrepôt 1 n’a pas d’entrepôt',
   },
 
 }

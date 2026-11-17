@@ -3051,13 +3051,14 @@ export default {
     '拆出来': 'Ergebniszeilen',
     '未选': 'Nicht gewählt',
     '点每行前面的 ▾ 增加一行仓库；同一行各仓库数量合计不能超过「可入库数量」，没分完的留在原行': 'Klicken Sie auf ▾ vor einer Zeile, um eine Lagerzeile hinzuzufügen; die Summe je Zeile darf die Zugangsmenge nicht überschreiten (der Rest bleibt in der Originalzeile)',
-    '同一行要拆至少两个仓库：再点一次 ▾': 'Eine Zeile braucht mindestens zwei Lager: erneut auf ▾ klicken',
     '第 {n} 个仓库子行还没填仓库或数量': 'Lagerzeile {n}: Lager oder Menge fehlt',
     '该行各仓库数量合计不能超过可入库数量': 'Die Summe je Zeile darf die Zugangsmenge nicht überschreiten',
     '该行还剩 {n} 没有分配，且原行没有仓库，请分完或先给原行选仓库': 'Zeile hat noch {n} nicht zugewiesen und die Originalzeile hat kein Lager; alles zuweisen oder zuerst ein Lager wählen',
     '合并回一行': 'Zu einer Zeile zusammenführen',
     '同一行不能出现重复的仓库（仓位）': 'Dasselbe Lager (Fach) darf in einer Zeile nicht doppelt vorkommen',
     '剩余 {n} 会留在原行（原仓库）': 'Die restlichen {n} bleiben in der Originalzeile (ursprüngliches Lager)',
+    '只填一个仓库：直接把这一行的仓库设为它（不拆行）': 'Nur ein Lager: wird direkt auf diese Zeile gesetzt (keine Aufteilung)',
+    '第 1 个仓库子行还没选仓库': 'Lagerzeile 1: kein Lager gewählt',
   },
 
 }

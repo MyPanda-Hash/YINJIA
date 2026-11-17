@@ -108,6 +108,7 @@
       <div class="pmw-foot">
         <span>{{ tt('要拆分的行') }}: <b>{{ splitLineCount }}</b> · {{ tt('拆出来') }}: <b>{{ willSplitRows }}</b> {{ tt('行') }}</span>
         <span v-if="problem" class="pmw-problem">{{ problem }}</span>
+        <span v-else-if="singleHint" class="pmw-hint">{{ singleHint }}</span>
         <span v-else-if="remainderHint" class="pmw-hint">{{ remainderHint }}</span>
       </div>
     </div>
@@ -164,16 +165,14 @@ const maxOf = (L) => (L?.groupRows || (L?.row ? [L.row] : [])).reduce((s, r) => 
 const allocatedOf = (L) => (L?.allocs || []).reduce((s, a) => s + Math.max(0, numOr0(a['数量'])), 0)
 const remainingOf = (L) => Math.round((maxOf(L) - allocatedOf(L)) * 10000) / 10000
 const hasId = (L) => L && L.row && L.row.id !== undefined && L.row.id !== null && L.row.id !== ''
-/** 这一组是不是"已经拆过"(有子行)—— 决定要不要显示「合并回一行」 */
-const isGrouped = (L) => (L?.groupRows || []).length > 1
 
 /**
- * 要提交的行:
+ * 要提交的行(用户口径 2026-11-17 第六轮「为什么确定不了」):
  *  · 填了 ≥2 个仓库子行 ⇒ 拆行(或改分配);
- *  · 已经拆过、现在只剩 1 个仓库子行 ⇒ **合并回一行**(回退)。
- * 其它(没动过的行)不提交,避免把别人的行改坏。
+ *  · 只填了 1 个仓库子行 ⇒ **把这一行的仓库设成它**(已经拆过的则先合并回一行)—— 不拆行,但要能确定;
+ * 没填子行的行不提交,避免把别人的行改坏。
  */
-const needsApply = (L) => (L?.allocs || []).length >= 2 || ((L?.allocs || []).length === 1 && isGrouped(L))
+const needsApply = (L) => (L?.allocs || []).length >= 1
 const splitLines = computed(() => lines.filter(needsApply))
 const splitLineCount = computed(() => splitLines.value.length)
 const willSplitRows = computed(() => splitLines.value.reduce((s, L) => s + Math.max(1, L.allocs.length), 0))
@@ -195,10 +194,13 @@ const problem = computed(() => {
   for (const L of lines) {
     const list = L.allocs || []
     if (!list.length) continue
-    // 已经拆过、只留一个仓库 = 合并回一行(回退),不要求"至少两个"
-    const merging = list.length === 1 && isGrouped(L)
-    if (list.length === 1 && !isGrouped(L)) return tt('同一行要拆至少两个仓库：再点一次 ▾')
+    // 只填一个仓库 = 直接设为这一行的仓库(不拆行):只要选了仓库就算合法,数量不参与
+    const single = list.length === 1
     if (!hasId(L)) return tt('请先保存单据，再拆分仓库')
+    if (single) {
+      if (!String(list[0]['仓库'] || '').trim()) return tt('第 1 个仓库子行还没选仓库')
+      continue
+    }
     const bad = list.findIndex((a) => !String(a['仓库'] || '').trim() || numOr0(a['数量']) <= 0)
     if (bad >= 0) return tt('第 {n} 个仓库子行还没填仓库或数量').replace('{n}', String(bad + 1))
     // 同一行拆到"同一个仓库 + 同一个仓位"没有意义,而且会让金蝶收到两条一模一样的行
@@ -208,17 +210,21 @@ const problem = computed(() => {
       if (seen.has(k)) return tt('同一行不能出现重复的仓库（仓位）')
       seen.add(k)
     }
-    if (!merging) {
-      if (remainingOf(L) < 0) return tt('该行各仓库数量合计不能超过可入库数量')
-      if (remainingOf(L) > 0 && !String(L.row['仓库'] || '').trim()) {
-        return tt('该行还剩 {n} 没有分配，且原行没有仓库，请分完或先给原行选仓库').replace('{n}', fmt(remainingOf(L)))
-      }
+    if (remainingOf(L) < 0) return tt('该行各仓库数量合计不能超过可入库数量')
+    if (remainingOf(L) > 0 && !String(L.row['仓库'] || '').trim()) {
+      return tt('该行还剩 {n} 没有分配，且原行没有仓库，请分完或先给原行选仓库').replace('{n}', fmt(remainingOf(L)))
     }
   }
   return ''
 })
 
 const canSubmit = computed(() => !saving.value && splitLineCount.value > 0 && !problem.value)
+
+/** 只填一个仓库 = 直接把这一行的仓库设为它(不拆行);这里给一句说明,别让人以为"填少了" */
+const singleHint = computed(() => {
+  const hit = lines.find((L) => (L.allocs || []).length === 1)
+  return hit ? tt('只填一个仓库：直接把这一行的仓库设为它（不拆行）') : ''
+})
 
 /** 填少了不算错:余量留在原行(原仓库),这里只做一句非阻断提示 */
 const remainderHint = computed(() => {
@@ -317,19 +323,23 @@ function mergeBack(L) {
 const close = () => emit('update:modelValue', false)
 
 /** 没分完的余量补一行(仓库 = 原行的仓库),这样服务端"合计 = 实收数量"的老口径仍然成立 */
-function withRemainder(L) {
+function payloadOf(L) {
   const allocs = L.allocs.map((a) => ({
     仓库: String(a['仓库'] || '').trim(),
     仓位编码: String(a['仓位编码'] || '').trim(),
     数量: Math.round(numOr0(a['数量']) * 10000) / 10000,
   }))
-  const rest = remainingOf(L)
-  if (rest > 0) {
-    allocs.push({
-      仓库: String(L.row['仓库'] || '').trim(),
-      仓位编码: String(L.row['仓位编码'] || '').trim(),
-      数量: Math.round(rest * 10000) / 10000,
-    })
+  // 只有"真要拆成多行"时才把没分完的余量补成原仓库那一行;
+  // 只填一个仓库 = 直接把这一行的仓库设成它(服务端 applySingle),不能补成两行
+  if (allocs.length >= 2) {
+    const rest = remainingOf(L)
+    if (rest > 0) {
+      allocs.push({
+        仓库: String(L.row['仓库'] || '').trim(),
+        仓位编码: String(L.row['仓位编码'] || '').trim(),
+        数量: Math.round(rest * 10000) / 10000,
+      })
+    }
   }
   return allocs
 }
@@ -338,7 +348,7 @@ async function confirm() {
   if (!canSubmit.value) return
   saving.value = true
   try {
-    const payload = splitLines.value.map((L) => ({ lineId: Number(L.row.id), allocs: withRemainder(L) }))
+    const payload = splitLines.value.map((L) => ({ lineId: Number(L.row.id), allocs: payloadOf(L) }))
     const res = await engine.splitPurInMultiWh({ docNo: props.docNo, lines: payload })
     ElMessage.success(tt('拆分成功，已拆成 {n} 行').replace('{n}', String(res?.rows || willSplitRows.value)))
     emit('saved', res)

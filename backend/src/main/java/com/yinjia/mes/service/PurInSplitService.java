@@ -115,10 +115,12 @@ public class PurInSplitService {
                     if (o instanceof Map<?, ?> m) allocs.add(new LinkedHashMap<>((Map<String, Object>) m));
                 }
             }
-            // 只给了一个仓库 = **合并回一行**(回退):把子行合回父行,不再拆
-            // (2026-11-17 用户口径「这个操作是要可以回退的」)
-            if (allocs.size() < 2) {
-                mergeChildren(no, lineId, user);
+            // 只给了一个仓库:先合并(有子行时 = 回退),再把这一行的仓库/仓位设成它(不拆行)。
+            // (2026-11-17 用户口径「上下都可以改…」之后又反馈「为什么确定不了」——只填一个仓库也是有效操作,
+            //  语义等于"把这一行放到这个仓库",不该拦)
+            if (allocs.isEmpty()) continue;
+            if (allocs.size() == 1) {
+                applySingle(no, lineId, allocs.get(0), user);
                 rowCount += 1;
                 Map<String, Object> one = new LinkedHashMap<>();
                 one.put("docNo", no);
@@ -336,6 +338,63 @@ public class PurInSplitService {
      * 校验 + 解析:{仓库} 在 bs_wh 里按「仓库名称」或「仓库编码」都能命中,统一回填编码/名称;
      * 仓位可选,传了就校验它属于该仓库(bs_wh_loc)。数量合计必须等于该行实收数量。
      */
+    /**
+     * 只给了一个仓库:先合并子行(回退),再把这一行的仓库/仓位设成它 —— 不拆行。
+     * 语义 = "把这行放到这个仓库"(用户在弹窗里只填一行就是想干这个)。
+     */
+    private void applySingle(String docNo, long lineId, Map<String, Object> alloc, String user) {
+        mergeChildren(docNo, lineId, user);
+        Map<String, Object> wh = resolveWhBin(str(alloc.get("仓库")), str(alloc.get("仓位编码")), 1);
+        jdbc.update("UPDATE " + LINE_TABLE + " SET [仓库] = ?, [仓库编码] = ?, [仓位编码] = ?, [仓位名称] = ?,"
+                        + " [现存量] = NULL, [现存量说明] = NULL, [asp_user1] = ?, [asp_time1] = ?"
+                        + " WHERE id = ? AND [单据编号] = ? AND ISNULL(asp_cancel, 'N') <> 'Y'",
+                new Object[]{
+                        wh.get("仓库"), wh.get("仓库编码"), wh.get("仓位编码"), wh.get("仓位名称"),
+                        user, new java.sql.Timestamp(System.currentTimeMillis()), lineId, docNo,
+                },
+                new int[]{Types.NVARCHAR, Types.NVARCHAR, Types.NVARCHAR, Types.NVARCHAR,
+                        Types.NVARCHAR, Types.TIMESTAMP, Types.BIGINT, Types.NVARCHAR});
+    }
+
+    /** 解析仓库/仓位(名称或编码都认;仓位要属于该仓库且未停用);解析不到直接报错并点名第几行 */
+    private Map<String, Object> resolveWhBin(String rawWh, String rawBin, int idx) {
+        if (rawWh.isEmpty()) throw new IllegalStateException("第 " + idx + " 行没有选仓库");
+        Map<String, Object> wh;
+        try {
+            wh = jdbc.queryForMap("SELECT 仓库编码, 仓库名称 FROM bs_wh"
+                    + " WHERE (仓库名称 = ? OR 仓库编码 = ?) AND ISNULL(asp_cancel, 'N') <> 'Y'"
+                    + " AND ISNULL(停用, 0) = 0", rawWh, rawWh);
+        } catch (EmptyResultDataAccessException e) {
+            throw new IllegalStateException("仓库「" + rawWh + "」在仓库档案里不存在或已停用");
+        }
+        String whName = str(wh.get("仓库名称"));
+        String whCode = str(wh.get("仓库编码"));
+        String binCode = rawBin;
+        if (!binCode.isEmpty()) {
+            try {
+                // ⚠ bs_wh_loc **没有「仓位名称」列**(2026-11-17 实测:SQL 207 列名 '仓位名称' 无效 ⇒
+                //   弹窗一选仓位就报"服务异常")。这里只校验仓位归属并取编码,名称就用编码——
+                //   bl_purchase_in.仓位名称 是可空展示列,各页面本来也都按 仓位编码 显示。
+                Map<String, Object> bin = jdbc.queryForMap("SELECT 仓位编码 FROM bs_wh_loc"
+                        + " WHERE 仓位编码 = ? AND (仓库 = ? OR 仓库编码 = ?) AND ISNULL(停用, 0) = 0",
+                        binCode, whName, whCode);
+                binCode = str(bin.get("仓位编码"));
+            } catch (EmptyResultDataAccessException e) {
+                throw new IllegalStateException("仓位「" + binCode + "」不属于仓库「" + whName + "」或已停用");
+            }
+        }
+        Map<String, Object> p = new LinkedHashMap<>();
+        p.put("仓库", whName);
+        p.put("仓库编码", whCode);
+        p.put("仓位编码", binCode);
+        p.put("仓位名称", "");
+        return p;
+    }
+
+    /**
+     * 校验 + 解析:{仓库} 在 bs_wh 里按「仓库名称」或「仓库编码」都能命中,统一回填编码/名称;
+     * 仓位可选,传了就校验它属于该仓库(bs_wh_loc)。数量合计必须等于该行实收数量。
+     */
     private List<Map<String, Object>> normalizeAllocs(List<Map<String, Object>> allocs, Map<String, Object> row) {
         if (allocs == null || allocs.size() < 2) {
             throw new IllegalStateException("至少要分到两个仓库:只分一个仓库不用拆");
@@ -343,59 +402,17 @@ public class PurInSplitService {
         BigDecimal total = num(row.get("实收数量"));
         BigDecimal sum = BigDecimal.ZERO;
         List<Map<String, Object>> out = new ArrayList<>();
-        List<String> problems = new ArrayList<>();
         int idx = 0;
         for (Map<String, Object> a : allocs) {
             idx++;
-            String rawWh = str(a.get("仓库"));
-            String rawBin = str(a.get("仓位编码"));
             BigDecimal qty = dec(a.get("数量"));
-            if (rawWh.isEmpty()) {
-                problems.add("第 " + idx + " 行没有选仓库");
-                continue;
-            }
             if (qty == null || qty.signum() <= 0) {
-                problems.add("第 " + idx + " 行数量必须大于 0");
-                continue;
+                throw new IllegalStateException("第 " + idx + " 行数量必须大于 0");
             }
-            Map<String, Object> wh;
-            try {
-                wh = jdbc.queryForMap("SELECT 仓库编码, 仓库名称 FROM bs_wh"
-                        + " WHERE (仓库名称 = ? OR 仓库编码 = ?) AND ISNULL(asp_cancel, 'N') <> 'Y'"
-                        + " AND ISNULL(停用, 0) = 0", rawWh, rawWh);
-            } catch (EmptyResultDataAccessException e) {
-                problems.add("仓库「" + rawWh + "」在仓库档案里不存在或已停用");
-                continue;
-            }
-            String whName = str(wh.get("仓库名称"));
-            String whCode = str(wh.get("仓库编码"));
-            String binCode = rawBin;
-            String binName = "";
-            if (!binCode.isEmpty()) {
-                try {
-                    // ⚠ bs_wh_loc **没有「仓位名称」列**(2026-11-17 实测:SQL 207 列名 '仓位名称' 无效 ⇒
-                    //   弹窗一选仓位就报"服务异常")。这里只校验仓位归属并取编码,名称就用编码——
-                    //   bl_purchase_in.仓位名称 是可空展示列,各页面本来也都按 仓位编码 显示。
-                    Map<String, Object> bin = jdbc.queryForMap("SELECT 仓位编码 FROM bs_wh_loc"
-                            + " WHERE 仓位编码 = ? AND (仓库 = ? OR 仓库编码 = ?) AND ISNULL(停用, 0) = 0",
-                            binCode, whName, whCode);
-                    binCode = str(bin.get("仓位编码"));
-                } catch (EmptyResultDataAccessException e) {
-                    problems.add("仓位「" + binCode + "」不属于仓库「" + whName + "」或已停用");
-                    continue;
-                }
-            }
-            Map<String, Object> p = new LinkedHashMap<>();
-            p.put("仓库", whName);
-            p.put("仓库编码", whCode);
-            p.put("仓位编码", binCode);
-            p.put("仓位名称", binName);
+            Map<String, Object> p = resolveWhBin(str(a.get("仓库")), str(a.get("仓位编码")), idx);
             p.put("数量", qty.setScale(SCALE, RoundingMode.HALF_UP));
             out.add(p);
             sum = sum.add(qty.setScale(SCALE, RoundingMode.HALF_UP));
-        }
-        if (!problems.isEmpty()) {
-            throw new IllegalStateException("拆分清单有问题:" + String.join(";", problems));
         }
         if (sum.compareTo(total.setScale(SCALE, RoundingMode.HALF_UP)) != 0) {
             throw new IllegalStateException("各仓库数量合计(" + plain(sum) + ")必须等于本行实收数量("
