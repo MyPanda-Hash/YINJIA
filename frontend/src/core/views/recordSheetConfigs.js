@@ -1195,9 +1195,11 @@ export const recordSheetConfigs = {
     // 受影响的只有跨这几条内部竖线的格子,且幅度极小(产品名称 170→175、炭棒规格1/2/3 70→70/78/77);
     // B:C/D:G/H:I/J:K 这些**块宽一分未动**,其它行的格子宽度逐像素不变。
     grid: [98, 68, 68, 64, 52, 58, 58, 75, 52, 94, 93],
-    // 2026-11-06 用户口径 A：烧结工艺清单（炭棒工艺管控清单）= YJ-QR-146-1（固定表单编号）
+    // 2026-11-17 用户口径(1117问题 #1)：右上角一律印**固定文件编号**，不是单据号；
+    //   对照表给的是「烧结工艺管控清单 YJ-QR-146 / 烧结配方管控清单 YJ-QR-154」
+    //   ⇒ 去掉原来的 -1 后缀，并给第 2 页(配方管控清单)单独一个号(页级 docNoStatic 覆盖顶层)。
     head: { title: 7, infoLabel: 2, infoValue: 2, docnoPrefix: '单据编号', docNoKey: '单据编号' },
-    docNoStatic: 'YJ-QR-146-1',
+    docNoStatic: 'YJ-QR-146',
     // ── 页签:三页**各用各的原始版式**(合并时曾统一成 11 列并把页 2 跨列重排,已恢复原设计)──
     // showHead:true —— 页 1/页 2 原本都是**独立一张单据**(工艺管控清单 / 配方管控清单),各自有自己的报告头;
     // 并入同一张单后仍照原样各渲染各的报告头。页 0(修订记录)不出报告头:设计与组装那页一样,
@@ -1210,7 +1212,8 @@ export const recordSheetConfigs = {
     pages: [
       { title: '成型工艺清单', grid: [98, 68, 68, 64, 52, 58, 58, 75, 52, 94, 93], showHead: true },
       // 原页 3 的 13 列网格;报告头三段跨度合计 = 13,右缘与 产品基本信息/配方表/配料要求 平齐
-      { title: '成型配方', grid: [76, 45, 82, 64, 39, 39, 39, 110, 48, 48, 91, 58, 41], head: { title: 7, infoLabel: 2, infoValue: 4 }, showHead: true, staticTitle: '炭棒配方管控清单' },
+      // 页级 docNoStatic 覆盖顶层：这一页是「烧结配方管控清单」= YJ-QR-154（顶层给的是工艺管控清单 146）
+      { title: '成型配方', grid: [76, 45, 82, 64, 39, 39, 39, 110, 48, 48, 91, 58, 41], head: { title: 7, infoLabel: 2, infoValue: 4 }, showHead: true, staticTitle: '炭棒配方管控清单', docNoStatic: 'YJ-QR-154' },
       // 修订记录页不出报告头(设计只有一行居中大标题 + 一行表头,由 dt.pageTitle 出标题)
       { title: '修订记录', headMode: 'report', showHead: false, grid: [98, 68, 68, 64, 52, 58, 58, 75, 52, 94, 93] },
     ],
@@ -1317,9 +1320,10 @@ export const recordSheetConfigs = {
     ],
     grid: [81, 52, 88, 70, 50, 50, 57, 122, 60, 50, 50, 50],
     // 报告头三段跨度 7+2+3 = 12
-    // 2026-11-06 用户口径 A：X烧结工艺清单 = YJ-QR-146-1（截图里与烧结工艺清单同一个号）
+    // 2026-11-17 用户口径(1117问题 #1 对照表)：X烧结工艺清单 = **YJ-QR-157**
+    //   （11-06 那版按截图填了 146-1，与烧结工艺清单同号；本次按用户给的清单改正）
     head: { title: 7, infoLabel: 2, infoValue: 3, docnoPrefix: '单据编号', docNoKey: '单据编号' },
-    docNoStatic: 'YJ-QR-146-1',
+    docNoStatic: 'YJ-QR-157',
     pages: [
       { title: 'X烧结配方工艺管控清单', grid: [81, 52, 88, 70, 50, 50, 57, 122, 60, 50, 50, 50], showHead: true },
       // 修订记录页不出报告头(同 RD_MOLD_PROC 页2:只有居中大标题 + 一行表头,由 dt.pageTitle 出标题)

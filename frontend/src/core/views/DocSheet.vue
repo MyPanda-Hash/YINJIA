@@ -628,7 +628,7 @@
           <div class="as-fill">
             <template v-for="(ph, pi) in row.phases" :key="ph.key">
               <div
-                v-if="!phaseHidden[pi]"
+                v-if="phaseVisible(pi, ph.num)"
                 class="as-phase"
                 :class="{ 'as-phase-done': head[ph.key + '_实际完成'] }"
                 :data-filled="hasPhaseContent(head, ph.num) ? '1' : '0'"
@@ -720,7 +720,7 @@
                 </div>
               </div>
             </template>
-            <div v-if="Object.values(phaseHidden).filter(Boolean).length" class="as-phase-restore" @click.stop="phaseHidden = {}">
+            <div v-if="hiddenPhaseCount" class="as-phase-restore" @click.stop="phaseHidden = {}; showAllPhases = true">
               {{ tt('显示全部') }}（{{ row.phases.length }}）
             </div>
           </div>
@@ -1292,6 +1292,33 @@ async function doTermAction(buttonName) {
 
 // 阶段框显示状态(本地视图;导出/打印按当前实际显示渲染)
 const phaseHidden = reactive({})
+/**
+ * 「显示全部」临时开关（2026-11-17 用户报障：「阶段隐藏后保存，审核人打开还是可以看到多个阶段」）。
+ *
+ * 根因：`phaseHidden` 只是组件内的 reactive，**从不落库**，审核人/重新打开时自然回到"全显示"。
+ *
+ * 改法不引入新库字段，改为**按数据推导**：
+ *   · 可编辑态（填单/草稿）→ 10 个阶段框全显示（否则没法填空白阶段）；
+ *   · 只读态（已审核/已归档，审批人看到的就是这一态）→ **只显示填过内容的阶段**，
+ *     与纸面 hasPhaseContent 同口径（计划内容/计划开始/计划完成/责任人/实际完成 任一非空）。
+ *   这样"隐藏未使用阶段"这件事变成数据事实，谁打开都一致，保存/刷新不会丢。
+ *   仍保留手动「隐藏」按钮（本地临时收起）与「显示全部」复原。
+ */
+const showAllPhases = ref(false)
+/** 某阶段框是否显示：手动隐藏 > 显示全部 > 只读态按是否有内容 > 可编辑态全显示 */
+function phaseVisible(pi, num) {
+  if (phaseHidden[pi]) return false
+  if (showAllPhases.value) return true
+  if (props.editable) return true
+  return hasPhaseContent(props.head || {}, num)
+}
+/** 当前被收起的阶段数（用于底部「显示全部（n）」提示） */
+const hiddenPhaseCount = computed(() => {
+  const rows = (props.config?.rows || []).filter((r) => r && r.kind === 'phases')
+  if (!rows.length) return 0
+  const phases = rows[0].phases || []
+  return phases.filter((ph, pi) => !phaseVisible(pi, ph.num)).length
+})
 
 const fieldMap = computed(() => new Map(props.fields.map((f) => [f.dataName || f.code, f])))
 /** 字段级只读(元数据 editable=0 → readonly):文书锁定字段(申请立项人/负责人)按纯文本显示,不可改 */
