@@ -33,7 +33,8 @@ test('后端：审批通过回填、弃审清空，且两者都限定在数据�
   assert.match(btn, /DATA_REC_AUDITOR_PANELS = java\.util\.Set\.of\(/, '缺集合常量')
   for (const p of REC) assert.ok(btn.includes(`"${p}"`), `集合缺少 ${p}`)
   assert.match(btn, /private void writeDataRecAuditor\(/, '缺回填方法')
-  assert.match(btn, /SET \[表单审核人\] = \?/, '回填写的是「表单审核人」列')
+  // 列名由 dataRecAuditorCol() 解析（label 表单审核人 → 物理列 备用1），见下面专门那条断言
+  assert.match(btn, /private String dataRecAuditorCol\(/, '回填前必须解析物理列名')
   assert.match(btn, /private void clearDataRecAuditor\(/, '缺清空方法')
   // 回填必须挂在单节点审批通过之后
   assert.match(btn, /writeDataRecAuditor\(def, no, operator\);/, '审批通过未调用回填')
@@ -52,4 +53,17 @@ test('#3 立项申请：对接人固定陈秀丽，弹窗不再给下拉', () =>
   const seg = list.slice(at, at + 2200)
   assert.doesNotMatch(seg, /v-model="apvLiaison"[\s\S]{0,80}el-select/, '弹窗里仍在给对接人下拉')
   assert.match(seg, /dq-fixed/, '应改为固定文本展示')
+})
+
+test('回填必须走 yj_field 的物理列名，不能直接拼 [表单审核人]', () => {
+  // 实测：这 8 张表里 label「表单审核人」→ 物理列 **备用1**（migrate-rd-datarec-reviewer-2026-09-30）。
+  // 直接 `SET [表单审核人]` 会报「列名无效」，而外层 try/catch 会把它吞掉 ⇒
+  // 表现为"审批通过了但纸面审核人还是空"（2026-11-17 首次上线即踩到）。
+  assert.match(btn, /private String dataRecAuditorCol\(/, '缺物理列解析方法')
+  assert.match(btn, /def\.byLabel\("表单审核人"\)/, '要走元数据取 FieldDef')
+  assert.match(btn, /f\.col\(\)/, '取 col_name')
+  // 两处 UPDATE 都必须是拼接变量，不能出现写死的列名
+  assert.doesNotMatch(btn, /SET \[表单审核人\] = /, '不得写死 [表单审核人] 列名')
+  assert.match(btn, /SET \[" \+ col \+ "\] = \?/, '回填用解析出的列')
+  assert.match(btn, /SET \[" \+ col \+ "\] = NULL/, '清空用解析出的列')
 })

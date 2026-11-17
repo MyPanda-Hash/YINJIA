@@ -4531,10 +4531,11 @@ public class ButtonService {
      * 草稿态就有签名；现在只有**真正审批通过**这一步才写。</p>
      */
     private void writeDataRecAuditor(PanelRegistry.PanelDef def, String no, String account) {
-        if (def == null || !DATA_REC_AUDITOR_PANELS.contains(def.code()) || no == null || no.isBlank()) return;
+        String col = dataRecAuditorCol(def);
+        if (col == null || no == null || no.isBlank()) return;
         try {
             jdbc.update("UPDATE " + def.headTable()
-                    + " SET [表单审核人] = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                    + " SET [" + col + "] = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
                     + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
                     signNameOf(account), currentUserName(), no);
         } catch (Exception e) {
@@ -4542,11 +4543,30 @@ public class ButtonService {
         }
     }
 
+    /**
+     * 「表单审核人」这一格在**该面板**的物理列名。
+     *
+     * <p>⚠ 必须走 yj_field 元数据取 col_name，**不能直接写 `[表单审核人]`**：
+     * 实测这 8 张表的 label「表单审核人」映射到物理列 **`备用1`**
+     * （见 tools/migrate-rd-datarec-reviewer-2026-09-30.sql 把审核人落进备用列池）。
+     * 直接按 label 拼列名会报「列名无效」，而本方法外层是 try/catch ⇒ 会被静默吞掉，
+     * 表现为「审批通过了但纸面审核人还是空」——比报错更难查（2026-11-17 首次上线即踩到）。</p>
+     *
+     * @return 物理列名；面板不在集合内或该格未登记则 null
+     */
+    private String dataRecAuditorCol(PanelRegistry.PanelDef def) {
+        if (def == null || !DATA_REC_AUDITOR_PANELS.contains(def.code())) return null;
+        PanelRegistry.FieldDef f = def.byLabel("表单审核人");
+        if (f == null || f.col() == null || f.col().isBlank()) return null;
+        return f.col();
+    }
+
     /** 数据记录表：弃审/驳回 → 清空「表单审核人」（签名随审批作废，与 writeDataRecAuditor 成对） */
     private void clearDataRecAuditor(PanelRegistry.PanelDef def, String no) {
-        if (def == null || !DATA_REC_AUDITOR_PANELS.contains(def.code()) || no == null || no.isBlank()) return;
+        String col = dataRecAuditorCol(def);
+        if (col == null || no == null || no.isBlank()) return;
         try {
-            jdbc.update("UPDATE " + def.headTable() + " SET [表单审核人] = NULL"
+            jdbc.update("UPDATE " + def.headTable() + " SET [" + col + "] = NULL"
                     + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         } catch (Exception e) {
             log.warn("[数据记录表] 清空表单审核人失败 {} {}: {}", def.code(), no, e.toString());

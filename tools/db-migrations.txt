@@ -4924,3 +4924,5 @@ migrate-prod-mold-perms-20261117.sql
 migrate-role-perms-20261117.sql
 # 2026-11-17：恢复「规格书批准」按钮 —— 补 RD_SPEC_DOC 的 specapprove 词（冯敏所在角色；此前 0 个角色有该词）
 migrate-spec-approve-perm-20261117.sql
+# 2026-11-17 1117问题 #5：清掉数据记录表「历史草稿」上被自动预填的审核人（只清未审核/未归档的单）
+migrate-datarec-clear-prefilled-auditor-20261117.sql
