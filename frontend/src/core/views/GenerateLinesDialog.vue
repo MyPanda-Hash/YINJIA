@@ -40,14 +40,6 @@
           %<span class="gl-tip">{{ tt('（本次生效；最高 50%，额度按来源行数量算）') }}</span>
         </span>
         <span class="gl-tip">{{ tt('勾选要生单的明细行并填写本次数量；未勾选的行不会进入新单据') }} · {{ tt('未勾选的明细行置灰、不能填写') }}</span>
-        <!-- 弹窗最顶部的**总全选**(2026-11-18 用户口径「批量生单和合单生单弹窗最顶部都没有全选按钮」):
-             一次作用于**所有来源单的全部行**,不必逐单点行头那两个链接;三态勾选框 + 行数,状态一眼可见 -->
-        <span class="gl-pick-all">
-          <el-checkbox :model-value="allPicked" :indeterminate="partialPicked" :disabled="!selectableTotal"
-                       @change="onPickAllChange">{{ tt('全选') }}</el-checkbox>
-          <el-button link size="small" :disabled="!count" @click="unpickAllDocs">{{ tt('取消全选') }}</el-button>
-          <span class="gl-picked">{{ tt('已选') }} {{ count }} {{ tt('行') }}</span>
-        </span>
       </div>
 
       <div v-for="doc in docs" :key="doc.sourceNo" class="gl-doc">
@@ -63,8 +55,8 @@
             <span v-if="doc.batchInherited" class="gl-lock">{{ tt('继承来源单') }}</span>
           </span>
           <span class="gl-doc-pick">
-            <el-button link type="primary" size="small" @click="selectAll(doc)">{{ tt('全选') }}</el-button>
-            <el-button link size="small" @click="selectNone(doc)">{{ tt('取消全选') }}</el-button>
+            <!-- 「全选 / 取消全选」这对文字链已由**表头那颗全选框**取代(2026-11-18 用户口径:
+                 「全选按钮在行号前面的格子上就行」)—— 同一块里留两份全选是噪声,这里不再挂 -->
             <!-- 2026-11-13 用户口径「也可以所有行带入第一个填入的仓库和仓位」 -->
             <el-button v-if="showWhBin" link type="primary" size="small"
                        :title="tt('把本单第一行填好的仓库与仓位套用到本单所有行')"
@@ -79,7 +71,16 @@
         <el-table :data="doc.lines" row-key="lineKey" border size="small"
                   :row-class-name="rowClassOfDoc(doc)"
                   :empty-text="tt('该单据没有可生单的明细行')">
+          <!-- 勾选列的表头 = **本单全选**(2026-11-18 用户口径「全选按钮在行号前面的格子上就行,
+               和生单保持一致」):三态勾选框(全勾 ✓ / 部分勾 ▬ / 全空),口径复用下面的 selectAll ——
+               只勾可选行(非已审核单据、已打印隔离行、可生单 = 0 的行都不会被顺手带进来)。 -->
           <el-table-column width="42" align="center">
+            <template #header>
+              <el-checkbox :model-value="docStats(doc).all" :indeterminate="docStats(doc).some"
+                           :disabled="!docStats(doc).total"
+                           :title="tt('全选本单的全部明细行')"
+                           @change="(v) => (v ? selectAll(doc) : selectNone(doc))" />
+            </template>
             <template #default="{ row }">
               <el-checkbox :model-value="isPicked(doc, row)" :disabled="!selectable(doc, row)"
                            @change="(v) => togglePick(doc, row, v)" />
@@ -261,28 +262,24 @@ const count = computed(() => {
   return n
 })
 
-/* ── 弹窗最顶部的总全选(2026-11-18 用户口径)────────────────────────
-   「批量生单和合单生单弹窗最顶部都没有全选按钮」—— 原来只有每张来源单行头的
-   「全选/取消全选」,合单一次勾七八张单要点七八次。这里给一个跨全部来源单的总开关:
-   · 口径与单张的 selectAll 完全一致(只勾**可选**的行,上限按当前超送比例算),
-     所以顶部全选不会把草稿单/已打印隔离行/无可生单量行放进来;
-   · 三态:全勾=✓、部分勾=—、一个都没勾=空;可勾行数为 0 时禁用。 */
-const selectableTotal = computed(() => {
-  let n = 0
-  for (const d of docs.value) for (const r of d.lines || []) if (selectable(d, r)) n++
-  return n
-})
-/** 已勾且**仍然可选**的行数(超送比例调小后,原来勾上的行可能变得不可选) */
-const pickedSelectable = computed(() => {
-  let n = 0
-  for (const d of docs.value) {
-    const set = picksOfDoc(d)
-    for (const r of d.lines || []) if (set.has(r.lineKey) && selectable(d, r)) n++
+/* ── 表头全选框(2026-11-18 用户口径)──────────────────────────────
+   「全选按钮在行号前面的格子上就行,和生单保持一致」—— 全选放进每张来源单表格
+   勾选列的表头格子里(标准表头全选的位置),三态由本节派生:
+   · total  = 本单**可勾**行数(非已审核 / 可生单 = 0 的行不算,已打印隔离行也算可勾但要显式勾);
+   · picked = 本单已勾且**仍然可选**的行数(超送比例调小后,原来勾上的行可能不再可选);
+   · all    = 可勾的都勾了;some = 部分勾(中间态 ▬);一个都没勾 → 两个都 false(空格子)。
+   读的都是响应式数据(pickedByDoc / ratioPct),所以表头勾选框随行内勾选实时变。 */
+function docStats(doc) {
+  const set = picksOfDoc(doc)
+  let total = 0
+  let picked = 0
+  for (const row of doc?.lines || []) {
+    if (!selectable(doc, row)) continue
+    total++
+    if (set.has(row.lineKey)) picked++
   }
-  return n
-})
-const allPicked = computed(() => selectableTotal.value > 0 && pickedSelectable.value >= selectableTotal.value)
-const partialPicked = computed(() => pickedSelectable.value > 0 && !allPicked.value)
+  return { total, picked, all: total > 0 && picked >= total, some: picked > 0 && picked < total }
+}
 
 /** 统一取勾选集合(组件里存数组,纯函数既收 Set 也收数组) */
 const picksOfDoc = (doc) => picksOf(pickedByDoc[doc.sourceNo])
@@ -316,16 +313,6 @@ function selectAll(doc) {
   pickedByDoc[doc.sourceNo] = keys
 }
 function selectNone(doc) { pickedByDoc[doc.sourceNo] = [] }
-
-/** 顶部总全选 / 总取消:对**所有来源单**逐个套用单张的办法(数量同样按剩余量预填) */
-function pickAllDocs() {
-  for (const doc of docs.value) selectAll(doc)
-}
-function unpickAllDocs() {
-  // 只清勾选,不动已填的本次数量(清数量是底部「清空」的事)
-  for (const doc of docs.value) selectNone(doc)
-}
-function onPickAllChange(on) { if (on) pickAllDocs(); else unpickAllDocs() }
 
 /** 全送:每张单按剩余量填满并勾上(隔离行同样只在可送上限内,用户仍可取消) */
 function fillRemaining() {
@@ -495,8 +482,9 @@ async function confirm() {
 .gl-batch { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: #46586e; }
 .gl-lock { color: #b88230; font-size: 12px; }
 .gl-doc-pick { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
-/* 顶部总全选:贴在提示条右侧,与每单行头的「全选」同一视觉语言(靠右、次级按钮) */
-.gl-pick-all { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding-left: 8px; }
+/* 表头全选框(本单全选):宽度只有 42px 的格子里居中 —— el-checkbox 默认 margin-right:30px,
+   不清掉会把勾选框顶到格子外面(行内那颗在正文格子里没这个问题,故只针对表头) */
+.gl-doc :deep(th .el-checkbox) { margin-right: 0; }
 .gl-picked { color: #5d6c67; font-size: 12.5px; }
 .gl-empty { color: #909399; }
 .gl-foot { margin-right: auto; font-size: 12.5px; color: #46586e; }

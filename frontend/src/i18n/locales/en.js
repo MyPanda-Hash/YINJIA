@@ -5458,6 +5458,7 @@ export default {
     '目标单据': 'Target document',
     '已勾选': 'Selected',
     '全选本页': 'Select this page',
+    '全选本单的全部明细行': 'Select all lines of this document',
     '取消全选': 'Deselect all',
     '本次数量': 'This Qty',
     '可生单': 'Generatable',
