@@ -1,0 +1,5 @@
+﻿SET NOCOUNT ON;
+DELETE FROM dbo.wo_pick_line WHERE 单头id IN (858, 859);
+SELECT @@ROWCOUNT AS 删明细;
+DELETE FROM dbo.wo_pick_doc WHERE id IN (858, 859);
+SELECT @@ROWCOUNT AS 删台账;

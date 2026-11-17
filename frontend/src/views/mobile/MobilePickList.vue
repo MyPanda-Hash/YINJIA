@@ -64,9 +64,9 @@
           :placeholder="tt('扫工单号/领料单号,或直接输入后点打开')"
           size="large"
           clearable
-          @keyup.enter="locate"
+          @keyup.enter="locate()"
         />
-        <el-button size="large" :loading="locateLoading" @click="locate">{{ tt('打开单据') }}</el-button>
+        <el-button size="large" :loading="locateLoading" @click="locate()">{{ tt('打开单据') }}</el-button>
         <el-button v-if="nativeScan" size="large" @click="scanInto">{{ tt('扫码') }}</el-button>
       </div>
       <div class="mp-hint">{{ tt('已完成和未完成的单据都能打开;括号里带上工单行号(如 0@GD-…@1001)可精确定位') }}</div>
@@ -160,6 +160,7 @@ import { useRouter } from 'vue-router'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { parseWorkOrderCode } from '@/business/scanCode'
+import { locateQueryOf } from '@/business/mobilePick'
 import { focusScanNow } from '@/business/scanFocus'
 
 const router = useRouter()
@@ -221,7 +222,8 @@ function applyScan(code) {
   const p = parseWorkOrderCode(text)
   if (!p.ok) { showErr(tt('这个码里没有工单号') + ':' + text); return }
   locateText.value = p.wo
-  locate(p.line)
+  // 2026-11-18:连**领料标记**一起传 —— 扫混料标签就开混料单,别再一律跳组装
+  locate(p.line, p.kind || '')
 }
 
 /**
@@ -360,19 +362,34 @@ async function loadList() {
  * 扫工单号 → 直接打开对应的领料单据。
  *
  * <p>本页**只定位不生成**(生单已独立成面板「生成工单领料/退料单」,2026-10-30 第二轮)。
+ *
+ * <p>🔴 2026-11-18 用户报障「生产领料扫混料和扫组装的二维码,都是跳到组装的单据界面」——
+ * 领料单纸面二维码第 4 段是领料标记(A=组装 / M=混料),这里把 `kind` 一起传给后端,
+ * 后端按类型过滤后只回那一张,扫哪张开哪张。老的三段码没有标记 ⇒ kind 为空,行为照旧。
+ *
+ * @param {number} [line] 工单行号(不传 = 不限定行)
+ * @param {'组装'|'混料'|''} [kind] 领料标记
  */
-async function locate(line) {
-  const kw = String(locateText.value || '').trim()
+async function locate(line, kind) {
+  const q = locateQueryOf(locateText.value)
+  const kw = q.wo
   clearMsg()
   if (!kw) { showErr(tt('请先扫描或输入工单号')); return }
+  const wantLine = Number(line) || q.line || 0
+  const wantKind = String(kind || q.kind || '')
   locateLoading.value = true
   try {
-    const res = await request.get('/px/mobilePick/locate', {
-      params: { woNo: kw, line: Number(line) || undefined },
-    })
+    const params = { woNo: kw }
+    if (wantLine > 0) params.line = wantLine
+    if (wantKind) params.kind = wantKind
+    const res = await request.get('/px/mobilePick/locate', { params })
     const d = res.data?.data || res.data || {}
     if (d.found) {
       openDoc(d.id)
+      return
+    }
+    if (d.hint === 'no-doc-kind') {
+      showErr(`${tt('没有找到这个工单/单据')} · ${wantKind} (${kw})`)
       return
     }
     if (d.hint === 'multi-line' && Array.isArray(d.candidates) && d.candidates.length) {

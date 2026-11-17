@@ -14,7 +14,7 @@ import assert from 'node:assert/strict'
 
 import {
   parseUsage, toRows, maxQtyOf, allocateForQty, allocateScannedFirst,
-  pickProgress, backIsEmpty, round4, printJobsOf,
+  pickProgress, backIsEmpty, round4, printJobsOf, locateQueryOf,
 } from './mobilePick.js'
 
 // ─── ① BOM 用量解析 ───────────────────────────────────────────────
@@ -260,4 +260,25 @@ test('printJobsOf:重复扫码把同一张单列两遍 ⇒ 只打一次', () => 
 test('printJobsOf:打印载荷为空(关掉自动打印)⇒ 一张都不打', () => {
   assert.deepEqual(printJobsOf({ 打印: null, 单据: [{ 打印: null }, { 打印: null }] }), [])
   assert.deepEqual(printJobsOf(null), [])
+})
+// ─── 生产领料扫码定位(领料标记) ─────────────────────────────────
+
+test('locateQueryOf:领料单纸面码 @M/@A → 带出工单行号与领料类型', () => {
+  // 2026-11-18 用户报障「扫混料和扫组装的二维码,都跳到组装的单据界面」——
+  // 前端必须把第 4 段的标记一起传给后端,否则后端只能按第一张(组装)打开。
+  assert.deepEqual(locateQueryOf('0@GD-2026-11-0007@1004@M'),
+    { wo: 'GD-2026-11-0007', line: 4, kind: '混料' })
+  assert.deepEqual(locateQueryOf('0@GD-2026-11-0007@1004@A'),
+    { wo: 'GD-2026-11-0007', line: 4, kind: '组装' })
+})
+
+test('locateQueryOf:老的三段工单码 → kind 为空(行为照旧)', () => {
+  assert.deepEqual(locateQueryOf('0@GD-2026-11-0007@1004'),
+    { wo: 'GD-2026-11-0007', line: 4, kind: '' })
+})
+
+test('locateQueryOf:纯工单号 / 领料单号 / 空串', () => {
+  assert.deepEqual(locateQueryOf('GD-2026-11-0007'), { wo: 'GD-2026-11-0007', line: 0, kind: '' })
+  assert.deepEqual(locateQueryOf('LL-2026-11-0044'), { wo: 'LL-2026-11-0044', line: 0, kind: '' })
+  assert.deepEqual(locateQueryOf('   '), { wo: '', line: 0, kind: '' })
 })

@@ -122,6 +122,21 @@ public class MobilePickController {
         return String.valueOf(code).toUpperCase(Locale.ROOT).contains(SEMI_MARK);
     }
 
+    /**
+     * 「领料标记」→ 领料类型(2026-11-18)。
+     *
+     * <p>领料单纸面二维码第 4 段带的就是它(用户口径「混料和组装的二维码是一样的,需要在二维码上
+     * 多一位作为混料领料还是组装领料的标记」):**A/组装 = 组装领料,M/混料 = 混料领料**。
+     * 空值或认不出的值一律返回空串(**不按类型过滤**,与老的三段码行为一致)。
+     */
+    static String pickKindOf(Object marker) {
+        String s = marker == null ? "" : String.valueOf(marker).trim().toUpperCase(Locale.ROOT);
+        if (s.isEmpty()) return "";
+        if ("A".equals(s) || "组装".equals(s) || "ASSEMBLY".equals(s)) return KIND_ASSEMBLY;
+        if ("M".equals(s) || "混料".equals(s) || "MIX".equals(s)) return KIND_MIX;
+        return "";
+    }
+
     /** 明细行是不是半成品(以 normalizeLine 打的 {@code 半成品} 标记为准,免得各处重复判编码) */
     private static boolean isSemiLine(Map<String, Object> it) {
         Object v = it == null ? null : it.get("半成品");
@@ -738,13 +753,24 @@ public class MobilePickController {
      * 与生成接口的区别:这里**不生成**任何东西,只找已开的单把它打开。
      * 找不到时返回 {@code found:false} 而不是报错 —— 现场扫错了码不该弹红框,
      * 前端会提示"该工单行还没开过领料单,可以点『生成』"。
+     *
+     * <p>🔴 2026-11-18(用户报障「生产领料扫混料和扫组装的二维码,都是跳到组装的单据界面」):
+     * 领料单纸面二维码第 4 段带了领料标记(`A`=组装 / `M`=混料),这里新增可选参数 {@code kind}
+     * —— 传了就**只在那一种单里定位**,扫混料标签就打开混料单、扫组装标签就打开组装单;
+     * 不传时行为与以前一致(命中整组,前端按第一张=组装打开)。
+     *
+     * @param woNo 工单号(或领料单号 LL-…)
+     * @param line 工单行号(可空)
+     * @param kind 领料标记:组装/混料 或 A/M(可空 = 不按类型过滤);认不出的值按"不过滤"处理
      */
     @GetMapping("/locate")
     public ApiResult<Map<String, Object>> locate(@RequestParam String woNo,
-                                                 @RequestParam(required = false) Integer line) {
+                                                 @RequestParam(required = false) Integer line,
+                                                 @RequestParam(required = false) String kind) {
         perm.requirePanelView(PANEL_SELF);
         String no = str(woNo);
         if (no.isEmpty()) throw new IllegalArgumentException("请先扫描或输入工单号");
+        String wantKind = pickKindOf(kind);
 
         Map<String, Object> out = new LinkedHashMap<>();
 
@@ -796,6 +822,18 @@ public class MobilePickController {
             out.put("candidates", List.of());
             out.put("hint", "no-doc");
             return ApiResult.ok(out);
+        }
+        // 2026-11-18:带了领料标记(扫的是纸面二维码)⇒ 只留那一种单
+        //   —— 扫混料标签就打开混料单,别再默认跳到组装那张。
+        if (!wantKind.isEmpty()) {
+            hits.removeIf(d -> !wantKind.equals(d.pickKind()));
+            out.put("按类型", wantKind);
+            if (hits.isEmpty()) {
+                out.put("found", false);
+                out.put("candidates", List.of());
+                out.put("hint", "no-doc-kind");
+                return ApiResult.ok(out);
+            }
         }
         // 跨多行 ⇒ 让用户挑行(沿用旧口径)
         long distinctLines = hits.stream().map(WoPickDocService.PickDoc::woLine).distinct().count();

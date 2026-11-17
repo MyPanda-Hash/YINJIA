@@ -16,7 +16,7 @@
  */
 
 import {
-  makeBatchRows, autoAllocateFifo, isNonFifo, selectedBatchRows,
+  makeBatchRows, autoAllocateFifo, isNonFifo, selectedBatchRows, parseWorkOrderCode,
 } from './scanCode.js'
 
 /** 四位小数取整(与后端 decimal(18,4) 同口径) */
@@ -225,6 +225,31 @@ export function printJobsOf(result) {
     jobs.push(p)
   }
   return jobs
+}
+
+/**
+ * 「生产领料」扫码/输入框 → 定位查询参数(工单号 + 行号 + 领料类型)。
+ *
+ * 🔴 2026-11-18 用户报障:「生产领料扫混料和扫组装的二维码,都是跳到组装的单据界面,这个不对」。
+ * 根因:页面拿到码只解析了「工单号 + 行号」,**第 4 段的领料标记(A=组装 / M=混料)被丢掉**,
+ * 后端 locate 就按"命中整组、默认第一张=组装"打开。
+ * 现在把标记一起带给后端(`kind`),扫哪张标签就打开哪张单。
+ *
+ * 口径:
+ *   · 整段是**领料单号**(LL-…,不是 @ 码)⇒ 原样当 wo 传,后端按单号打开;
+ *   · 工单码 / 领料单纸面码 ⇒ 拆出 wo / line / kind(标记认不出或老码没有 ⇒ kind='');
+ *   · 空串 ⇒ 全空,调用方照常提示"请先扫描或输入工单号"。
+ *
+ * @param {string} raw 扫码枪 / 手输 / 壳里回传的原串
+ * @returns {{ wo: string, line: number, kind: '组装'|'混料'|'' }}
+ */
+export function locateQueryOf(raw) {
+  const text = String(raw == null ? '' : raw).trim()
+  if (!text) return { wo: '', line: 0, kind: '' }
+  if (!text.includes('@')) return { wo: text, line: 0, kind: '' }   // 纯工单号/领料单号
+  const p = parseWorkOrderCode(text)
+  if (!p.ok) return { wo: text, line: 0, kind: '' }
+  return { wo: p.wo, line: Number(p.line) || 0, kind: p.kind || '' }
 }
 
 export { makeBatchRows, autoAllocateFifo, isNonFifo, selectedBatchRows }
