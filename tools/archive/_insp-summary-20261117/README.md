@@ -21,6 +21,7 @@
 | `ego/round-05.mjs` | **导出内容级取证**:拦截 blob + 用 xlsx 解析 3 个 sheet/行数/合计 |
 | `ego/round-06~10.mjs` | 导出无反应的分层诊断(最终定位 `aoa_to_sheet` 标题行不是数组) |
 | `ego/round-11.mjs` | 5173 切正式账套 YJ 后复验页面 + 导出(截图 12) |
+| `ego/round-12.mjs` | 快捷区间联动取证:今天/本周/本月/上月的区间值与取数(截图 13) |
 
 ## 复跑方式
 
@@ -45,6 +46,8 @@ ego-browser nodejs -e "await import('file:///D:/workspace/yinjia/tools/archive/_
   `按送样人 / 按委托单 / 检测明细`,表头与合计行与界面一致。
 - English:`Sample Inspection Summary`;页签 `By sender / By commission / sample`;
   按钮 `Search / Reset / Export Excel`;业务数据(人名/样品名/单号)保持原值。
+- 快捷区间(`ego/round-12.mjs`,2026-11-17):今天 `11-17~11-17`、本周 `11-16~11-17`、
+  本月 `11-01~11-17`、上月 `10-01~10-31`,每次切换都重新取数(统计条数字随之变化)。
 
 ## 发现并已修的问题
 
