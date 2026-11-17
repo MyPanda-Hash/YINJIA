@@ -2224,9 +2224,16 @@ defineExpose({ focusField })
 .as-fill-multi {
   padding: 0 6px;
 }
+/* ⚠ 2026-11-18 修「项目实施计划·测试方案 三子区文字重叠」（用户报障截图：
+   测试方法的长文本压住了「测试标准：150字」那一行）。
+   原写法 `flex:1; min-height:0` ⇒ 三块**等分**行高（h:160 ⇒ 每块 ~53px），
+   而只读文本 `.as-ro-text` 没有溢出约束 ⇒ 长文本直接溢出格子、盖住下一块。
+   改为**按内容自然高度**（flex:0 0 auto）+ 与等分时相当的最小高度：
+   · 内容短 ⇒ 三块仍各占 ~52px，版式与设计一致（行内 min-height 160 兜住）；
+   · 内容长 ⇒ 该块自己长高，把整行撑开（.as-row 是 min-height，不会被裁切、也不再重叠）。 */
 .as-sub {
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: 52px;
   display: flex;
   flex-direction: column;
   padding: 2px 4px;
