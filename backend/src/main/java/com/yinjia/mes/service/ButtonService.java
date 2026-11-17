@@ -728,9 +728,87 @@ public class ButtonService {
         return java.time.LocalDate.now();
     }
 
+    // ══════════════════════════════════════════════════════════════════════════════
+    // 单据编号可手工调整(2026-11-17 用户口径:新纸样「委托单编号 可调整」)
+    //   「可以改」不是「随便改」:
+    //     ① 只有 DOC_NO_EDITABLE_PANELS 里的面板受理(纸面把该字段渲染成输入框);
+    //     ② 已提交审批 / 已审核 / 已归档 / 已作废 / 已中止的单不受理(状态行 yj_doc_status 说了算);
+    //     ③ 目标号必须在**业务表**里查不到(号池 s_allno 里可能留着"建过又删掉的草稿"的号,
+    //        这种空占号允许复用 —— 否则用户改成一个池里有过、库里没有的号会被无故拦住);
+    //     ④ 改号时 头表 + 行表 + yj_doc_status 三者一起挪,挪完把号回登 s_allno 留痕
+    //        (不回登的话月内取号基准仍按 s_allno 单调递增,不至于重号,但号池会缺一段留痕)。
+    // ══════════════════════════════════════════════════════════════════════════════
+    private static final java.util.Set<String> DOC_NO_EDITABLE_PANELS = java.util.Set.of("INSP_COMMISSION");
+
+    /** 保存前把"用户手改的单据编号"接过来(改号成功则后续一律按新号落库) */
+    private String adoptEditedDocNo(PanelRegistry.PanelDef def, Map<String, Object> head, String no, String user) {
+        if (def == null || head == null || no == null || no.isBlank()) return no;
+        if (!DOC_NO_EDITABLE_PANELS.contains(def.code())) return no;
+        String col = def.groupCol() != null && !def.groupCol().isBlank() ? def.groupCol() : def.codeCol();
+        if (col == null || col.isBlank()) return no;
+        // 表头载荷的键是 yj_field.label(中文即数据键);本面板 label 与物理列同名,仍按元数据取一次
+        String key = col;
+        for (PanelRegistry.FieldDef fd : def.fields()) {
+            if (fd.col() != null && fd.col().equals(col)) {
+                key = fd.label();
+                break;
+            }
+        }
+        Object raw = head.get(key);
+        String wanted = raw == null ? "" : String.valueOf(raw).trim();
+        if (wanted.isEmpty() || wanted.equals(no.trim())) return no;
+        if (wanted.length() > 50) throw new IllegalArgumentException("单据编号最多 50 个字符");
+        ensureDocNoRenameAllowed(def, no);
+        ensureDocNoFree(def, col, wanted, no);
+        renameDocNo(def, col, no, wanted, user);
+        head.put(key, wanted);
+        log.info("[改号] {} 单据编号 {} → {}(操作人 {})", def.code(), no, wanted, user);
+        return wanted;
+    }
+
+    /** 状态门禁:已离草的单一律不许改号(审批/归档/作废/中止任一命中即拒) */
+    private void ensureDocNoRenameAllowed(PanelRegistry.PanelDef def, String no) {
+        List<Integer> hit = jdbc.query(
+                "SELECT TOP 1 1 FROM yj_doc_status WHERE panel_code = ? AND doc_no = ? AND ("
+                        + "ISNULL(pending,'N') = 'Y' OR shr IS NOT NULL OR ISNULL(archived,'N') = 'Y'"
+                        + " OR ISNULL(canceled,'N') = 'Y' OR ISNULL(stopped,'N') = 'Y')",
+                (rs, i) -> 1, def.code(), no);
+        if (!hit.isEmpty()) {
+            throw new IllegalArgumentException("该单据已提交审批/已审核/已归档/已作废,编号不能再改");
+        }
+    }
+
+    /** 查重:业务表里已有同号(排除自己)就拒 */
+    private void ensureDocNoFree(PanelRegistry.PanelDef def, String col, String wanted, String selfNo) {
+        String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
+        if (table == null || table.isBlank()) return;
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM [" + table + "] WHERE [" + col + "] = ? AND [" + col + "] <> ?",
+                Integer.class, wanted, selfNo);
+        if (n != null && n > 0) throw new IllegalArgumentException("单据编号「" + wanted + "」已存在,请换一个");
+    }
+
+    /** 挪号:头表 + 行表 + 状态行,并把新号回登号池 */
+    private void renameDocNo(PanelRegistry.PanelDef def, String col, String oldNo, String newNo, String user) {
+        String headTable = def.hasHeadTable() ? def.headTable() : def.lineTable();
+        if (headTable != null && !headTable.isBlank()) {
+            jdbc.update("UPDATE [" + headTable + "] SET [" + col + "] = ? WHERE [" + col + "] = ?", newNo, oldNo);
+        }
+        String lineTable = def.lineTable();
+        if (def.hasHeadTable() && lineTable != null && !lineTable.isBlank()
+                && tableCols(lineTable).contains(col)) {
+            jdbc.update("UPDATE [" + lineTable + "] SET [" + col + "] = ? WHERE [" + col + "] = ?", newNo, oldNo);
+        }
+        jdbc.update("UPDATE yj_doc_status SET doc_no = ?, update_at = GETDATE() WHERE panel_code = ? AND doc_no = ?",
+                newNo, def.code(), oldNo);
+        formNoService.registerNo(def.prefix(), newNo, user);
+    }
+
     private Map<String, Object> saveDoc(PanelRegistry.PanelDef def, Map<String, Object> head,
                                         List<Map<String, Object>> items, String no, String user,
                                         boolean markSaved, boolean systemDraft) {
+        // 纸样「委托单编号 可调整」⇒ 草稿阶段允许改号(见 adoptEditedDocNo)
+        no = adoptEditedDocNo(def, head, no, user);
         // 工序检验三单:检验人员默认当前电脑端登录人(2026-10-21;空值/历史 system 占位才填)
         defaultQcInspector(def, head, user);
         boolean split = def.hasHeadTable();

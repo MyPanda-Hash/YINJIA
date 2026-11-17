@@ -4913,3 +4913,8 @@ migrate-sample-insp-module-20261116.sql
 #   现在按配置派单、落库,代理回来第一次 /pending 按 id 顺序补打;默认保留 3 天 = 72 小时(print.cache_hours,用户口径「补打印保留3天」)。
 #   含中文注明(表+15 列)、pk/ix 命名与末尾自检(关键列 5/5、索引 1/1、注明 ≥15)。两账套已执行
 migrate-print-task-cache-20261116.sql
+
+# 2026-11-17 检验委托单第三次修订(用户新 .doc 标黄差异):单据编号可手工改号(editable=1)、
+#   委托单位/制造商/生产厂/样品型号规格/报告类型 五个字段转下拉框字典、headDefaults 去掉
+#   样品处理方式与检验报告有效期默认值、列注明同步(10 日/只读语义);幂等;两账套
+migrate-insp-commission-rev-20261117.sql

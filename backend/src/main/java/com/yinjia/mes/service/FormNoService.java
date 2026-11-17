@@ -84,6 +84,22 @@ public class FormNoService {
     }
 
     /**
+     * 手工改号后把新号**回登号池**(2026-11-17:检验委托单「委托单编号可调整」)。
+     *
+     * <p>只做留痕,不改取号规则:{@link #nextFree} 的基准本来就是
+     * max(号池末号, 业务表同月最大号),少登一条不会发重号;但缺留痕会让 s_allno 的月度分段
+     * 出现"库里有的号池里没有",以后排查重号又要靠猜 —— 所以照 {@link #next} 的写法补一条。
+     * 池里已有该号(重复保存/改回来)时跳过,幂等。
+     */
+    public synchronized void registerNo(String prefix, String no, String user) {
+        if (prefix == null || prefix.isBlank() || no == null || no.isBlank()) return;
+        Integer exists = jdbc.queryForObject("SELECT COUNT(1) FROM s_allno WHERE dh = ?", Integer.class, no);
+        if (exists != null && exists > 0) return;
+        jdbc.update("INSERT INTO s_allno (comm, dh, lb, ny, asp_user1, asp_time1, asp_cancel) VALUES (?,?,?,?,?,GETDATE(),'N')",
+                "0", no, prefix, LocalDate.now().format(NY_FMT), user == null ? "admin" : user);
+    }
+
+    /**
      * 取第一个既不在号池、也不在业务表里的候选号。
      *
      * <p>起始序号取「号池末号」与「业务表同前缀同月最大号」的较大者 + 1:业务表里已有

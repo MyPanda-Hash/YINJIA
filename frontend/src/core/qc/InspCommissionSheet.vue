@@ -57,7 +57,17 @@
       </div>
       <div class="ic-meta-no">
         <span class="ic-meta-no-label">{{ tt('委托单编号：') }}</span>
-        <span class="ic-meta-no-val">{{ headVal('单据编号') }}</span>
+        <!-- 2026-11-17 纸样标黄「可调整」⇒ 编号可手工改(保存时查重、提交审批后锁定) -->
+        <el-input
+          v-if="canEdit('单据编号')"
+          :model-value="headVal('单据编号')"
+          size="small"
+          class="ic-input ic-meta-no-input"
+          maxlength="50"
+          :placeholder="tt('自动生成')"
+          @update:model-value="(v) => setHead('单据编号', v)"
+        />
+        <span v-else class="ic-meta-no-val">{{ headVal('单据编号') }}</span>
       </div>
     </div>
 
@@ -72,26 +82,59 @@
         <col class="ic-col-6" />
       </colgroup>
       <tbody>
-        <!-- ── 委托方/制造方/生产方:每行「名称/地址」合并成一格(纸样三行,值跨后 5 列) ── -->
+        <!-- ── 委托方/制造方/生产方:每行「名称/地址」合并成一格(纸样三行,值跨后 5 列) ──
+             2026-11-17 纸样:名称格改成「□销售 □品质 □研发 □其他____」这类勾选(值写进原字段),
+             地址仍单独填;勾选值 = 该字段的中文值,「其他」时后面的横线可手填。 -->
         <tr v-for="row in PARTY_ROWS" :key="row.label">
           <th class="ic-lbl">{{ tt(row.label) }}</th>
           <td class="ic-cell" colspan="5">
             <div class="ic-party-line">
-              <template v-for="(key, ki) in row.keys" :key="key">
-                <el-input
-                  v-if="canEdit(key)"
-                  :model-value="headVal(key)"
-                  size="small"
-                  :class="['ic-input', ki === 0 ? 'ic-party-name' : 'ic-party-addr']"
-                  maxlength="200"
-                  :placeholder="tt(key)"
-                  @update:model-value="(v) => setHead(key, v)"
-                />
+              <template v-if="row.choices">
                 <span
-                  v-else
-                  :class="['ic-text', 'ic-party-text', ki === 0 ? 'ic-party-name' : 'ic-party-addr']"
-                >{{ headVal(key) }}</span>
+                  v-for="opt in row.choices"
+                  :key="opt"
+                  class="ic-opt ic-opt-inline"
+                  :class="{ 'is-clickable': canEdit(row.keys[0]) }"
+                  @click="pickChoice(row.keys[0], opt)"
+                >
+                  <span class="ic-box">{{ choiceBox(row.keys[0], opt) }}</span>
+                  <span class="ic-opt-text">{{ tt(opt) }}</span>
+                </span>
+                <span class="ic-fill ic-fill-party">
+                  <el-input
+                    v-if="canEdit(row.keys[0]) && isOtherActive(row.keys[0])"
+                    :model-value="headVal(row.keys[0])"
+                    size="small"
+                    class="ic-input ic-input-fill"
+                    maxlength="120"
+                    :placeholder="tt('请填写名称')"
+                    @update:model-value="(v) => setHead(row.keys[0], v)"
+                  />
+                  <span v-else-if="isCustomValue(row.keys[0])" class="ic-fill-text">{{ headVal(row.keys[0]) }}</span>
+                </span>
               </template>
+              <template v-else>
+                <el-input
+                  v-if="canEdit(row.keys[0])"
+                  :model-value="headVal(row.keys[0])"
+                  size="small"
+                  :class="['ic-input', 'ic-party-name']"
+                  maxlength="200"
+                  :placeholder="tt(row.keys[0])"
+                  @update:model-value="(v) => setHead(row.keys[0], v)"
+                />
+                <span v-else :class="['ic-text', 'ic-party-text', 'ic-party-name']">{{ headVal(row.keys[0]) }}</span>
+              </template>
+              <el-input
+                v-if="canEdit(row.keys[1])"
+                :model-value="headVal(row.keys[1])"
+                size="small"
+                :class="['ic-input', 'ic-party-addr']"
+                maxlength="300"
+                :placeholder="tt(row.keys[1])"
+                @update:model-value="(v) => setHead(row.keys[1], v)"
+              />
+              <span v-else :class="['ic-text', 'ic-party-text', 'ic-party-addr']">{{ headVal(row.keys[1]) }}</span>
             </div>
           </td>
         </tr>
@@ -114,19 +157,24 @@
           </template>
         </tr>
 
-        <!-- ── 样品型号/规格 | 检验类别(值区 = 已选目录项目摘要 + 选择按钮) ── -->
+        <!-- ── 样品型号/规格(2026-11-17 纸样:改成单选类别 □滤芯 □水样 □电气类) | 检验类别(值区 = 已选目录项目摘要 + 选择按钮) ── -->
         <tr>
           <th class="ic-lbl">{{ tt('样品型号/规格') }}</th>
           <td class="ic-cell" colspan="2">
-            <el-input
-              v-if="canEdit('样品型号/规格')"
-              :model-value="headVal('样品型号/规格')"
-              size="small"
-              class="ic-input"
-              maxlength="120"
-              @update:model-value="(v) => setHead('样品型号/规格', v)"
-            />
-            <span v-else class="ic-text">{{ headVal('样品型号/规格') }}</span>
+            <div class="ic-party-line">
+              <span
+                v-for="opt in SAMPLE_KINDS"
+                :key="opt"
+                class="ic-opt ic-opt-inline"
+                :class="{ 'is-clickable': canEdit('样品型号/规格') }"
+                @click="pickOne('样品型号/规格', opt)"
+              >
+                <span class="ic-box">{{ isPicked('样品型号/规格', opt) ? '■' : '□' }}</span>
+                <span class="ic-opt-text">{{ tt(opt) }}</span>
+              </span>
+              <!-- 老数据里的自由文本(具体型号/规格)原样显示:改单选不等于把历史值抹掉 -->
+              <span v-if="isCustomValue('样品型号/规格')" class="ic-fill-text">{{ headVal('样品型号/规格') }}</span>
+            </div>
           </td>
           <th class="ic-lbl">{{ tt('检验类别') }}</th>
           <td class="ic-cell ic-cat-cell" colspan="2">
@@ -306,7 +354,7 @@
           </td>
         </tr>
 
-        <!-- ── 报告类型(2 选 1) ── -->
+        <!-- ── 报告类型(2026-11-17 纸样加「只要数据」⇒ 3 选 1) ── -->
         <tr>
           <th class="ic-lbl">{{ tt('报告类型') }}</th>
           <td class="ic-cell" colspan="5">
@@ -318,7 +366,7 @@
               @click="pickOne('报告类型', opt)"
             >
               <span class="ic-box">{{ isPicked('报告类型', opt) ? '■' : '□' }}</span>
-              <span class="ic-opt-text">{{ tt(oi === 0 ? '普通报告；' : 'CNAS 报告') }}</span>
+              <span class="ic-opt-text">{{ tt(opt) }}{{ oi < REPORT_OPTIONS.length - 1 ? '；' : '' }}</span>
             </span>
           </td>
         </tr>
@@ -465,12 +513,19 @@ const bump = ref(0)
  *   制造商/地址      | 值(制造商 + 制造商地址)
  *   生产厂/地址      | 值(生产厂 + 生产厂地址)
  * 显示标签是合并文案(照 .doc 纸样),数据键仍是两个独立字段 —— 没有合并 SQL 列、没改 yj_field。
+ *
+ * 2026-11-17 新纸样:名称格变成「勾选框 + 其他可填」(用户口径:勾选值**写进原字段**):
+ *   委托单位 = □销售 □品质 □研发 □其他____ ;制造商/生产厂 = □银嘉 □其他____。
+ * 「其他」勾上后,后面的横线改成可输入的框,填的值直接落回同一列(不改数据键、不新增列)。
  */
 const PARTY_ROWS = [
-  { label: '委托单位/单位地址', keys: ['委托单位', '委托单位地址'] },
-  { label: '制造商/地址', keys: ['制造商', '制造商地址'] },
-  { label: '生产厂/地址', keys: ['生产厂', '生产厂地址'] },
+  { label: '委托单位/单位地址', keys: ['委托单位', '委托单位地址'], choices: ['销售', '品质', '研发', '其他'] },
+  { label: '制造商/地址', keys: ['制造商', '制造商地址'], choices: ['银嘉', '其他'] },
+  { label: '生产厂/地址', keys: ['生产厂', '生产厂地址'], choices: ['银嘉', '其他'] },
 ]
+
+/** 样品型号/规格 → 单选类别(2026-11-17 用户口径「替换型号/规格为单选类别」) */
+const SAMPLE_KINDS = ['滤芯', '水样', '电气类']
 
 /**
  * 纸面上的 6 格行(标签|值|标签|值|标签|值):
@@ -493,7 +548,8 @@ const HANDLE_OPTIONS = [
   {
     value: '委托单位自愿放弃',
     text: '2、委托单位自愿放弃；',
-    note: '（自发出检验报告之日起 45 日内不取样品，又未做任何说明的，视为委托单位自愿放弃样品，由检验机构对其进行处置）；',
+    // 2026-11-17 新纸样:45 日 → 10 日
+    note: '（自发出检验报告之日起 10 日内不取样品，又未做任何说明的，视为委托单位自愿放弃样品，由检验机构对其进行处置）；',
   },
   {
     value: '委托单位委托检验机构代办样品托运手续',
@@ -504,7 +560,8 @@ const HANDLE_OPTIONS = [
 
 /** 判定规则 / 报告类型 / 检验报告有效期(纸面单选;值 = 选中项中文文案) */
 const RULE_OPTIONS = ['按标准限值判定', '其他判定规则', '无需判定']
-const REPORT_OPTIONS = ['普通报告', 'CNAS 报告']
+/** 2026-11-17 新纸样:报告类型加「只要数据」 */
+const REPORT_OPTIONS = ['只要数据', '普通报告', 'CNAS报告']
 const VALIDITY_OPTIONS = ['长期有效', '规定有效期']
 /** 单选组清单(按数据键索引) —— 判当前选中项与「点谁写谁」都看这一份 */
 const PICK_GROUPS = {
@@ -512,14 +569,15 @@ const PICK_GROUPS = {
   判定规则: RULE_OPTIONS,
   报告类型: REPORT_OPTIONS,
   检验报告有效期: VALIDITY_OPTIONS,
+  '样品型号/规格': SAMPLE_KINDS,
 }
 
-/** 新建空单默认值(契约 §4.1;报告类型故意留空,由用户自己勾) */
-const DEFAULT_PICKS = [
-  ['样品处理方式', '委托单位自行取走'],
-  ['判定规则', '无需判定'],
-  ['检验报告有效期', '长期有效'],
-]
+/**
+ * 新建空单默认值(契约 §4.1;报告类型故意留空,由用户自己勾)。
+ * 2026-11-17:纸面不再预勾「样品处理方式」与「检验报告有效期」⇒ 只留判定规则
+ * (与 yj_panel.config 的 headDefaults 同口径,两边一起看)。
+ */
+const DEFAULT_PICKS = [['判定规则', '无需判定']]
 
 /* ───────────────────────── 明细行(从送样登记表带入的检验项目) ───────────────────────── */
 
@@ -757,6 +815,56 @@ function pickOne(key, value) {
   setHead(key, value)
 }
 
+/* ───────── 勾选 + 「其他」手填(2026-11-17 纸样:委托单位/制造商/生产厂) ───────── */
+
+/** 空白差异不该让勾选框错位(老数据「CNAS 报告」vs 字典「CNAS报告」) */
+function squashText(s) {
+  return String(s ?? '').replace(/\s+/g, '')
+}
+
+/** 该字段的勾选清单(委托方三行的人文选项 + 单选组的通用清单) */
+function choicesOf(key) {
+  const row = PARTY_ROWS.find((r) => r.choices && r.keys[0] === key)
+  return row ? row.choices : (PICK_GROUPS[key] || [])
+}
+
+/** 当前值是不是「清单之外的自定义值」(老数据/手填名称) */
+function isCustomValue(key) {
+  const cur = headVal(key).trim()
+  if (!cur) return false
+  return !choicesOf(key).some((o) => squashText(o) === squashText(cur))
+}
+
+/** 本次刚点了「其他」(还没输入)—— 与「已有自定义值」合并判断 */
+const otherOn = ref({})
+function isOtherActive(key) {
+  if (otherOn.value[key] === true) return true
+  return choicesOf(key).includes('其他') && isCustomValue(key)
+}
+
+/** 勾选框 ■/□:「其他」看 isOtherActive,其余按值精确比 */
+function choiceBox(key, opt) {
+  if (opt === '其他') return isOtherActive(key) ? '■' : '□'
+  return squashText(headVal(key)) === squashText(opt) ? '■' : '□'
+}
+
+/** 点勾选:选具体项 ⇒ 值=该项;选「其他」⇒ 打开横线输入框并清掉原具体项 */
+function pickChoice(key, opt) {
+  if (!canEdit(key)) return
+  if (opt === '其他') {
+    otherOn.value[key] = true
+    if (!isCustomValue(key)) setHead(key, '')
+    return
+  }
+  otherOn.value[key] = false
+  setHead(key, opt)
+}
+
+/** 换单(编号变了)⇒「其他」的临时态归零,免得上一张单的输入框跟到下一张 */
+watch(() => String(props.head?.['单据编号'] || ''), () => {
+  otherOn.value = {}
+})
+
 /* ───────────────────────── 送样登记表目录弹窗 ───────────────────────── */
 
 const catalogOpen = ref(false)
@@ -938,6 +1046,12 @@ watch(
 .ic-meta-no-val {
   padding-left: 2px;
 }
+/* 编号可改(2026-11-17):只读态还是纸面的裸号,编辑态给一个下划线输入框 */
+.ic-meta-no-input {
+  width: 190px;
+  margin-left: 2px;
+  vertical-align: middle;
+}
 
 /* ── ③ 主表:6 列基准栅格(列宽 = 纸样实测 / 1054px) ──
    186 / 152 / 174 / 134 / 137 / 271  ⇒  17.6% 14.4% 16.5% 12.7% 13.0% 25.8% */
@@ -1060,6 +1174,18 @@ watch(
 }
 .ic-party-text {
   width: auto;
+}
+/* 勾选「其他」后的横线:占剩余宽度,纸面上仍是下划线输入(2026-11-17) */
+.ic-fill-party {
+  flex: 0 1 26%;
+  min-width: 96px;
+}
+/* 三行名称格的勾选项不许被压成竖排(实测窄窗下「销售」会拆成「销 / 售」) */
+.ic-party-line .ic-opt {
+  flex: 0 0 auto;
+}
+.ic-party-line .ic-opt-text {
+  white-space: nowrap;
 }
 
 /* ── 检验类别格:摘要 + 「选择检验项目」按钮 ── */
