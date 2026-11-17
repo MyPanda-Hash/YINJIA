@@ -32,7 +32,11 @@
       <div class="as-company">惠州市银嘉环保科技有限公司</div>
       <!-- 表格式纸面(样品申请单 layout:'grid'):编号在信息条里(模板 row2 第一格),顶栏不再重复一格 -->
       <div v-if="!isGrid" class="as-docno">
-        <div v-if="editable && isRefKey('文档编号')" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
+        <!-- 2026-11-17 用户口径（1117问题 #2）：右上角那格改印**受控文件编号**（YJ-QR-155/156），
+             与产品文件那批同款；原本挂在这一格的「项目编号」参照控件下移到信息表
+             「立项编号」行（两处同一个数据键『文档编号』，ADR-0001 不动数据键 ⇒ 下游零影响）。 -->
+        <template v-if="docnoStatic"><span class="as-docno-static">{{ tt('文件编号') }}：{{ docnoStatic }}</span></template>
+        <div v-else-if="editable && isRefKey('文档编号')" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
           <span class="as-ref-text" :class="{ 'is-empty': !head['文档编号'] }">{{ head['文档编号'] || tt(docnoLabelText) }}</span>
           <el-icon class="as-ref-ico"><Search /></el-icon>
         </div>
@@ -1116,6 +1120,8 @@ function removeGridRow(idx) {
  * 判定表在 docSheetConfigs.docnoLabel(可单测);未登记的面板回空串 ⇒ 仍显示「文档编号：」。
  * 已带冒号,模板里直接 `tt(docnoLabelText)` 取译名。
  */
+/** 纸面右上角固定文件编号（config.docnoStatic）；空 = 仍走原来的「项目编号/文档编号」参照格 */
+const docnoStatic = computed(() => String(props.config?.docnoStatic || ''))
 const docnoLabelText = computed(() => {
   const lb = docnoLabel(props.panelCode)
   return lb ? lb + '：' : '文档编号：'
@@ -1806,6 +1812,13 @@ defineExpose({ focusField })
 }
 .as-docno-input {
   width: 130px;
+}
+/* 右上角固定文件编号（YJ-QR-155/156）：与产品文件那批的受控编号同观感——
+   斜体、右对齐、不可点（不是输入框，也不弹参照） */
+.as-docno-static {
+  white-space: nowrap;
+  color: #b00;
+  font-weight: 600;
 }
 /* 参照单元格(文档编号 -> 立项申请右上角编号):拟态输入框,点击弹参照 */
 .as-ref-ctl {
