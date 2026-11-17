@@ -127,3 +127,71 @@ export function filterFlowRows(rows, keyword, onlyOpen = false) {
     return hay.includes(kw)
   })
 }
+
+/* ═════════ 与「项目流程管控」(ProjectFlow.vue)对齐的展示口径 · 2026-11-17 ═════════
+ * 用户口径:「产品文件流程管控的格式可以按照项目流程管控的格式进行参考设计」。
+ * 参考实现把「状态标签/当前环节/展开行信息区」的口径都放在纯函数里,页面只负责画 ——
+ * 这里照做,避免两页各写一套判定(判定一漂,同一张单在两条流程里说法就不一样)。
+ */
+
+const STEP_LABEL = {
+  done: '已完成',
+  doing: '进行中',
+  none: '未开始',
+}
+
+/**
+ * 步骤的**状态文案**(el-tag 里显示的那三个字)。
+ *
+ * <p>归一成三档、不直接显示单据状态原文:ProductFlow 原先 `st.state` 会原样吐出「草稿」,
+ * 而 ProjectFlow 那一列一直是「已完成/进行中/未开始」。两页并排看就露馅,故统一走这里。</p>
+ *
+ * @param {{tone?: string}} step flowStepsOf() 产出的步骤
+ * @returns {'已完成'|'进行中'|'未开始'}
+ */
+export function stateLabelOf(step) {
+  const tone = String(step?.tone || STEP_STATE.none)
+  return STEP_LABEL[tone] || STEP_LABEL.none
+}
+
+/**
+ * 「当前环节」= 第一个没完成的步骤(与 nextStepOf 同一个判定,但多给一个**第几步**)。
+ *
+ * <p>ProjectFlow 的「当前环节」列显示成 `3/10 环节名`,这边是 `2/5 成型工艺清单`。
+ * 全部完成返回 null(界面显示「已完成」)。</p>
+ *
+ * @param {Array} steps flowStepsOf() 的结果
+ * @returns {{index: number, step: object, text: string}|null} index 是 1 起的序号
+ */
+export function currentStepOf(steps) {
+  const list = Array.isArray(steps) ? steps : []
+  const i = list.findIndex((s) => s.tone !== STEP_STATE.done)
+  if (i < 0) return null
+  return { index: i + 1, step: list[i], text: `${i + 1}/${list.length}` }
+}
+
+/** 展开行底部的「单据信息」项(与 ProjectFlow 的 pf-meta 同构:label + value 成对) */
+const DOC_META_FIELDS = [
+  { label: '产品编号', pick: (r) => r?.['产品编号'] },
+  { label: '产品名称', pick: (r) => r?.['产品名称'] },
+  { label: '立项文档编号', pick: (r) => r?.['立项文档编号'] },
+  // 「产品信息表单号」= 这张开发包对应产品信息表的**单据编号**(PI-…),
+  // 与第一列表头那个「产品编号」(A-54-08 这种业务编号)是两回事,别混。
+  { label: '产品信息表单号', pick: (r) => r?.['单据编号'] },
+  { label: '最后动作', pick: (r) => r?.at },
+]
+
+/**
+ * 展开行信息区:与 ProjectFlow 的 `dl.pf-meta` 同一形态(5 项 label/value)。
+ * 空值统一给「-」(参考实现是 `|| '-'`,不显示 undefined/空串)。
+ *
+ * @param {Record<string, any>|null} row /px/rdDevOverview 的一行
+ * @returns {Array<{label: string, value: string}>}
+ */
+export function docMetaOf(row) {
+  return DOC_META_FIELDS.map((f) => {
+    const v = f.pick(row)
+    const s = v === undefined || v === null ? '' : String(v).trim()
+    return { label: f.label, value: s || '-' }
+  })
+}

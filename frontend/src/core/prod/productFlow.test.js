@@ -2,7 +2,8 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
-  STEP_STATE, filterFlowRows, flowKpisOf, flowStatusOf, flowStepsOf, nextStepOf, stepStateOf,
+  STEP_STATE, currentStepOf, docMetaOf, filterFlowRows, flowKpisOf, flowStatusOf, flowStepsOf,
+  nextStepOf, stateLabelOf, stepStateOf,
 } from './productFlow.js'
 
 /**
@@ -174,4 +175,67 @@ test('⑫ 「产品数」KPI 必须与列表行数一致（新建未编号的单
     { 产品编号: 'T1', 单据编号: 'CP-1', state: '已归档', nodes: [] },
   ]
   assert.equal(flowKpisOf(rows).total, 2, '有单据编号的新单也要计入产品数（与列表同一个筛选口径）')
+})
+
+/* ═══ 2026-11-17 用户口径:「产品文件流程管控的格式可以按照项目流程管控的格式进行参考设计」═══
+ * 参考实现 = frontend/src/views/rd/ProjectFlow.vue。逐项对齐的是**信息组织方式**,不是配色:
+ *   ① 每一步都带状态标签(el-tag)。ProductFlow 原来只有「未开始」三个字,且把「草稿」原样吐出来;
+ *   ② 展开行底部有「单据信息」dl(项目流程管控是 5 项:立项文档编号/申请立项人/实施计划单号/
+ *      最后动作/进度查询行)⇒ 这边给 5 项:产品编号/产品名称/立项文档编号/产品信息表单号/最后动作;
+ *   ③ 表头有「当前环节」列(几/几步 + 环节名),而不是只在展开行里说卡在哪;
+ *   ④ 窄屏(≤768)收列 —— 否则 el-table 横向溢出,375 实测被裁。
+ * 纯口径集中在 productFlow.js,页面只负责画(与项目流程管控同一条纪律)。
+ */
+
+test('⑬ 步骤状态要归一成三档给标签用（不再把「草稿」原样吐给界面）', () => {
+  const steps = flowStepsOf(row('A-1', '甲', '草稿', [
+    node('RD_SPEC_DOC', '规格书', '已归档', true, false, 'S-1'),
+    node('RD_MOLD_PROC', '成型工艺清单', '草稿', false, false, 'M-1'),
+    node('RD_ASM_PROC', '组装工艺清单', '未开始', false),
+    node('RD_INSP_PLAN', '出货检验计划表', '未开始', false),
+  ]))
+  const byKey = Object.fromEntries(steps.map((s) => [s.key, s]))
+  assert.equal(byKey.RD_SPEC_DOC.tone, 'done')
+  assert.equal(byKey.RD_MOLD_PROC.tone, 'doing', '草稿=已建单未完成 ⇒ 进行中')
+  assert.equal(byKey.RD_ASM_PROC.tone, 'none')
+  // 状态文本:三档各有固定的中文说法（与项目流程管控的 stateText 同款）
+  assert.equal(stateLabelOf(byKey.RD_SPEC_DOC), '已完成')
+  assert.equal(stateLabelOf(byKey.RD_MOLD_PROC), '进行中')
+  assert.equal(stateLabelOf(byKey.RD_ASM_PROC), '未开始')
+})
+
+test('⑭ 「当前环节」= 第一个没完成的步骤,给出第几步 + 环节名（表头列用）', () => {
+  const steps = flowStepsOf(row('A-1', '甲', '已归档', [
+    node('RD_SPEC_DOC', '规格书', '已归档', true, false, 'S-1'),
+    node('RD_MOLD_PROC', '成型工艺清单', '未开始', false),
+    node('RD_ASM_PROC', '组装工艺清单', '未开始', false),
+    node('RD_INSP_PLAN', '出货检验计划表', '未开始', false),
+  ]))
+  const cur = currentStepOf(steps)
+  assert.ok(cur, '还有未完成的步骤 ⇒ 要能说出卡在哪')
+  // 5 步顺序 = 产品信息表 / 规格书 / 成型 / 组装 / 出货;
+  // 本行时 产品信息表(已归档=done) + 规格书(done) 都完成 ⇒ 第一个没完成的是第 3 步成型工艺清单。
+  assert.equal(cur.index, 3, '产品信息表+规格书已完成 ⇒ 卡在第 3 步')
+  assert.equal(cur.step.label, '成型工艺清单')
+  assert.equal(cur.text, '3/5', '表头显示成「3/5」这种形态')
+  // 全部完成 ⇒ null（表头显示「已完成」）
+  const allDone = [1, 2, 3, 4, 5].map((i) => ({ key: 'K' + i, label: 'x' + i, tone: 'done', state: '已归档', at: '' }))
+  assert.equal(currentStepOf(allDone), null)
+})
+
+test('⑮ 展开行「单据信息」五项与项目流程管控同构（纯函数产出，页面不拼装）', () => {
+  const r0 = row('A-9', '甲产品', '已归档', [
+    node('RD_SPEC_DOC', '规格书', '已归档', true, false, 'S-9'),
+    node('RD_MOLD_PROC', '成型工艺清单', '未开始', false),
+    node('RD_ASM_PROC', '组装工艺清单', '未开始', false),
+    node('RD_INSP_PLAN', '出货检验计划表', '未开始', false),
+  ], { 填写人: '张莉', at: '2026-11-17 13:31' })
+  const meta = docMetaOf(r0)
+  assert.deepEqual(meta.map((m) => m.label), ['产品编号', '产品名称', '立项文档编号', '产品信息表单号', '最后动作'])
+  assert.equal(meta[0].value, 'A-9')
+  assert.equal(meta[3].value, 'CP-A-9', '「产品信息表单号」= 该产品的产品信息表单据编号')
+  assert.equal(meta[4].value, '2026-11-17 13:31')
+  // 空值统一显示「-」，不显示 undefined/空串（与项目流程管控的 `|| '-'` 同口径）
+  const blank = docMetaOf({ 产品编号: '', 产品名称: '', 立项文档编号: '', 单据编号: '', at: '' })
+  assert.ok(blank.every((m) => m.value === '-'), '空值一律显示 -')
 })
