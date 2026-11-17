@@ -111,3 +111,16 @@ test('⑥ 表单管理人不得再被「当前编辑人」覆盖（三处写入�
   assert.doesNotMatch(btn, /UPDATE rd_asm_proc_head SET 表单管理人 = \?[\s\S]{0,120}realNameOf\(user\), no\)/,
     '不得再按当前保存人回写')
 })
+
+test('⑦ 审核人必须显示**姓名**，不能被 shr（账号）覆盖', () => {
+  // 生产实测：已审单纸面「审核人」显示 "admin"（账号）——
+  //   后端 QueryService 默认把虚拟字段「审核人」覆盖成 yj_doc_status.shr，
+  //   而本面板的审核人是**表内真值列**（label 审核人 → 物理列 备用3，审批时写姓名）。
+  // 处理与质量单据一致：表内有值用表内，为空才退回 shr 兜底。
+  const qs = readFileSync(
+    new URL('../../../../backend/src/main/java/com/yinjia/mes/service/QueryService.java', import.meta.url), 'utf8')
+  const at = qs.indexOf('private static boolean isTwoLevelSignPanel(')
+  assert.ok(at > 0, '缺 isTwoLevelSignPanel')
+  const seg = qs.slice(at, at + 1200)
+  assert.match(seg, /"RD_ASM_PROC"\.equals\(panelCode\)/, '组装工艺要进"表内审核人为准"的例外')
+})
