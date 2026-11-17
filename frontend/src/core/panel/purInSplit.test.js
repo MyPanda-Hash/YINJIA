@@ -100,6 +100,15 @@ test('② 入口是工具栏按钮「多仓库入库」,前两轮的做法已彻
   assert.ok(!/split icon/.test(form))
 })
 
+test('② 列表页(内联表单)也接了这颗按钮 —— 否则会落到通用 callButton 报「未定义按钮规则」', () => {
+  const list = src('./../views/PanelxList.vue')
+  assert.ok(/if \(action === '多仓库入库'\)/.test(list), '列表页 onButton 必须接同一动作')
+  assert.ok(/<PurInMultiWhDialog/.test(list), '列表页也要挂载弹窗')
+  assert.ok(/多仓库入库: !current\.value \|\| st !== '草稿'/.test(list), '列表页按钮同样只在草稿可点')
+  assert.ok(/onPurInMultiWhSaved/.test(list), '拆完要重载列表(明细行已按仓库拆开)')
+  assert.ok(/hasUnsavedChanges\(\)/.test(list), '有未保存修改时先拦住(界面与库不一致时拆行会错)')
+})
+
 test('② 弹窗:每行 ▾ 加一行仓库子行,合计不超过可入库数量,确定走 multiWh 一次性提交', () => {
   const dlg = src('./../views/PurInMultiWhDialog.vue')
   assert.ok(/addAlloc\(/.test(dlg) && /@click="addAlloc\(row\.L\)"/.test(dlg), '每行 ▾ 要能加一行仓库子行')
