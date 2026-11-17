@@ -148,7 +148,7 @@
             <td class="ic-cell">
               <!-- 联系人(=送样人):纸样「拉选填」⇒ 有账号的人名下拉,可搜索;老姓名仍可手输 -->
               <el-select
-                v-if="canEdit(c.key) && c.select"
+                v-if="canEdit(c.key) && c.select && !contactDialogMode"
                 :model-value="headVal(c.key)"
                 size="small"
                 filterable
@@ -161,6 +161,19 @@
               >
                 <el-option v-for="o in optionsOf(c.key)" :key="o" :label="o" :value="o" />
               </el-select>
+              <!-- 人数超过阈值(2026-11-17 用户口径:>15 个账号)⇒ 改成弹窗查找,纸面只显示已选姓名 -->
+              <div v-else-if="canEdit(c.key) && c.select" class="ic-cat-line">
+                <span class="ic-text">{{ headVal(c.key) }}</span>
+                <el-button
+                  size="small"
+                  type="primary"
+                  plain
+                  class="ic-pick-btn no-print"
+                  @click="openContactPick"
+                >
+                  {{ tt('选择') }}
+                </el-button>
+              </div>
               <el-input
                 v-else-if="canEdit(c.key)"
                 :model-value="headVal(c.key)"
@@ -267,7 +280,7 @@
                 <tr>
                   <th>{{ tt('序号') }}</th>
                   <th>{{ tt('检测元素') }}</th>
-                  <th>{{ tt('内部检出限') }}</th>
+                  <th>{{ tt(limitKey) }}</th>
                   <th>{{ tt('检测误差') }}</th>
                   <th>{{ tt('测试方法') }}</th>
                   <th>{{ tt('测试周期') }}</th>
@@ -280,7 +293,7 @@
                 <tr v-for="(row, ri) in items" :key="rowKeyOf(row, ri)">
                   <td class="ic-items-no">{{ cell(row, '行号') || ri + 1 }}</td>
                   <td>{{ cell(row, '检测元素') }}</td>
-                  <td>{{ cell(row, '内部检出限') }}</td>
+                  <td>{{ limitOf(row) }}</td>
                   <td>{{ cell(row, '检测误差') }}</td>
                   <td>{{ cell(row, '测试方法') }}</td>
                   <td>{{ cell(row, '测试周期') }}</td>
@@ -502,7 +515,33 @@
     </div>
     <div class="ic-docno">{{ tt('YJ-QP-701-1-01 (00)') }}</div>
 
-    <!-- ⑤ 送样登记表目录弹窗(档案面板 SAMPLE_REG 的 44 行检测目录;确认后带入行表) -->
+    <!-- ⑤ 送样人(联系人)弹窗选择:人数超过阈值时用它替代下拉(2026-11-17 用户口径) -->
+    <el-dialog
+      v-model="contactPickOpen"
+      :title="tt('选择送样人')"
+      width="420px"
+      append-to-body
+      :close-on-click-modal="false"
+      class="ic-contact-dialog"
+    >
+      <el-input v-model="contactKeyword" :placeholder="tt('输入姓名搜索')" clearable />
+      <div class="ic-contact-list">
+        <div
+          v-for="o in contactPickOptions"
+          :key="o.value"
+          class="ic-contact-item"
+          :class="{ 'is-active': o.value === headVal('联系人') }"
+          @click="pickContact(o.value)"
+        >{{ o.label }}</div>
+        <el-empty v-if="!contactPickOptions.length" :description="tt('暂无匹配的人员')" :image-size="50" />
+      </div>
+      <template #footer>
+        <el-button @click="clearContact">{{ tt('清空') }}</el-button>
+        <el-button type="primary" @click="contactPickOpen = false">{{ tt('取消') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ⑥ 送样登记表目录弹窗(档案面板 SAMPLE_REG 的 44 行检测目录;确认后带入行表) -->
     <SampleCatalogPickDialog v-model="catalogOpen" @confirm="onCatalogConfirm" />
   </div>
 </template>
@@ -610,6 +649,9 @@ const DEFAULT_PICKS = [['判定规则', '无需判定']]
 const DETAIL_LABELS = [
   '行号',
   '检测元素',
+  '标准方法检出限',
+  // 并行任务(2026-11-17)把 SAMPLE_REG/行表的「内部检出限」改名为「标准方法检出限」:
+  // 两个键都认(带入时都带、显示时优先取有值的那一个),改名前后建的单都不会丢这一列。
   '内部检出限',
   '检测误差',
   '测试方法',
@@ -619,6 +661,31 @@ const DETAIL_LABELS = [
   '检测标准备注',
 ]
 /** 「收费」两个可能的键:label 是 收费（一个样/元）,物理列是 收费 —— 读两边都认 */
+/**
+ * 「检出限」的两个可能键(2026-11-17 并行任务把目录/行表的「内部检出限」改名为「标准方法检出限」):
+ * 显示时优先取行里真正有值的那个,表头文字跟着走 —— 改名前后建的单都不会出现空列。
+ */
+const LIMIT_KEYS = ['标准方法检出限', '内部检出限']
+
+/** 表头文字:先看行表里哪些行真有值,再退回 yj_field 里登记的名字 */
+const limitKey = computed(() => {
+  bump.value
+  const rows = items.value
+  for (const k of LIMIT_KEYS) {
+    if (rows.some((r) => String(r?.[k] ?? '').trim() !== '')) return k
+  }
+  return LIMIT_KEYS[0]
+})
+
+/** 一行里「检出限」的值(两个键都认) */
+function limitOf(row) {
+  for (const k of LIMIT_KEYS) {
+    const v = String(row?.[k] ?? '').trim()
+    if (v) return v
+  }
+  return ''
+}
+
 const FEE_KEYS = ['收费（一个样/元）', '收费']
 
 /** 明细行(只读取,不创建) */
@@ -805,6 +872,43 @@ function optionsOf(key) {
   const raw = Array.isArray(f?.options) ? f.options : []
   return raw.map((o) => (o && typeof o === 'object' ? (o.value ?? o.label ?? '') : o))
     .filter((v) => v !== '' && v != null)
+}
+
+/**
+ * 送样人(联系人)选择控件双模(2026-11-17 用户口径:
+ * 「当前这个页面的检验人下拉框当账号超过 15 个后就变为弹窗查找的形式选择」):
+ *   · 账号 ≤ 15 ⇒ 纸面内联下拉(可搜索、可手输);
+ *   · 账号 > 15 ⇒ 纸面只显示已选姓名 + 「选择」按钮,点开**弹窗查找**(搜索框 + 名单),
+ *     弹窗里仍允许手输清单外的姓名(搜索词不在名单时列表头插一条「使用「xxx」」)。
+ * 阈值只影响这张纸面;通用表单页仍走全局面板阈值 `REF_DROPDOWN_THRESHOLD`(20)。
+ */
+const CONTACT_PICK_DIALOG_THRESHOLD = 15
+const contactDialogMode = computed(() => optionsOf('联系人').length > CONTACT_PICK_DIALOG_THRESHOLD)
+
+const contactPickOpen = ref(false)
+const contactKeyword = ref('')
+const contactPickOptions = computed(() => {
+  const base = optionsOf('联系人').map((v) => ({ value: v, label: v }))
+  const kw = contactKeyword.value.trim()
+  if (!kw) return base
+  const lower = kw.toLowerCase()
+  const hit = base.filter((o) => o.label.toLowerCase().includes(lower))
+  // 手输兜底:清单里没有就补一条「使用「xxx」」,历史姓名/新同事照样能填
+  if (!base.some((o) => o.label === kw)) hit.unshift({ value: kw, label: `${tt('使用')}「${kw}」` })
+  return hit
+})
+function openContactPick() {
+  if (!canEdit('联系人')) return
+  contactKeyword.value = ''
+  contactPickOpen.value = true
+}
+function pickContact(value) {
+  setHead('联系人', value)
+  contactPickOpen.value = false
+}
+function clearContact() {
+  setHead('联系人', '')
+  contactPickOpen.value = false
 }
 
 /** 表头取值 */
@@ -1677,6 +1781,11 @@ watch(
   .ic-sheet .ic-items td {
     line-height: 1.45 !important;
   }
+  /* 送样人弹窗同理:打印时一律不印 */
+  .ic-contact-dialog,
+  .el-overlay:has(.ic-contact-dialog) {
+    display: none !important;
+  }
   /* 弹窗(append-to-body,不在 .portal 里)不跟着隐藏 ⇒ 开着弹窗按打印会印上去 */
   body.approval-printing .el-overlay,
   body.approval-printing .el-message-box__wrapper,
@@ -1692,4 +1801,30 @@ watch(
   @page {
     margin: 8mm;
   }
-}</style>
+}
+/* 送样人弹窗(2026-11-17:账号 >15 时用弹窗查找替代纸面下拉;append-to-body ⇒ 只能写全局) */
+.ic-contact-list {
+  margin-top: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+}
+.ic-contact-item {
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  border-bottom: 1px solid #f2f3f5;
+}
+.ic-contact-item:last-child {
+  border-bottom: none;
+}
+.ic-contact-item:hover {
+  background: #f5f7fa;
+}
+.ic-contact-item.is-active {
+  color: #2f6fed;
+  font-weight: 600;
+  background: #eef3ff;
+}
+</style>
