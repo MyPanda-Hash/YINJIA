@@ -35,6 +35,8 @@ if (used >= cap) throw ...
 
 - 后端 `addExtField`:**分页签面板按「该页签那一段」判上限**(新增 `tabUsedOf(panelCode, tab)`,
   与分配器同一口径),非分页签面板保持原判据(8 张数据记录表 8 列不变)。
+  `isTabbed()` 认的是 `TABBED_PANELS = {QC_INSP_REQ, QC_INSP_REQ_SERIES}` ⇒ **两个来料检验要求面板
+  一次修好**(`QC_INSP_REQ` 目前只有 1 列,还没撞上限,但累计超 20 时同样会被误拦)。
   连条数也并成一条 SQL(原 `extFieldOverview` 是逐列 20 次查询,`extLabelOf` 已随之删除)。
 - 后端 `extFieldOverview.tabPools` 改用同一个 `tabUsedOf`(用量数字与闸门同源)。
 - 前端 `FieldManagerDialog.vue`:分页签面板加两条看得懂的提示并据此禁用「添加」——
@@ -73,7 +75,40 @@ node tools/archive/_extfield-tab-cap-20261117/_verify-extfield-tab-cap.mjs
 > 界面脚本的坑:同 URL 的 `page.goto` 在 SPA 里是 no-op,上一轮留下的对话框会保持旧数据
 > —— round-11 因此先 `page.reload()` 再点「自定义字段」。
 
-### 4.3 构建
+### 4.4 另一个来料检验要求(`QC_INSP_REQ`)同口径 + 「满一张不串别的表」取证
+
+两个面板在同一个代码分支里(`TABBED_PANELS = {QC_INSP_REQ, QC_INSP_REQ_SERIES}`),
+所以修一次两边都生效;下面这套是**实跑**出来的,不是推断。
+
+```powershell
+# ① 接口:把「PP棉」填满 → 另一张表照加 → 满表再加必须被点名拦下 → 自动清场
+node tools/archive/_extfield-tab-cap-20261117/_verify-tab-isolation-20261117.mjs
+```
+
+`[RESULT] PASS`(测试库,7 张表):
+
+| 断言 | 实测 |
+|---|---|
+| 起手无满表 | 折叠棉 2/20、端盖 1/20,其余 0/20 |
+| 「PP棉」(段 备用121-140)填满 | 0 → **20/20** |
+| 满表期间另一张表仍可加 | 「垫片」`200 success col=备用21`,`0 → 1` |
+| 满表用量不受影响 | 「PP棉」仍 20/20 |
+| 满表再加被拦 | `409`,提示「**「PP棉」**自定义列已达上限(20/20)…」——点名本表,不是面板累计 24 |
+| 清场 | 21 列全部退绑,用量回到起手值,标准库临时条目 0 |
+
+```powershell
+# ② 界面:同一场景点一遍
+```
+
+| round | 场景 | 结果 |
+|---|---|---|
+| round-13 | `QC_INSP_REQ` 页签切到满额的「PP管」 | 黄条「本表自定义列已达上限（20/20）…」+「添加」禁用;列表 20 行 |
+| round-13 | 同一对话框里切回「折叠棉」 | 黄条消失、「添加」可用 → 点下去 `字段已添加:备用4、备用5`,`折叠棉 2/20 → 4/20`,**「PP管 20/20」纹丝不动** |
+
+> 结论:上限是「每张表各 20」,**一张表满了只拦这一张**,同面板其它表与另一个面板都不受影响;
+> 界面上按**当前所选页签**判满,切换页签提示与按钮态立刻跟着变。
+
+### 4.5 构建
 
 - `npm run build` + `mvn -q -DskipTests clean package` 通过(rebuild-prod.ps1 全流程);
   产物已含新前端(`PanelxList-*.js` 里能搜到「本表自定义列已达上限」);
@@ -83,12 +118,17 @@ node tools/archive/_extfield-tab-cap-20261117/_verify-extfield-tab-cap.mjs
 
 验证过程中在**测试库**临时加过列,已按下面的路径清干净(正式库零写入):
 
-- `_fill-tab-20261117.mjs fill/retire` —— 给「阻垢系列」临时填到 19/20、20/20 做界面取证,再全部退绑;
-- `_cleanup-test-20261117.mjs` —— 退绑验证列 + 彻底删 `qc.insp_item` 里的验证条目;
-- 手工 SQL(仅 `HSDZ_MES_TEST`):删 `yj_translation` 里 `验证*` 的 en 行。
+- `_fill-tab-20261117.mjs fill/retire` —— 给某张表临时填到 19/20、20/20 做界面取证,再全部退绑
+  (默认 `QC_INSP_REQ_SERIES/阻垢系列`;第二轮取证用 `fill 20 QC_INSP_REQ PP管` 填的是另一个面板);
+- `_verify-tab-isolation-20261117.mjs` —— 「满一张不串别的表」的接口取证,脚本自带清场;
+- `_cleanup-test-20261117.mjs` —— 两个面板一起清:退绑 `验证满/验证法/验证标/验证列` 前缀的列
+  + 彻底删 `qc.insp_item` 里同前缀条目;
+- 手工 SQL(仅 `HSDZ_MES_TEST`):删 `yj_translation` 里上述**前缀**的 en 行
+  (⚠ 别用 `LIKE '验证%'` 兜底,会连既有 `验证数据` 的译名一起删)。
 
-清完复核:测试库动态字段回到 32 条、阻垢系列 14/20、标准库无 `验证` 残留。
-⚠ 期间误删过测试库里 `验证数据` 的 en/ja 两行译名(那是既有数据,不是本任务的),已按正式库原文
+清完复核:`QC_INSP_REQ` 3 条、`QC_INSP_REQ_SERIES` 32 条(与验证前一致),各表用量回到起手值,
+`qc.insp_item` 无 `验证` 残留下标;正式库两个面板仍是 1 条 / 30 条。
+⚠ 第一轮曾误删测试库里 `验证数据` 的 en/ja 两行译名(既有数据,不是本任务的),已按正式库原文
 (`Verification Data` / `検証データ`,source=manual)补回。
 
 ## 6. 遗留/无关项

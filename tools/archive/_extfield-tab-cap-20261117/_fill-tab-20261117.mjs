@@ -1,15 +1,17 @@
 /**
- * _fill-tab-20261117.mjs — 临时把测试库「阻垢系列」填到指定用量(给「本表已满」界面取证用)。
- * 用法:node _fill-tab-20261117.mjs fill 5   # 再加 5 列(14 → 19)
- *      node _fill-tab-20261117.mjs retire    # 删掉本脚本造的所有「验证满N」列 + 标准库条目
+ * _fill-tab-20261117.mjs — 临时把测试库某面板的**某一张表**填到指定用量(给「本表已满」界面取证用)。
+ * 用法:node _fill-tab-20261117.mjs fill 5 [panel] [tab]   # 再加 5 列
+ *      node _fill-tab-20261117.mjs retire [panel] [tab]    # 删掉本脚本造的所有「验证满*」列 + 标准库条目
+ * 默认 panel=QC_INSP_REQ_SERIES / tab=阻垢系列(2026-11-17 第一轮);
+ * 另一个来料检验要求:node _fill-tab-20261117.mjs fill 20 QC_INSP_REQ PP管
  * ⚠ 只动测试库(HSDZ_MES_TEST),标签前缀固定 `验证满`,清理只删这个前缀。
  */
 const BASE = 'http://127.0.0.1:8090/api'
-const PANEL = 'QC_INSP_REQ_SERIES'
-const TAB = '阻垢系列'
-const PREFIX = '验证满'
 const mode = process.argv[2] || 'fill'
 const n = Number(process.argv[3] || 5)
+const PANEL = process.argv[4] || 'QC_INSP_REQ_SERIES'
+const TAB = process.argv[5] || '阻垢系列'
+const PREFIX = '验证满'
 
 const login = await (await fetch(`${BASE}/auth/login`, {
   method: 'POST', headers: { 'Content-Type': 'application/json' },
