@@ -3690,6 +3690,8 @@ public class ButtonService {
         if (SINGLE_LEVEL_INSP_PANELS.contains(def.code())) {
             writeBackSignCell(def, no, "审核人", "审核时间", operator);
         }
+        // 数据记录表(实验室 8 张)：审核人**审核后生成**（1117问题 #5）
+        writeDataRecAuditor(def, no, operator);
         // 规格书(RD_SPEC_DOC):「审核」格 = **审批通过的人**（2026-11-06 用户口径
         // 「审核的是在审批人审批之后，把对应的审批人的账号和日期回填进去」）。
         // 规格书不走两级审批（「一级审批就回填」）⇒ 落点就在这条单节点通过路径上。
@@ -3713,8 +3715,12 @@ public class ButtonService {
             if (!level.isEmpty()) applyGrade(def.code(), no, level, operator);
             // 2026-10-28 用户口径:「立项申请可以由管理员在审批定级的时候确定一个对接人进行分发，
             //   后续也默认是这个对接人，除非进行修改」⇒ 审批弹窗里一并选对接人,与定级同一动作完成分发。
-            // 载荷不带对接人则跳过(兼容旧前端/老单:仍可用侧栏「定级分发」补发)。
+            // 2026-11-17 用户口径(1117问题 #3):「冯总审核后直接跳转到秀丽分发，**不要下拉选择二级审核人**」
+            //   ⇒ 载荷没带对接人时**默认分发给陈秀丽**（chenxiuli），不再留空等人工补发；
+            //     已分发给别人的（旧单/改过）由前端把原值带上，不会被这里覆盖。
+            //   ⚠ 默认写在服务端而不只写前端：接口直连/旧前端/其他入口调审批也不会漏分发。
             String liaison = pickOf(formData, "对接人");
+            if (liaison.isEmpty()) liaison = RD_DEFAULT_LIAISON_ACCOUNT;
             if (!liaison.isEmpty()) assignLiaison(def.code(), no, liaison, operator);
         }
         // 测试申请单:审批时可以**一并分发测试负责人**(2026-10-29 用户口径
@@ -4225,6 +4231,21 @@ public class ButtonService {
      *       (「批准」格不再写,历史值保留)。</li>
      * </ul>
      */
+    /**
+     * 「数据记录表」一族（实验室 8 张：碱性/矿物质/抗菌/阻垢/RO保护/浸泡/滴落/功能性滤效）。
+     *
+     * <p>2026-11-17 用户口径（1117问题 #5）：「审核人需审核后生成，不能自动填充」。
+     * 这些表纸面表尾/头部有一格「审核人」（物理列 `表单审核人`），原先前端 docDefaults 建单就
+     * 预填「秀丽」⇒ 草稿态就已经"签了名"。现在：**审批通过时由本类回填、弃审/驳回时清空**，
+     * 前端不再预填（docDefaults 里那 8 条已删）。</p>
+     *
+     * <p>⚠ 物理列名是「表单审核人」—— 叫「审核人」的那一列会被 {@code save()} 的
+     * {@code body.remove("审核人")} 静默丢弃（那是 yj_doc_status.shr 的虚拟字段）。</p>
+     */
+    public static final java.util.Set<String> DATA_REC_AUDITOR_PANELS = java.util.Set.of(
+            "RD_ALKALINE", "RD_MINERAL", "RD_ANTIBACT", "RD_SCALE",
+            "RD_RO_PROTECT", "RD_SOAK", "RD_DROP_PREC", "RD_FILTER_EFF");
+
     public static final java.util.Set<String> SINGLE_LEVEL_INSP_PANELS =
             // QC_LINE_PATROL（成型车间巡线记录表）2026-11-17 追加：用户口径（Excel #13）
             //   「无审批流（要求程志/李光从账户写报表提交 → 刘磊账户审核）」
@@ -4314,6 +4335,14 @@ public class ButtonService {
      *   审核=一级审批通过的人、批准=超级管理员(出厂检验报告、首件/制程检验单纸面第一格印
      *   「检验员」/「检验人」,语义同为编制)。
      */
+    /**
+     * 立项申请审批通过后**自动分发**的对接人账号（2026-11-17 用户口径，1117问题 #3）：
+     * 「冯总审核后直接跳转到秀丽分发，不要下拉选择二级审核人」。
+     *
+     * <p>陈秀丽 = `chenxiuli`（研发审核角色；同时也是产品信息表的一级审核人）。</p>
+     */
+    private static final String RD_DEFAULT_LIAISON_ACCOUNT = "chenxiuli";
+
     private static final java.util.Set<String> TWO_LEVEL_PANELS = twoLevelPanels();
 
     /** 两级面板集合 = RD_PROD_INFO / RD_SAMPLE_EXT(一级选人)+ 质量单据一族(二级固定超级管理员) */
@@ -4496,10 +4525,42 @@ public class ButtonService {
     }
 
     /**
+     * 数据记录表：审批通过 → 回填纸面「表单审核人」= 审批通过人（2026-11-17 用户口径，1117问题 #5）。
+     *
+     * <p>用户原话：「审核人需审核后生成，不能自动填充」。原来前端建单即预填「秀丽」，
+     * 草稿态就有签名；现在只有**真正审批通过**这一步才写。</p>
+     */
+    private void writeDataRecAuditor(PanelRegistry.PanelDef def, String no, String account) {
+        if (def == null || !DATA_REC_AUDITOR_PANELS.contains(def.code()) || no == null || no.isBlank()) return;
+        try {
+            jdbc.update("UPDATE " + def.headTable()
+                    + " SET [表单审核人] = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    signNameOf(account), currentUserName(), no);
+        } catch (Exception e) {
+            log.warn("[数据记录表] 回填表单审核人失败 {} {}: {}", def.code(), no, e.toString());
+        }
+    }
+
+    /** 数据记录表：弃审/驳回 → 清空「表单审核人」（签名随审批作废，与 writeDataRecAuditor 成对） */
+    private void clearDataRecAuditor(PanelRegistry.PanelDef def, String no) {
+        if (def == null || !DATA_REC_AUDITOR_PANELS.contains(def.code()) || no == null || no.isBlank()) return;
+        try {
+            jdbc.update("UPDATE " + def.headTable() + " SET [表单审核人] = NULL"
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        } catch (Exception e) {
+            log.warn("[数据记录表] 清空表单审核人失败 {} {}: {}", def.code(), no, e.toString());
+        }
+    }
+
+    /**
      * 清「审核 / 批准」两格(驳回或弃审 → 回草稿:签名随审批作废)。
      * **编制格不清** —— 谁编的单没变;重新提交时会按新的提交人刷新。
      */
     private void clearAuditSignCells(PanelRegistry.PanelDef def, String no) {
+        // 数据记录表：签名随审批作废（1117问题 #5）。挂在**这个入口**而不是 4 个调用点，
+        // 是因为弃审/驳回/撤回共 4 条路都汇到这里，逐处挂必漏。
+        clearDataRecAuditor(def, no);
         if (def == null || (!QC_DOC_PREPARER.containsKey(def.code()) && !SINGLE_LEVEL_INSP_PANELS.contains(def.code()))) return;
         try {
             // ⚠ 2026-11-13:不能盲写「审批人/审批时间」—— 出货检验表观(qc_asm_insp_head)当年没有两级审批,

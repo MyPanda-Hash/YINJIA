@@ -2386,13 +2386,14 @@
             <el-radio-button v-for="lv in gradeOptions" :key="lv" :value="lv">{{ tt(lv) }}</el-radio-button>
           </el-radio-group>
         </div>
+        <!-- 2026-11-17 用户口径（1117问题 #3）：「冯总审核后直接跳转到秀丽分发，**不要下拉选择二级审核人**」
+             ⇒ 对接人固定为陈秀丽，不再给下拉。后端 confirmRdApprove 仍会兜底默认，
+             老单/接口直连也不会漏分发。要换人仍可在「产品信息表→定级分发」等既有入口改。 -->
         <div class="dq-row" style="align-items:center">
           <span class="dq-label">{{ tt('对接人') }}</span>
-          <el-select v-model="apvLiaison" style="flex:1" filterable clearable :placeholder="tt('对接人（选填）')">
-            <el-option v-for="u in rdFlowUsers" :key="u.username" :label="`${u.realName}（${u.username}）`" :value="u.username" />
-          </el-select>
+          <span class="dq-fixed">{{ tt('陈秀丽') }}<span class="dq-fixed-hint">{{ tt('（审批后自动分发）') }}</span></span>
         </div>
-        <div class="dq-tip">{{ tt('在审批定级的同时选择对接人，一步完成分发；不选则审批后由侧栏「补发对接人」补上') }}</div>
+        <div class="dq-tip">{{ tt('审批通过即自动分发对接人（陈秀丽），无需选择；如需更换请审批后到「定级分发」修改') }}</div>
         <div class="dq-row" style="align-items:flex-start">
           <span class="dq-label">{{ tt('审批意见') }}</span>
           <el-input v-model="apvOpinion" type="textarea" :rows="3" :placeholder="tt('审批意见（选填）')" />
@@ -8299,6 +8300,8 @@ const apvLevel = ref('')
 const apvOpinion = ref('')
 const apvDocNo = ref('')
 /** 2026-10-28:审批定级时一并分发对接人(用户口径「后续也默认是这个对接人」) */
+/** 立项申请审批后自动分发的对接人（2026-11-17 1117问题 #3：冯总审核后直接到秀丽分发） */
+const RD_DEFAULT_LIAISON = 'chenxiuli'
 const apvLiaison = ref('')
 
 // ── 测试申请单:审批通过 + 分发测试负责人(2026-10-29) ──
@@ -8388,8 +8391,9 @@ async function openRdApprove(no) {
   apvLevel.value = String(current.value?.['项目等级'] || '')
   // 对接人下拉的候选来自账号清单(与「定级分发」同一份);不预取 ⇒ 打开弹窗时拉一次
   await ensureRdFlowUsers()
-  // 默认带出已有对接人("后续也默认是这个对接人");新单为空,由用户自行选或不选
-  apvLiaison.value = String(rdFlow.liaison || '')
+  // 2026-11-17（1117问题 #3）：对接人固定陈秀丽 —— 已分发过的沿用原值，新单直接默认 chenxiuli。
+  // 弹窗里已不再给下拉（见模板），这里仍赋值是为了把值提交给后端（后端另有一道兜底默认）。
+  apvLiaison.value = String(rdFlow.liaison || RD_DEFAULT_LIAISON)
   apvOpinion.value = ''
   apvVisible.value = true
 }
