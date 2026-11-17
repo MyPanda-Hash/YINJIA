@@ -984,15 +984,25 @@ async function saveOptManager() {
 const colspanAll = computed(() => 3 + batches.value.length * 2 + (props.editable ? 1 : 0))
 
 /** 列宽(百分比 ⇒ 屏幕与打印同一套,打印不会因为列多被裁):
- *  检验项目 11% / 检验方法 12% / 检验要求 32%(批次多时收到 26%/20%) / 每批两列平分余量 / 操作 3.5%。 */
+ *  检验项目 11% / 检验方法 26%(批次 3 个时 22%、4 个以上 20%) /
+ *  检验要求 18%(批次 3 个时 14%、4 个以上 12%) / 每批两列平分余量 / 操作 3.5%。
+ *
+ *  2026-11-17 用户口径(出货检验功能 + 出货检验表观两张单同一套纸面):
+ *  「检验方法的宽度大一些,检验要求的宽度小一些」——
+ *  原来 方法 12% / 要求 32%,方法那列是整段操作步骤(动辄 5~8 行折行),
+ *  要求那列多半只是一句判定值(高度 50cm、>50kgf、≥99%),宽度给反了。
+ *  现在 方法 26% / 要求 18%(批次多时同比例收窄),批次列拿到的余量口径不变。 */
 const colWidths = computed(() => {
   const n = Math.max(batches.value.length, 1)
   const opPct = props.editable ? 3.5 : 0
-  const reqPct = n <= 2 ? 32 : n === 3 ? 26 : 20
-  const fixedPct = 11 + 12
+  // 检验方法永远比检验要求宽(两者都随批次数量收窄,保持 26:18 / 22:14 / 20:12)
+  const mtdPct = n <= 2 ? 26 : n === 3 ? 22 : 20
+  const reqPct = n <= 2 ? 18 : n === 3 ? 14 : 12
+  const fixedPct = 11 + mtdPct
+  // 每批两列至少留 6%(合计);批次极多时靠 .qr-grid 的 min-width + 横向滚动兜住,不把要求列算成负数
   const pairTotal = Math.max(100 - fixedPct - reqPct - opPct, n * 6)
   const pairPct = pairTotal / n
-  const out = ['11%', '12%', (100 - fixedPct - opPct - pairTotal).toFixed(2) + '%']
+  const out = ['11%', mtdPct + '%', reqPct + '%']
   for (let i = 0; i < n; i++) {
     // 每个批次两列各占一半:批次号列要放得下「批次号」小标签 + 改名输入框 + 删除 ×
     out.push((pairPct * 0.5).toFixed(2) + '%', (pairPct * 0.5).toFixed(2) + '%')
