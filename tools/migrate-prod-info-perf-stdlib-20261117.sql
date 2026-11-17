@@ -30,9 +30,14 @@ BEGIN
              WHERE ISNULL([特殊性能描述], N'''') <> N''''
                AND ISNULL(asp_cancel, ''N'') <> ''Y''
         )
+        -- ⚠ item_code 只有 60 字，而性能描述最长实测 106 字 ⇒ 不能拿正文当编码（会 8152 截断）。
+        --   改为序号编码 PF0001…，正文只进 content(nvarchar(max))。
         INSERT INTO yj_std_lib (lib_code, item_code, content, seq, enabled, asp_user1, asp_time1)
-        SELECT N''prod.perf'', s.v, s.v,
-               ISNULL((SELECT MAX(seq) FROM yj_std_lib WHERE lib_code = N''prod.perf''), 0) + 1,
+        SELECT N''prod.perf'',
+               N''PF'' + RIGHT(N''0000'' + CAST(ROW_NUMBER() OVER (ORDER BY s.v) AS nvarchar(10)), 4),
+               s.v,
+               ISNULL((SELECT MAX(seq) FROM yj_std_lib WHERE lib_code = N''prod.perf''), 0)
+                 + ROW_NUMBER() OVER (ORDER BY s.v),
                1, N''migrate'', GETDATE()
           FROM src s
          WHERE NOT EXISTS (SELECT 1 FROM yj_std_lib l WHERE l.lib_code = N''prod.perf'' AND l.content = s.v);';
