@@ -2025,6 +2025,9 @@ export default {
     '审批中': 'In Approval',
     '已中止': 'Stopped',
     '已作废': 'Voided',
+    // 2026-11-16 金蝶在册核对:金蝶侧已删除/已作废的单(服务端标记,状态不再是已审核 ⇒ 生单被拒)
+    '金蝶已删除': 'Deleted in Kingdee',
+    '金蝶已作废': 'Voided in Kingdee',
     '启用': 'Active',
     '状态': 'Status',
     '单据状态': 'Doc Status',
@@ -4362,6 +4365,12 @@ export default {
     '父字段名不能与字段名相同:': 'Parent name must differ from the field name: ',
     '每张表各 20 个扩展位': '20 extension slots per table',
     '本表已用': 'Used in this table',
+    // 分页签面板「每张表各 20 个」的上限提示(2026-11-17:上限按表算,不是按面板总数算)
+    '本表自定义列已达上限': 'This table has reached its custom-column limit',
+    '如需再加请先停用这张表不用的列': 'to add more, retire unused columns of this table first',
+    '本表只剩 1 个自定义列位置': 'This table has only 1 custom-column slot left',
+    '父目录 + 两个子目录一次要占 2 个位置，请先停用这张表不用的列':
+      'A parent + two child columns take 2 slots at once — retire unused columns of this table first',
     '留空=独立列;可直接输入新分组名': 'Leave empty for a standalone column; type a new group name to create one',
     '该表还没有分组名：直接输入一个名字（回车）即可新建': 'This table has no group yet — type a new name and press Enter to create one',
     '这张表还没有自定义列': 'No custom columns in this table yet',
