@@ -25,23 +25,27 @@ IF OBJECT_ID('yj_std_lib') IS NULL
 GO
 
 /* ---------- ① 把历史取值种进标准库 ---------- */
--- ⚠ 必须判列存在：两账套 schema 不同步 —— 正式库 rd_prod_info_head 有 [应用场景]，
---   测试库这一版**没有该列**（实测），硬写会 207 让整条链在测试库中断。
---   缺列时跳过种入（字段侧照改，界面照样能手工新增条目）。
+-- ⚠ 必须**动态 SQL**：两账套 schema 不同步 —— 正式库 rd_prod_info_head 有 [应用场景]，
+--   测试库这一版没有（实测 COL_LENGTH 为 NULL）。
+--   仅用 `IF COL_LENGTH(...) IS NOT NULL` 包住**不管用**：SQL Server 在**批编译期**就解析
+--   语句里的列名，IF 条件还没求值就报 207（本次实测踩到，错误指向 CTE 里的 [应用场景]）。
+--   动态拼串则整段不进编译，缺列时干脆不执行。
 IF COL_LENGTH('rd_prod_info_head', N'应用场景') IS NOT NULL
 BEGIN
-    ;WITH src AS (
-        SELECT DISTINCT LTRIM(RTRIM([应用场景])) AS v
-          FROM rd_prod_info_head
-         WHERE ISNULL([应用场景], N'') <> N''
-           AND ISNULL(asp_cancel, 'N') <> 'Y'
-    )
-    INSERT INTO yj_std_lib (lib_code, item_code, content, seq, enabled, asp_user1, asp_time1)
-    SELECT N'prod.scene', s.v, s.v,
-           ISNULL((SELECT MAX(seq) FROM yj_std_lib WHERE lib_code = N'prod.scene'), 0) + 1,
-           1, N'migrate', GETDATE()
-      FROM src s
-     WHERE NOT EXISTS (SELECT 1 FROM yj_std_lib l WHERE l.lib_code = N'prod.scene' AND l.content = s.v);
+    DECLARE @seedSql nvarchar(max) = N'
+        ;WITH src AS (
+            SELECT DISTINCT LTRIM(RTRIM([应用场景])) AS v
+              FROM rd_prod_info_head
+             WHERE ISNULL([应用场景], N'''') <> N''''
+               AND ISNULL(asp_cancel, ''N'') <> ''Y''
+        )
+        INSERT INTO yj_std_lib (lib_code, item_code, content, seq, enabled, asp_user1, asp_time1)
+        SELECT N''prod.scene'', s.v, s.v,
+               ISNULL((SELECT MAX(seq) FROM yj_std_lib WHERE lib_code = N''prod.scene''), 0) + 1,
+               1, N''migrate'', GETDATE()
+          FROM src s
+         WHERE NOT EXISTS (SELECT 1 FROM yj_std_lib l WHERE l.lib_code = N''prod.scene'' AND l.content = s.v);';
+    EXEC sp_executesql @seedSql;
     PRINT N'[prod-scene] 历史取值已种入 prod.scene = ' + CAST(@@ROWCOUNT AS nvarchar(10));
 END
 ELSE PRINT N'[prod-scene] 本库无 rd_prod_info_head.[应用场景] 列，跳过种入';
