@@ -882,6 +882,8 @@ public class ButtonService {
                 // 建单那一刻按创建人姓名补上(仅空值)—— 同段之上 putEditorCols 的理由:本分支直接
                 // return,走不到保存末尾那次调用。字段仍只读、save() 仍剥离入参,故不会变成可手改。
                 prefillPreparerName(def, no, user);
+                // 紧急放行申请单:建单即带出「责任人 / 责任部门」(仅空值;本分支直接 return,故在此补)
+                prefillJjfOwner(def, no, user);
                 // 产品变更申请单:建单即铺部门评审行(照 YJ-QR-130 纸面 7 个部门)
                 if (CHANGE_PANEL.equals(def.code())) ensureChangeDeptRows(def, no, user);
                 // 四个受控文件的编辑门禁在**空草稿分支也要过**(2026-09-21 全流程走查发现的门禁洞):
@@ -1001,6 +1003,8 @@ public class ButtonService {
         ensureBatchNoByDate(def, head, items);
         // 明细「行序」自动补号(2026-11-04,组装物料清单 ASM_BOM 连加两行保存撞唯一索引):见方法注释
         assignNewLineSeq(def, items, no);
+        // 紧急放行申请单:保存时补「责任人 / 责任部门」(仅空值,覆盖"带数据一次保存建单"这条路)
+        putJjfOwner(def, head, user);
         if (split) {
             // 已生效/已归档的"部门填写"模式**只写明细**：表头字段（产品编号/变更事由/会签人…）
             // 一律不落库，否则会签人顺手就能把这张已生效单的实质内容改掉。
@@ -3567,6 +3571,9 @@ public class ButtonService {
                 writeBackSignCell(def, no, prep, null, operator);
             }
         }
+        // 紧急放行申请单:右上「责任部门」= 责任人所属部门 ⇒ 与上面「责任人=提交人」同一步刷新,
+        // 否则提交后会出现「责任人=张三(生产部) 但 责任部门=李四的技术部」的错位。
+        if (JJF_PANEL.equals(def.code())) syncJjfDeptToSubmitter(def.headTable(), no, operator);
         // 规格书(RD_SPEC_DOC):「制订」格 = **提交审批的人**（2026-11-06 用户口径
         // 「规格书的底部的首先制定是填写提交审批的账号名字和日期」）。
         // 与质量单据同一时机（提交这一刻），但落的是单列合写「姓名/yyyy.M.d」。
@@ -4160,7 +4167,7 @@ public class ButtonService {
             Map.entry("QC_BHG", "填写人"),        // YJ-QR-11  不合格报告(制程)
             Map.entry("QC_BHC", "责任人"),        // YJ-QR-59  不合格品处理单(制程)
             Map.entry("QC_BHZ", "责任人"),        // YJ-QR-64  不合格品处理单(自制物料)
-            Map.entry("QC_JJF", "检测人"),        // YJ-QR-92  紧急放行申请单
+            Map.entry("QC_JJF", "责任人"),        // YJ-QR-92  紧急放行申请单(2026-11-17:纸面「编制」= 责任人)
             Map.entry("QC_SCP", "责任人"),        // YJ-QR-118 试产材料使用申请单
             Map.entry("QC_OQC_REPORT", "检验员")); // YJ-QR-05/A1 出厂检验报告(2026-11-04:纸面第一格=检验员=编制)
 
@@ -4247,7 +4254,7 @@ public class ButtonService {
      * <p>与 {@link #PREPARER_EDITABLE_PANELS} 的区别:那边是"预填且用户可改",
      * 这边是"预填但用户不可改"。要扩大范围只改本集合。
      */
-    private static final java.util.Set<String> PREPARER_CREATOR_PREFILL = java.util.Set.of("QC_BHG");
+    private static final java.util.Set<String> PREPARER_CREATOR_PREFILL = java.util.Set.of("QC_BHG", "QC_JJF");
 
     /**
      * 纯落款「编制」格的**创建人预填**(只在为空时写,绝不覆盖已有值)。
@@ -4266,6 +4273,84 @@ public class ButtonService {
                     realNameOf(user), currentUserName(), no);
         } catch (Exception e) {
             log.warn("[编制格] 预填 {} 失败 no={}: {}", def.code(), no, e.getMessage());
+        }
+    }
+
+    // ══════════ 紧急放行申请单(QC_JJF)表头自动生成:责任人 / 责任部门 ══════════
+    // 2026-11-17 用户口径(截图:一．紧急放行原因「责任人: 冯敏 日期: 年 月 日」红框 +
+    //   「无法填写,新增要求自动生成时间以及填写人员」;右上信息表「责任部门: 责任人所属部门」):
+    //   · 责任人   = 建单/提交审批的人(纯落款,见 QC_DOC_PREPARER + PREPARER_CREATOR_PREFILL);
+    //   · 责任部门 = **责任人所属部门** —— 建单时按建单人所属部门写入,提交审批时按提交人刷新
+    //                (提交审批会把「责任人」刷成提交人,两格必须同一个人身上取,否则会错位);
+    //   · 日期     = 单据日期(建单即当天,由单据引擎默认值写;yj_field.editable=0 ⇒ 纸面只读)。
+    // 只补/只刷新这两列,不动其它字段;非本面板调用直接返回。
+
+    /** 紧急放行申请单面板码 */
+    private static final String JJF_PANEL = "QC_JJF";
+    /** 紧急放行申请单「责任部门」列(标签=物理列) */
+    private static final String JJF_DEPT_COL = "责任部门";
+
+    /** 账号所属部门名(取 yj_user.dept_id → yj_dept.dept_name;查不到/系统线程返回空串) */
+    private String deptNameOf(String user) {
+        if (user == null || user.isBlank() || "system".equals(user)) return "";
+        try {
+            List<String> v = jdbc.queryForList(
+                    "SELECT TOP 1 ISNULL(d.dept_name, N'') FROM yj_user u LEFT JOIN yj_dept d ON d.id = u.dept_id"
+                            + " WHERE u.username = ?", String.class, user);
+            return v.isEmpty() ? "" : String.valueOf(v.get(0)).trim();
+        } catch (Exception e) {
+            log.warn("[责任部门] 取部门失败 user={}: {}", user, e.getMessage());
+            return "";
+        }
+    }
+
+    /** 紧急放行申请单:表头对象里补「责任人 / 责任部门」(只补空值,不覆盖已有值) */
+    private void putJjfOwner(PanelRegistry.PanelDef def, Map<String, Object> head, String user) {
+        if (def == null || head == null || !JJF_PANEL.equals(def.code())) return;
+        if (user == null || user.isBlank() || "system".equals(user)) return;
+        if (blankSafe(head.get("责任人")).isEmpty() && tableCols(def.headTable()).contains("责任人"))
+            head.put("责任人", realNameOf(user));
+        if (blankSafe(head.get(JJF_DEPT_COL)).isEmpty() && tableCols(def.headTable()).contains(JJF_DEPT_COL)) {
+            String dept = deptNameOf(user);
+            if (!dept.isEmpty()) head.put(JJF_DEPT_COL, dept);
+        }
+    }
+
+    /**
+     * 紧急放行申请单:落库后补「责任人 / 责任部门」(只补空值)。
+     * 空白草稿分支在建单后直接 return,走不到保存末尾那次 {@link #putJjfOwner},故两处各调一次。
+     */
+    private void prefillJjfOwner(PanelRegistry.PanelDef def, String no, String user) {
+        if (def == null || no == null || !JJF_PANEL.equals(def.code())) return;
+        if (user == null || user.isBlank() || "system".equals(user)) return;
+        try {
+            Set<String> cols = tableCols(def.headTable());
+            if (cols.contains("责任人"))
+                jdbc.update("UPDATE " + def.headTable() + " SET [责任人] = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                                + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                                + " AND ([责任人] IS NULL OR LTRIM(RTRIM([责任人])) = '')",
+                        realNameOf(user), currentUserName(), no);
+            String dept = deptNameOf(user);
+            if (!dept.isEmpty() && cols.contains(JJF_DEPT_COL))
+                jdbc.update("UPDATE " + def.headTable() + " SET [" + JJF_DEPT_COL + "] = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                                + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                                + " AND ([" + JJF_DEPT_COL + "] IS NULL OR LTRIM(RTRIM([" + JJF_DEPT_COL + "])) = '')",
+                        dept, currentUserName(), no);
+        } catch (Exception e) {
+            log.warn("[责任部门] 预填失败 no={}: {}", no, e.getMessage());
+        }
+    }
+
+    /** 紧急放行申请单:提交审批时「责任部门」跟着提交人走(与「责任人」刷成提交人同口径) */
+    private void syncJjfDeptToSubmitter(String table, String no, String operator) {
+        try {
+            if (table == null || table.isBlank() || !tableCols(table).contains(JJF_DEPT_COL)) return;
+            String dept = deptNameOf(operator);
+            if (dept.isEmpty()) return;
+            jdbc.update("UPDATE " + table + " SET [" + JJF_DEPT_COL + "] = ?"
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", dept, no);
+        } catch (Exception e) {
+            log.warn("[责任部门] 提交刷新失败 no={}: {}", no, e.getMessage());
         }
     }
 

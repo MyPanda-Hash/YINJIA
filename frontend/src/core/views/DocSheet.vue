@@ -440,7 +440,24 @@
                 />
                 <span v-else>{{ head[row.signKey || '填写人'] || '' }}</span>
               </span>
-              <span class="q-sign-date">{{ tt('日期') }}：　　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</span>
+              <!-- 章节行签名日期:2026-11-17 补 dateKey 支持(紧急放行申请单「一．紧急放行原因」的
+                   「责任人 / 日期」两格要求**系统自动生成**)。与 dept 行同一套渲染:
+                   配了 dateKey 且可编辑 = 三格手填;配了 dateKey 但字段只读(yj_field.editable=0)
+                   = 只显示值(自动生成的值不给改);没配 dateKey = 纸面空白「年 月 日」。 -->
+              <span class="q-sign-date">
+                <template v-if="row.dateKey && editable && !dateKeyLocked(row)">
+                  {{ tt('日期') }}：<el-input class="as-cell-input q-date-in q-dy" size="small" :model-value="datePart(row.dateKey, 'y')" @update:model-value="v => setDatePart(row.dateKey, 'y', v)" />
+                  {{ tt('年') }}
+                  <el-input class="as-cell-input q-date-in q-dm" size="small" :model-value="datePart(row.dateKey, 'm')" @update:model-value="v => setDatePart(row.dateKey, 'm', v)" />
+                  {{ tt('月') }}
+                  <el-input class="as-cell-input q-date-in q-dm" size="small" :model-value="datePart(row.dateKey, 'd')" @update:model-value="v => setDatePart(row.dateKey, 'd', v)" />
+                  {{ tt('日') }}
+                </template>
+                <template v-else-if="row.dateKey && head[row.dateKey]">
+                  {{ tt('日期') }}：{{ datePart(row.dateKey, 'y') }} {{ tt('年') }} {{ datePart(row.dateKey, 'm') }} {{ tt('月') }} {{ datePart(row.dateKey, 'd') }} {{ tt('日') }}
+                </template>
+                <template v-else>{{ tt('日期') }}：　　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</template>
+              </span>
             </div>
           </div>
         </div>
@@ -1296,6 +1313,21 @@ function autoRowsOf(row) {
 function signKeyLocked(c) {
   const key = (c && c.signKey) || '填写人'
   return !!(fieldMap.value.get(key) || {}).readonly
+}
+
+/**
+ * 签名行「日期」格的字段级只读(2026-11-17)。
+ *
+ * 与 {@link signKeyLocked} 同一口径:签名日期绑的字段(yj_field)元数据只读 ⇒ 只显示值、不给编辑。
+ * 起因:紧急放行申请单「一．紧急放行原因」的责任人/日期要求**系统自动生成**(建单人 + 建单日),
+ * 那两个字段已置 editable=0;若这里仍按 sheet 级 editable 渲染输入框,用户会以为能手填而实际存不进去。
+ * 未登记 dateKey 的签名行不受影响(照旧走纸面空白「年 月 日」)。
+ */
+function dateKeyLocked(c) {
+  const key = c && c.dateKey
+  if (!key) return false
+  const f = fieldMap.value.get(key)
+  return !!(f && f.readonly)
 }
 
 /**

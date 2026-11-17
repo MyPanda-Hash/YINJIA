@@ -384,30 +384,46 @@ export const qcSheetCfgs = {
   QC_JJF: {
     docno: 'YJ-QR-92',
     titlePart1: '紧急放行通知单', titlePart2: '', titlePart3: '',
-    info: qcInfo(''),
+    // 右上信息表(2026-11-17 用户口径,截图绿字):
+    //   · 使用范围 = 印刷值「公司内部」;
+    //   · 责任部门 = **责任人所属部门**(由后端按建单/提交人所属部门写入 qc_jjf.责任部门,只读);
+    //   · 时间 = 单据日期(建单即当天,只读)。
+    info: [
+      { label: '使用范围', kind: 'static', text: '公司内部' },
+      { label: '责任部门', key: '责任部门' },
+      { label: '时间', key: '单据日期', kind: 'date' },
+    ],
     rows: [
       { kind: 'pairs', cells: [
         { label: '物料类型', key: '物料类型', kind: 'checks', options: ['外部来料', '自制物料'], flex: 3 },
       ] },
       { kind: 'pairs', cells: [
         { label: '物料名称', key: '物料名称', flex: 1 },
+        // 2026-11-17 用户口径(截图「点击选择→不用点击选择,责任人手动录入」):
+        //   物料编码由「参照 INV 存货编码」改为**纯文本手输**(yj_field.data_type=文本、ref 全清)。
         { label: '物料编码', key: '物料编码', flex: 1 },
       ] },
       { kind: 'pairs', cells: [
         { label: '申请放行数量', key: '申请放行数量', flex: 1 },
         { label: '批次号', key: '批次号', flex: 1 },
       ] },
-      { kind: 'section', label: '一．紧急放行原因', key: '紧急放行原因', h: 110, max: 2000, sign: '责任人', signKey: '责任人' },
+      // 一．紧急放行原因:责任人 + 日期(2026-11-17 用户口径「日期无法填写,新增要求自动生成时间以及
+      //   填写人员」)⇒ 责任人 = 建单/提交人(后端写,只读)、日期 = 单据日期(dateKey,只读),
+      //   两格都由系统生成,纸面照原样印「责任人: ＿ 日期: 年 月 日」。
+      { kind: 'section', label: '一．紧急放行原因', key: '紧急放行原因', h: 110, max: 2000,
+        sign: '责任人', signKey: '责任人', dateKey: '单据日期' },
       { kind: 'section', label: '二．相关部门处理意见', h: 34 },
       { kind: 'dept', label: '产品开发部意见', h: 130, subs: [
         { label: '性能', key: '产品开发部性能意见', checks: ['同意使用', '不同意使用'], max: 250 },
         { label: '工艺', key: '产品开发部工艺意见', checks: ['同意使用', '不同意使用'], max: 250 },
       ] },
       { kind: 'dept', label: '品质部意见', h: 80, subs: [{ key: '品质部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
-      { kind: 'section', label: '三．检测结果', key: '检测结果', h: 90, max: 1000 },
+      // 2026-11-17 用户口径(截图红框「三．检测结果 → 这一行删除」):该行整行下线;
+      //   qc_jjf.[检测结果] 物理列保留(历史值不丢),yj_field 登记已随迁移删除。
     ],
     signKind: 'plain',
-    signCells: qcSignStd('检测人'),
+    // 底部落款(截图绿字):编制 = 责任人、审核 = 一级审批通过人(冯敏)、批准 = 二级(冯总/超级管理员)。
+    signCells: qcSignStd('责任人'),
   },
 
   // YJ-QR-118 试产材料使用申请单

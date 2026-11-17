@@ -4942,3 +4942,8 @@ migrate-insp-commission-sender-20261117.sql
 #   送了啥样品测试啥,安排检测工作」):授权给能看检验委托单/送样登记表的角色(view,query,export)+ 面板名
 #   10 语言译名;页面 /qc/inspSummary,取数 POST /api/px/inspSummary/summary(只读现算);两账套已执行;幂等
 migrate-insp-summary-20261117.sql
+# 2026-11-17 紧急放行申请单 QC_JJF(YJ-QR-92)版面改造 + 二级审批落地:
+#   ① qc_jjf 补 [责任部门](=责任人所属部门,后端自动写,纸面只读);② 物料编码 参照→文本(手动录入);
+#   ③ 责任人/单据日期 置只读(自动生成填写人员与时间);④ 「三、检测结果」字段注销(物理列保留);
+#   ⑤ 检测人 hidden(不再充当编制格,编制改绑[责任人]);两账套已执行;幂等
+migrate-jjf-twolevel-20261117.sql
