@@ -97,24 +97,32 @@ test('① 提交清单:空仓库行剔除、数量收口到 4 位小数、仓库
   assert.equal(allocSummary([{ 仓库: '恒亿仓', 数量: 6 }, { 仓库: '成品B仓', 数量: 2 }]), '恒亿仓 6 / 成品B仓 2')
 })
 
-test('② 入口只对采购入库单开,且未落库时提示先保存', () => {
+test('② 入口落在「仓库」格子上(不再有操作列的拆分图标),且只对采购入库单开', () => {
   const form = src('./../views/PanelxForm.vue')
   assert.ok(/isPurInPanel = computed\(\(\) => String\(panelCode\.value\) === 'PURCHASE_IN'\)/.test(form),
-    '拆分入口必须按面板码判定(不能所有单据都出现)')
-  assert.ok(/v-if="isPurInPanel"/.test(form), '拆分图标要带 v-if="isPurInPanel"')
-  assert.ok(/openPurInSplit\(/.test(form), '拆分图标要接到 openPurInSplit')
-  assert.ok(/canSplitRow\(row\)/.test(form), '未落库/数量为 0 的行必须被 canSplitRow 拦下')
-  assert.ok(/请先保存单据，再拆分仓库/.test(form), '拦下时要说明"先保存"')
-  assert.ok(/<PurInSplitDialog/.test(form), '拆行弹窗要挂载')
+    '多选入口必须按面板码判定(不能所有单据都出现)')
+  assert.ok(/function isPurInWhField\(dr\)/.test(form) && /'仓库'/.test(form),
+    '只把「仓库」字段改走多选弹窗')
+  assert.ok(/if \(isPurInWhField\(dr\)\) \{\s*openPurInWhPick\(row\)/.test(form),
+    '仓库格子的点击必须被拦到多选弹窗(而不是原来的单选参照)')
+  assert.ok(!/openPurInSplit|class="split"|<PurInSplitDialog/.test(form),
+    '第一版的做法(操作列拆分图标 + 拆分弹窗)已按用户口径撤掉,不能留回来')
+  assert.ok(/<PurInWhPickDialog/.test(form), '多选仓库弹窗要挂载')
   assert.ok(/:doc-no="form\['单据编号'\]/.test(form), '弹窗必须带上单据编号(服务端据此校验草稿/ERP)')
+  assert.ok(/onPurInWhPicked/.test(form) && /onPurInWhSplitSaved/.test(form),
+    '勾一个仓库要回填本行、勾多个要重载单据')
 })
 
-test('② 弹窗复用同一份校验,差额不为 0 时「确定拆分」不可点', () => {
-  const dlg = src('./../views/PurInSplitDialog.vue')
-  assert.ok(/validateAllocs\(allocs, total\.value\)/.test(dlg), '弹窗校验必须走纯函数')
+test('② 多选弹窗:勾一个直接落值,勾多个才走拆分校验,差额不为 0 不许提交', () => {
+  const dlg = src('./../views/PurInWhPickDialog.vue')
+  assert.ok(/el-checkbox/.test(dlg), '仓库要能多选(复选框列表)')
+  assert.ok(/picked\.length === 1/.test(dlg) && /emit\('picked'/.test(dlg),
+    '只勾一个仓库 = 原单选行为,不拆行')
+  assert.ok(/validateAllocs\(allocs\.value, total\.value\)/.test(dlg), '多选时校验必须走纯函数')
   assert.ok(/:disabled="!canSubmit"/.test(dlg), '校验不过时不许提交')
-  assert.ok(/splitPurInLine\(/.test(dlg), '提交走引擎的 splitPurInLine')
-  assert.ok(/来源采购订单行号与批次号保持不变/.test(dlg), '要在界面上讲清"来源行号/批次号不变"')
+  assert.ok(/splitPurInLine\(/.test(dlg), '多选提交走引擎的 splitPurInLine')
+  assert.ok(/来源采购订单行号、批次号不变/.test(dlg), '要在界面上讲清"来源行号/批次号不变"')
+  assert.ok(/平均分配/.test(dlg), '提供平均分配(常见场景:两仓各一半)')
 })
 
 test('③ 前端只提交清单,复制行/分摊金额/拆占用链在服务端', () => {
@@ -137,15 +145,16 @@ test('③ 前端只提交清单,复制行/分摊金额/拆占用链在服务端'
 
 test('④ 新增词条在 10 个语言包里都有译名(切 en / ja 不露中文)', () => {
   const keys = [
-    '拆分仓库', '采购订单行号', '增加一行', '已分配合计', '差额', '至少要分到两个仓库',
-    '确定拆分', '拆分失败', '拆分成功，已拆成 {n} 行', '请先保存单据，再拆分仓库',
+    '选择仓库（可多选）', '搜索仓库名称/编码', '平均分配', '至少选择一个仓库',
+    '没有匹配的仓库', '采购订单行号', '已分配合计', '差额',
+    '拆分失败', '拆分成功，已拆成 {n} 行', '请先保存单据，再拆分仓库',
   ]
   for (const locale of ['en', 'zh-TW', 'ja', 'ko', 'es', 'fr', 'de', 'ru', 'vi', 'th']) {
     const text = src(`../../i18n/locales/${locale}.js`)
     for (const k of keys) {
       const hit = new RegExp(`'${k}':\\s*'([^']+)'`).exec(text)
       assert.ok(hit, `${locale}.js 缺词条:${k}`)
-      // zh-TW 是中文繁体:像「增加一行」这种繁简同形,译名与原文相同是正常的,只要求非中文语言不回落中文
+      // zh-TW 是中文繁体:繁简同形时译名与原文相同是正常的,只要求非中文语言不回落中文
       if (locale !== 'zh-TW') assert.notEqual(hit[1].trim(), k, `${locale}.js 的「${k}」还是中文原文`)
     }
   }

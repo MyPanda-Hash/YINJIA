@@ -6298,22 +6298,26 @@ export default {
     // 2026-11-17 客户口径:未勾选的明细行置灰且不能填(四个打印/生单弹窗同一句)
     '未勾选的明细行置灰、不能填写': 'Unchecked lines are greyed out and cannot be edited',
     // 2026-11-17 采购入库单「一行拆多个仓库」(草稿态)
-    '拆分仓库': 'Split across warehouses',
     '采购订单行号': 'PO line no.',
-    '拆成多行后：来源采购订单行号与批次号保持不变；各仓库数量合计必须等于实收数量': 'After splitting, the source PO line no. and batch no. stay unchanged; the warehouse quantities must add up to the received qty',
-    '增加一行': 'Add row',
     '已分配合计': 'Allocated total',
     '差额': 'Difference',
-    '至少要分到两个仓库': 'Split across at least two warehouses',
     '第 {n} 行没有选仓库': 'Row {n}: no warehouse selected',
     '第 {n} 行数量必须大于 0': 'Row {n}: quantity must be greater than 0',
     '各仓库数量合计必须等于实收数量': 'Warehouse quantities must add up to the received qty',
-    '确定拆分': 'Split',
     '拆分失败': 'Split failed',
     '拆分成功，已拆成 {n} 行': 'Split done: {n} rows',
     '仓库档案读取失败，请刷新后重试': 'Failed to load warehouse master data; please refresh and retry',
-    '拆分仓库（一行分多个仓库存放）': 'Split across warehouses (one line into several)',
     '请先保存单据，再拆分仓库': 'Save the document first, then split',
+    // 2026-11-17 采购入库单「仓库」多选(勾多个 = 拆成多行)
+    '选择仓库（可多选）': 'Select warehouses (multiple)',
+    '搜索仓库名称/编码': 'Search warehouse name / code',
+    '平均分配': 'Split evenly',
+    '至少选择一个仓库': 'Select at least one warehouse',
+    '勾选多个仓库时，这一行会按仓库拆成多行（来源采购订单行号、批次号不变）；只勾一个仓库则直接用它': 'With several warehouses checked, this line is split into one line per warehouse (source PO line no. and batch no. stay unchanged); a single warehouse is applied directly',
+    '没有匹配的仓库': 'No matching warehouse',
+    '个仓库': 'warehouse(s)',
+    '点这里可选多个仓库（勾多个会把这一行拆成多行）': 'Click to pick several warehouses (more than one splits this line)',
+    '只选一个仓库：直接使用该仓库（不拆行）': 'Only one warehouse selected: it is used directly (no split)',
   },
 
 }

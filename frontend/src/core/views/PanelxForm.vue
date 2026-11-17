@@ -211,7 +211,7 @@
                     <span
                       class="ref-cell"
                       :class="{ disabled: !detailRefEnabled(dr), 'dblclick-ref': detailRefTrigger(dr) === 'dblclick' }"
-                      :title="detailRefTrigger(dr) === 'dblclick' && detailRefEnabled(dr) ? '双击选择存货' : ''"
+                      :title="detailRefHint(dr)"
                       @click="openDetailRef(dr, row, tab, 'click')"
                       @dblclick.stop="openDetailRef(dr, row, tab, 'dblclick')"
                     >{{ drRefText(dr, row) }}</span>
@@ -267,12 +267,8 @@
                   <el-input v-else v-model="row[dr.dataName]" :disabled="!editable || dr.computed" />
                 </template>
               </el-table-column>
-              <el-table-column v-if="editable" label="操作" :width="isPurInPanel ? 78 : 50" align="center" fixed="right">
-                <template #default="{ $index, row }">
-                  <!-- 采购入库单:草稿态下把这一行拆成多行(每行一个仓库) —— 2026-11-17 客户口径。
-                       其它面板不显示:拆行口径(台账/流水/转ERP 都按行)是为采购入库写的,别顺手推广 -->
-                  <el-icon v-if="isPurInPanel" class="split" :title="tt('拆分仓库（一行分多个仓库存放）')"
-                           @click="openPurInSplit(row)"><Share /></el-icon>
+              <el-table-column v-if="editable" label="操作" width="50" align="center" fixed="right">
+                <template #default="{ $index }">
                   <el-icon class="del" @click="detailData[tab.key].splice($index, 1)"><Delete /></el-icon>
                 </template>
               </el-table-column>
@@ -345,9 +341,9 @@
       </el-dialog>
     </div>
     <RefPickDialog v-model="refVisible" :field="refPick?.field" :row="refPick?.row" :mode="refPick?.mode" @confirm="onRefConfirm" />
-    <!-- 采购入库单:一行拆多个仓库(草稿态;拆完服务端已落库,这里只负责重载看一眼) -->
-    <PurInSplitDialog v-model="purInSplitVisible" :doc-no="form['单据编号'] || ''" :row="purInSplitRow"
-                      @saved="onPurInSplitSaved" />
+    <!-- 采购入库单:明细「仓库」格子点开的多选仓库弹窗(勾一个直接落值 / 勾多个拆成多行) -->
+    <PurInWhPickDialog v-model="purInWhPickVisible" :doc-no="form['单据编号'] || ''" :row="purInWhPickRow"
+                       @picked="onPurInWhPicked" @saved="onPurInWhSplitSaved" />
 
     <!-- 下拉框字段弹窗模式(>20 条):字典项搜索选择 -->
     <el-dialog v-model="dictPickVisible" :title="tt('选择') + '：' + (dictPickField ? tt(dictPickField.name) : '')" width="440px" append-to-body :close-on-click-modal="false">
@@ -396,7 +392,7 @@ const emit = defineEmits(['saved'])
 import { tt } from '@/i18n'
 import { sourceHintOf, sourceHintText as sourceHintTextOf, sourceHintTitle as sourceHintTitleOf, hasHiddenSourceColumn } from '@core/panel/sourceHint'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Back, Plus, Delete, ArrowDown, Search, Share } from '@element-plus/icons-vue'
+import { Back, Plus, Delete, ArrowDown, Search } from '@element-plus/icons-vue'
 import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
@@ -407,7 +403,7 @@ import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
 import SelectVoucherDialog from './SelectVoucherDialog.vue'
-import PurInSplitDialog from './PurInSplitDialog.vue'
+import PurInWhPickDialog from './PurInWhPickDialog.vue'
 // 拆行纯函数:能不能拆(已落库 + 数量>0)一律由它判,弹窗与入口共用一份口径
 import { canSplitRow } from '@core/panel/purInSplit'
 import ImportDialog from './ImportDialog.vue'
@@ -930,24 +926,38 @@ function isMultiline(r) {
 const refVisible = ref(false)
 const refPick = ref(null)
 
-/* ── 采购入库单:明细行「拆分仓库」(2026-11-17 客户口径) ──
-   入口只在采购入库单的操作列出现;真正拆行在服务端(一个事务:复制行 + 分摊金额 + 拆占用链),
-   成功后重载单据让人看到拆出来的多行(不在前端手改 detailData,免得行 id 对不上服务端)。 */
-const purInSplitVisible = ref(false)
-const purInSplitRow = ref({})
+/* ── 采购入库单:明细「仓库」格子点开 = 多选仓库(2026-11-17 用户口径,第二轮) ──
+   用户原话:「可以在仓库选择时多个按钮,实现多选仓库弹窗」⇒ 入口落在仓库格子本身;
+   第一版在操作列放过一颗拆分图标,被否掉了(「不要设置成这样」),已撤掉。
+   勾一个仓库 = 直接回填(与原来的单选参照同一结果);勾多个 = 交给服务端把这一行拆成多行。 */
+const purInWhPickVisible = ref(false)
+const purInWhPickRow = ref({})
 
-function openPurInSplit(row) {
-  if (!editable.value) return
-  if (!canSplitRow(row)) {
-    // 还没落库的行没有 id,服务端无从下手 —— 说清楚"先保存",别让人以为按钮坏了
-    ElMessage.warning(tt('请先保存单据，再拆分仓库'))
-    return
-  }
-  purInSplitRow.value = row
-  purInSplitVisible.value = true
+/** 只对采购入库单的「仓库」字段改走多选弹窗;其余字段/面板仍是原来的参照选择 */
+function isPurInWhField(dr) {
+  return isPurInPanel.value && String(dr?.dataName || '') === '仓库'
 }
 
-async function onPurInSplitSaved() {
+function openPurInWhPick(row) {
+  if (!editable.value) return
+  purInWhPickRow.value = row
+  purInWhPickVisible.value = true
+}
+
+/** 只勾了一个仓库:把值写回本行(含仓库编码),并像参照选择那样刷一次现存量 */
+function onPurInWhPicked(p) {
+  const row = purInWhPickRow.value || {}
+  row['仓库'] = p?.name || ''
+  if (Object.prototype.hasOwnProperty.call(row, '仓库编码')) row['仓库编码'] = p?.code || ''
+  if (p?.clearBin) {
+    if (Object.prototype.hasOwnProperty.call(row, '仓位编码')) row['仓位编码'] = ''
+    if (Object.prototype.hasOwnProperty.call(row, '仓位')) row['仓位'] = ''
+  }
+  engine.fillCurrentStock(row).catch(() => { /* 现存量只是展示列,失败不拦编辑 */ })
+}
+
+/** 多选拆行成功:服务端已落库,重载单据看拆出来的多行 */
+async function onPurInWhSplitSaved() {
   await load()
 }
 
@@ -987,8 +997,25 @@ function detailRefEnabled(dr) {
   return !Array.isArray(statuses) || statuses.length === 0 || statuses.includes(status.value)
 }
 
+/**
+ * 明细参照格的悬停提示:
+ * · 采购入库单的「仓库」→ 说明"可以选多个仓库,勾多个就把这行拆成多行";
+ * · 其它参照字段保持原口径(双击触发的存货参照才提示双击)。
+ */
+function detailRefHint(dr) {
+  if (!detailRefEnabled(dr)) return ''
+  if (isPurInWhField(dr)) return tt('点这里可选多个仓库（勾多个会把这一行拆成多行）')
+  return detailRefTrigger(dr) === 'dblclick' ? '双击选择存货' : ''
+}
+
 function openDetailRef(dr, row, tab, trigger = 'click') {
   if (!detailRefEnabled(dr) || detailRefTrigger(dr) !== trigger) return
+  // 采购入库单的「仓库」改成多选仓库弹窗:勾一个 = 原单选行为,勾多个 = 这一行按仓库拆成多行
+  // (台账/流水/转ERP 都按「行 × 仓库」取数,所以拆行是唯一不会出现两套账的做法)
+  if (isPurInWhField(dr)) {
+    openPurInWhPick(row)
+    return
+  }
   refPick.value = { field: dr, kind: 'detail', row, tab, mode: 'detail' }
   refVisible.value = true
 }
@@ -1916,12 +1943,6 @@ watch(() => [panelCode.value, code.value], () => {
 .del {
   cursor: pointer;
   color: #dc2626;
-}
-/* 采购入库单「拆分仓库」:与删除图标同一行,颜色用主色区分(拆是"生"、删是"灭") */
-.split {
-  cursor: pointer;
-  color: #116a5b;
-  margin-right: 8px;
 }
 .img-ph {
   display: inline-flex;
