@@ -1370,6 +1370,8 @@ export default {
     '生成产成品入库单（自制退库）': 'Generar entrada PT (retorno)',
     '生成委外发料单': 'Generar emisión subcontrato',
     '已中止': 'Detenido',
+    '金蝶已删除': 'Eliminado en Kingdee',
+    '金蝶已作废': 'Anulado en Kingdee',
     '已完成': 'Completado',
     '输入搜索': 'Escribir para buscar',
     '点击编辑': 'Clic para editar',

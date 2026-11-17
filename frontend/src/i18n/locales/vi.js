@@ -1360,6 +1360,8 @@ export default {
     '生成产成品入库单（自制退库）': 'Sinh nhập thành phẩm (trả nội bộ)',
     '生成委外发料单': 'Sinh cấp gia công',
     '已中止': 'Đã dừng',
+    '金蝶已删除': 'Đã xóa trong Kingdee',
+    '金蝶已作废': 'Đã hủy trong Kingdee',
     '已完成': 'Đã hoàn thành',
     '输入搜索': 'Gõ để tìm',
     '点击编辑': 'Bấm để sửa',

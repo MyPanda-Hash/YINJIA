@@ -8729,7 +8729,7 @@ public class ButtonService {
         return docStatusOf(panelCode, no);
     }
 
-    /** 状态推导:已作废 > 已中止(含金蝶手动关闭) > 删除申请中 > 修改申请中 > 待二级审批/审批中 > 修改中 > 已生效 > 已归档 > 已完成(金蝶自动关单) > 已审核 > 草稿
+    /** 状态推导:已作废 > 已中止(含金蝶手动关闭) > 金蝶已删除/已作废 > 删除申请中 > 修改申请中 > 待二级审批/审批中 > 修改中 > 已生效 > 已归档 > 已完成(金蝶自动关单) > 已审核 > 草稿
      *  (2026-09-20 两级审批:待一级=「审批中」,一级通过后=「待二级审批」—— 两处推导必须同改,
      *   另一处在 QueryService.docStatus,管列表行状态) */
     private Map<String, Object> docStatusOf(String panelCode, String no) {
@@ -8749,6 +8749,13 @@ public class ButtonService {
         } else if ("H".equals(r.get("erp_close_state"))) {
             // 金蝶「手动关闭」= 人工终止(方案 A,2026-09-20):与 MES 中止同义
             out.put("status", "已中止");
+        } else if ("D".equals(r.get("erp_close_state"))) {
+            // 金蝶侧已删除(2026-11-16 在册核对 deploy/sync-presence.mjs 写入):
+            // 单子从金蝶消失了,MES 不能再当"已审核"用 —— 状态不满足「已审核」⇒ 生单/分批送料自动被拒
+            out.put("status", "金蝶已删除");
+        } else if ("Z".equals(r.get("erp_close_state"))) {
+            // 金蝶侧已作废 / 已反审核回草稿(同上):同样不再算「已审核」
+            out.put("status", "金蝶已作废");
         } else if ("Y".equals(r.get("deleting"))) {
             out.put("status", "删除申请中");
         } else if ("T".equals(ts)) {

@@ -1,0 +1,5 @@
+﻿SET NOCOUNT ON;
+SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME='yj_doc_status' AND COLUMN_NAME IN ('erp_close_state','canceled','stopped');
+GO
+SELECT erp_close_state, COUNT(*) AS n FROM yj_doc_status GROUP BY erp_close_state;

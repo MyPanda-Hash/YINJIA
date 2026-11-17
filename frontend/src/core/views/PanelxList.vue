@@ -13863,6 +13863,18 @@ onUnmounted(() => {
   border: 1px solid #c7d2fe;
   background: #eef2ff;
 }
+/* 金蝶侧已删除/已作废(2026-11-16 在册核对):红/橙 —— 状态不是「已审核」,生单/分批送料会被拒,
+   这里红得显眼,免得现场反复点按钮(提示里会让他刷新页面等下一轮同步) */
+.doc-status.金蝶已删除 {
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+}
+.doc-status.金蝶已作废 {
+  color: #b45309;
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
+}
 .doc-status.生产中,
 .doc-status.审批中 {
   color: #2f4d75;
