@@ -34,6 +34,8 @@ ScanActivity + ZXing,**没有装这个 Capacitor 原生插件** ⇒ 插件 JS �
 > 脚本与截图都在本目录:`round-0*.mjs`、`*.png`;重跑方式
 > `ego-browser nodejs -e "await import('file:///C:/Users/Lenovo/ego/mix-scan-ui-20261119/round-08.mjs')"`
 > (先把本目录的 .mjs 拷回 `C:/Users/Lenovo/ego/mix-scan-ui-20261119/`)。
+> ⚠ 仓库 `.gitignore` 里 `*.png` 被全局忽略(**截图只在本地**
+> `C:/Users/Lenovo/ego/mix-scan-ui-20261119/` 与本目录);进 git 的是可复跑的 .mjs 与本说明。
 
 用 `Page.addScriptToEvaluateOnNewDocument` 注入**假壳**(`window.YjNative.scan` 300ms 后回调
 `__yjScanResult`),复现 App 内扫码链路;工单用测试库真实数据 `GD-2026-11-0015 #1`(产品 `A-45-01`,
@@ -51,6 +53,30 @@ ScanActivity + ZXing,**没有装这个 Capacitor 原生插件** ⇒ 插件 JS �
 | 切英文/日文后本页显示目标语言(仅客户/物料名等业务事实保中文) | ✅ 14-final-en.png |
 
 单测:`cd frontend && npm test` → 2016 通过(含新增 4 条);`npm run build` 通过。
+
+## 第二批(同日):其他领料/退料加扫码按钮 + 扫码混料补模糊查询
+
+用户口径:「其他领料和其他退料没有扫码按钮,还有扫码混料没有模糊查询的栏框」。
+
+| 位置 | 改动 |
+|---|---|
+| `MobileOtherScan.vue`(其他领料 + 其他退料,同一组件两入口) | 扫码行改成 `输入框 + 查询 + 扫码`(与其他手机扫码页同形);「扫码」调 `nativeScan.scanOnce()`(即 `window.YjNative.scan()`),扫到即回填并**自动查库存**(扫一次=查一次);网页版无桥不显示该按钮 |
+| `MobileMixScan.vue` | 查询框支持**模糊查询**:手敲的工单号 / 产品名 / 物料编码**片段**走 `POST /px/workOrderList`(与生产领料同一接口、同一交互),命中多行列候选(工单号#行号 · 产品编码·名称 · 排产数量),点哪条载入哪条;带 `@` 的工单码仍走精确路径 |
+| `mixScan.js` | 撤掉上一版的 `plainOrderNo`:非 `@` 串一律交给模糊查询,解析器回归「只认工单二维码」(避免物料码被当单号) |
+| `en.js` / `ja.js` | 补两页共 37 条译名(其他领料/退料此前 13 条 en、22 条 ja 都没交付) |
+
+验证(同样注入假壳;测试库 YJ_TEST):
+
+| 断言 | 结果 |
+|---|---|
+| 其他领料 / 其他退料出现「查询 + 扫码」两颗按钮 | ✅ 19-other-pick-scan.png / 20-other-ret-scan.png |
+| 点「扫码」→ `YjNative.scan()` 被调用 → 码回填 → 自动查出库存(雅可比CS 12975) | ✅ scanCalls +1,cands=1,alerts 空 |
+| 模糊查 `0015` → 1 条候选 | ✅ 17-fuzzy-by-no.png |
+| 模糊查 `烧结` → 20 条候选 + 提示「匹配到多行,请选择工单行」 | ✅ 16-fuzzy-by-name.png |
+| 点候选 → 载入该工单行、候选收起、物料清单按该产品取 | ✅ 18-after-pick.png |
+| 带 `@` 的工单码仍走精确路径(不受模糊影响) | ✅ round-06/08 |
+
+单测:`npm test` → 2021 通过;`npm run build` 通过。
 
 ## 遗留
 

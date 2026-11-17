@@ -33,8 +33,9 @@
       (封装见 business/nativeScan.js 头部注释;没有桥的环境根本不显示扫码按钮)。
    ② **界面要和生产领料一样**:"一个查询,一个输入框加扫码"。
       ⇒ 扫码行由「输入框内嵌查询 + 独立相机按钮(手机上被挤到第二行)」改成
-      MobilePick.vue 同款单行:输入框 + 查询 + 扫码(44px 命中区、手机竖屏也不换行);
-      输入框同时接受**手敲工单号**(生产领料也这样,见 parseWorkOrderQr 的 plainOrderNo)。
+      MobilePick.vue 同款单行:输入框 + 查询 + 扫码(44px 命中区、手机竖屏也不换行)。
+   ③ **"没有模糊查询的栏框"**(同日第二批口径):手敲的工单号 / 产品名片段不走工单码解析,
+      改走与「生产领料」同一个 {@code POST /px/workOrderList} 模糊查,命中多行列候选让人点。
 -->
 <template>
   <div class="mm-scan">
@@ -50,13 +51,28 @@
         v-model="woText"
         size="large"
         clearable
-        :placeholder="tt('扫工单码或输入工单号')"
+        :placeholder="tt('扫工单码，或输入工单号/产品名片段查询')"
         @keyup.enter="onScanWorkOrder"
       />
       <el-button size="large" :loading="woLoading" @click="onScanWorkOrder">{{ tt('查询') }}</el-button>
       <el-button v-if="nativeScan" size="large" :loading="scanning === 'wo'" @click="scanWoCamera">
         {{ tt('扫码') }}
       </el-button>
+    </div>
+
+    <!-- 模糊查询命中多行 → 列候选让人点(与生产领料同一个交互;绝不默认第一行) -->
+    <div v-if="woCandidates.length" class="mm-cand">
+      <div class="mm-cand-tip">{{ tt('匹配到多行,请选择工单行') }}</div>
+      <div
+        v-for="(c, i) in woCandidates"
+        :key="`${c.orderNo}#${c.lineNo}-${i}`"
+        class="mm-cand-row"
+        @click="pickWorkOrderRow(c)"
+      >
+        <span class="mm-cand-no">{{ c.orderNo }}<i>#{{ c.lineNo }}</i></span>
+        <span class="mm-cand-p">{{ c.productCode }} · {{ c.productName }}</span>
+        <span class="mm-cand-qty" :class="{ warn: c.planQty <= 0 }">{{ c.planQty > 0 ? fmt(c.planQty) : tt('未排产') }}</span>
+      </div>
     </div>
 
     <el-alert v-if="errText" :title="errText" type="warning" :closable="false" show-icon class="mm-alert" />
@@ -261,9 +277,13 @@ const printMsg = ref('')
 
 const order = ref(null)           // { orderNo, lineNo, lineId, productCode, productName, line, planQty }
 const lineOptions = ref([])       // 整单码命中多行时的可选项
+const woCandidates = ref([])      // 模糊查询命中的候选工单行(2026-11-17)
 const lines = ref([])             // 物料清单(expandBom 结果,含 picked/remain)
 const activeIdx = ref(-1)
 const docs = ref([])
+
+/** 模糊查询候选最多列几条:手机上再多也点不过来,查得宽了应该继续敲关键字 */
+const WO_CANDIDATE_LIMIT = 20
 
 const manualQty = ref(0)          // 手输数量(秤离线时兜底)
 const scaleVal = ref(0)
@@ -340,7 +360,19 @@ async function onScanWorkOrder() {
   errText.value = ''
   okText.value = ''
   printMsg.value = ''
-  const q = parseWorkOrderQr(woText.value, { plainOrderNo: true })
+  const raw = String(woText.value || '').trim()
+  if (!raw) {
+    errText.value = reasonText('empty')
+    return
+  }
+  woCandidates.value = []
+  // 现场扫的工单码(含 @)= 精确路径;手敲/扫码枪敲进去的单号或拼音片段 = 模糊查(2026-11-17 用户口径
+  // 「扫码混料没有模糊查询的栏框」)—— 与「生产领料」同一条查询(/px/workOrderList),查法与候选列表也一样。
+  if (!raw.includes('@')) {
+    await fuzzySearchWorkOrder(raw)
+    return
+  }
+  const q = parseWorkOrderQr(raw)
   if (!q.ok) {
     errText.value = reasonText(q.reason)
     return
@@ -380,8 +412,68 @@ async function onScanWorkOrder() {
   }
 }
 
+/**
+ * 模糊查工单(2026-11-17 新增):工单号 / 物料编码 / 产品名称 的**任意片段**都能查。
+ *
+ * <p>口径与「生产领料」完全一致(同一个接口 {@code POST /px/workOrderList},同样的候选列表交互),
+ * 用户原话「扫码混料没有模糊查询的栏框」—— 现场手上没有码纸时,敲 `0015` 或 `烧结` 就应该能找单。
+ *
+ * <p>命中唯一工单时**直接进作业**(少一次点屏);命中多行/多个工单时列候选让人自己点 ——
+ * 绝不默认第一行(混料落到错行的后果和领料一样:料记到别的产品上)。
+ */
+async function fuzzySearchWorkOrder(kw) {
+  woLoading.value = true
+  try {
+    const res = await request.post('/px/workOrderList', { keyword: kw })
+    // request 拦截器已把响应解成 ApiResult 信封 ⇒ 行在 res.data(与「生产领料」同一写法)
+    const rows = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
+    if (!rows.length) {
+      errText.value = tt('没有找到匹配的工单：换个工单号或产品名的片段试试')
+      order.value = null
+      lines.value = []
+      docs.value = []
+      return
+    }
+    const exact = rows.filter((r) => String(r['工单号'] || '').trim() === kw)
+    // 敲的就是完整工单号、且只有一行 ⇒ 直接用;否则列候选
+    if (exact.length === 1 && rows.length === 1) {
+      await pickWorkOrderRow(exact[0])
+      return
+    }
+    woCandidates.value = (exact.length ? exact : rows).slice(0, WO_CANDIDATE_LIMIT).map((r) => ({
+      orderNo: String(r['工单号'] || '').trim(),
+      lineNo: Number(r['工单行号']) || 0,
+      productCode: String(r['物料编码'] || r['产品编码'] || '').trim(),
+      productName: String(r['产品名称'] || '').trim(),
+      line: String(r['生产线'] || '').trim(),
+      planQty: Number(r['排产数量']) || 0,
+    }))
+  } catch (e) {
+    errText.value = errMsg(e) || tt('查询工单失败')
+  } finally {
+    woLoading.value = false
+  }
+}
+
+/** 点候选:把这行工单设成本次作业对象 */
+async function pickWorkOrderRow(c) {
+  woCandidates.value = []
+  woText.value = c.orderNo
+  errText.value = ''
+  await useWorkOrderRow({
+    工单号: c.orderNo,
+    工单行号: c.lineNo,
+    行id: 0,
+    产品编码: c.productCode,
+    产品名称: c.productName,
+    生产线: c.line,
+    排产数量: c.planQty,
+  })
+}
+
 /** 把某一行工单设成本次作业对象,并拉它的物料清单 + 未保存草稿 */
 async function useWorkOrderRow(r) {
+  woCandidates.value = []          // 选中后收起候选列表
   order.value = {
     orderNo: String(r['工单号'] || '').trim(),
     lineNo: Number(r['工单行号']) || 0,
@@ -699,6 +791,7 @@ function resetOrder() {
   lineOptions.value = []
   lines.value = []
   docs.value = []
+  woCandidates.value = []
   woText.value = ''
   matText.value = ''
   okText.value = ''
@@ -723,6 +816,17 @@ function resetOrder() {
 .mm-bar :deep(.el-input__inner) { font-size: 16px; }   /* 16px 以下 iOS 会自动放大 */
 .mm-bar :deep(.el-button) { height: 44px; min-width: 64px; flex: none; }
 .mm-alert { margin-bottom: 12px; }
+/* 模糊查询候选(2026-11-17):与「生产领料」的候选列表同形态 —— 一行一条工单行,点哪条用哪条 */
+.mm-cand { border: 1px solid var(--el-border-color-light); border-radius: 6px; padding: 8px 10px; margin-bottom: 12px; }
+.mm-cand-tip { font-size: 12px; color: var(--el-text-color-secondary); margin-bottom: 6px; }
+.mm-cand-row { display: flex; align-items: baseline; gap: 8px; padding: 8px 2px; border-bottom: 1px dashed var(--el-border-color-lighter); cursor: pointer; }
+.mm-cand-row:last-child { border-bottom: none; }
+.mm-cand-row:active { background: var(--el-color-primary-light-9); }
+.mm-cand-no { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.mm-cand-no i { font-style: normal; font-weight: 400; color: var(--el-color-primary); margin-left: 2px; }
+.mm-cand-p { flex: 1; min-width: 0; font-size: 12px; color: var(--el-text-color-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mm-cand-qty { font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mm-cand-qty.warn { color: var(--el-color-warning); }
 .mm-card { border: 1px solid var(--el-border-color-light); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; }
 .mm-order-l1 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .mm-no { font-size: 15px; font-weight: 600; }

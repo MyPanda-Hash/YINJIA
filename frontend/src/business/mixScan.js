@@ -30,25 +30,18 @@
  * 为什么要减 1000:行号加了 1000 前缀是为了让码里的行号恒为 4 位、便于人眼与扫码枪对齐;
  * 减回去才是 plang.pl_xc 的真实行号。
  *
- * <p>2026-11-17:页面查询框与「生产领料」一致,**允许直接敲工单号**(没有码纸时不必先找码)。
- * 该行为由 `opt.plainOrderNo` 显式开启,默认仍拒绝 —— 否则物料码
- * `YJ-SX-001|2026...` 会被误判成工单号(既有单测钉住了这条)。
+ * <p>2026-11-17:本函数**只认工单二维码**(必须带 @)。手敲的工单号 / 产品名片段不走这里,
+ * 由页面转「模糊查询」({@code POST /px/workOrderList})—— 否则物料码 `YJ-SX-001|2026...`
+ * 会被误判成工单号(既有单测钉住了这条)。
  *
  * @param {string} raw 扫码枪或手工输入的原串
- * @param {{ plainOrderNo?: boolean }} [opt] plainOrderNo:不带 @ 的纯工单号(只认"像单号"的串)
- * @returns {{ ok: boolean, company: string, orderNo: string, lineNo: number, reason?: string }}
+ * @returns {{ ok: boolean, company: string, orderNo: string, lineNo: number, kind?: string, reason?: string }}
  */
-export function parseWorkOrderQr(raw, opt = {}) {
+export function parseWorkOrderQr(raw) {
   const text = String(raw == null ? '' : raw).trim()
   if (!text) return { ok: false, company: '', orderNo: '', lineNo: 0, reason: 'empty' }
   const parts = text.split('@')
-  if (parts.length < 2) {
-    // 手工敲的纯工单号:必须"像单号"(无 | 这个物料码分隔符、有数字),否则仍按 no-order 拒绝
-    if (opt.plainOrderNo && /^[A-Za-z0-9][A-Za-z0-9._\-/]*$/.test(text) && /\d/.test(text)) {
-      return { ok: true, company: '', orderNo: text, lineNo: 0 }
-    }
-    return { ok: false, company: '', orderNo: '', lineNo: 0, reason: 'no-order' }
-  }
+  if (parts.length < 2) return { ok: false, company: '', orderNo: '', lineNo: 0, reason: 'no-order' }
   const company = String(parts[0] || '').trim()
   const orderNo = String(parts[1] || '').trim()
   if (!orderNo) return { ok: false, company, orderNo: '', lineNo: 0, reason: 'no-order' }

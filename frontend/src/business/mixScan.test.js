@@ -80,17 +80,12 @@ test('parseWorkOrderQr:扫到物料码(含 |)不该被当工单码', () => {
   assert.equal(r.reason, 'no-order')
 })
 
-test('parseWorkOrderQr:plainOrderNo 允许直接敲工单号(2026-11-17 查询框与生产领料一致)', () => {
-  const r = parseWorkOrderQr('GD-2026-10-0221', { plainOrderNo: true })
-  assert.equal(r.ok, true)
-  assert.equal(r.orderNo, 'GD-2026-10-0221')
-  assert.equal(r.lineNo, 0, '没敲行号 = 整单,由页面让人选行')
-  // 开关只放行"像单号"的串:物料码(带 |)、纯字母、空串仍然拒绝
-  assert.equal(parseWorkOrderQr('YJ-SX-001|20261014001', { plainOrderNo: true }).reason, 'no-order')
-  assert.equal(parseWorkOrderQr('GDXYZ', { plainOrderNo: true }).reason, 'no-order')
-  assert.equal(parseWorkOrderQr('', { plainOrderNo: true }).reason, 'empty')
-  // 默认不开启 ⇒ 与旧行为一致
+test('parseWorkOrderQr:手敲的单号/产品名片段不走这里,交给页面的模糊查询', () => {
+  // 2026-11-17 用户口径「扫码混料没有模糊查询的栏框」:非 @ 串 ⇒ 页面转 /px/workOrderList 模糊查,
+  // 解析器本身仍然只认二维码,免得物料码被当成工单号
   assert.equal(parseWorkOrderQr('GD-2026-10-0221').reason, 'no-order')
+  assert.equal(parseWorkOrderQr('0015').reason, 'no-order')
+  assert.equal(parseWorkOrderQr('烧结炭棒').reason, 'no-order')
 })
 
 test('expandBom:应投 = 标准用量 × 排产数量 + 损耗量', () => {
