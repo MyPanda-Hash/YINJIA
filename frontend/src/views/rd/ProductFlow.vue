@@ -55,7 +55,7 @@
       </div>
       <el-table
         :data="shown"
-        row-key="产品编号"
+        :row-key="rowKeyOf"
         size="small"
         border
         class="pfl-table"
@@ -73,9 +73,11 @@
                   <div class="pfl-step-body">
                     <span class="pfl-step-name">{{ tt(st.label) }}</span>
                     <span class="pfl-step-no">{{ st.docNo || '—' }}</span>
-                    <!-- 处理人（2026-11-11）:产品信息表=填写并提交审批的人;规格书=二级负责人;
-                         成型/组装/出货=签核后分发的负责人。空着只显示"—",不编造 -->
-                    <span class="pfl-step-owner" :title="tt('处理人')">{{ tt('处理人') }}<b>{{ st.owner || '—' }}</b></span>
+                    <!-- 处理人:2026-11-17 用户口径「把处理人的名字去掉」⇒ 本页不再显示姓名。
+                         改为显示**最后操作时间**(同一条口径「每个都显示处理的日期，比如我是
+                         2026年11月17日13:31分操作的」);取不到时间显示「—」,不编造。
+                         st.owner 仍由后端下发,只是这里不渲染(其它视图/导出还要用)。 -->
+                    <span class="pfl-step-at" :title="tt('最后操作时间')">{{ st.at || '—' }}</span>
                   </div>
                   <span class="pfl-step-state">{{ tt(st.state || (st.tone === 'none' ? '未开始' : '')) }}</span>
                   <span v-if="st.reaudited" class="pfl-step-flag">{{ tt('待重走') }}</span>
@@ -84,7 +86,10 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="产品编号" :label="tt('产品编号')" width="132" />
+        <!-- 产品编号为空(新建的产品信息表还没填)时显示「—」:行照常出现,但一眼看出"这单还没编号" -->
+        <el-table-column :label="tt('产品编号')" width="132">
+          <template #default="{ row }">{{ row['产品编号'] || '—' }}</template>
+        </el-table-column>
         <el-table-column prop="产品名称" :label="tt('产品名称')" min-width="180" show-overflow-tooltip />
         <el-table-column prop="立项文档编号" :label="tt('立项文档编号')" width="160" show-overflow-tooltip />
         <el-table-column :label="tt('进度')" width="96" align="right">
@@ -135,6 +140,16 @@ const kpiCards = computed(() => {
   ]
 })
 
+/**
+ * 行键:优先产品编号;新建未填编号的单退回单据编号。
+ * ⚠ 不能再写死 row-key="产品编号" —— 2026-11-17 起列表会含"还没填产品编号"的新单,
+ * 空键在 el-table 里会互相撞车(同一 key 的多行共用一个展开态,展开一行另一行跟着动)。
+ */
+function rowKeyOf(row) {
+  const code = String(row?.['产品编号'] || '').trim()
+  return code || ('NO:' + String(row?.['单据编号'] || ''))
+}
+
 function stepsOf(row) { return flowStepsOf(row) }
 function nextOf(row) { return nextStepOf(flowStepsOf(row)) }
 
@@ -158,7 +173,13 @@ async function load() {
   try {
     const res = await request.get('/px/rdDevOverview')
     const list = (res && res.data && res.data.products) || []
-    rows.value = list.filter((r) => String(r?.['产品编号'] || '').trim() !== '')
+    // ⚠ 2026-11-17 用户口径「新增的产品信息应该放最上面，不要放下面」:
+    //   原来这里把「产品编号为空」的行整条丢掉 —— 而新建的产品信息表恰恰**还没填产品编号**,
+    //   于是"刚建的那张"永远不出现在列表里,用户看到的就是"新单跑到下面去了/根本找不到"。
+    //   现在保留:只要**有单据编号**就说明这张单真实存在,列表照样列出来
+    //   (产品编号列显示「—」,提示它还没填)。产品编号才是"开发包身份",
+    //   没有它的单不该冒充成一个开发包,所以仍然过滤 —— 过滤条件改成"两者都空才算脏行"。
+    rows.value = list.filter((r) => String(r?.['单据编号'] || '').trim() !== '' || String(r?.['产品编号'] || '').trim() !== '')
   } catch (e) {
     rows.value = []
     denied.value = true
@@ -221,8 +242,8 @@ onMounted(load)
 .pfl-step-body { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .pfl-step-name { font-weight: 500; color: #1f2d3d; }
 .pfl-step-no { font-size: 12px; color: #8a97a5; }
-.pfl-step-owner { font-size: 12px; color: #8a97a5; }
-.pfl-step-owner b { margin-left: 4px; font-weight: 500; color: #1f2d3d; }
+/* 最后操作时间(2026-11-17 取代原来的「处理人」):等宽数字,竖排时逐行对齐好扫 */
+.pfl-step-at { font-size: 12px; color: #5b6b7c; font-variant-numeric: tabular-nums; }
 .pfl-step-state { margin-left: auto; font-size: 12px; color: #5c6b7a; }
 .pfl-step-flag { margin-left: 8px; padding: 0 6px; line-height: 18px; border-radius: 9px; background: #fdf3e7; color: #a0641a; font-size: 11px; }
 

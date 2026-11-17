@@ -42,7 +42,12 @@ export function flowStepsOf(row) {
     docNo: String(row['单据编号'] || ''),
     // 处理人（2026-11-11 用户口径）：产品信息表 = **填写并提交审批的人**；
     // 规格书 = 产品信息表的二级负责人；成型/组装/出货 = 签核后分发给该文件的负责人。
+    // ⚠ 2026-11-17 用户口径「去掉处理人，只留单号 + 状态 + 日期」⇒ 界面不再显示 owner。
+    //   字段保留：后端仍在算（别的视图/导出会用到），只是本页不渲染。
     owner: String(row['填写人'] || ''),
+    // 最后操作时间（2026-11-17 用户口径「每个都显示处理的日期」）：后端 yyyy-MM-dd HH:mm，
+    // 取不到就是空串 ⇒ 界面显示「—」，不编造。
+    at: String(row.at || ''),
     state: String(row.state || ''),
     tone: String(row.state || '') === '已归档' ? STEP_STATE.done
       : (String(row.state || '').trim() && String(row.state) !== '草稿' ? STEP_STATE.doing : STEP_STATE.none),
@@ -53,6 +58,7 @@ export function flowStepsOf(row) {
     label: String(n.label || n.panel || ''),
     docNo: String(n.docNo || ''),
     owner: String(n.owner || ''),
+    at: String(n.at || ''),
     state: String(n.state || ''),
     tone: stepStateOf(n),
     reaudited: !!n.reaudited,
@@ -93,7 +99,10 @@ export function flowStatusOf(row) {
 }
 
 export function flowKpisOf(rows) {
-  const list = (Array.isArray(rows) ? rows : []).filter((r) => String(r?.['产品编号'] || '').trim() !== '')
+  // ⚠ 2026-11-17:「产品数」的口径必须与列表**同一份行**——两者都只要求"单据编号或产品编号有一个"
+  //   (新建的产品信息表还没填产品编号)。此前这里单看产品编号 ⇒ 列表 3 行、KPI 写 2 的产品数矛盾。
+  const list = (Array.isArray(rows) ? rows : []).filter((r) => String(r?.['产品编号'] || '').trim() !== ''
+    || String(r?.['单据编号'] || '').trim() !== '')
   let done = 0
   let doing = 0
   let none = 0
