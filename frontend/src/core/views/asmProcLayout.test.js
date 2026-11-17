@@ -65,3 +65,29 @@ test('③ 审核人：纸面有这一格（只读）、库里有列、审批通�
   assert.match(btn, /private void writeFieldByLabel\(/, '缺 writeFieldByLabel')
   assert.match(btn, /if \("RD_ASM_PROC"\.equals\(def\.code\(\)\)\) writeFieldByLabel\(def, no, "审核人"/, '审批通过未回填审核人')
 })
+
+test('④ 表单管理人固定柴善银：前端默认 + 后端强制 + 历史回填，三处都要有', () => {
+  // 用户 2026-11-17 追加口径：「这个表单管理员应该是柴善银，是**固定的**」
+  //   —— 覆盖 2026-10-28「=当前编辑人」那条。
+  // 只改一处不够：老单显示的是库里的历史值（生产实测 陈秀丽2 / 系统管理员2），
+  // 必须三处齐：新建默认、保存强制、历史回填。
+  assert.match(defaults, /\['表单管理人', '柴善银'\]/, '① 新建默认')
+  assert.match(btn, /if \("RD_ASM_PROC"\.equals\(def\.code\(\)\)\) body\.put\("表单管理人", "柴善银"\);/,
+    '② 保存时服务端强制（前端缓存/旧默认值都盖不掉）')
+  const mgrMig = readFileSync(
+    new URL('../../../../tools/migrate-asm-proc-fixed-manager-20261117.sql', import.meta.url), 'utf8')
+  assert.match(mgrMig, /SET \[表单管理人\] = N'柴善银'/, '③ 历史单回填')
+  assert.match(mgrMig, /WHERE ISNULL\(\[表单管理人\], N''\) <> N'柴善银'/, '幂等')
+})
+
+test('⑤ 审核人 = 审批通过人：代码回填 + 历史单按 shr 补（账号→姓名）', () => {
+  assert.match(btn, /if \("RD_ASM_PROC"\.equals\(def\.code\(\)\)\) writeFieldByLabel\(def, no, "审核人"/,
+    '审批通过时回填')
+  const mgrMig = readFileSync(
+    new URL('../../../../tools/migrate-asm-proc-fixed-manager-20261117.sql', import.meta.url), 'utf8')
+  // shr 存账号，纸面要人名 ⇒ 走 yj_user.real_name，取不到退回账号（宁可显示账号也不留空）
+  assert.match(mgrMig, /JOIN yj_doc_status s[\s\S]*LEFT JOIN yj_user u[\s\S]*u\.username = s\.shr/,
+    '历史单按 shr 补审核人')
+  assert.match(mgrMig, /ISNULL\(NULLIF\(LTRIM\(RTRIM\(u\.real_name\)\), N''\), s\.shr\)/, '账号→姓名兜底')
+  assert.match(mgrMig, /ISNULL\(h\.\[备用3\], N''\) = N''/, '只补空值，不覆盖既有')
+})
