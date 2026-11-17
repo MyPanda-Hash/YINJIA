@@ -4918,3 +4918,5 @@ migrate-print-task-cache-20261116.sql
 migrate-rd-extra-record-file-20261117.sql
 # 2026-11-17 Excel #14：新增「外部-非开发样品申请单」面板（复制外部开发样品单；销售录单、刘磊/王光珍审核、其他人只读）
 migrate-sample-nondev-20261117.sql
+# 2026-11-17 Excel #7：生产模具表 PROD_MOLD 补齐角色权限行（实测缺 文件负责人 + 2 个自动化角色）
+migrate-prod-mold-perms-20261117.sql
