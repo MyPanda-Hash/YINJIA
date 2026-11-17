@@ -3692,6 +3692,8 @@ public class ButtonService {
         }
         // 数据记录表(实验室 8 张)：审核人**审核后生成**（1117问题 #5）
         writeDataRecAuditor(def, no, operator);
+        // 组装工艺管控清单：新增的「审核人」格 = 审批通过人（1117问题 #6「产品负责人审核后自动填充」）
+        if ("RD_ASM_PROC".equals(def.code())) writeFieldByLabel(def, no, "审核人", signNameOf(operator));
         // 规格书(RD_SPEC_DOC):「审核」格 = **审批通过的人**（2026-11-06 用户口径
         // 「审核的是在审批人审批之后，把对应的审批人的账号和日期回填进去」）。
         // 规格书不走两级审批（「一级审批就回填」）⇒ 落点就在这条单节点通过路径上。
@@ -4559,6 +4561,25 @@ public class ButtonService {
         PanelRegistry.FieldDef f = def.byLabel("表单审核人");
         if (f == null || f.col() == null || f.col().isBlank()) return null;
         return f.col();
+    }
+
+    /**
+     * 按**字段 label** 写单格值（列名从 yj_field 元数据取，绝不拼 label）。
+     *
+     * <p>为什么要这个通用方法：本系统的纸面 label 与物理列常年不同名
+     * （数据记录表 表单审核人→备用1、组装工艺 审核人→备用3）。
+     * 直接按 label 拼列名会「列名无效」，而调用方多包 try/catch ⇒ 静默失败，极难查。</p>
+     */
+    private void writeFieldByLabel(PanelRegistry.PanelDef def, String no, String label, String value) {
+        if (def == null || no == null || no.isBlank() || def.headTable() == null) return;
+        PanelRegistry.FieldDef f = def.byLabel(label);
+        if (f == null || f.col() == null || f.col().isBlank()) return;
+        try {
+            jdbc.update("UPDATE " + def.headTable() + " SET [" + f.col() + "] = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", value, currentUserName(), no);
+        } catch (Exception e) {
+            log.warn("[签核格] 写 {} 失败 {} {}: {}", label, def.code(), no, e.toString());
+        }
     }
 
     /** 数据记录表：弃审/驳回 → 清空「表单审核人」（签名随审批作废，与 writeDataRecAuditor 成对） */

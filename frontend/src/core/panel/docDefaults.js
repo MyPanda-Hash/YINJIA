@@ -139,8 +139,12 @@ const DOC_DEFAULTS = {
   //   (函数形式:applyDocDefaults 把 userName 放 ctx;新建时先带,后续任意编辑由
   //    PanelxList 的 EDITOR_STAMP_FIELDS 监视器刷新,保存时 ButtonService 再按当前人回写)。
   //   ⚠ 同批的成型工艺清单/成型配方**不动**(仍为刘磊,用户本次只点了组装工艺)。
+  // 2026-11-17 用户口径（1117问题 #6）：「表单管理人：**柴善银**」
+  //   —— 覆盖 2026-10-28 那条「表单管理人=当前编辑人」的口径（用户本次点名要固定柴善银）。
+  //   同时该面板**新增**一格「审核人」：产品负责人审核后自动填充（字段由
+  //   tools/migrate-asm-proc-auditor-20261117.sql 登记，写入走 ButtonService 审批通过路径）。
   RD_ASM_PROC: [
-    ['表单管理人', (form, ctx) => ctx.userName || ''],
+    ['表单管理人', '柴善银'],
     ['密级', '保密'],
     ['使用范围', '银嘉内部'],
     ['版本号', 'V@today'],

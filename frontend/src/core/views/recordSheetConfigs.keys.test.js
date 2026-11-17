@@ -268,7 +268,9 @@ test('组装工艺清单 3 页签:每页有 grid/showHead,每条表有唯一的�
 
   // ── ①页签数与页题(设计 3 个 sheet 一对一) ──
   const titles = (cfg.pages || []).map((p) => p.title)
-  assert.deepEqual(titles, ['修订记录', '组装BOM表', '组装工艺清单'], '页签应为设计 3 个 sheet')
+  // 2026-11-17 用户口径（1117问题 #6）：「修订记录放最右边」⇒ 原 修订记录/BOM/工艺 改为 BOM/工艺/修订记录。
+  //   页序变动后 sections/dataTables 的 page 号必须同步（本文件另有断言钉 page 越界）。
+  assert.deepEqual(titles, ['组装BOM表', '组装工艺清单', '修订记录'], '页签应为 3 个 sheet，修订记录在最右')
 
   // ── ②每页都要能算出非 0 的网格宽 ──
   for (const [i, pg] of (cfg.pages || []).entries()) {

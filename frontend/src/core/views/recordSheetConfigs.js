@@ -89,7 +89,7 @@ import { SPEC_TEST_LIB } from './specTestLib.js'
  *    见 tools/gen/gen-asm-proc-lib.cjs 的实测输出)。 */
 const RD_ASM_PROC_DT0 = [
       { lib: 'asm.proc',   // 标准库:组装工艺 4 变体(裸棒/机器包布/复合半成品/成品)
-        page: 2,
+        page: 1, // 2026-11-17 页序重排：工艺清单页（原 2）
         bar: '关键控制清单',
         filterKey: '表区', filterVal: '关键控制清单',
         // 工艺形态 已在「产品基本信息」区有一格(见 sections),表头不再重复一条变体切换行
@@ -130,7 +130,7 @@ const RD_ASM_PROC_DT0 = [
  *  由 dt.pageTitle 出居中标题(与 RD_SPEC_DOC 的「修订记录」页同一做法)。
  *  列宽按 1040 总宽配平(与另两页的报告头/表格同宽,打印时三页左右缘对齐)。 */
 const RD_ASM_PROC_DT_REVISION = {
-  page: 0,
+  page: 2, // 2026-11-17 页序重排：修订记录挪到最右（原 0）
   pageTitle: '修订记录',
   filterKey: '表区', filterVal: '修订记录',
   // 本页无「产品基本信息」区,变体切换行在这里既不驱动本页标题(本页出 pageTitle 居中大标题)
@@ -165,7 +165,7 @@ const RD_ASM_PROC_DT_REVISION = {
  *    (改 label 会同时漂移 RD_ASM_BOM/RD_SPEC_DOC 两处数据键,2026-09-18 已定不改;
  *     这里靠 yj_field.alias 在显示层改名,见 migrate-asm-proc-redesign-2026-09-20.sql §4)。 */
 const RD_ASM_PROC_DT_BOM = {
-  page: 1,
+  page: 0, // 2026-11-17 页序重排：BOM 表升为首个页签（原 1）
   bar: 'BOM表',
   filterKey: '表区', filterVal: '物料清单',
   // 本页有「产品基本信息」区且其中已有 工艺形态 一格 ⇒ 表头不再重复一条变体切换行
@@ -1743,21 +1743,30 @@ export const recordSheetConfigs = {
       //   只读,值 = 当前编辑人 —— 新建/选产品编号/编辑任何内容时由前端带入,
       //   保存时由后端 ButtonService 按登录人回写(见 docDefaults + PanelxList 的 EDITOR_STAMP_FIELDS)。
       { label: '表单管理人', key: '表单管理人', type: 'text', readonly: true },
+      // 2026-11-17 用户口径（1117问题 #6）：「增加一个审核人：**产品负责人审核后自动填充**」。
+      //   只读格（yj_field.editable=0，落库列 备用3，见 migrate-asm-proc-auditor-20261117.sql）；
+      //   值由 ButtonService 在**审批通过**时写入 = 审批通过人（签名+无日期，与同面板落款口径一致）。
+      { label: '审核人', key: '审核人', type: 'text', readonly: true },
       { label: '密级', key: '密级', type: 'text' },
       { label: '使用范围', key: '使用范围', type: 'text' },
       { label: '版本号', key: '版本号', type: 'text' },
     ],
+    // 2026-11-17 用户口径（1117问题 #6）：「修订记录放最右边」。
+    //   原页序 修订记录/BOM表/工艺清单 → **BOM表/工艺清单/修订记录**。
+    //   ⚠ 页序一变，下面 sections/dataTables 上的 `page:` 必须同步重编
+    //     （BOM 1→0、工艺 2→1、修订记录 0→2）；漏改一处的表现是"区块跑到别的页签"或整页空白。
     pages: [
-      // 页 0:设计 sheet「修订记录」只有 B6:G6 一行居中大标题 + B7 表头 ⇒ 不出报告头,
-      // 由 dt.pageTitle 出标题(RD_SPEC_DOC 的修订记录页即此做法)。
-      { title: '修订记录', headMode: 'report', showHead: false, grid: [130, 260, 130, 260] },
       { title: '组装BOM表', headMode: 'report', showHead: true, grid: [130, 260, 130, 260],
         staticTitle: '组装工艺控制-BOM表' },
       { title: '组装工艺清单', headMode: 'report', showHead: true, grid: [130, 260, 130, 260],
         staticTitle: '组装工艺控制-组装/包装关键控制清单' },
+      // 末页：设计 sheet「修订记录」只有 B6:G6 一行居中大标题 + B7 表头 ⇒ 不出报告头,
+      // 由 dt.pageTitle 出标题(RD_SPEC_DOC 的修订记录页即此做法)。
+      { title: '修订记录', headMode: 'report', showHead: false, grid: [130, 260, 130, 260] },
     ],
     // 设计两张表的 B9:G9 都是「产品基本信息」,格子相同 ⇒ 同一份声明给两页(各声明 page)。
-    sections: [RD_ASM_PROC_INFO_SEC(1), RD_ASM_PROC_INFO_SEC(2)],
+    // 页序重排后同步：BOM 页 = 0、工艺清单页 = 1（见上面 pages 的注释）
+    sections: [RD_ASM_PROC_INFO_SEC(0), RD_ASM_PROC_INFO_SEC(1)],
     // 4 个关键控制清单变体(设计《关键控制清单--标准库》4 个 sheet)各有各的纸面标题。
     // 变体内容**不在配置里** —— 内容源是 asm.proc 标准库(勾选即整表替换),
     // 这里只为"按头字段切标题"声明骨架;variants 的键必须与 工艺形态 字典 / asm.proc 的 item_code 一致。

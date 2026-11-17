@@ -4926,3 +4926,5 @@ migrate-role-perms-20261117.sql
 migrate-spec-approve-perm-20261117.sql
 # 2026-11-17 1117问题 #5：清掉数据记录表「历史草稿」上被自动预填的审核人（只清未审核/未归档的单）
 migrate-datarec-clear-prefilled-auditor-20261117.sql
+# 2026-11-17 1117问题 #6：组装工艺管控清单新增「审核人」格（label 审核人 → 列 备用3，只读，审批通过回填）
+migrate-asm-proc-auditor-20261117.sql
