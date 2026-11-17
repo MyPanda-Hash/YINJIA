@@ -1451,6 +1451,21 @@ function applyApprovalDocNo(source) {
     const v = source?.[k]
     if (v !== undefined && v !== null && String(v).trim() !== '') { code = String(v).trim(); break }
   }
+  // 2026-11-17 修（用户口径「这个项目编号在选择客户的时候自己根据规则带入」）：
+  //   上一步在**正式环境永远取不到值** —— 客户参照（RD_APPROVAL.客户名）的 ref_field 是 `mc`，
+  //   回填的是**客户名**本身，既没有「客户编码」列也没有 dm 列 ⇒ code 恒为空 ⇒ 立项编号一直空白。
+  //   而用户口径明确：**客户名里已含编码**（如「B-85-06 青岛伊可普」）⇒ 从名字开头把编码抠出来。
+  //   只认 ASCII 开头的编码段（字母/数字/连字符/下划线/点）；纯中文客户名抠不出编码就**不填**，
+  //   绝不拿中文当编码拼接。
+  if (!code) {
+    const NAME_KEYS = ['客户名', '客户名称', 'mc']
+    for (const k of NAME_KEYS) {
+      const name = source?.[k]
+      if (name === undefined || name === null) continue
+      const m = String(name).trim().match(/^([A-Za-z0-9][A-Za-z0-9._-]*)/)
+      if (m && m[1]) { code = m[1]; break }
+    }
+  }
   if (!code) return
   const d = new Date()
   const ymd = String(d.getFullYear())
