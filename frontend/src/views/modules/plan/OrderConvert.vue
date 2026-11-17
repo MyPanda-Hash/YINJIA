@@ -146,12 +146,19 @@
         </template>
       </el-table>
 
-    <!-- 工艺路线选择弹窗(2026-10-05 用户口径:路线多时下拉不现实 ⇒ 弹窗;支持编码/名称过滤,列出工序序列) -->
-    <el-dialog v-model="routeDialog" :title="tt('选择工艺路线')" width="660px" append-to-body>
+    <!-- 工艺路线选择弹窗(2026-10-05 用户口径:路线多时下拉不现实 ⇒ 弹窗;支持编码/名称过滤,列出工序序列)
+         2026-11-17 修复「上次选过的路线看起来还被选中、但确定点不了」:
+           ① destroy-on-close:弹窗关闭即卸载内容,el-table 内部的 currentRow(高亮)随之清空 ——
+              此前弹窗只是 v-show 隐藏,上次的 current-row 一直留着,重开时"看着选中、实际没选";
+           ② 选行除了 @current-change 还接 @row-click:Element Plus 的 setCurrentRow 只在**行变了**时
+              才发 current-change,点回同一条(已是 currentRow 的)行不会触发,routePick 停在上次的值
+              ⇒ 确定一直是灰的,必须先点别的路线再点回来。 -->
+    <el-dialog v-model="routeDialog" :title="tt('选择工艺路线')" width="660px" append-to-body destroy-on-close>
       <el-input v-model="routeKw" :placeholder="tt('编码 / 名称')" clearable style="width: 220px; margin-bottom: 8px" />
       <div class="oc-route-note">{{ tt('仅「已审核」的工艺路线可用于转工单（未审核的路线置灰，需先在「基础设置→工艺路线」完成审核）') }}</div>
       <el-table :data="routeFiltered" size="small" border height="330" highlight-current-row
-                @current-change="(r) => (routePick = r)" @row-dblclick="applyRoute" :row-class-name="routeRowCls">
+                @row-click="onRouteRowClick" @current-change="onRouteCurrentChange"
+                @row-dblclick="applyRoute" :row-class-name="routeRowCls">
         <el-table-column :label="tt('编码')" prop="编码" width="140" />
         <el-table-column :label="tt('名称')" prop="名称" width="170" show-overflow-tooltip />
         <el-table-column :label="tt('工序序列')" prop="工序序列" min-width="220" show-overflow-tooltip />
@@ -165,7 +172,7 @@
       <template #footer>
         <span class="oc-route-tip">{{ tt('将对勾选的') }} {{ checked.length }} {{ tt('行应用该路线(双击行亦可)') }}</span>
         <el-button @click="routeDialog = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" :disabled="!routePick || routePick.审核状态 !== '已审核'" @click="applyRoute">{{ tt('确定') }}</el-button>
+        <el-button type="primary" :disabled="!canApplyRoute" @click="applyRoute">{{ tt('确定') }}</el-button>
       </template>
     </el-dialog>
 
@@ -225,6 +232,19 @@ async function loadRoutes() {
   try { routeOptions.value = (await request.post('/px/processTask/routes', {})).data || [] } catch { routeOptions.value = [] }
 }
 function openRouteDialog() { routePick.value = null; routeKw.value = ''; routeDialog.value = true }
+/**
+ * 弹窗里"选中哪条路线"= routePick(确定按钮的判据)。
+ * 2026-11-17 修复:光靠 @current-change 不够 —— Element Plus 的 setCurrentRow 只在行**变了**时发
+ * current-change,点回同一条(已是 currentRow 的)行什么都不发,routePick 就停在上次的值(或 null),
+ * 表现是"行亮着、确定点不了,必须先点别的路线再点回来"。所以:
+ *   · @row-click 每次都落 routePick(重复点同一条也生效);
+ *   · @current-change 继续兜底:过滤把当前行滤掉时它会发 null,routePick 跟着清空,避免
+ *     "确定可点但选中行已不在列表里"。
+ */
+function onRouteRowClick(row) { routePick.value = row || null }
+function onRouteCurrentChange(row) { routePick.value = row || null }
+/** 确定按钮:必须选中且已审核(未审核路线置灰不可用,2026-10-16 口径) */
+const canApplyRoute = computed(() => !!routePick.value && routePick.value.审核状态 === '已审核')
 /** 行样式:未审核的工艺路线整行置灰(2026-10-16) */
 function routeRowCls({ row }) { return row.审核状态 === '已审核' ? '' : 'oc-row-warn' }
 /** 把弹窗里选中的路线应用到**勾选行**(批量;未勾选则不动) */
