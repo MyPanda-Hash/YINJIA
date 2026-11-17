@@ -142,7 +142,9 @@
         <!-- ── 联系人 / 联系电话（手机）/ E-mail(纸面列头印 E-mail,数据键仍是「邮箱」) ── -->
         <tr v-for="(rowDef, ri) in SIX_CELL_ROWS" :key="'ic-six-' + ri">
           <template v-for="c in rowDef" :key="c.key">
-            <th class="ic-lbl">{{ tt(c.title || c.key) }}</th>
+            <th class="ic-lbl">
+              {{ tt(c.title || c.key) }}<span v-if="isRequired(c.key)" class="ic-req">*</span>
+            </th>
             <td class="ic-cell">
               <el-input
                 v-if="canEdit(c.key)"
@@ -159,7 +161,9 @@
 
         <!-- ── 样品型号/规格(2026-11-17 纸样:改成单选类别 □滤芯 □水样 □电气类) | 检验类别(值区 = 已选目录项目摘要 + 选择按钮) ── -->
         <tr>
-          <th class="ic-lbl">{{ tt('样品型号/规格') }}</th>
+          <th class="ic-lbl">
+            {{ tt('样品型号/规格') }}<span v-if="isRequired('样品型号/规格')" class="ic-req">*</span>
+          </th>
           <td class="ic-cell" colspan="2">
             <div class="ic-party-line">
               <span
@@ -176,7 +180,9 @@
               <span v-if="isCustomValue('样品型号/规格')" class="ic-fill-text">{{ headVal('样品型号/规格') }}</span>
             </div>
           </td>
-          <th class="ic-lbl">{{ tt('检验类别') }}</th>
+          <th class="ic-lbl">
+            {{ tt('检验类别') }}<span v-if="isRequired('检验类别')" class="ic-req">*</span>
+          </th>
           <td class="ic-cell ic-cat-cell" colspan="2">
             <div class="ic-cat-line">
               <span class="ic-text">{{ headVal('检验类别') }}</span>
@@ -758,6 +764,18 @@ function canEdit(key) {
   return props.editable && !isLocked(key)
 }
 
+/**
+ * 必填标记(2026-11-17 用户口径:纸样上带**红色 *** 的即必填,截图 = 联系人/样品名称/
+ * 样品数量/样品型号/规格/检验类别)。
+ * 数据真源仍是 `yj_field.required`(后端 dataSchema 里叫 isRequired)—— 这里只做显示,
+ * 不写死清单:以后在字段管理里勾掉必填,纸面的 * 会一起消失(保存校验同源)。
+ */
+function isRequired(key) {
+  const f = (props.fields || []).find((x) => (x.dataName || x.name || x.code) === key)
+  if (!f) return false
+  return f.isRequired === true || f.required === true || Number(f.required) === 1
+}
+
 /** 表头取值 */
 function headVal(key) {
   return String(props.head?.[key] ?? '')
@@ -1045,6 +1063,13 @@ watch(
 }
 .ic-meta-no-val {
   padding-left: 2px;
+}
+/* 必填标记:纸样红 *(2026-11-17 用户口径「用这个红色*即可」) */
+.ic-req {
+  color: #e60012;
+  font-weight: 700;
+  margin-left: 2px;
+  line-height: 1;
 }
 /* 编号可改(2026-11-17):只读态还是纸面的裸号,编辑态给一个下划线输入框 */
 .ic-meta-no-input {

@@ -23,7 +23,7 @@
 | 9 | 样品处理方式第 2 项 **10 日内**(旧 45 日) | `HANDLE_OPTIONS` 文案 + 列注明同步 | — |
 | 10 | 报告类型 `□只要数据 □普通报告 □CNAS报告` | 字典 + 纸面加「只要数据」;老值「CNAS 报告」靠 squash 容错仍能认 | — |
 | 11 | 样品处理方式 / 检验报告有效期**不再预勾** | `headDefaults` 收窄成只剩判定规则;纸面 `DEFAULT_PICKS` 同批 | — |
-| 12 | 「标星号的为必填项」 | ⚠ 本轮 .doc **扫不到任何星号**(`document.xml` 里 `*` = 0,仅 9 处黄色高亮)⇒ **必填项本轮未动**,等用户补截图另开迁移 | 「我截图给你」 |
+| 12 | 「标星号的为必填项」 | 用户补发截图后落地(红色 `*`):**联系人 / 样品名称 / 样品数量 / 样品型号/规格 / 检验类别** 五格 `yj_field.required=1`,纸面按 `isRequired` 渲染红 `*`(`#e60012`);迁移 [migrate-insp-commission-required-20261117.sql](../../migrate-insp-commission-required-20261117.sql) | 「图中星号为必填项」「用这个红色*即可」 |
 
 ## 二、验收证据(ego 浏览器,5173 源码版 + 测试账套 YJ_TEST)
 
@@ -37,9 +37,17 @@
 | 迁移两账套 | `DbSync run migrate-insp-commission-rev-20261117.sql`:HSDZ_MES / HSDZ_MES_TEST 均 `[OK] 10 batches`;复核 5 个下拉字典 + `config={"headDefaults":{"判定规则":"无需判定"}}` |
 | 静态检查 | `npm run build` 通过;`mvn -DskipTests compile`(JDK 25)通过;`node --test src/business/menus.test.js src/core/qc/inspCommissionVat.test.js` **32/32 通过**;`DbNormAudit` 两账套 `RESULT: FAIL-3`(与改动前存量一致,无新增漂移);新迁移已登记(未登记清单 12 项 = 存量) |
 
+## 二之二、必填项(红色 * —— 用户 2026-11-17 截图口径)
+
+| 证据 | 说明 |
+|---|---|
+| `shots/round-16-required.png` | 新增草稿纸面:5 个红 `*` **只**出现在 联系人 / 样品名称 / 样品数量 / 样品型号/规格 / 检验类别;实测 `getComputedStyle(.ic-req).color = rgb(230, 0, 18)` = `#e60012`,其余格子无 `*` |
+| `shots/round-16-blocked.png` | 什么都不填点「保存」⇒ 弹窗 `还有 6 项必填未填写…联系人不能为空 / 样品名称不能为空 / 样品数量不能为空 / 样品型号/规格不能为空 / 检验类别不能为空 / 请至少添加一行明细去填写`(6 = 上述 5 + 明细页签整表必填) |
+| 数据库复核 | `yj_field.required=1` 恰 7 行 = 上述 5 + 单据编号 + 单据日期;自检脚本里写了行数守卫(≠7 直接 RAISERROR) |
+
 ## 三、测试数据清理
 
-联调只在**测试账套**建过两张单(WT-2026-11-9001 / WT-2026-11-9002),
+联调只在**测试账套**建过三张单(WT-2026-11-9001 / 9002 / 9003),
 按 [cleanup-test-data.sql](cleanup-test-data.sql) 物理删除(head / detail / yj_doc_status / yj_form_approval 全清 0);
 号池 `s_allno` 保留不复用。**正式账套未写入任何数据**(复核:头表仍 1 行 = 原样)。
 

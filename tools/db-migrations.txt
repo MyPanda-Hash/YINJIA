@@ -4918,3 +4918,7 @@ migrate-print-task-cache-20261116.sql
 #   委托单位/制造商/生产厂/样品型号规格/报告类型 五个字段转下拉框字典、headDefaults 去掉
 #   样品处理方式与检验报告有效期默认值、列注明同步(10 日/只读语义);幂等;两账套
 migrate-insp-commission-rev-20261117.sql
+
+# 2026-11-17 检验委托单必填项(用户截图:红色 * = 必填):联系人/样品名称/样品数量/样品型号规格/检验类别
+#   五格 yj_field.required 0→1;纸面按 isRequired 渲染红 *;两账套已执行;幂等
+migrate-insp-commission-required-20261117.sql
