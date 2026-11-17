@@ -210,6 +210,11 @@ public class PanelPermissionService {
         m.put(PagePanelRegistry.PROC_FLOW_CARD + "|删除照片", new String[]{"entry"});
         m.put(PagePanelRegistry.PROC_FLOW_CARD + "|确认完成", new String[]{"confirm"});
         m.put(PagePanelRegistry.PROC_FLOW_CARD + "|保存", new String[]{"entry"});
+        // 样品检验汇总表(2026-11-17):「导出 Excel」按钮与 POST /px/inspSummary/export 共用 export 词
+        // (组织架构里取消该角色的「导出」格子后,前端按钮隐藏、直调接口也会 403)。
+        // 两个按钮名都登记:前端文案是「导出 Excel」,接口闸门按「导出」调用。
+        m.put(PagePanelRegistry.INSP_SUMMARY + "|导出", new String[]{"export"});
+        m.put(PagePanelRegistry.INSP_SUMMARY + "|导出 Excel", new String[]{"export"});
         // ERP 集成配置清单(2026-10-18 用户口径「除管理员只可看不可编辑」):写配置**不挂权限词**,
         // 由 ErpIntegController 直接 requireAdmin();同时登记进 ADMIN_ONLY_PANELS 做纵深防御
         // (将来若给该页加按钮,非管理员的写动作仍会被 requireButton 的 admin 闸门拦住)。

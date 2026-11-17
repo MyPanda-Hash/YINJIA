@@ -4,22 +4,28 @@ import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.InspSummaryService;
 import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 /**
- * 样品检验汇总表(2026-11-17)—— 按时间范围汇总「谁送了什么样品、要测哪些项目」。
+ * 样品检验汇总表(2026-11-17)—— 按时间范围汇总「谁送了什么样品、要测哪些项目」并导出送检汇总表。
  *
  * <p>页面 = {@code views/modules/qc/InspSummary.vue},**不是** yj_panel 单据面板
  * ⇒ 按页面级虚拟面板 {@link PagePanelRegistry#INSP_SUMMARY} 登记,授权落 {@code yj_role_panel};
- * 动作集只有 可见 / 查询 / 导出(本接口只读,导出在前端用 xlsx 现生成)。
+ * 动作集 = 可见 / 查询 / 导出。
  *
- * <p>用户口径(2026-11-17):「为当前的样品检验增加汇总表,能够查看到一天或者一周,送好多个样品,
- * 测试啥的总表。要按一个时间范围,去导出有多少人送了啥样品测试啥,安排检测工作。」
+ * <p>导出格式以用户 2026-11-17 给的纸表为准(时间 / 送样人 / 委托单编号 / 样品名称 / 数量 /
+ * 测试项目 / 是否接收 / 是否检测 / 数据或报告输出 / 备注),后三列是 Excel 下拉勾选列,
+ * 由 {@link InspSummaryService#export(Map)} 用 POI 生成(SheetJS 社区版写不出数据验证)。
  */
 @RestController
 @RequestMapping("/api/px/inspSummary")
@@ -44,5 +50,26 @@ public class InspSummaryController {
     public ApiResult<Map<String, Object>> summary(@RequestBody(required = false) Map<String, Object> body) {
         perm.requirePanelView(PagePanelRegistry.INSP_SUMMARY);
         return ApiResult.ok(service.summary(body));
+    }
+
+    /**
+     * 导出「送检信息汇总表」(.xlsx,单 sheet;后三列带 Excel 下拉数据验证)。
+     *
+     * <p>权限:页面查看权 + 「导出」词(组织架构里可单独取消某角色的导出格子)。
+     *
+     * @param body 与 {@link #summary(Map)} 同一套查询条件
+     */
+    @PostMapping("/export")
+    public ResponseEntity<byte[]> export(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.INSP_SUMMARY);
+        perm.requireButton(PagePanelRegistry.INSP_SUMMARY, "导出");
+        InspSummaryService.ExportFile file = service.export(body);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDisposition(ContentDisposition.attachment()
+                .filename(file.fileName(), StandardCharsets.UTF_8).build());
+        headers.setContentLength(file.bytes().length);
+        return ResponseEntity.ok().headers(headers).body(file.bytes());
     }
 }

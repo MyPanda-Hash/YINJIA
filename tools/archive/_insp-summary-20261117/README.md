@@ -29,6 +29,10 @@
 | `ego/round-17.mjs` | 展开列加「明细」表头、空态显示当前区间、已审核单在「本月」可见(截图 17/18) |
 | `ego/round-18.mjs` | 8090 打包版复验「展开」表头 + 空态区间 + 本月已审核(截图 19/20) |
 | `ego/round-19.mjs` | English 下确认展开列表头 = `Expand`、空态 = `No sample submissions in this date range` |
+| `ego/round-20.mjs` | UI 点「导出 Excel」→ `POST /api/px/inspSummary/export` 落 blob、文件名/类型正确(截图 21) |
+| `check-export.py` | 用 openpyxl 读回导出文件:表头/数据行/数据验证/冻结/筛选/列宽 |
+| `export-check.json` | `check-export.py` 对 `sample-export.xlsx` 的实测输出 |
+| `sample-export.xlsx` | 2026-11-17 实测导出样本(正式库 11-01~11-17,一行测试单) |
 
 ## 复跑方式
 
@@ -49,8 +53,13 @@ ego-browser nodejs -e "await import('file:///D:/workspace/yinjia/tools/archive/_
   面板名译名 10 条。
 - 页面(8090 / 5173-YJ):「本月」→ 送样人数 1 / 送样单数 1 / 检测项目项次 1 / 收费合计 106.00 /
   已审核 0 / 待检 1;两个页签与展开明细均正常;点单号可跳检验委托单。
-- 导出:文件名 `样品检验汇总表_20261101-20261117.xlsx`(23681 字节),3 个 sheet =
-  `按送样人 / 按委托单 / 检测明细`,表头与合计行与界面一致。
+- 导出(**2026-11-17 第二轮改为服务端 POI**,格式按用户纸表):
+  文件名 `送检信息汇总表_20261101-20261117.xlsx`(4353 字节,UI 实测 4363 字节含下载头);
+  单 sheet `送检信息汇总表`,表头 = 时间/送样人/委托单编号/样品名称/数量/测试项目/是否接收/是否检测/
+  数据或报告输出/备注;一行 = 一张委托单;后三列空白 + Excel 下拉:
+  `G2:G202`√、`H2:H202`√、`I2:I202`数据/报告/数据+报告(`allowBlank`,箭头可见);
+  冻结首行、`A1:J2` 筛选;见 `export-check.json`(openpyxl 读回)与 `sample-export.xlsx`(样本)。
+  验证脚本 `check-export.py`;UI 点击取证 `ego/round-20.mjs`(截图 21)。
 - English:`Sample Inspection Summary`;页签 `By sender / By commission / sample`;
   按钮 `Search / Reset / Export Excel`;业务数据(人名/样品名/单号)保持原值。
 - 快捷区间(`ego/round-12.mjs`,2026-11-17):今天 `11-17~11-17`、本周 `11-16~11-17`、
@@ -83,6 +92,15 @@ ego-browser nodejs -e "await import('file:///D:/workspace/yinjia/tools/archive/_
    ⇒ 按设计被 `单据日期` 区间排除(不是按审核时间)。切「本月」即出现:已审核 1 / 待检 0,
    行上「单据状态=已审核」(见截图 18)。为避免同样误会,空态文案已带上当前区间:
    `当前时间范围内没有送样记录（2026-11-16 ~ 2026-11-17）`(见截图 17)。
+6. **导出格式按用户纸表改造 + 下拉(2026-11-17 第三轮)**:
+   原导出是前端 SheetJS 生成的 3 个 sheet;用户给了纸表格式(时间/送样人/委托单编号/样品名称/数量/
+   测试项目/是否接收/是否检测/数据或报告输出/备注)并要求后三列「下拉选 √」。
+   关键限制:**SheetJS 社区版写不出 Excel 数据验证**(只读不写),因此改为
+   **服务端 POI 生成**(`InspSummaryService.export`,POI 5.x 是既有依赖),前端只下载 blob。
+   POI 的下拉箭头要传 `setSuppressDropDownArrow(true)` 才显示(两层 inversion:POI 写
+   `showDropDown=!suppress`,而 Excel 把 `showDropDown="1"` 当隐藏;第一版传 false 实测
+   `showDropDown=true` = 无箭头,已改)。`check-export.json` 实测三列均为 list、`allowBlank`、
+   `showDropDown=false`(箭头可见)。
 
 ## 遗留观察(不在本任务范围)
 

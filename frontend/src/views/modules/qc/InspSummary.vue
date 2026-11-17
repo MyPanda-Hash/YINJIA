@@ -349,72 +349,46 @@ function openDoc(no) {
 }
 
 /**
- * 导出 Excel:三张表一起给(汇总-按送样人 / 汇总-按委托单 / 检测明细)。
- * 用户口径「按一个时间范围,去导出有多少人送了啥样品测试啥,安排检测工作」——
- * 明细表就是拿去排班的那张,所以即使界面只有两个页签也要一起导出。
+ * 导出「送检信息汇总表」(.xlsx,单 sheet;表头与用户 2026-11-17 给的纸表一致,
+ * 是否接收/是否检测/数据或报告输出 三列是 Excel 下拉)。
+ *
+ * 由服务端 POI 生成(POST /px/inspSummary/export):SheetJS 社区版写不出 Excel 数据验证(下拉),
+ * 而 POI 是后端既有依赖 ⇒ 版式与下拉都收在服务端一份,前端只负责下载。
  */
 async function exportExcel() {
   if (!hasData.value) return
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
-  const rangeText = `${range.value[0] || ''} ${tt('至')} ${range.value[1] || ''}`
-  const title = `${tt('样品检验汇总表')}（${rangeText}）`
-  // 每张表第 1 行都是标题行(必须是数组行,否则 aoa_to_sheet 会报 expects an array of arrays)
-  const headRow = [title]
-
-  // ① 按送样人
-  const senderCols = [tt('送样人'), tt('送样单数'), tt('检测项目项次'), tt('涉及样品'), tt('检测项目'),
-    tt('已审核单数'), tt('待检单数'), tt('收费合计'), tt('最近送样日期')]
-  const senderRows = senders.value.map((s) => [s['送样人'], s['送样单数'], s['检测项目项次'], s['涉及样品'],
-    s['检测项目'], s['已审核单数'], s['待检单数'], money(s['收费合计']), s['最近送样日期']])
-  const senderSum = ['合计', senders.value.reduce((n, s) => n + Number(s['送样单数'] || 0), 0),
-    senders.value.reduce((n, s) => n + Number(s['检测项目项次'] || 0), 0), '', '',
-    senders.value.reduce((n, s) => n + Number(s['已审核单数'] || 0), 0),
-    senders.value.reduce((n, s) => n + Number(s['待检单数'] || 0), 0),
-    money(senders.value.reduce((n, s) => n + Number(s['收费合计'] || 0), 0)), '']
-  const ws1 = XLSX.utils.aoa_to_sheet([headRow, [], senderCols, ...senderRows, senderSum])
-  ws1['!cols'] = [{ wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 28 }, { wch: 40 },
-    { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 14 }]
-  XLSX.utils.book_append_sheet(wb, ws1, tt('按送样人').slice(0, 28))
-
-  // ② 按委托单
-  const docCols = [tt('单据日期'), tt('单据编号'), tt('送样人'), tt('委托单位'), tt('样品名称'),
-    tt('样品型号/规格'), tt('样品数量'), tt('检测项目数'), tt('检测项目'), tt('测试方法'),
-    tt('收费合计'), tt('单据状态'), tt('审核人'), tt('审核时间')]
-  const docRows = docs.value.map((d) => [d['单据日期'], d['单据编号'], d['送样人'], d['委托单位'],
-    d['样品名称'], d['样品类别'], d['样品数量'], d['检测项目数'], d['检测项目'], d['测试方法'],
-    money(d['合计收费']), d['单据状态'], d['审核人'], d['审核时间']])
-  const docSum = ['合计', '', '', '', '', '', '', docs.value.reduce((n, d) => n + Number(d['检测项目数'] || 0), 0),
-    '', '', money(docs.value.reduce((n, d) => n + Number(d['合计收费'] || 0), 0)), '', '', '']
-  const ws2 = XLSX.utils.aoa_to_sheet([headRow, [], docCols, ...docRows, docSum])
-  ws2['!cols'] = [{ wch: 12 }, { wch: 16 }, { wch: 12 }, { wch: 10 }, { wch: 20 },
-    { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 40 }, { wch: 18 },
-    { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 18 }]
-  XLSX.utils.book_append_sheet(wb, ws2, tt('按委托单').slice(0, 28))
-
-  // ③ 检测明细(排班用)
-  const itemCols = [tt('单据日期'), tt('单据编号'), tt('送样人'), tt('样品名称'), tt('样品型号/规格'),
-    tt('样品数量'), tt('行号'), tt('检测元素'), tt('测试方法'), tt('测试周期'),
-    tt('收费（一个样/元）'), tt('单据状态')]
-  const itemRows = []
-  for (const d of docs.value) {
-    for (const it of (d['明细'] || [])) {
-      itemRows.push([d['单据日期'], d['单据编号'], d['送样人'], d['样品名称'], d['样品类别'],
-        d['样品数量'], it['行号'], it['检测元素'], it['测试方法'], it['测试周期'],
-        money(it['收费']), d['单据状态']])
-    }
+  const loading = ElMessage({ message: tt('正在生成 Excel…'), duration: 0 })
+  try {
+    const blob = await request.post('/px/inspSummary/export', {
+      日期起: range.value[0],
+      日期止: range.value[1],
+      送样人: sender.value.trim(),
+      单据状态: status.value,
+      keyword: keyword.value.trim(),
+    }, { responseType: 'blob' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `送检信息汇总表_${(range.value[0] || '').replace(/-/g, '')}-${(range.value[1] || '').replace(/-/g, '')}.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
+    ElMessage.success(tt('已导出'))
+  } catch (e) {
+    ElMessage.error(await blobErrorMessage(e) || tt('导出失败'))
+  } finally {
+    loading.close()
   }
-  const itemSum = ['合计', '', '', '', '', '', '', '', '', '',
-    money(itemRows.reduce((n, r) => n + Number(r[10] || 0), 0)), '']
-  const ws3 = XLSX.utils.aoa_to_sheet([headRow, [], itemCols, ...itemRows, itemSum])
-  ws3['!cols'] = [{ wch: 12 }, { wch: 16 }, { wch: 12 }, { wch: 20 }, { wch: 12 },
-    { wch: 10 }, { wch: 8 }, { wch: 16 }, { wch: 12 }, { wch: 30 },
-    { wch: 14 }, { wch: 10 }]
-  XLSX.utils.book_append_sheet(wb, ws3, tt('检测明细').slice(0, 28))
+}
 
-  const fileName = `${tt('样品检验汇总表')}_${(range.value[0] || '').replace(/-/g, '')}-${(range.value[1] || '').replace(/-/g, '')}.xlsx`
-  XLSX.writeFile(wb, fileName)
-  ElMessage.success(`${tt('已导出')} ${senders.value.length} ${tt('人')} / ${docs.value.length} ${tt('单')} / ${itemRows.length} ${tt('项')}`)
+/** blob 响应的错误体解析:失败时后端回 JSON(ApiResult),按 Blob.text() 读出 message */
+async function blobErrorMessage(e) {
+  const data = e?.response?.data
+  if (data instanceof Blob) {
+    try { return JSON.parse(await data.text())?.message || '' } catch { /* 非 JSON 走兜底 */ }
+  }
+  return e?.response?.data?.message || e?.message || ''
 }
 
 onMounted(() => {

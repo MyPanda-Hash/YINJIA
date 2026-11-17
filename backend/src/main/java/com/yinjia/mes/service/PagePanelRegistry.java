@@ -81,7 +81,8 @@ public final class PagePanelRegistry {
      *
      * <p>页面 = {@code views/modules/qc/InspSummary.vue},**不是** yj_panel 单据面板
      * (它是"查询/汇总/导出"页,不承载单据)⇒ 页面级虚拟面板,授权落 {@code yj_role_panel};
-     * 动作 = 可见 / 查询 / 导出(导出在前端用 xlsx 生成,后端仍是只读接口)。
+     * 动作 = 可见 / 查询 / 导出(导出由后端 POI 生成「送检信息汇总表」,含 Excel 下拉数据验证;
+     * 见 {@link InspSummaryService#export(java.util.Map)})。
      * 迁移:{@code tools/migrate-insp-summary-20261117.sql}(授权 + 面板名译名)。
      */
     public static final String INSP_SUMMARY = "INSP_SUMMARY";
