@@ -89,6 +89,41 @@ public class PurInSplitService {
     }
 
     /**
+     * 多行一起拆(工具栏「多仓库入库」弹窗一次提交多行)。
+     *
+     * <p>为什么不前端逐行调:一次提交若第 3 行失败,前两行已经落库 —— 用户看到"一半成功"
+     * 却不知道为什么。这里用**一个事务**包住,任一行不合法整批回滚:要么全成,要么一行都不动。
+     *
+     * @param lines [{lineId, allocs:[{仓库, 仓位编码, 数量}]}]
+     */
+    @Transactional
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> splitMulti(String docNo, List<Map<String, Object>> lines, String user) {
+        if (lines == null || lines.isEmpty()) throw new IllegalStateException("没有要拆分的明细行");
+        int rowCount = 0;
+        List<Object> done = new ArrayList<>();
+        for (Map<String, Object> l : lines) {
+            long lineId = l.get("lineId") instanceof Number n ? n.longValue() : 0L;
+            List<Map<String, Object>> allocs = new ArrayList<>();
+            if (l.get("allocs") instanceof List<?> list) {
+                for (Object o : list) {
+                    if (o instanceof Map<?, ?> m) allocs.add(new LinkedHashMap<>((Map<String, Object>) m));
+                }
+            }
+            // self-invocation:同处一个事务(外层 @Transactional 已开启,inner 不再新建)
+            Map<String, Object> one = split(docNo, lineId, allocs, user);
+            rowCount += ((Number) one.get("rows")).intValue();
+            done.add(one);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("docNo", docNo);
+        out.put("lines", lines.size());
+        out.put("rows", rowCount);
+        out.put("detail", done);
+        return out;
+    }
+
+    /**
      * 把一行拆成多行(每行一个仓库)。
      *
      * @param docNo  采购入库单号

@@ -768,6 +768,15 @@ export async function splitPurInLine({ docNo, lineId, allocs }) {
   return unwrapStrict(await request.post('/px/purIn/split', { docNo, lineId, allocs: allocs || [] }))
 }
 
+/**
+ * 采购入库单「多仓库入库」弹窗一次性提交多行(2026-11-17 用户口径:工具栏按钮 → 和生单一样的界面,
+ * 每行下拉展开成多个仓库子行)。服务端用一个事务包住全部行:任一行不合法整批回滚。
+ * @param {{docNo:string, lines:Array<{lineId:number, allocs:Array<{仓库:string,仓位编码?:string,数量:number}>}>}} p
+ */
+export async function splitPurInMultiWh({ docNo, lines }) {
+  return unwrapStrict(await request.post('/px/purIn/multiWh', { docNo, lines: lines || [] }))
+}
+
 // ==================== 统一生单对话框(2026-10-31 用户口径) ====================
 /**
  * 生单预览:勾选的来源单据(一张 = 原「生单」,多张 = 「批量生单」)各自的明细行。

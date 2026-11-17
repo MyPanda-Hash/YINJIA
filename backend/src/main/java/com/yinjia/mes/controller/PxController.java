@@ -288,6 +288,24 @@ public class PxController {
         return ApiResult.ok(purInSplit.split(docNo, lineId, allocs, currentUser()));
     }
 
+    /**
+     * 「多仓库入库」弹窗一次提交多行(2026-11-17 用户口径:工具栏一颗按钮 → 和生单一样的界面,
+     * 每行可下拉展开成多个仓库子行,各子行合计不超过该行可入库数量)。
+     *
+     * <p>一个事务包住全部行:任一行不合法整批回滚,不会出现"前两行改了、第三行报错"的半成品。
+     */
+    @PostMapping("/purIn/multiWh")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> purInMultiWh(@RequestBody Map<String, Object> body) {
+        String docNo = String.valueOf(body.getOrDefault("docNo", ""));
+        List<Map<String, Object>> lines = new java.util.ArrayList<>();
+        if (body.get("lines") instanceof List<?> l) {
+            for (Object o : l) if (o instanceof Map<?, ?> m) lines.add(new LinkedHashMap<>((Map<String, Object>) m));
+        }
+        perm.requireButton("PURCHASE_IN", "修改");
+        return ApiResult.ok(purInSplit.splitMulti(docNo, lines, currentUser()));
+    }
+
     // ============ 采购订单报表打印记录(2026-11-07) ============
     // 用户口径:有金额/无金额两个报表打印时要能勾选行/填数量,并且要像材料码那样**留下打印记录**,
     // 可重打(原样再出纸、次数+1)、可作废(只作废这张纸)。与材料码的差别只有一处:

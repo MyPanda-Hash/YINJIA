@@ -341,9 +341,9 @@
       </el-dialog>
     </div>
     <RefPickDialog v-model="refVisible" :field="refPick?.field" :row="refPick?.row" :mode="refPick?.mode" @confirm="onRefConfirm" />
-    <!-- 采购入库单:明细「仓库」格子点开的多选仓库弹窗(勾一个直接落值 / 勾多个拆成多行) -->
-    <PurInWhPickDialog v-model="purInWhPickVisible" :doc-no="form['单据编号'] || ''" :row="purInWhPickRow"
-                       @picked="onPurInWhPicked" @saved="onPurInWhSplitSaved" />
+    <!-- 采购入库单:工具栏「多仓库入库」弹窗(每行 ▾ 加一行仓库子行,合计不超过可入库数量) -->
+    <PurInMultiWhDialog v-model="purInMultiWhVisible" :doc-no="form['单据编号'] || ''" :rows="purInDetailRows"
+                        @saved="onPurInMultiWhSaved" />
 
     <!-- 下拉框字段弹窗模式(>20 条):字典项搜索选择 -->
     <el-dialog v-model="dictPickVisible" :title="tt('选择') + '：' + (dictPickField ? tt(dictPickField.name) : '')" width="440px" append-to-body :close-on-click-modal="false">
@@ -403,9 +403,7 @@ import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
 import SelectVoucherDialog from './SelectVoucherDialog.vue'
-import PurInWhPickDialog from './PurInWhPickDialog.vue'
-// 拆行纯函数:能不能拆(已落库 + 数量>0)一律由它判,弹窗与入口共用一份口径
-import { canSplitRow } from '@core/panel/purInSplit'
+import PurInMultiWhDialog from './PurInMultiWhDialog.vue'
 import ImportDialog from './ImportDialog.vue'
 import BomImportDialog from './BomImportDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
@@ -850,6 +848,8 @@ function isDisabled(action) {
     审批通过: !['审批中', '待二级审批'].includes(s) || !isEdit.value,
     审批驳回: !['审批中', '待二级审批'].includes(s) || !isEdit.value,
     扫描填单: false,
+    // 多仓库入库(2026-11-17):只在"已保存的草稿"上可用 —— 拆行按行 id 动库,新单还没 id
+    多仓库入库: s !== '草稿' || !isEdit.value || !editable.value,
   }
   // 2026-08-25：所有「生成XX」生单按钮统一仅已审核可用（对齐 T+：已审核才能选择生单）
   // 2026-09-20：去掉残留的「生产中」档(状态推导无此档,全库无此值),与后端 PushGenerateHandler 的「仅已审核」一致
@@ -926,38 +926,28 @@ function isMultiline(r) {
 const refVisible = ref(false)
 const refPick = ref(null)
 
-/* ── 采购入库单:明细「仓库」格子点开 = 多选仓库(2026-11-17 用户口径,第二轮) ──
-   用户原话:「可以在仓库选择时多个按钮,实现多选仓库弹窗」⇒ 入口落在仓库格子本身;
-   第一版在操作列放过一颗拆分图标,被否掉了(「不要设置成这样」),已撤掉。
-   勾一个仓库 = 直接回填(与原来的单选参照同一结果);勾多个 = 交给服务端把这一行拆成多行。 */
-const purInWhPickVisible = ref(false)
-const purInWhPickRow = ref({})
+/* ── 采购入库单:工具栏「多仓库入库」(2026-11-17 用户口径,第三轮) ──
+   用户原话:「写法还是改成有个多仓库入库按钮(在顶部)。点击后和生单一样的界面。
+     然后每行明细的头部有个下拉扩展的倒三角,点一下就多出一行明细来。但是总数量不超过最大数量。」
+   前两轮的做法(操作列拆分图标 / 仓库格子多选弹窗)都按用户口径撤掉了;
+   现在入口只有这一颗工具栏按钮,明细拆分全在弹窗里做(PurInMultiWhDialog)。 */
+const purInMultiWhVisible = ref(false)
 
-/** 只对采购入库单的「仓库」字段改走多选弹窗;其余字段/面板仍是原来的参照选择 */
-function isPurInWhField(dr) {
-  return isPurInPanel.value && String(dr?.dataName || '') === '仓库'
-}
-
-function openPurInWhPick(row) {
-  if (!editable.value) return
-  purInWhPickRow.value = row
-  purInWhPickVisible.value = true
-}
-
-/** 只勾了一个仓库:把值写回本行(含仓库编码),并像参照选择那样刷一次现存量 */
-function onPurInWhPicked(p) {
-  const row = purInWhPickRow.value || {}
-  row['仓库'] = p?.name || ''
-  if (Object.prototype.hasOwnProperty.call(row, '仓库编码')) row['仓库编码'] = p?.code || ''
-  if (p?.clearBin) {
-    if (Object.prototype.hasOwnProperty.call(row, '仓位编码')) row['仓位编码'] = ''
-    if (Object.prototype.hasOwnProperty.call(row, '仓位')) row['仓位'] = ''
+function openPurInMultiWh() {
+  if (!editable.value || !isEdit.value) {
+    ElMessage.warning(tt('请先保存单据，再拆分仓库'))
+    return
   }
-  engine.fillCurrentStock(row).catch(() => { /* 现存量只是展示列,失败不拦编辑 */ })
+  purInMultiWhVisible.value = true
 }
 
-/** 多选拆行成功:服务端已落库,重载单据看拆出来的多行 */
-async function onPurInWhSplitSaved() {
+/** 当前单据的明细行(弹窗按这份数据展开仓库子行;拆完重载单据) */
+const purInDetailRows = computed(() => {
+  const key = tabs.value?.[0]?.key
+  return key ? (detailData[key] || []) : []
+})
+
+async function onPurInMultiWhSaved() {
   await load()
 }
 
@@ -1004,18 +994,11 @@ function detailRefEnabled(dr) {
  */
 function detailRefHint(dr) {
   if (!detailRefEnabled(dr)) return ''
-  if (isPurInWhField(dr)) return tt('点这里可选多个仓库（勾多个会把这一行拆成多行）')
   return detailRefTrigger(dr) === 'dblclick' ? '双击选择存货' : ''
 }
 
 function openDetailRef(dr, row, tab, trigger = 'click') {
   if (!detailRefEnabled(dr) || detailRefTrigger(dr) !== trigger) return
-  // 采购入库单的「仓库」改成多选仓库弹窗:勾一个 = 原单选行为,勾多个 = 这一行按仓库拆成多行
-  // (台账/流水/转ERP 都按「行 × 仓库」取数,所以拆行是唯一不会出现两套账的做法)
-  if (isPurInWhField(dr)) {
-    openPurInWhPick(row)
-    return
-  }
   refPick.value = { field: dr, kind: 'detail', row, tab, mode: 'detail' }
   refVisible.value = true
 }
@@ -1321,6 +1304,11 @@ async function onButton(action) {
   if (erpClickBlocked(action, erpPushing.value)) { ElMessage.warning(tt(ERP_BUSY_KEY)); return }
   if (APPROVE_ACTIONS.includes(action) && !user.isAdmin && !user.approvePanels.includes(panelCode.value)) {
     return ElMessage.warning('当前角色无审批权限')
+  }
+  // 多仓库入库(2026-11-17 用户口径):工具栏按钮 → 整单明细 + 每行 ▾ 展开仓库子行的分配界面
+  if (action === '多仓库入库') {
+    openPurInMultiWh()
+    return
   }
   if (action === '扫描填单') {
     if (!editable.value) {
