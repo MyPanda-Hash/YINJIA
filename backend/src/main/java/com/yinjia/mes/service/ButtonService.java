@@ -1192,8 +1192,10 @@ public class ButtonService {
         // 与上面编辑人同一套口径:前端只保证纸面显示与保存报文带上,落库一律以本次保存人为准 ——
         // 否则用户把这一格改回别人名字就能伪造"谁管的这张表"。
         if ("RD_ASM_PROC".equals(def.code())) {
+            // 2026-11-17：值改为**固定柴善银**（用户口径「是固定的」），不再按本次保存人回写。
+            //   保留这段 UPDATE 的作用是"防止前端旧缓存把它改回别人"—— 每次保存都钉一次固定值。
             jdbc.update("UPDATE rd_asm_proc_head SET 表单管理人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
-                    realNameOf(user), no);
+                    ASM_PROC_FORM_MANAGER, no);
         }
         // 纯落款「编制」格的创建人预填(2026-11-02):见 prefillPreparerName 注释。
         // 落库后执行 ⇒ 同一次保存即可在纸面上看到;只在为空时写,不覆盖已有/用户已确认的值。
@@ -1216,7 +1218,10 @@ public class ButtonService {
     private void putEditorCols(PanelRegistry.PanelDef def, String table, Map<String, Object> cols, String user) {
         String name = realNameOf(user);
         if ("RD_PROD_INFO".equals(def.code()) && tableCols(table).contains("编辑人")) cols.put("编辑人", name);
-        if ("RD_ASM_PROC".equals(def.code()) && tableCols(table).contains("表单管理人")) cols.put("表单管理人", name);
+        // 组装工艺：表单管理人**固定柴善银**（2026-11-17 用户口径），不再跟当前编辑人
+        if ("RD_ASM_PROC".equals(def.code()) && tableCols(table).contains("表单管理人")) {
+            cols.put("表单管理人", ASM_PROC_FORM_MANAGER);
+        }
     }
 
     /**
@@ -4348,6 +4353,17 @@ public class ButtonService {
      * <p>陈秀丽 = `chenxiuli`（研发审核角色；同时也是产品信息表的一级审核人）。</p>
      */
     private static final String RD_DEFAULT_LIAISON_ACCOUNT = "chenxiuli";
+
+    /**
+     * 组装工艺管控清单（RD_ASM_PROC）纸面「表单管理人」的**固定值**（2026-11-17 用户口径）：
+     * 「这个表单管理员应该是柴善银，是**固定的**」—— 覆盖 2026-10-28「=当前编辑人」那条。
+     *
+     * <p>⚠ 三处写入点必须同时固定，漏一处就会被"当前编辑人"覆盖回去：
+     * ① 前端 PanelxList 的 EDITOR_STAMP_FIELDS（纸面显示）；
+     * ② putEditorCols（空白草稿分支落库）；
+     * ③ saveDoc 末尾那段 UPDATE（正常保存落库）。</p>
+     */
+    private static final String ASM_PROC_FORM_MANAGER = "柴善银";
 
     private static final java.util.Set<String> TWO_LEVEL_PANELS = twoLevelPanels();
 

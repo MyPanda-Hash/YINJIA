@@ -6410,7 +6410,11 @@ watch(
 // 只改**显示值与保存报文**(cur 是保存时回传的表头对象),不主动置脏:
 //   用户没有别的改动就不该弹「未保存」提醒。落库权威仍在服务端(ButtonService 每次保存按登录人回写),
 //   所以即使这一格没被前端改到,存下去也一定是当前登录人。
-const EDITOR_STAMP_FIELDS = { RD_PROD_INFO: '编辑人', RD_ASM_PROC: '表单管理人' }
+// 2026-11-17：RD_ASM_PROC 的「表单管理人」已改为**固定柴善银**（用户口径「是固定的」），
+//   故从这里移除 —— 否则每次打开/编辑草稿都会把纸面值改写成当前登录人（生产实测：
+//   库里已是柴善银，界面却被盖成「系统管理员」，就是这个监视器干的）。
+//   产品信息表的「编辑人」= 当前编辑人，属于另一件事，保留。
+const EDITOR_STAMP_FIELDS = { RD_PROD_INFO: '编辑人' }
 watch(
   () => [panelCode.value, draftEditable.value, cur.value?.['单据编号'], JSON.stringify(cur.value || {})],
   () => {

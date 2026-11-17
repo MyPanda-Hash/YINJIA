@@ -91,3 +91,23 @@ test('⑤ 审核人 = 审批通过人：代码回填 + 历史单按 shr 补（�
   assert.match(mgrMig, /ISNULL\(NULLIF\(LTRIM\(RTRIM\(u\.real_name\)\), N''\), s\.shr\)/, '账号→姓名兜底')
   assert.match(mgrMig, /ISNULL\(h\.\[备用3\], N''\) = N''/, '只补空值，不覆盖既有')
 })
+
+test('⑥ 表单管理人不得再被「当前编辑人」覆盖（三处写入点全固定）', () => {
+  // 生产实测踩到的坑：库里已经是柴善银，界面却显示「系统管理员」——
+  //   PanelxList 的 EDITOR_STAMP_FIELDS 每次打开草稿都把当前登录人写进纸面；
+  //   后端 putEditorCols / 保存末尾 UPDATE 也按 realNameOf(user) 回写。
+  // 三处必须同时固定，漏一处就会被覆盖回去。
+  const list = readFileSync(new URL('./PanelxList.vue', import.meta.url), 'utf8')
+  assert.doesNotMatch(list, /RD_ASM_PROC: '表单管理人'/, '前端监视器不得再盖表单管理人')
+  assert.match(list, /EDITOR_STAMP_FIELDS = \{ RD_PROD_INFO: '编辑人' \}/, '产品信息表的编辑人保留')
+
+  assert.match(btn, /ASM_PROC_FORM_MANAGER = "柴善银"/, '后端要有固定值常量')
+  // ① 空白草稿分支
+  assert.match(btn, /tableCols\(table\)\.contains\("表单管理人"\)\) \{\s*\n\s*cols\.put\("表单管理人", ASM_PROC_FORM_MANAGER\)/,
+    'putEditorCols 要写固定值')
+  // ② 保存末尾
+  assert.match(btn, /UPDATE rd_asm_proc_head SET 表单管理人 = \?[\s\S]{0,120}ASM_PROC_FORM_MANAGER, no\)/,
+    '保存末尾 UPDATE 要写固定值')
+  assert.doesNotMatch(btn, /UPDATE rd_asm_proc_head SET 表单管理人 = \?[\s\S]{0,120}realNameOf\(user\), no\)/,
+    '不得再按当前保存人回写')
+})
