@@ -7149,6 +7149,43 @@ public class ButtonService {
         return result(no, "会签中");
     }
 
+    /**
+     * 会签通过 → 在该会签人所属部门的纸面行上盖「签字 + 日期」（2026-11-17 用户口径 A）。
+     *
+     * <p>用户原话：「会签人员直接会签人签名后直接显示对应部门以及签名信息到表格」+
+     * 追问确认「点通过即在该部门行写"签字+日期"，内容留空（或写"/"）」。</p>
+     *
+     * <p>映射口径与填写门禁**同一套**（{@link #changeDeptsOf}：
+     * `yj_user.dept_id → yj_change_dept.部门`），不另造规则：
+     * · 一个账号可能映射到多个部门（如 9/12 都是品质部）⇒ 这些部门行**都盖**；
+     * · 映射里查不到部门（账号没配 dept_id）⇒ **静默跳过**，不影响会签本身
+     *   —— 会签是流程动作，盖章只是纸面留痕，不能因缺映射把人卡住；
+     * · 只写 签字/日期 两列，「变更后内容」保持原样（没给意见就是空）。</p>
+     *
+     * <p>幂等：只更新 `签字` 为空或就是本人的行，重复签不会刷掉别人的签名。
+     * 一票否决（驳回）不走这里 —— 驳回本来就不该留签名。</p>
+     */
+    private void stampSignoffDeptRow(PanelRegistry.PanelDef def, String no, String user) {
+        try {
+            java.util.Set<String> depts = changeDeptsOf(user);
+            if (depts.isEmpty()) return;
+            String signer = realNameOf(user);
+            String today = LocalDate.now().toString();
+            for (String dept : depts) {
+                if (dept == null || dept.isBlank()) continue;
+                jdbc.update("UPDATE " + def.lineTable() + " SET 签字 = ?, 日期 = ? "
+                                + " WHERE " + def.groupCol() + " = ? AND 部门 = ? "
+                                + "   AND ISNULL(表区, N'') = ? AND ISNULL(asp_cancel,'N') <> 'Y' "
+                                + "   AND (ISNULL(签字, N'') = N'' OR 签字 = ?)",
+                        signer, today, no, dept, CHANGE_DEPT_SECTION, signer);
+            }
+        } catch (Exception e) {
+            // 盖章失败不得拖垮会签（会签已落库）；只在日志里留痕
+            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
+                    .warn("会签部门行盖章失败 panel={} no={} user={}: {}", def.code(), no, user, e.toString());
+        }
+    }
+
     /** 会签通过(仅本单会签人):全部签完 → **自动**转审批中(用户口径:会签通过才进审核) */
     private Map<String, Object> signoffApprove(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String no = requireNo(formData);
@@ -7160,6 +7197,14 @@ public class ButtonService {
                         + "WHERE panel_code = ? AND form_no = ? AND action = 'SIGNOFF' AND result = 'PENDING' AND operator = ?",
                 opinion.isEmpty() ? null : opinion, CHANGE_PANEL, no, user);
         if (n == 0) throw new IllegalStateException("会签已处理，请刷新后查看");
+        // 🔴 会签即盖章（2026-11-17 用户口径 A）：
+        //   「点通过即在该部门行写"签字+日期",内容留空(或写"/")」
+        //   此前只有 stampSignature 那条路（**填了「变更后内容」并保存**才盖章）——
+        //   会签人只点「会签通过」不填内容时，纸面「三、部门评审意见」里他那一行
+        //   永远停在「/ /」（用户截图即此状）。这里补上"签了就算"的通道。
+        //   ⚠ 只写 签字/日期 两列：不动「变更后内容」（用户没给意见就让它空着，
+        //     尊重实际输入，也让 stampSignature 的"内容变了才盖章"口径不被污染）。
+        stampSignoffDeptRow(def, no, user);
         if (signoffPending(no).isEmpty()) {
             // 全部通过:转审批中(走提交内核——刻意跳过发起人校验,最后一位会签人通常不是发起人)
             doSubmitApproval(def, no, opinion);
