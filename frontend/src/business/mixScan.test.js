@@ -10,9 +10,13 @@
  *   · mixProgress        → 「全部扫完才能整单保存」的判据
  *   · buildScanPayload   → POST /px/mix/scan 的字段名(与后端正文字段逐一对应)
  *   · buildMixSlipPayload→ 混料单纸面载荷(表头/部门标签/签名 + 计划→请领、实际→实发)
+ *   · 页面静态检查       → 文案都有英文译名;原生扫码只走 window.YjNative(2026-11-17 报障回归)
  */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   parseWorkOrderQr,
   expandBom,
@@ -76,7 +80,7 @@ test('parseWorkOrderQr:扫到物料码(含 |)不该被当工单码', () => {
   assert.equal(r.reason, 'no-order')
 })
 
-test('parseWorkOrderQr:plainOrderNo 允许直接敲工单号(2026-11-19 查询框与生产领料一致)', () => {
+test('parseWorkOrderQr:plainOrderNo 允许直接敲工单号(2026-11-17 查询框与生产领料一致)', () => {
   const r = parseWorkOrderQr('GD-2026-10-0221', { plainOrderNo: true })
   assert.equal(r.ok, true)
   assert.equal(r.orderNo, 'GD-2026-10-0221')
@@ -314,4 +318,26 @@ test('MIX_PAPER:纸样口径固定(标题/文件编码/横板 A4)', () => {
   assert.equal(MIX_PAPER.文件编码, 'YJ-QR-147')
   assert.equal(MIX_PAPER.纸张.w, '297mm')
   assert.equal(MIX_PAPER.纸张.h, '210mm')
+})
+
+test('扫码混料页面:每个 tt() 文案都有英文译名(建页时漏过一遍,钉死别再漏)', () => {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const vue = readFileSync(join(here, '../views/mobile/MobileMixScan.vue'), 'utf8')
+  const en = readFileSync(join(here, '../i18n/locales/en.js'), 'utf8')
+  const keys = [...vue.matchAll(/tt\('([^']+)'\)/g)].map((m) => m[1])
+  assert.ok(keys.length > 30, '页面文案不该被抽空')
+  const missing = [...new Set(keys)].filter((k) => !en.includes(`'${k}'`) && !en.includes(`"${k}"`))
+  assert.deepEqual(missing, [], '这些文案缺英文译名: ' + missing.join(' / '))
+})
+
+test('扫码混料扫码:只走 YjNative 桥,不再用 @capacitor-mlkit(手搓壳没装这个原生插件)', () => {
+  const here = dirname(fileURLToPath(import.meta.url))
+  const src = readFileSync(join(here, 'nativeScan.js'), 'utf8')
+  // 注释里可以提这个插件(解释事故原因),所以只看去掉注释后的代码
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  assert.match(code, /window\.YjNative\.scan\(\)/, '原生扫码必须调 window.YjNative.scan()')
+  assert.match(code, /__yjScanResult/, '结果由壳回调 window.__yjScanResult(code, ok)')
+  // 手搓壳里没有这个原生实现,一调必抛 "This plugin method is not available on this platform."
+  assert.doesNotMatch(code, /@capacitor-mlkit/, 'ML Kit 插件不该再被引入')
+  assert.doesNotMatch(code, /BarcodeScanner/, '不该再调 BarcodeScanner.*')
 })

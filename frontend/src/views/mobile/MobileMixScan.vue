@@ -25,32 +25,37 @@
   【为什么秤值要「提交本笔」才落库,而不是扫完就写】
   用户口径是「提交保存一笔」:现场放过料、看一眼秤稳定了才点提交;写早了会把称重跳动值存进去。
   取不到稳定值时页面要求手输(秤离线/故障不能让现场卡死)。
+
+  【2026-11-17 修正(用户报障,两件事)】
+   ① **相机扫码报 "This plugin method is not available on this platform."**
+      原因是本页用了 ML Kit(Capacitor 插件),而 App 是手搓壳、只有 `window.YjNative` 桥。
+      ⇒ 改走**与生产领料/生产扫码登记同一条调用**:`window.YjNative.scan()` + `window.__yjScanResult`
+      (封装见 business/nativeScan.js 头部注释;没有桥的环境根本不显示扫码按钮)。
+   ② **界面要和生产领料一样**:"一个查询,一个输入框加扫码"。
+      ⇒ 扫码行由「输入框内嵌查询 + 独立相机按钮(手机上被挤到第二行)」改成
+      MobilePick.vue 同款单行:输入框 + 查询 + 扫码(44px 命中区、手机竖屏也不换行);
+      输入框同时接受**手敲工单号**(生产领料也这样,见 parseWorkOrderQr 的 plainOrderNo)。
 -->
 <template>
   <div class="mm-scan">
     <div class="mm-head">
       <div class="mm-title">{{ tt('扫码混料') }}</div>
-      <div class="mm-sub">
-        {{ tt('扫工单码 → 带出物料清单 → 逐项扫物料码取电子秤 → 逐笔保存 → 全部扫完整单保存并自动打印') }}
-      </div>
+      <div class="mm-sub">{{ tt('扫工单 → 扫物料取秤 → 整单保存打印') }}</div>
     </div>
 
-    <!-- ① 扫工单码 -->
-    <div class="mm-scanbar">
+    <!-- ① 扫工单码(2026-11-17 用户口径「界面要和生产领料一样:一个查询,一个输入框加扫码」)-->
+    <div class="mm-bar">
       <el-input
         ref="woInput"
         v-model="woText"
         size="large"
         clearable
-        :placeholder="tt('扫描或输入工单二维码')"
+        :placeholder="tt('扫工单码或输入工单号')"
         @keyup.enter="onScanWorkOrder"
-      >
-        <template #append>
-          <el-button :loading="woLoading" @click="onScanWorkOrder">{{ tt('查询') }}</el-button>
-        </template>
-      </el-input>
-      <el-button v-if="nativeScan" size="large" :loading="scanning === 'wo'" class="mm-cam" @click="scanWoCamera">
-        {{ tt('相机扫码') }}
+      />
+      <el-button size="large" :loading="woLoading" @click="onScanWorkOrder">{{ tt('查询') }}</el-button>
+      <el-button v-if="nativeScan" size="large" :loading="scanning === 'wo'" @click="scanWoCamera">
+        {{ tt('扫码') }}
       </el-button>
     </div>
 
@@ -94,6 +99,10 @@
       <div class="mm-scale-manual">
         <span class="mm-k">{{ tt('手输数量') }}</span>
         <el-input-number v-model="manualQty" :min="0" :precision="4" :step="0.1" size="large" controls-position="right" />
+        <!-- 「取秤提交」= 给左侧高亮那一行取一次秤值,放秤卡里比挤在扫码行更顺(扫码行只留 查询/扫码) -->
+        <el-button size="large" :disabled="!activeLine" :loading="savingOne" @click="submitActive">
+          {{ tt('取秤提交') }}
+        </el-button>
       </div>
     </div>
 
@@ -139,23 +148,19 @@
     </div>
 
     <!-- ⑤ 扫物料码 -->
-    <div v-if="order && lines.length" class="mm-scanbar">
+    <div v-if="order && lines.length" class="mm-bar">
       <el-input
         ref="matInput"
         v-model="matText"
         size="large"
         clearable
-        :placeholder="tt('扫描或输入物料码（存货编码|批号）')"
+        :placeholder="tt('扫物料码或输入物料编码')"
         @keyup.enter="onScanMaterial"
-      >
-        <template #append>
-          <el-button :loading="savingOne" @click="onScanMaterial">{{ tt('提交本笔') }}</el-button>
-        </template>
-      </el-input>
-      <el-button v-if="nativeScan" size="large" :loading="scanning === 'mat'" class="mm-cam" @click="scanMatCamera">
-        {{ tt('相机扫码') }}
+      />
+      <el-button size="large" :loading="savingOne" @click="onScanMaterial">{{ tt('提交本笔') }}</el-button>
+      <el-button v-if="nativeScan" size="large" :loading="scanning === 'mat'" @click="scanMatCamera">
+        {{ tt('扫码') }}
       </el-button>
-      <el-button size="large" :disabled="!activeLine" @click="submitActive">{{ tt('取秤提交') }}</el-button>
     </div>
 
     <!-- ⑥ 整单保存 -->
@@ -325,6 +330,7 @@ function scanErrText(r) {
   const map = {
     denied: tt('未授予相机权限，请在系统设置里开启后重试'),
     'not-native': tt('当前环境不支持相机扫码'),
+    timeout: tt('扫码超时，请重试或改用输入框'),
     empty: tt('没有扫到内容'),
   }
   return map[r.reason] || (tt('扫码失败：') + (r.message || ''))
@@ -334,7 +340,7 @@ async function onScanWorkOrder() {
   errText.value = ''
   okText.value = ''
   printMsg.value = ''
-  const q = parseWorkOrderQr(woText.value)
+  const q = parseWorkOrderQr(woText.value, { plainOrderNo: true })
   if (!q.ok) {
     errText.value = reasonText(q.reason)
     return
@@ -709,15 +715,19 @@ function resetOrder() {
 .mm-head { margin-bottom: 12px; }
 .mm-title { font-size: 18px; font-weight: 600; }
 .mm-sub { margin-top: 4px; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.6; }
-.mm-scanbar { display: flex; gap: 8px; margin-bottom: 12px; }
-.mm-scanbar :deep(.el-input) { flex: 1; min-width: 0; }
-.mm-cam { flex: none; }
+/* 扫码行(2026-11-17 与「生产领料」对齐):一个输入框 + 查询 + 扫码,同一行不放换行。
+   `.mm-row` 是物料清单行,名字别混。 */
+.mm-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.mm-bar :deep(.el-input) { flex: 1; min-width: 0; }
+.mm-bar :deep(.el-input__wrapper) { min-height: 44px; }
+.mm-bar :deep(.el-input__inner) { font-size: 16px; }   /* 16px 以下 iOS 会自动放大 */
+.mm-bar :deep(.el-button) { height: 44px; min-width: 64px; flex: none; }
 .mm-alert { margin-bottom: 12px; }
 .mm-card { border: 1px solid var(--el-border-color-light); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; }
 .mm-order-l1 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .mm-no { font-size: 15px; font-weight: 600; }
 .mono { font-variant-numeric: tabular-nums; }
-.mm-tag { font-size: 11px; padding: 0 6px; border-radius: 8px; background: var(--el-color-primary-light-9); color: var(--el-color-primary); }
+.mm-tag { font-size: 11px; padding: 0 6px; border-radius: 8px; background: var(--el-color-primary-light-9); color: var(--el-color-primary); white-space: nowrap; }
 .mm-clear { margin-left: auto; }
 .mm-kv { display: grid; grid-template-columns: 64px 1fr; gap: 4px 8px; font-size: 13px; }
 .mm-k { color: var(--el-text-color-secondary); font-size: 12px; }
@@ -731,8 +741,12 @@ function resetOrder() {
 .mm-scale-label { font-size: 12px; color: var(--el-text-color-secondary); white-space: nowrap; }
 .mm-scale-num { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .mm-scale-hint { font-size: 11px; color: var(--el-text-color-secondary); white-space: nowrap; }
-.mm-scale-manual { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+/* 手输数量 + 取秤提交:英文("Enter quantity" + "Take weight")在 390 宽会超出去,
+   允许这一组换行、按钮最少 44px 高,长文案就落到第二行,不会把「取秤提交」截掉。 */
+.mm-scale-manual { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.mm-scale-manual .mm-k { white-space: nowrap; }
 .mm-scale-manual :deep(.el-input-number) { width: 132px; }
+.mm-scale-manual :deep(.el-button) { height: 44px; white-space: nowrap; }
 .mm-list { margin-bottom: 12px; }
 .mm-list-head { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--el-text-color-regular); margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--el-border-color-lighter); }
 .mm-list-head :deep(.el-button) { margin-left: auto; }
@@ -763,11 +777,9 @@ function resetOrder() {
 .mm-doc-l3 :deep(.el-button) { margin-left: auto; }
 @media (max-width: 480px) {
   .mm-scan { padding: 10px 12px 22px; }
-  /* 手机上二维码/料码扫描框与三颗按钮一行放不下:让输入框独占一行,按钮平分下一行
-     (2026-11-18 手机竖屏走查:三颗按钮把输入框挤到只剩「扫描或输入物料」几个字) */
-  .mm-scanbar { flex-wrap: wrap; }
-  .mm-scanbar :deep(.el-input) { flex: 1 1 100%; }
-  .mm-scanbar :deep(.el-button) { flex: 1 1 0; margin-left: 0; }
+  /* 手机竖屏也不换行(生产领料 375 宽就是"输入框 + 查询 + 扫码"一行),只把按钮内边距收紧、
+     让输入框留出可读宽度 —— 2026-11-17 之前的"按钮换到下一行"是用户明确不要的样子。 */
+  .mm-bar :deep(.el-button) { min-width: 56px; padding: 8px 10px; }
   .mm-scale-manual :deep(.el-input-number) { width: 110px; }
 }
 </style>
