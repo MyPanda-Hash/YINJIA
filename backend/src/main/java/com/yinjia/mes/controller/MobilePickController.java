@@ -1730,6 +1730,12 @@ public class MobilePickController {
                 : null);
         // 2026-11-18:同一工单行可能有**两张**单(组装 + 混料) —— 一并带回去,
         // 前端据此把两张都列出来、都能点进去(用户口径)。
+        // 🔴 2026-11-18(第二轮用户报障「生成工单领料扫码时,只有组装领料自动打印,混料领料没打印出来」):
+        //   这里以前只给**顶层**一个打印载荷(那是组装那张),{@code 单据} 数组里的每张单**没有**载荷
+        //   ⇒ 重复扫码(已开过单)走这条路径时,前端拿不到混料那张的纸面,重打只能打组装。
+        //   现在逐张给:每张单一个 {@code printPayload}(标题/领料类型/明细都按**自己**那张单取)。
+        String pName = wo == null ? "" : str(wo.get("产品名称"));
+        String pSpec = wo == null ? "" : str(wo.get("规格型号"));
         List<Map<String, Object>> made = new ArrayList<>();
         for (WoPickDocService.PickDoc x : docs.listActive(woNo, line)) {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -1740,6 +1746,7 @@ public class MobilePickController {
             m.put("物料项数", x.itemCount());
             m.put("已领项数", x.doneCount());
             m.put("重复", true);
+            m.put("打印", wantPrint && wo != null ? printPayload(woNo, line, pName, pSpec, x.id()) : null);
             made.add(m);
         }
         out.put("单据", made);

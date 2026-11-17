@@ -195,4 +195,36 @@ export function selectedQty(batchRows) {
   return round4(selectedBatchRows(batchRows).reduce((s, b) => s + round4(b.qty), 0))
 }
 
+/**
+ * 生单结果 →「要打几张纸、各打什么」。
+ *
+ * 🔴 2026-11-18 用户报障:「生成工单领料扫码的时候,只有组装领料自动打印,混料领料没有打印出来」。
+ * 根因:后端一个工单行会出**两张**单(组装 + 混料),每张单的纸面载荷放在 `单据[i].打印` 里;
+ * 而开单工作台只读了**顶层** `打印`(那是组装那张)⇒ 混料那张从来没进过打印队列。
+ *
+ * 口径:
+ *   · 有 `单据` 数组 ⇒ **逐张**取各自的 `打印`(组装、混料都打,顺序与台账一致);
+ *   · 老结构/没有 `单据`(例如只有一张单的旧返回)⇒ 退回顶层 `打印`;
+ *   · 同一张单(领料单号相同)只打一次 —— 重复扫码会把同一张单再列出来;
+ *   · `打印` 为 null(关掉了自动打印)⇒ 该张不打。
+ *
+ * @param {any} result 单个工单行的生单结果(批量接口 `/create/batch` 的 成功[i],或 `/generate` 的 data)
+ * @returns {any[]} 打印载荷数组(交给 queueToPrintStation)
+ */
+export function printJobsOf(result) {
+  const row = result || {}
+  const docs = Array.isArray(row.单据) ? row.单据.filter((d) => d && d.打印) : []
+  const source = docs.length ? docs.map((d) => d.打印) : (row.打印 ? [row.打印] : [])
+  const seen = new Set()
+  const jobs = []
+  for (const p of source) {
+    if (!p) continue
+    const key = String(p.领料单号 || '') || (String(p.标题 || '') + '|' + String(p.二维码内容 || ''))
+    if (seen.has(key)) continue
+    seen.add(key)
+    jobs.push(p)
+  }
+  return jobs
+}
+
 export { makeBatchRows, autoAllocateFifo, isNonFifo, selectedBatchRows }
