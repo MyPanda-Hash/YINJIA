@@ -54,11 +54,50 @@ ego-browser nodejs -e "await import('file:///D:/YINJIA-main/tools/archive/_pick-
 > 「领料部门」在纸面上是空的:后端 `printPayload` 压根没有这个字段(打印站点透传也是空串),
 > 系统原纸面同样空白 —— 不是这次生成时漏了。
 
-## 四、文件清单
+## 四、第二轮:物料编码二维码(用户 2026-11-17 追问「我要的是物料编码对应的二维码」)
+
+第一版把「物料编码」当**纸面文字列**印在领料单上,扫码用的仍是抬头那个**工单码**;
+用户要的是**每个物料编码自己的二维码** ⇒ 重新出两张 A4 竖版「物料编码二维码」纸:
+
+| 单 | PDF | 编码(二维码内容) |
+|---|---|---|
+| 组装 | `pdf/物料码二维码-GD-2026-11-0009-行1-组装-LL-2026-11-0051.pdf` | `0@C-89-04**TB`、`0@YJ-KBL-012` |
+| 混料 | `pdf/物料码二维码-GD-2026-11-0009-行1-混料-LL-2026-11-0052.pdf` | `0@YJ-XH-002`、`0@YJ-YPS-002`、`0@YJ-ZX-003`、`0@YJ-SLD-009`、`0@KG-AJE-A01` |
+
+**码内容口径(不是自创)**:`公司代码@存货编码[@批号]` = `0@<物料编码>`(本单批号全空 ⇒ 两段)。
+依据:`src/core/panel/companyCode.js`(公司代码常量 `'0'`)、`print-formats.productCardQrText()`(商品标识卡)、
+`scanPick.parseBarcode()`(条码管理 2026-10-21 起的材料仓新码)、`MobilePick.vue.applyScan()` 注释
+「物料码 `0@YJ-ZZ-001` → 物料编码,不带批次 ⇒ 列出该物料全部批次」。
+
+版式:一张纸 = 一张领料单的全部物料编码,每料一张卡(二维码 40×40mm + 物料编码 13pt 等宽粗体 +
+名称/规格/单位/请领数量 + 码内容原文),A4 竖版、双列;**半成品**卡上标「半成品·免领」。
+
+复跑:
+
+```powershell
+cd D:\YINJIA-main\tools\archive\_pick-slip-pdf-20261117
+node gen-qr-sheets.mjs                       # 出 qr-组装.html / qr-混料.html
+cd D:\YINJIA-main
+ego-browser nodejs -e "await import('file:///D:/YINJIA-main/tools/archive/_pick-slip-pdf-20261117/print-qr-pdf.mjs')"
+```
+
+验收:
+
+| # | 验什么 | 结果 |
+|---|---|---|
+| 1 | 页数/纸张 | 各 **1 页**,594.96×841.92 pt = **209.89×297.01 mm**(A4 竖版) |
+| 2 | **二维码真能解** | OpenCV `QRCodeDetector` 解整页截图:**组装解出 2/2、混料解出 5/5**,内容与上表逐字一致 |
+| 3 | 文本层 | `pdf/物料码-组装.txt`、`pdf/物料码-混料.txt`:标题/工单#行号/领料单号/每个编码/名称/规格/单位/请领数量/码内容原文全在 |
+| 4 | 版面 | DOM 实测:sheet 793.7px = 210mm,grid 703px(186mm 版心),card 90.5mm × 52mm,二维码 40mm |
+
+## 五、文件清单
 
 - `00-cols.sql` / `01-probe.sql` / `02-probe.sql` / `03-lines.sql` / `04-payload.sql` — 取数探针
 - `04-payload.out.txt` — 两份纸面载荷(原始 SqlRunner 输出,`gen-slips.mjs` 直接读它)
 - `gen-slips.mjs` — 纸面 HTML 生成器(复刻 `pickSlipHtml` + 物料编码列)
+- `gen-qr-sheets.mjs` / `print-qr-pdf.mjs` — 物料编码二维码纸(HTML 生成 / 落 PDF)
+- `shot-qr-sheets.mjs` + `decode_qr.py` — 整页截图 + OpenCV 解码复核
+- `measure-slip.mjs` / `measure-qr.mjs` — 版面几何实测
 - `print-pdf.mjs` — ego 落 PDF(`Page.printToPDF`)
 - `shot-slips.mjs` / `shot-pdf.mjs` — 目检截图(HTML 层 / PDF 阅读器层)
 - `_PdfPageSize.java` — 页数 + 纸张尺寸校验
