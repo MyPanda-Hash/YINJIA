@@ -40,7 +40,8 @@ test('切段:空串 → 空数组', () => {
 })
 
 test('工单码:1001 → 行号 1(减掉固定的 1000)', () => {
-  assert.deepEqual(parseWorkOrderCode('0@GD-2026-10-0221@1001'), { ok: true, wo: 'GD-2026-10-0221', line: 1 })
+  assert.deepEqual(parseWorkOrderCode('0@GD-2026-10-0221@1001'),
+    { ok: true, wo: 'GD-2026-10-0221', line: 1, kind: '' })
 })
 
 test('工单码:1007 → 行号 7', () => {
@@ -48,7 +49,20 @@ test('工单码:1007 → 行号 7', () => {
 })
 
 test('工单码:只有工单号(手输) → 行号 0 表示未指定', () => {
-  assert.deepEqual(parseWorkOrderCode('GD-2026-10-0221'), { ok: true, wo: 'GD-2026-10-0221', line: 0 })
+  assert.deepEqual(parseWorkOrderCode('GD-2026-10-0221'),
+    { ok: true, wo: 'GD-2026-10-0221', line: 0, kind: '' })
+})
+
+// 2026-11-18 用户口径:「混料和组装的二维码是一样的,需要在二维码上多一位作为
+//   混料领料还是组装领料的标记」⇒ 领料单纸面二维码第 4 段 A=组装 / M=混料。
+test('工单码:第 4 段领料标记 A/M → kind=组装/混料(老的三段码 kind 为空)', () => {
+  assert.deepEqual(parseWorkOrderCode('0@GD-2026-10-0221@1001@A'),
+    { ok: true, wo: 'GD-2026-10-0221', line: 1, kind: '组装' })
+  assert.equal(parseWorkOrderCode('0@GD-2026-10-0221@1001@M').kind, '混料')
+  assert.equal(parseWorkOrderCode('0@GD-2026-10-0221@1001@m').kind, '混料', '小写也认')
+  assert.equal(parseWorkOrderCode('0@GD-2026-10-0221@1001@混料').kind, '混料', '写中文也认')
+  assert.equal(parseWorkOrderCode('0@GD-2026-10-0221@1001').kind, '', '没有第 4 段 ⇒ 空(老码不变)')
+  assert.equal(parseWorkOrderCode('0@GD-2026-10-0221@1001@X').kind, '', '认不出的标记 ⇒ 空')
 })
 
 test('工单码:空串 → empty', () => {

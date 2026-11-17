@@ -2086,38 +2086,42 @@ public class MobilePickController {
      *              只有在还没有台账的极少数路径下才为空(那时明细为空,纸面就是空白表)
      */
     private Map<String, Object> printPayload(String woNo, int line, String productName, String spec, Long docId) {
+        WoPickDocService.PickDoc d = docId == null ? null : docs.byId(docId);
+        // 领料类型:拿不到台账时按组装算(极少数"还没有台账"的路径)
+        String kind = d == null || d.pickKind() == null || d.pickKind().isBlank() ? KIND_ASSEMBLY : d.pickKind();
+        boolean mix = KIND_MIX.equals(kind);
+
         Map<String, Object> m = new LinkedHashMap<>();
-        // 与 print-formats.woQrText 同口径:公司代码@工单号@(1000+行号);公司代码全库为 '0'
-        m.put("二维码内容", "0@" + woNo + "@" + (1000 + Math.max(1, line)));
+        // 公司代码@工单号@(1000+行号)**@领料标记**(2026-11-18 用户口径:
+        //   「混料和组装的二维码是一样的,需要在二维码上多一位作为混料领料还是组装领料的标记」)
+        //   ⇒ 第 4 段 **A = 组装领料 / M = 混料领料**。前 3 段口径不变(工单码解析照旧能用):
+        //   scanCode.splitScan 只取工单号+行号,parseWorkOrderQr 只读前 3 段,多一段不影响。
+        m.put("二维码内容", "0@" + woNo + "@" + (1000 + Math.max(1, line)) + "@" + (mix ? "M" : "A"));
+        m.put("领料标记", mix ? "M" : "A");
         m.put("工单号", woNo);
         m.put("工单行号", line);
         m.put("产品名称", productName);
         m.put("规格型号", spec);
-        m.put("标题", "生产领料单");
+        // 纸面标题:两种都是「生产领料单」,后面括号注明这张是组装还是混料(2026-11-18 用户口径)
+        m.put("标题", "生产领料单（" + (mix ? "混料" : "组装") + "）");
         // 纸面抬头的「No」= 领料单号、「日期」= 单据日期
         Map<String, String> head = new LinkedHashMap<>();
         List<Map<String, Object>> rows = new ArrayList<>();
-        if (docId != null) {
-            WoPickDocService.PickDoc d = docs.byId(docId);
-            if (d != null) {
-                m.put("领料单号", d.outNo());
-                m.put("状态", d.state());
-                // 纸面标题按领料类型区分(2026-11-18):组装领料单 / 混料领料单,
-                // 现场拿到纸一眼看得出这是哪一张,不用去翻单号。
-                m.put("领料类型", d.pickKind());
-                m.put("标题", KIND_MIX.equals(d.pickKind()) ? "混料领料单" : "生产领料单");
-                m.put("打印日期", java.time.LocalDate.now().toString());
-                // 明细与页面同源(未完成读 wo_pick_line,已完成读材料出库单)
-                for (Map<String, Object> it : linesOf(d.outNo(), "pick")) {
-                    Map<String, Object> row = new LinkedHashMap<>();
-                    row.put("材料名称", str(it.get("名称")));
-                    row.put("规格", str(it.get("规格")));
-                    row.put("单位", str(it.get("单位")));
-                    row.put("请领数量", num(it.get("BOM用量")));
-                    row.put("实发数量", num(it.get("数量")));
-                    row.put("备注", str(it.get("批号")));
-                    rows.add(row);
-                }
+        if (d != null) {
+            m.put("领料单号", d.outNo());
+            m.put("状态", d.state());
+            m.put("领料类型", kind);
+            m.put("打印日期", java.time.LocalDate.now().toString());
+            // 明细与页面同源(未完成读 wo_pick_line,已完成读材料出库单)
+            for (Map<String, Object> it : linesOf(d.outNo(), "pick")) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("材料名称", str(it.get("名称")));
+                row.put("规格", str(it.get("规格")));
+                row.put("单位", str(it.get("单位")));
+                row.put("请领数量", num(it.get("BOM用量")));
+                row.put("实发数量", num(it.get("数量")));
+                row.put("备注", str(it.get("批号")));
+                rows.add(row);
             }
         }
         m.put("明细", rows);

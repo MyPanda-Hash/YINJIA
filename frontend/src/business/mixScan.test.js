@@ -38,6 +38,18 @@ test('parseWorkOrderQr:行号 1001 → 1,1000 → 0', () => {
   assert.equal(parseWorkOrderQr('YJ@GD-1@1000').lineNo, 0)
 })
 
+// 2026-11-18:领料单纸面二维码第 4 段 = 领料标记(A=组装 / M=混料);
+//   扫码混料页仍按前 3 段取数,多一段不能把解析搞坏。
+test('parseWorkOrderQr:带领料标记的第 4 段 ⇒ 前 3 段照旧,kind 带出来', () => {
+  const mix = parseWorkOrderQr('0@GD-2026-10-0220@1002@M')
+  assert.equal(mix.ok, true)
+  assert.equal(mix.orderNo, 'GD-2026-10-0220')
+  assert.equal(mix.lineNo, 2)
+  assert.equal(mix.kind, '混料')
+  assert.equal(parseWorkOrderQr('0@GD-2026-10-0220@1002@A').kind, '组装')
+  assert.equal(parseWorkOrderQr('0@GD-2026-10-0220@1002').kind, '', '老的三段码 kind 为空')
+})
+
 test('parseWorkOrderQr:没有行号段 → lineNo=0(整单)', () => {
   const r = parseWorkOrderQr('YJ@GD-2026-10-0220')
   assert.equal(r.ok, true)
@@ -62,6 +74,19 @@ test('parseWorkOrderQr:扫到物料码(含 |)不该被当工单码', () => {
   const r = parseWorkOrderQr('YJ-SX-001|20261014001')
   assert.equal(r.ok, false)
   assert.equal(r.reason, 'no-order')
+})
+
+test('parseWorkOrderQr:plainOrderNo 允许直接敲工单号(2026-11-19 查询框与生产领料一致)', () => {
+  const r = parseWorkOrderQr('GD-2026-10-0221', { plainOrderNo: true })
+  assert.equal(r.ok, true)
+  assert.equal(r.orderNo, 'GD-2026-10-0221')
+  assert.equal(r.lineNo, 0, '没敲行号 = 整单,由页面让人选行')
+  // 开关只放行"像单号"的串:物料码(带 |)、纯字母、空串仍然拒绝
+  assert.equal(parseWorkOrderQr('YJ-SX-001|20261014001', { plainOrderNo: true }).reason, 'no-order')
+  assert.equal(parseWorkOrderQr('GDXYZ', { plainOrderNo: true }).reason, 'no-order')
+  assert.equal(parseWorkOrderQr('', { plainOrderNo: true }).reason, 'empty')
+  // 默认不开启 ⇒ 与旧行为一致
+  assert.equal(parseWorkOrderQr('GD-2026-10-0221').reason, 'no-order')
 })
 
 test('expandBom:应投 = 标准用量 × 排产数量 + 损耗量', () => {

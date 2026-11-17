@@ -30,24 +30,56 @@
  * 为什么要减 1000:行号加了 1000 前缀是为了让码里的行号恒为 4 位、便于人眼与扫码枪对齐;
  * 减回去才是 plang.pl_xc 的真实行号。
  *
+ * <p>2026-11-19:页面查询框与「生产领料」一致,**允许直接敲工单号**(没有码纸时不必先找码)。
+ * 该行为由 `opt.plainOrderNo` 显式开启,默认仍拒绝 —— 否则物料码
+ * `YJ-SX-001|2026...` 会被误判成工单号(既有单测钉住了这条)。
+ *
  * @param {string} raw 扫码枪或手工输入的原串
+ * @param {{ plainOrderNo?: boolean }} [opt] plainOrderNo:不带 @ 的纯工单号(只认"像单号"的串)
  * @returns {{ ok: boolean, company: string, orderNo: string, lineNo: number, reason?: string }}
  */
-export function parseWorkOrderQr(raw) {
+export function parseWorkOrderQr(raw, opt = {}) {
   const text = String(raw == null ? '' : raw).trim()
   if (!text) return { ok: false, company: '', orderNo: '', lineNo: 0, reason: 'empty' }
   const parts = text.split('@')
-  if (parts.length < 2) return { ok: false, company: '', orderNo: '', lineNo: 0, reason: 'no-order' }
+  if (parts.length < 2) {
+    // 手工敲的纯工单号:必须"像单号"(无 | 这个物料码分隔符、有数字),否则仍按 no-order 拒绝
+    if (opt.plainOrderNo && /^[A-Za-z0-9][A-Za-z0-9._\-/]*$/.test(text) && /\d/.test(text)) {
+      return { ok: true, company: '', orderNo: text, lineNo: 0 }
+    }
+    return { ok: false, company: '', orderNo: '', lineNo: 0, reason: 'no-order' }
+  }
   const company = String(parts[0] || '').trim()
   const orderNo = String(parts[1] || '').trim()
   if (!orderNo) return { ok: false, company, orderNo: '', lineNo: 0, reason: 'no-order' }
   // 第三段(行号)可选:整单码只到工单号时,行号记 0 表示「整单」
   const lineRaw = parts.length > 2 ? String(parts[2] || '').trim() : ''
-  if (!lineRaw) return { ok: true, company, orderNo, lineNo: 0 }
+  // 第四段(可选)= **领料标记**:2026-11-18 领料单纸面二维码多带一位,
+  //   `A`=组装领料 / `M`=混料领料(用户口径「混料和组装的二维码是一样的,需要在二维码上多一位作为标记」)。
+  //   老的三段工单码没有这段 ⇒ kind 记空串,行为与以前一模一样。
+  const kind = pickKindOf(parts[3])
+  if (!lineRaw) return { ok: true, company, orderNo, lineNo: 0, kind }
   const n = Number(lineRaw)
-  if (!Number.isFinite(n)) return { ok: false, company, orderNo, lineNo: 0, reason: 'bad-line' }
+  if (!Number.isFinite(n)) return { ok: false, company, orderNo, lineNo: 0, reason: 'bad-line', kind }
   const lineNo = n >= 1000 ? n - 1000 : n
-  return { ok: true, company, orderNo, lineNo }
+  return { ok: true, company, orderNo, lineNo, kind }
+}
+
+/**
+ * 二维码「领料标记」段 → 领料类型。
+ *
+ * <p>领料单纸面二维码第 4 段:`A`/`组装` ⇒ 组装领料;`M`/`混料` ⇒ 混料领料;
+ * 其它值或没有这一段(老工单码)⇒ `''`,`parseWorkOrderQr` 的其余字段与以前一致。
+ *
+ * @param {any} seg 第 4 段原文
+ * @returns {'组装'|'混料'|''}
+ */
+export function pickKindOf(seg) {
+  const s = String(seg == null ? '' : seg).trim().toUpperCase()
+  if (!s) return ''
+  if (s === 'A' || s === '组装' || s === 'ASSEMBLY') return '组装'
+  if (s === 'M' || s === '混料' || s === 'MIX') return '混料'
+  return ''
 }
 
 /**
