@@ -9479,6 +9479,13 @@ async function exportSheetExcel() {
     // 无合计、空白行全在），用户报的「炭棒配方管控清单-设计添加量导出错误」就是它。
     // 版式口径在 RecordSheetPanels.exportRecipeExcel + core/mold/recipeExport.js。
     RD_MOLD_PROC: 'exportRecipeExcel',
+    // 2026-11-17（Excel #10「工艺单-X烧结 · 配方计算导出异常」）：
+    // X烧结与烧结工艺清单**共用同一个配方表导出器**（RecordSheetPanels.exportRecipeExcel
+    // 按 dt.recipeCalc / filterVal='配方表' 找表，两个面板都配了 recipeCalc），
+    // 但映射表当初只登记了 RD_MOLD_PROC ⇒ X烧结一直在走「通用导出」，
+    // 于是用户看到的还是老毛病（小数位不对、空行全在、没有合计）。
+    // 这是"专属导出写好了却没接上"的典型漏接，补这一行即可。
+    RD_X_SINTER: 'exportRecipeExcel',
   }[panelCode.value]
   if (catalogExporter) {
     const sheet = approvalSheetRef.value

@@ -916,6 +916,43 @@ public class QueryService {
         return docs;
     }
 
+    /**
+     * 取一张「档案型」面板的虚拟单据（getFormDescriptor 用）。
+     *
+     * <p>背景（2026-11-17 生产实测）：`PROD_MOLD`（生产模具表，`mode='archive'`）点「新增/编辑」报
+     * HTTP 500 —— SQL 里出现 `t.[null] AS __no`。根因是 archive 面板在 yj_panel 里
+     * **`group_col = NULL`**（维护表本来就没有单据号、没有单据头，见
+     * tools/migrate-prod-mold-panel-20261030.sql 的注释），而 `loadOneDoc → loadDocs` 无条件
+     * 拼 `t.[group_col]`，NULL 就拼成了 `t.[null]`。</p>
+     *
+     * <p>archive 的**列表**走的是另一条路（{@link #queryArchive}：全量行平铺 + 一张虚拟单承载），
+     * 所以列表一直正常、只有表单描述符挂。这里补上同样口径的单表单路径：
+     * 虚拟单 = `{编号: 面板名, 状态: 启用, detail: {tabKey: [全部行]}}`，
+     * 与 queryArchive 返回的形状**逐字一致**，前端不需要为表单另写一套渲染。</p>
+     *
+     * @param docNo 档案面板无真实单号，调用方传什么都会被忽略（整份档案只有一张虚拟单）
+     */
+    public Map<String, Object> loadOneArchiveDoc(PanelRegistry.PanelDef def, String docNo) {
+        String cols = selectCols(def, def.fields(), derivedPanelNameLabel(def));
+        String sql = "SELECT t.id AS __id, " + cols + " FROM " + def.lineTable() + " t"
+                + " WHERE " + cancelFilter(def.lineTable())
+                + " ORDER BY t.id DESC OFFSET 0 ROWS FETCH NEXT " + ARCH_LOAD_CAP + " ROWS ONLY";
+        List<Map<String, Object>> rows = jdbc.queryForList(sql);
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (Map<String, Object> r : rows) items.add(rowToLabels(def, r, true));
+
+        String localeKey = TranslationService.localeKey(org.springframework.context.i18n.LocaleContextHolder.getLocale());
+        String docName = "zh".equals(localeKey) ? def.name()
+                : translations.scope(localeKey, "panel").getOrDefault(def.name(), def.name());
+
+        Map<String, Object> doc = new LinkedHashMap<>();
+        doc.put("编号", docName);
+        doc.put("状态", "启用");
+        doc.put("单据状态", "启用");
+        doc.put("detail", Map.of(def.tabKey(), items));
+        return doc;
+    }
+
     /** 取一张单据(getFormDescriptor 用) */
     public Map<String, Object> loadOneDoc(PanelRegistry.PanelDef def, String docNo) {
         // 只看自己的单据（2026-11-06）：列表已按 asp_user1 过滤，这里再拦「知道单号直接取」的旁路。

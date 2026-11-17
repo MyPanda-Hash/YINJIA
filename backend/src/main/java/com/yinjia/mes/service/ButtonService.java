@@ -4083,7 +4083,12 @@ public class ButtonService {
      * </ul>
      */
     public static final java.util.Set<String> SINGLE_LEVEL_INSP_PANELS =
-            java.util.Set.of("QC_FIRST_INSP", "QC_PROC_INSP", "QC_ASM_INSP");
+            // QC_LINE_PATROL（成型车间巡线记录表）2026-11-17 追加：用户口径（Excel #13）
+            //   「无审批流（要求程志/李光从账户写报表提交 → 刘磊账户审核）」
+            //   该表此前纸头「审核人」只读、注释写"本期不做审批流" ⇒ 现在按单级审批接上：
+            //   提交审批 → 审批通过(一次) → 已审核 → 弃审 → 草稿。
+            //   编制格 = 巡线人员（业务值，可手填；提交审批时为空才兜底写提交人）。
+            java.util.Set.of("QC_FIRST_INSP", "QC_PROC_INSP", "QC_ASM_INSP", "QC_LINE_PATROL");
 
     /** 单级审批面板的「编制」格列名(检验人业务值,可手填) */
     private static final Map<String, String> SINGLE_LEVEL_PREPARER = Map.of(
@@ -4091,7 +4096,9 @@ public class ButtonService {
             // 2026-11-13 用户口径「为当前的出货检验表观增加审批流程」:出货检验表观(原组装成品检验单)
             // 与出货检验功能同形 —— 提交审批 → 审批通过(一次) → 已审核 → 弃审 → 草稿;
             // 表尾「检验人」= 编制(业务值,可手填,提交审批时为空才兜底写提交人)。
-            "QC_ASM_INSP", "检验员");
+            "QC_ASM_INSP", "检验员",
+            // 巡线记录表的「编制」= 巡线人员（纸面最后一列，业务值）
+            "QC_LINE_PATROL", "巡线人员");
 
     /** 该面板的「编制」格是否可手改(= 预填型);非此类返回空串 */
     private String preparerEditableColOf(String panelCode) {

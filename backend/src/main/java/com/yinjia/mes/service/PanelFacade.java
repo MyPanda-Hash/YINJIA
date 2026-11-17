@@ -71,7 +71,13 @@ public class PanelFacade {
     public Map<String, Object> getFormDescriptor(String panelCode, String code) {
         PanelRegistry.PanelDef def = registry.panel(panelCode);
         Map<String, Object> cfg = configService.getPanelConfig(panelCode);
-        Map<String, Object> doc = queryService.loadOneDoc(def, code);
+        // 档案型面板（mode='archive'，如「生产模具表 PROD_MOLD」）**没有单据号/单据头**：
+        // yj_panel.group_col 为 NULL ⇒ loadOneDoc → loadDocs 会拼出 `t.[null] AS __no`
+        // 并抛 500（2026-11-17 生产实测）。这类面板的列表走 queryArchive（全量行 + 一张虚拟单），
+        // 表单描述符必须走同一口径的 loadOneArchiveDoc，形状才和列表一致。
+        Map<String, Object> doc = "archive".equals(def.mode())
+                ? queryService.loadOneArchiveDoc(def, code)
+                : queryService.loadOneDoc(def, code);
 
         Map<String, Object> data = new LinkedHashMap<>(doc);
         Object detailObj = data.remove("detail");
