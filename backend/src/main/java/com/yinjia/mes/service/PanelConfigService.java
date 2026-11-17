@@ -437,6 +437,21 @@ public class PanelConfigService {
             buttonGroups.add(group("更多", List.of("复制", "表格调整", "导出", "退出")));
         }
 
+        // 「审核」(直接审核:草稿 → 已审核,一步到位)是**每张单据面板都要有**的按钮 ——
+        // 2026-11-13 用户口径「单据的按钮界面都需要加上这个按钮」;前端 PanelxList 会把它从审批组里
+        // **提出来**单独成一颗工具栏按钮(hoistDirectAudit,紧挨在「审批 ▼」左边)。
+        // 但 T+/出入库那一代面板的审批组写的是 {"审核","提交审批","审批通过",…}:**组名**叫「审核」,
+        // 组内却没有「审核」这个动作;而前端 engine.normalizeApprovalGroups 只把"工作流固定动作之外的
+        // extras"留下来 ⇒ 这些单的工具栏永远少一颗「审核」,自填自审的角色只能"展开审批 ▼ → 审批通过"。
+        // 2026-11-17 用户报障「采购入库单没有审核按钮,还有检查别的面板是否都有」时实测:
+        //   79 张 doc 面板里 67 张有, **10 张没有** —— 采购入库/产成品入库/销售出库/销售退货/材料出库/
+        //   生产退料/其他入库/其他出库/调拨/盘点(= 全部 T+ 式出入库单);另外 2 张
+        //   (SUPPLIER_PU_ORDER 只有查询+打印、WLBOM 自助维护无审批流)本就没有审批组,不补。
+        // 故在**组装完按钮组之后**统一补一道,而不是逐面改 PANDA_BUTTONS 里那 10 处字面量 ——
+        // 逐面改的做法每新增一张 T+ 单就会再漏一次(这次漏的就是整批)。真闸门仍在服务端
+        // ButtonService.audit():审批权(∪本人自审)、已提交审批不可直审、两级审批面板拒绝直审。
+        if (!flat && doc) ensureDirectAuditAction(buttonGroups);
+
         List<Map<String, Object>> panelButtons = new ArrayList<>();
         for (String b : flatButtons) panelButtons.add(Map.of("buttonName", b));
 
@@ -786,6 +801,48 @@ public class PanelConfigService {
         m.put("name", name);
         m.put("actions", actions);
         return m;
+    }
+
+    /** 直接审核动作名。与前端 PanelxList.DIRECT_AUDIT_ACTION 同字面量 —— 按钮名是**数据键**(ADR-0001 永不翻译)。 */
+    private static final String DIRECT_AUDIT_ACTION = "审核";
+
+    /** 审批流水线固定动作,与前端 engine.js APPROVAL_WORKFLOW_ACTIONS 同集合(归一化时会被收进同一个「审批」组)。 */
+    private static final List<String> APPROVAL_WORKFLOW_ACTIONS =
+            List.of("提交审批", "审批通过", "审批驳回", "审批情况", "弃审");
+
+    /**
+     * 给**单据面板**的审批组补一颗「审核」(直接审核),2026-11-17。
+     *
+     * <p>为什么需要:后端下发的审批组来自 {@code PANDA_BUTTONS}(T+/PANDA 一比一复刻),其中出入库那一代
+     * 写的是 {@code {"审核","提交审批","审批通过","审批驳回","审批情况","弃审"}} —— 组名是「审核」,
+     * 动作里却没有「审核」;前端 {@code normalizeApprovalGroups} 归一时只保留
+     * {@link #APPROVAL_WORKFLOW_ACTIONS} 之外的 extras,于是这 10 张单的工具栏根本没有「审核」。</p>
+     *
+     * <p>做法:已有「审核」→ 原样返回(其余 67 张 doc 面板走这条,下发面 0 变化);
+     * 没有 → 找到第一个"含工作流动作"的组,把「审核」**追加在组尾**。追加在尾部是有意的:
+     * 归一化后它只是 extras,前端 {@code hoistDirectAudit} 会把它单独提成一颗按钮,
+     * 「审批 ▼」的主按钮仍是「提交审批」,既有点击习惯不变。</p>
+     *
+     * <p>没有任何审批组的单据面板(供应商采购打印 SUPPLIER_PU_ORDER 只有查询+打印、
+     * 物料清单 WLBOM 自助维护无审批流)**不加** —— 给只读面板塞一颗点了必被拒的按钮是死入口。</p>
+     */
+    private static void ensureDirectAuditAction(List<Map<String, Object>> groups) {
+        for (Map<String, Object> g : groups) {
+            Object acts = g.get("actions");
+            if (acts instanceof List<?> list && list.contains(DIRECT_AUDIT_ACTION)) return;
+        }
+        for (Map<String, Object> g : groups) {
+            Object acts = g.get("actions");
+            if (!(acts instanceof List<?> list)) continue;
+            boolean approvalGroup = list.stream()
+                    .anyMatch(a -> APPROVAL_WORKFLOW_ACTIONS.contains(String.valueOf(a)));
+            if (!approvalGroup) continue;
+            List<String> merged = new ArrayList<>();
+            for (Object a : list) merged.add(String.valueOf(a));
+            merged.add(DIRECT_AUDIT_ACTION);
+            g.put("actions", merged);
+            return;
+        }
     }
 
     /** 单个字段规格:dataName 为字段键(对齐 light-mes 中文键契约,永不随语言变化);
