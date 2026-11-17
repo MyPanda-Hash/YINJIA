@@ -1754,7 +1754,7 @@
         </div>
         <!-- 查询弹窗面板(T+):单个「单据日期」区间控件(日期段必填的统一入口) -->
         <div v-if="reportQueryDialog" class="query-dialog-field">
-          <label class="req-label">{{ tt('单据日期') }}</label>
+          <label class="req-label">{{ tt('单据日期') }}<span class="req-star">*</span></label>
           <el-date-picker
             v-model="rqdRange"
             type="daterange"
@@ -1772,7 +1772,7 @@
         </div>
         <div v-for="field in queryDialogFields" :key="headerFieldKey(field)" class="query-dialog-field">
           <label :class="{ 'req-label': rqdFieldRequired(field) }">
-            {{ headerFieldLabel(field) }}
+            {{ headerFieldLabel(field) }}<span v-if="rqdFieldRequired(field)" class="req-star">*</span>
           </label>
           <!-- 参照双模(2026-09-21):按档案行数自动选控件 —— ≤20 行可搜索下拉(仓库 6 个),
                >20 行参照弹窗(存货 3838 个);都不开 allow-create,未建档值手输不进条件 -->
@@ -14464,11 +14464,16 @@ onUnmounted(() => {
   color: #444;
   white-space: nowrap;
 }
-/* 必填红星(2026-11-13 用户口径「把必填项的红点标识去掉，保留必填项的属性就行」):
-   只去掉**视觉**，`.req` / `.req-label` 类名与 required 判据照旧（校验/必填提示不受影响）。 */
-.field label.req {
+.field label.req::before {
+  content: '*';
+  color: #ff0033;
+  margin-right: 2px;
 }
-.col-hdr-text.req {
+.col-hdr-text.req::before {
+  content: '*';
+  color: #ff0033;
+  margin-right: 2px;
+  font-weight: bold;
 }
 .field :deep(.el-input),
 .field :deep(.el-select),

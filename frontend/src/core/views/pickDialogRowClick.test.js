@@ -77,23 +77,23 @@ test('⑤ 勾中的行要能一眼看出来（选中态样式 + 手型光标）'
   }
 })
 
-test('⑥ 纸面必填红星去掉，但必填属性/校验逻辑一个都不动', () => {
-  // 视觉：.rs-req 不再画星
+test('⑥ 纸面必填红星在，必填属性/校验逻辑也都在', () => {
+  // 视觉：.rs-req 必须画星(2026-11-17 用户口径「必填要标红。之前的标红也没了」——红星回来了)
   const css = sheet.slice(sheet.indexOf('.rs-req'))
-  assert.doesNotMatch(css.slice(0, 240), /content:\s*'\*'/,
-    '.rs-req::after 不许再画红星（用户口径：只去掉红点）')
+  assert.match(css.slice(0, 240), /content:\s*'\*'/,
+    '.rs-req::after 要画红星（必填要标红）')
   // 行为：isReq / isPairReq 的调用必须还在（保存校验、定位闪烁都靠它）
   assert.match(sheet, /function isReq\(/, 'isReq 判据必须保留')
   assert.match(sheet, /'rs-req': isReq\(|'rs-req': isPairReq\(/, '标签格仍要带必填标记类（供后续样式/校验使用）')
   assert.match(sheet, /rs-field-blink|rsFieldBlink/, '校验定位闪烁（必填缺失时跳转提示）必须保留')
 })
 
-test('⑦ 其它面板的红星一并去掉（同一个用户口径，别只改纸面这一处）', () => {
-  // 查询弹窗 / 列表表头 / 检验记录 / 物料标签：都不再画红星
-  assert.doesNotMatch(list.slice(list.indexOf('.field label.req')), /content:\s*'\*'/, 'PanelxList 查询弹窗红星去掉')
-  assert.doesNotMatch(list.slice(list.indexOf('.col-hdr-text.req')), /content:\s*'\*'/, 'PanelxList 表头红星去掉')
-  assert.doesNotMatch(qcSheet, /class="qr-req"/, 'QcInspRecSheet 红星 span 去掉')
-  assert.doesNotMatch(labelDlg.slice(labelDlg.indexOf('.mlq-req')), /content:\s*'\*'/, 'MaterialLabelDialog 红星去掉')
-  // ⚠ 但必填**属性**仍在：QcInspRecSheet 的 isRequired 判据不能跟着删
-  assert.match(qcSheet, /function isRequired\(/, 'isRequired 判据必须保留（只删视觉）')
+test('⑦ 其它面板的必填红星一并画回来（同一个用户口径，别只改纸面这一处）', () => {
+  // 查询弹窗 / 列表表头 / 检验记录 / 物料标签：都要画红星
+  assert.match(list.slice(list.indexOf('.field label.req')), /content:\s*'\*'/, 'PanelxList 查询弹窗红星')
+  assert.match(list.slice(list.indexOf('.col-hdr-text.req')), /content:\s*'\*'/, 'PanelxList 表头红星')
+  assert.match(qcSheet, /class="qr-req"/, 'QcInspRecSheet 红星 span')
+  assert.match(labelDlg.slice(labelDlg.indexOf('.mlq-req')), /content:\s*'\*'/, 'MaterialLabelDialog 红星')
+  // ⚠ 必填**属性**同样在：QcInspRecSheet 的 isRequired 判据不能跟着删
+  assert.match(qcSheet, /function isRequired\(/, 'isRequired 判据必须保留')
 })

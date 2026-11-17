@@ -98,3 +98,78 @@ cd tools && java -cp lib\mssql-jdbc.jar verify\FourDocAudit.java HSDZ_MES
 2026-11-13 用户口径「保留必填项的属性就行，只是去掉红点」→ `PanelxList.vue` 把
 `.field label.req` / `.col-hdr-text.req` 的样式清空(仍是空规则),所以**必填列在界面上没有视觉标记**。
 明细表格列头仍带 `req` class(可通过 `:title="必填"` 之类补提示),需要的话可以再做——本次没动。
+
+---
+
+# 第二轮(同日,用户追问后):审批流没有必填校验 + 红星要画回来
+
+## 8. 用户报障
+
+> 「为什么来料检验单没有必填的验证，必填没填也可以提交审批。不点保存可以直接提交审批和审核（而且没有必填校验）」
+> 「还有必填要标红。之前的标红也没了」
+
+## 9. 「提交审批 / 审批通过」原来一处必填校验都没有
+
+`ButtonService` 里必填只在两处:保存(`ensureRequiredFilled` / `ensureDetailRequiredFilled`,而且看**载荷**)与
+审核(本次第一轮加的合格数量闸门)。而 `doSubmitApproval` / `approveApproval` **完全不查**;
+不点保存直接点它们时,载荷里只有单号 ⇒ 保存那两道等于没跑。
+
+修法:新增**文档级**闸门 `ensureDocRequiredFilled(def, no, phase)` —— 不看载荷,直接按
+`yj_field.required=1`(表头 + 明细,系统自动填的字段除外)去查**库里的单据**;挂在三个状态推进点:
+
+| 动作 | 位置 |
+|---|---|
+| 提交审批 | `doSubmitApproval`(会签完成后自动提交也走这里) |
+| 审核 | `audit()` |
+| 审批通过(一级/二级) | `approveApproval()` 入口,`approveSecond` 之前 |
+
+草稿保存/保存为草稿仍不做必填限制(用户口径:允许存一半)。
+
+回归(`_verify-required-gate-20261117.mjs`,测试库,自带清场,6/6 PASS):
+
+| 断言 | 实测 |
+|---|---|
+| 缺「合格数量」的草稿直接「提交审批」 | 409「明细第 1 行「合格数量」不能为空，请先补全再提交审批」(修前 200 → 审批中) |
+| 同一张草稿直接「审核」 | 409(合格数量闸门) |
+| 补齐必填 → 保存 → 提交审批 → 审批通过 | 200 / 200 / 200 |
+
+## 10. 界面:必填红星画回来
+
+2026-11-13 的 `2c2c032ad`「必填红星全部去掉（保留必填属性）」把 7 处星星清成了空规则;
+本轮**反向应用该提交的视觉 hunk**(点行勾选那部分不动),星号全部回来:
+
+| 位置 | 恢复的写法 |
+|---|---|
+| `RecordSheetPanels` | `.rs-req::after { content:'*' }` |
+| `PanelxList` | `.field label.req::before` / `.col-hdr-text.req::before` + 两处 `.req-star` |
+| `PanelxForm` / `NewVoucherDialog` | `<span v-if="isNotNull" class="req">*</span>` + `.req{color}` |
+| `QcInspRecSheet` | 三处 `<span class="qr-req">*</span>` + `.qr-req{color}` |
+| `MaterialLabelDialog` | `.mlq-req::before` |
+| `MobileLabRecord` | `<span v-if="f.isNotNull" class="req">*</span>` |
+
+两个源码级测试按新口径改回(先前的"星号不在"断言反过来钉"星号要在"):
+`pickDialogRowClick.test.js` ⑥⑦、`qcInspRecColumns.test.js`。`npm test` 1989 项全绿。
+
+界面取证(5173 + 正式库真实草稿 `IJ-2026-10-0020`):
+
+| 检查 | 结果 |
+|---|---|
+| 明细列头 `物料编码` / `合格数量` 的 `::before` | `"*"`(红星在) |
+| 表头 `单据编号` / `单据日期` | `"*"`(红星在) |
+| 点「审批 ▸ 提交审批」 | 弹窗「提交审批前需先保存：还有 1 项必填没填写 … 明细第 1 行合格数量不能为空」,单据仍为草稿(本次点击没写库:该单 `yj_doc_status` 无记录) |
+
+截图:`ego/round-19-stars.png`、`ego/round-21-submit-blocked.png`。
+
+## 11. 存量影响(正式库)
+
+- `合格数量` 为 NULL 的明细行 12 条,全部在**未审核草稿**里(已审核 0 条违例);
+- 另核采购入库 / 销售出库 / 材料出库 / 送料暂收 / 暂收退回的**在途(审批中)**单据:
+  必填明细列为空的行数 **均为 0** ⇒ 新闸门不会卡住任何在途单。
+
+## 12. 未做:8090 的前端静态产物
+
+本轮前端改动(红星)在 5173 立即生效;**8090 的 `BOOT-INF/classes/static` 没重打** ——
+同一工作区里另一个会话还有未提交的前端改动(BatchSendDialog / GenerateLinesDialog /
+MaterialLabelDialog / PurchaseOrderPrintDialog / locales / index.css 等),现在打包会把它的半成品
+一起打进 jar 与 static 提交,故先按住,等它收尾后再 `build-appjar.ps1`。
+

@@ -1526,6 +1526,75 @@ public class ButtonService {
     }
 
     /**
+     * 文档级必填闸门 —— 在「提交审批 / 审核 / 审批通过」三个状态推进点调用(2026-11-17 用户口径:
+     *   「为什么来料检验单没有必填的验证，必填没填也可以提交审批。不点保存可以直接提交审批和审核（而且没有必填校验）」)。
+     *
+     * <p>为什么不复用保存那两道: {@link #ensureRequiredFilled} / {@link #ensureDetailRequiredFilled}
+     * 看的是**本次载荷**，缺键一律当成「选单/局部提交」放行 —— 而不点保存直接点提交审批时，
+     * 载荷里常常只有单号，等于没校验。这里改成**拿库里的单据**说话:表头 + 明细逐字段核
+     * `yj_field.required=1` 的列(系统自动填的字段除外，见 {@link #REQUIRED_SYS_FIELDS})。</p>
+     *
+     * <p>只拦状态推进:草稿保存/保存为草稿仍按用户口径不做必填限制(允许存一半)。</p>
+     *
+     * @param phase 提示语里的动作名(提交审批 / 审核 / 审批通过),让用户知道是哪一步被拦
+     */
+    private void ensureDocRequiredFilled(PanelRegistry.PanelDef def, String no, String phase) {
+        if (no == null || no.isBlank() || !def.isDoc()) return;
+        String codeCol = def.codeCol();
+        if (codeCol == null || codeCol.isBlank()) return;
+        String act = phase == null || phase.isBlank() ? "提交" : phase;
+        // ---- 1) 表头:有独立头表才查(单表式 headTable 为空,表头值就存在行表里,按行校验覆盖) ----
+        if (def.hasHeadTable()) {
+            List<Map<String, Object>> heads = jdbc.queryForList(
+                    "SELECT * FROM " + def.headTable() + " WHERE [" + codeCol + "] = ?", no);
+            Map<String, Object> head = heads.isEmpty() ? null : heads.get(0);
+            if (head != null) {
+                for (PanelRegistry.FieldDef f : def.fieldsAt("header")) {
+                    if (!f.required() || REQUIRED_SYS_FIELDS.contains(f.col()) || REQUIRED_SYS_FIELDS.contains(f.label())) continue;
+                    Object v = head.get(f.col());
+                    if (v == null || String.valueOf(v).isBlank()) {
+                        throw new IllegalStateException("「" + f.displayName() + "」不能为空，请先补全再" + act);
+                    }
+                }
+            }
+        }
+        // ---- 2) 明细:逐行核(只报第一条违规,便于前端定位;软删行不算) ----
+        List<PanelRegistry.FieldDef> required = def.fieldsAt("detail").stream()
+                .filter(PanelRegistry.FieldDef::required)
+                .filter(f -> !REQUIRED_SYS_FIELDS.contains(f.col()))
+                .filter(f -> !REQUIRED_SYS_FIELDS.contains(f.label()))
+                .toList();
+        if (required.isEmpty() || def.lineTable() == null || def.lineTable().isBlank()) return;
+        boolean softDelete = hasSoftDeleteCol(def.lineTable());
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT * FROM " + def.lineTable() + " WHERE [" + codeCol + "] = ?"
+                        + (softDelete ? " AND ISNULL(asp_cancel,'N') <> 'Y'" : "") + " ORDER BY id", no);
+        for (int i = 0; i < rows.size(); i++) {
+            Map<String, Object> row = rows.get(i);
+            if (row == null) continue;
+            for (PanelRegistry.FieldDef f : required) {
+                Object v = row.get(f.col());
+                if (v == null || String.valueOf(v).isBlank()) {
+                    throw new IllegalStateException("明细第 " + (i + 1) + " 行「" + f.displayName()
+                            + "」不能为空，请先补全再" + act);
+                }
+            }
+        }
+    }
+
+    /** 行表是否有软删列 asp_cancel(老表可能没有 —— 没有就不加过滤条件,别让整条校验抛"列名无效") */
+    private boolean hasSoftDeleteCol(String table) {
+        try {
+            Integer n = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(?) AND name = 'asp_cancel'",
+                    Integer.class, table);
+            return n != null && n > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
      * 来料检验单「合格数量」必填 —— 保存路径(2026-11-17 用户口径「合格数量要设置为必填」)。
      *
      * <p>与通用 {@link #ensureDetailRequiredFilled} 的差别只有一条,但正是这条让"必填"形同虚设:
@@ -2715,6 +2784,9 @@ public class ButtonService {
         // 来料检验单「合格数量」必填兜底(2026-11-17 用户口径):保存已拦一道,但「保存为草稿」豁免必填,
         // 草稿仍可直接审核 ⇒ 审核这一环按**库里的行**复核;审核下游按合格数量分流入库/退料,空了就断链。
         if ("QC_INSP".equals(def.code())) ensureInspOkQtyFilledForAudit(def, no);
+        // 文档级必填(表头 + 明细全字段,按库里的单据判):审核/审批通过/提交审批三个状态推进点共用,
+        // 2026-11-17 用户口径「必填没填也可以提交审批」。
+        ensureDocRequiredFilled(def, no, "审核");
         // 两级审批面板(2026-10-04 用户口径「取消直审」):一律走 提交审批 → 一级审批通过 → 超级管理员批准,
         // 直审会让第二级形同虚设(纸面「审核/批准」两格也就没了两级留痕)。接口层同口径拒绝。
         // · 固定超级管理员作二级的(ADMIN_L2_PANELS:特采单 + 质量单据一族 + 出厂检验报告)= 管理员也拒(原口径不变);
@@ -3445,6 +3517,10 @@ public class ButtonService {
         // 修改态(文件类:申请修改经管理员审批通过)同样可提交审批,通过后 finalizeModify 再归档
         if (!"草稿".equals(st.get("status")) && !"修改中".equals(st.get("status")))
             throw new IllegalStateException("仅草稿或修改中状态可提交审批");
+        // 文档级必填(2026-11-17 用户口径「必填没填也可以提交审批」):
+        // 这里按**库里的单据**核表头+明细必填 —— 不点保存直接点提交审批时,载荷里只有单号,
+        // 保存那两道载荷校验等于没跑(见 ensureDocRequiredFilled 方法注释)。
+        ensureDocRequiredFilled(def, no, "提交审批");
         // 工序报工单:报工的**整行校验**前移到「提交审批」(2026-11-01 用户口径:
         //   「这个需要在提交审批处来进行校验而不是点击审批通过的时候出现校验」/「当前这个也是」)。
         //   校验内容 = 审核同一份判据(行锚点 / 工序在本行工艺路线内 / 不跳序 / 数量上限 /
@@ -3524,6 +3600,8 @@ public class ButtonService {
         if ("FINISH_IN".equals(def.code())) assertFinishInInspLink(no);
         String operator = currentUserName();
         int node = pendingNodeOf(def.code(), no);
+        // 文档级必填(2026-11-17):一级/二级通过前都核一遍(库里数据可能被修改申请改过)
+        ensureDocRequiredFilled(def, no, "审批通过");
         if (node == 2) return approveSecond(def, no, operator, formData);
         Map<String, Object> st = docStatusOf(def.code(), no);
         if (!"审批中".equals(st.get("status"))) throw new IllegalStateException("仅审批中状态可审批通过");
