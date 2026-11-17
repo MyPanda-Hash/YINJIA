@@ -4937,3 +4937,8 @@ migrate-mix-batch-20261118.sql
 # 2026-11-17 检验委托单「联系人」= 送样人(用户截图「拉选填」):data_type→下拉框,字典=yj_user 有账号人员姓名;
 #   新建单据默认带入当前登录人姓名(ButtonService.putSenderDefault/…InHead);两账套已执行;幂等
 migrate-insp-commission-sender-20261117.sql
+
+# 2026-11-17 样品检验汇总表(页面级虚拟面板 INSP_SUMMARY;用户口径「按一个时间范围,去导出有多少人
+#   送了啥样品测试啥,安排检测工作」):授权给能看检验委托单/送样登记表的角色(view,query,export)+ 面板名
+#   10 语言译名;页面 /qc/inspSummary,取数 POST /api/px/inspSummary/summary(只读现算);两账套已执行;幂等
+migrate-insp-summary-20261117.sql

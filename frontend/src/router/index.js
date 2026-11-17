@@ -129,6 +129,10 @@ const routes = [
       //   点节点跳对应面板并定位该单(没有该面板查看权时只提示不跳);数据由 QcFlowService 现算。
       //   页面级虚拟面板 QC_FLOW(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由。
       { path: 'qc/flowMonitor', component: () => import('@/views/modules/qc/QcFlowMonitor.vue'), meta: { title: '品质流程监控', code: 'qcFlowMonitor', panelCode: 'QC_FLOW' } },
+      // 样品检验汇总表(2026-11-17 用户口径:「……按一个时间范围,去导出有多少人送了啥样品测试啥,安排检测工作。」):
+      //   按送样人 / 按委托单两个视角 + 今日/本周/本月快捷区间 + 导出 Excel(前端 xlsx 现生成)。
+      //   页面级虚拟面板 INSP_SUMMARY(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由,显式注册。
+      { path: 'qc/inspSummary', component: () => import('@/views/modules/qc/InspSummary.vue'), meta: { title: '样品检验汇总表', code: 'qcInspSummary', panelCode: 'INSP_SUMMARY' } },
       // ══════════ 手机扫码(2026-10-30 新增一级目录)══════════
       // 用户口径:「把生产领料和工序报工这两个 app 的面版重新放在一个新的『手机扫码』(和生产计划平级)
       //   导航下。工序报工不变。生产领料重写。」

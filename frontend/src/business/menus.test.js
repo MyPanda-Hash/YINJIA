@@ -445,8 +445,10 @@ const PAGE_LEAF_GROUPS = new Set(['dc'])
 //   「样品检验需要单独放在外面的位置,相当于单独一个模块实现了」) ⇒ 它的一级子项是两个带
 //   面板码的**面板叶子**(送样登记表 SAMPLE_REG / 检验委托单 INSP_COMMISSION),不是再套一层分组,
 //   与「手机扫码」改版前同款,故登记进 PANEL_LEAF_GROUPS(下面的层级同构断言会逐项校验)。
+// 2026-11-17:新增第三个叶子「样品检验汇总表」INSP_SUMMARY(用户口径「按一个时间范围,去导出
+//   有多少人送了啥样品测试啥,安排检测工作」)—— 页面级虚拟面板,专用路由 /qc/inspSummary。
 const PANEL_LEAF_GROUPS = new Set(['plan', 'prodProcess', 'qcSample'])
-test('样品检验为独立一级模块,紧跟品质管理(送样登记表 / 检验委托单)', () => {
+test('样品检验为独立一级模块,紧跟品质管理(送样登记表 / 检验委托单 / 汇总表)', () => {
   const topCodes = menuTree.map((n) => n.code)
   const qcAt = topCodes.indexOf('qc')
   const sampleAt = topCodes.indexOf('qcSample')
@@ -456,13 +458,16 @@ test('样品检验为独立一级模块,紧跟品质管理(送样登记表 / 检
   assert.ok(sampleAt < dmAt, '样品检验应在数据建模之前')
   const node = menuTree[sampleAt]
   assert.equal(node.title, '样品检验')
-  assert.deepEqual((node.children || []).map((c) => c.panelCode), ['SAMPLE_REG', 'INSP_COMMISSION'])
-  assert.deepEqual((node.children || []).map((c) => c.title), ['送样登记表', '检验委托单'])
+  assert.deepEqual((node.children || []).map((c) => c.panelCode), ['SAMPLE_REG', 'INSP_COMMISSION', 'INSP_SUMMARY'])
+  assert.deepEqual((node.children || []).map((c) => c.title), ['送样登记表', '检验委托单', '样品检验汇总表'])
+  // 汇总表是页面级虚拟面板:走专用路由,不能写成 /panelx/list(否则会落进通用面板)
+  const summary = node.children.find((c) => c.panelCode === 'INSP_SUMMARY')
+  assert.equal(summary.path, '/qc/inspSummary')
   // 迁移而非复制:品质管理下不得残留旧分组/旧面板入口
   const qcJson = JSON.stringify(menuTree.find((n) => n.code === 'qc'))
   assert.ok(!qcJson.includes('qcSample'), '品质管理下不应再有 qcSample 分组')
-  assert.ok(!qcJson.includes('SAMPLE_REG') && !qcJson.includes('INSP_COMMISSION'),
-    '品质管理下不应再挂样品检验的两张面板')
+  assert.ok(!qcJson.includes('SAMPLE_REG') && !qcJson.includes('INSP_COMMISSION') && !qcJson.includes('INSP_SUMMARY'),
+    '品质管理下不应再挂样品检验的面板')
 })
 
 test('导航层级同构:一级模块的二级目录一律是"带面板的分组",不出现裸叶子/空壳层', () => {

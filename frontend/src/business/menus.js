@@ -721,6 +721,11 @@ export const menuTree = [
     children: [
       { code: 'qcSampleReg', title: '送样登记表', path: '/panelx/list/SAMPLE_REG', icon: 'Notebook', panelCode: 'SAMPLE_REG' },
       { code: 'qcInspCommission', title: '检验委托单', path: '/panelx/list/INSP_COMMISSION', icon: 'Document', panelCode: 'INSP_COMMISSION', operationName: '新增流程' },
+      // 样品检验汇总表(2026-11-17 用户口径:「为当前的样品检验增加汇总表,能够查看到一天或者一周,
+      //   送好多个样品,测试啥的总表。要按一个时间范围,去导出有多少人送了啥样品测试啥,安排检测工作。」)
+      // 页面级虚拟面板 INSP_SUMMARY(定义见后端 PagePanelRegistry)⇒ 专用路由 /qc/inspSummary,
+      // 数据由 /api/px/inspSummary/summary 现算(只读),导出 Excel 在前端生成。
+      { code: 'qcInspSummary', title: '样品检验汇总表', path: '/qc/inspSummary', icon: 'DataAnalysis', panelCode: 'INSP_SUMMARY' },
     ],
   },
   // 2026-10-18 用户口径:「写一个数据建模目录」——其下依次放 字段管理 / 数据字典。

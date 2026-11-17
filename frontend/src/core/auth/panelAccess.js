@@ -88,6 +88,8 @@ export const PAGE_PANELS = Object.freeze({
   SCHEDULE_BOARD: 'SCHEDULE_BOARD',
   WORK_ORDER_BOARD: 'WORK_ORDER_BOARD',
   WORK_ORDER_LIST: 'WORK_ORDER_LIST',
+  // 2026-11-17:样品检验汇总表(只读汇总页;export 词控「导出 Excel」按钮显隐)
+  INSP_SUMMARY: 'INSP_SUMMARY',
 })
 
 /**
