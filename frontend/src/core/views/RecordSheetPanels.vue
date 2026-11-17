@@ -928,7 +928,7 @@
                   @input="emit('dirty')"
                   @change="onDetailTextCommit(row, c.key)"
                 />
-                <span v-else class="rs-txt rsp-cell" :title="isLockedCell(dt, row, c) ? tt('非本部门栏目（只读）') : ''">{{ cellText(cellKind(c), row[c.key]) || ' / ' }}</span>
+                <span v-else class="rs-txt rsp-cell" :title="isLockedCell(dt, row, c) ? tt('非本部门栏目（只读）') : ''">{{ readCellText(c, row[c.key]) || ' / ' }}</span>
               </td>
               <td v-if="editable && !dt.fixedRows" class="rs-td-op"><span class="rs-op-add" :title="tt('在本行下方插入一行')" @click="addRow(dt, row)">＋</span><span class="rs-op-del" @click="removeRow(row)">×</span></td>
             </tr>
@@ -2108,6 +2108,34 @@ function stdLibOf(key) {
 function cellKind(c) {
   const f = (props.fields || []).find((x) => (x.dataName || x.code) === c?.key)
   return cellKindOf(f?.dataType)
+}
+
+/**
+ * 只读态要不要给这一格补 `%`（2026-11-17 用户口径，Excel #10「没有百分比号」）。
+ *
+ * <p>用户截图里 X烧结配方表的「添加比例%」列印出来是 `23` / `30` / `45`，
+ * 红字标了「没有百分比号」—— 列名带 % 但**值不带**，看起来像普通数字。</p>
+ *
+ * <p>为什么按列名判而不按 dataType：这三个字段在 yj_field 里都是 `文本`
+ * （`设计添加量` / `添加比例` / `单支含量g`，实测），拿不到数值/百分比语义；
+ * 而列名本身已经把单位写进去了（「添加比例%」），跟着列名走最稳、也不用改库。</p>
+ *
+ * <p>只在**只读态**补：编辑态是输入框，塞个 % 进去会污染用户输入。</p>
+ */
+function needsPercentSuffix(c) {
+  const label = String(c?.label ?? '')
+  if (!label.includes('%')) return false
+  const v = String(c?.key ?? '')
+  // 排除「单支含量g」这类虽然同表但单位是克的列（列名里没有 %，上面已挡）
+  return v === '添加比例' || label.endsWith('%')
+}
+
+/** 只读态的格文本：数值列补单位（目前只有百分比） */
+function readCellText(c, v) {
+  const text = cellText(cellKind(c), v)
+  if (!text) return ''
+  if (!needsPercentSuffix(c)) return text
+  return String(text).trim().endsWith('%') ? String(text) : String(text).trim() + '%'
 }
 
 /** 日期/时间控件回值 → 写回行(区间合成文本),并置脏交给父级保存 */
