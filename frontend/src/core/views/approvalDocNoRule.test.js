@@ -28,8 +28,9 @@ function codeOf(source) {
   for (const k of NAME_KEYS) {
     const name = source?.[k]
     if (name === undefined || name === null) continue
-    const m = String(name).trim().match(/^([A-Za-z0-9][A-Za-z0-9._-]*)/)
-    if (m && m[1]) return m[1]
+    // 与实现同一套正则：编码位置不固定，全串扫
+    const m = String(name).match(/[A-Za-z]{1,4}-[0-9][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*/)
+    if (m && m[0]) return m[0]
   }
   return ''
 }
@@ -39,16 +40,18 @@ test('从客户名抠编码：B-85-06 青岛伊可普 → B-85-06', () => {
   assert.equal(codeOf({ 客户名: 'B-85-06 青岛伊可普' }), 'B-85-06')
 })
 
-test('各种真实形态都能抠出来', () => {
-  assert.equal(codeOf({ mc: 'A12 某某' }), 'A12')
-  assert.equal(codeOf({ mc: 'c-112 伊可普' }), 'c-112')
-  assert.equal(codeOf({ mc: 'C-112' }), 'C-112')          // 只有编码
-  assert.equal(codeOf({ mc: '  X_9.1  客户 ' }), 'X_9.1')  // 前后空格、下划线点号
+test('各种真实形态都能抠出来（**编码位置不固定**）', () => {
+  assert.equal(codeOf({ mc: 'B-85-06 青岛伊可普' }), 'B-85-06')     // 编码在前（用户给的例子）
+  // 生产实测的真实形态：编码在中文名之后，后面还跟着电话 —— 只看开头会永远抠不到
+  assert.equal(codeOf({ mc: '浙江德凌电器有限公司 A-60 跟单客户 18658439031 林小姐 谢琴' }), 'A-60')
+  assert.equal(codeOf({ mc: 'C-112' }), 'C-112')                    // 只有编码
+  assert.equal(codeOf({ mc: '某公司 c-112 客户' }), 'c-112')          // 小写也行
 })
 
-test('纯中文客户名抠不出编码 ⇒ 不填（绝不拿中文当编码）', () => {
+test('纯中文名 / 纯数字电话 都不许当成编码', () => {
   assert.equal(codeOf({ mc: '青岛伊可普电器有限公司' }), '')
   assert.equal(codeOf({ mc: '欧科塑胶制品(深圳)有限公司' }), '')
+  assert.equal(codeOf({ mc: '浙江德凌电器有限公司 18658439031' }), '', '纯数字电话不是编码')
   assert.equal(codeOf({}), '')
   assert.equal(codeOf(null), '')
 })
@@ -60,7 +63,8 @@ test('显式编码列优先于从名字抠', () => {
 test('实现里这两条链路都在（防只剩其一）', () => {
   assert.match(vue, /const CODE_KEYS = \['客户编码', '客户代码', 'dm', '客户编号', '编码'\]/, '显式编码列')
   assert.match(vue, /const NAME_KEYS = \['客户名', '客户名称', 'mc'\]/, '客户名兜底')
-  assert.match(vue, /\^\(\[A-Za-z0-9\]\[A-Za-z0-9\._-\]\*\)/, '只认 ASCII 开头的编码段')
+  assert.match(vue, /\[A-Za-z\]\{1,4\}-\[0-9\]\[A-Za-z0-9\]\*\(\?:-\[A-Za-z0-9\]\+\)\*/, '编码段正则（字母+连字符+数字）')
+  assert.doesNotMatch(vue, /match\(\/\^\(\[A-Za-z0-9\]/, '不得再只看开头（生产实测编码在名字后面）')
   assert.match(vue, /props\.head\['文档编号'\] = code \+ ymd/, '规则 = 客户编码 + 日期')
   assert.match(vue, /String\(d\.getFullYear\(\)\)[\s\S]{0,120}padStart\(2, '0'\)/, '日期 YYYYMMDD')
 })

@@ -1459,11 +1459,18 @@ function applyApprovalDocNo(source) {
   //   绝不拿中文当编码拼接。
   if (!code) {
     const NAME_KEYS = ['客户名', '客户名称', 'mc']
+    // ⚠ 编码位置**不固定**，必须全串扫，不能只看开头：
+    //   用户给的例子是「B-85-06 青岛伊可普」（编码在前），
+    //   而生产实测（2026-11-17 ego 选客户）是「浙江德凌电器有限公司 A-60 跟单客户 18658439031 …」
+    //   —— 编码在**中文名之后**。只看开头永远抠不到 ⇒ 立项编号仍旧空白。
+    // 规则：字母段(1-4) + 连字符 + 数字开头，后面可继续接字母/数字/连字符。
+    //   这样 B-85-06 / A-60 / C-112 都能命中；纯数字手机号 18658439031、中文都不会误命中。
+    const CODE_IN_NAME = /[A-Za-z]{1,4}-[0-9][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*/
     for (const k of NAME_KEYS) {
       const name = source?.[k]
       if (name === undefined || name === null) continue
-      const m = String(name).trim().match(/^([A-Za-z0-9][A-Za-z0-9._-]*)/)
-      if (m && m[1]) { code = m[1]; break }
+      const m = String(name).match(CODE_IN_NAME)
+      if (m && m[0]) { code = m[0]; break }
     }
   }
   if (!code) return
