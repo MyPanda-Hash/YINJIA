@@ -185,12 +185,10 @@ export async function runPresenceCheck({ configPath, dryRun = false, full = fals
         `SELECT 单据编号 AS no, 外部数据ID AS extId FROM ${doc.headTable} WHERE 外部数据ID IS NOT NULL`)).recordset;
 
       const affected = [];
-      const alive = [];
       for (const m2 of mes) {
         const st = erp.get(String(m2.extId).trim());
         if (st === undefined) affected.push({ no: m2.no, kind: 'D', erpStatus: '金蝶已无此单' });
         else if (st !== 'C') affected.push({ no: m2.no, kind: 'Z', erpStatus: st });
-        else alive.push(m2.no);
       }
 
       // ③ 安全闸门:命中过多 ⇒ 判定列表取不全,一个都不动
@@ -225,10 +223,18 @@ export async function runPresenceCheck({ configPath, dryRun = false, full = fals
         out.details.push({ panel: doc.code, docNo: a.no, kind: a.kind, trace, erpStatus: a.erpStatus });
       }
 
-      // ⑤ 自愈:金蝶侧又是已审核的单,清掉历史 D/Z 标记
-      for (const no of alive) {
-        if (dryRun) continue;
-        try { out.revived += await clearMark(mssql, pool, doc, no); } catch { /* 忽略 */ }
+      // ⑤ 自愈:本类历史标记里,除了刚判定的受影响单,其余一律清掉(金蝶侧还是 C ⇒ 单子回来了)。
+      //     ⚠ 必须**一条 SQL**做完:金蝶在册两千多张,逐单 UPDATE 就是两千多个来回(实测会把核对拖成几十秒)。
+      if (!dryRun) {
+        const r = new mssql.Request(pool);
+        r.input('code', mssql.NVarChar(50), doc.code);
+        const skip = affected.map((a) => a.no);
+        let where = `WHERE s.panel_code=@code AND ISNULL(s.erp_close_state,N'') IN (N'D', N'Z')`;
+        skip.forEach((no, i) => { r.input(`s${i}`, mssql.NVarChar(100), no); });
+        if (skip.length) where += ` AND s.doc_no NOT IN (${skip.map((_, i) => `@s${i}`).join(',')})`;
+        const rs = await r.query(`UPDATE s SET erp_close_state=NULL, update_at=GETDATE()
+                                    FROM yj_doc_status s ${where}`);
+        out.revived += rs.rowsAffected ? rs.rowsAffected[0] : 0;
       }
 
       state.presence[doc.code] = {

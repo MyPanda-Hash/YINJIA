@@ -131,6 +131,19 @@ try {
     ok(u2[0] && u2[0].c === 'Y', '② 行表也一起软删');
 
     console.log(`  [统计] 命中 ${(res.details || []).length} 条 / 标记 ${res.marked} / 软删 ${res.removed}`);
+
+    // ③ 自愈:把"有痕迹"样本的外部数据ID 还原成真值,再跑一轮 ⇒ 它又出现在金蝶已审核列表里,
+    //    之前打的 'D' 标记必须被清掉(否则一次误判会让这张单永久不能生单)
+    {
+      const b = backup.find((x) => x.no === traced);
+      const r = new mssql.Request(pool);
+      r.input('no', mssql.NVarChar(100), traced);
+      r.input('ext', mssql.NVarChar(100), b.extId);
+      await r.query(`UPDATE bd_pu_order SET 外部数据ID=@ext WHERE 单据编号=@no`);
+      await runPresenceCheck({ full: true, log: (m) => console.log(`    [presence-2] ${m}`) });
+      const t3 = await q(`SELECT erp_close_state AS ecs FROM yj_doc_status WHERE panel_code=N'PU_ORDER' AND doc_no=@no`, { no: { t: mssql.NVarChar(100), v: traced } });
+      ok(!t3[0] || t3[0].ecs === null, `③ 金蝶侧恢复后标记自动清掉(实际 ${t3[0] && t3[0].ecs})`);
+    }
   }
 } finally {
   await restoreAll();
