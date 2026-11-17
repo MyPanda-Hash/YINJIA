@@ -319,6 +319,10 @@ public class KingdeePushService {
                 "SELECT * FROM " + lineTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
         if (lines.isEmpty()) throw new RuntimeException("单据无明细行，不可转ERP");
 
+        // ②c 来源订单在金蝶侧已失效(2026-11-16 在册核对标记 'D'/'Z')⇒ 直接拒绝,
+        //    别等金蝶回一句"单据X的源单''已被删除"让现场猜;守卫自身异常不阻断转ERP
+        assertSourceAlive(panelCode, docNo, head, lines);
+
         // ③ 行仓库编码:空的从 bs_wh 解析(2026-09-23:采购入库/销售出库的明细仓库由「参照选仓库」
         //    录入,值可能只落在 仓库名称 或 仓库 上;两者都按「名称或编码」匹配 bs_wh)
         //    采购订单不推仓库(订单无入库语义,仓档不全的账套反而拒单),跳过
@@ -798,6 +802,80 @@ public class KingdeePushService {
 
     /** 采购订单金蝶内部引用(src_inter_id=单据id;src_entry_id=按分录 seq 查分录id) */
     private record PoRefs(String billId, Map<Integer, String> entryIdBySeq) {}
+
+    /**
+     * 转ERP 前置守卫(2026-11-16「金蝶在册核对」配套):**来源采购/销售订单在金蝶已删除或已作废 ⇒ 拒绝转ERP**。
+     *
+     * <p>为什么要有:在册核对(deploy/sync-presence.mjs)会把"金蝶侧已删除/已作废"的订单写成
+     * {@code yj_doc_status.erp_close_state='D'/'Z'}(界面状态「金蝶已删除 / 金蝶已作废」)。而采购入库单
+     * 转ERP 一定要带金蝶源单(`src_bill_no` + `src_seq`,见 {@link #resolvePoRefs} 那段血泪注释):
+     * 金蝶侧那张订单没了 ⇒ 推送必然被金蝶拒(实测口径「单据X的源单''已被删除」),现场看不懂也修不了。
+     * 这里提前拦下并**说清怎么办**,避免把金蝶原始报错抛给用户。
+     *
+     * <p>口径:
+     * <ul>
+     *   <li>取来源单号:采购入库/暂收退料 → 表头「采购订单号」(合单时是"订单1、订单2"串)+ 行级
+     *       「源单编号」/「采购单号」;销售出库/销售退货 → 表头「销售订单号」;</li>
+     *   <li>只拦 `D`(金蝶已删除)/`Z`(已作废、已反审核),其它状态一律放行(状态机该拦的自有别的闸门);</li>
+     *   <li>**守卫自身出错绝不阻断转ERP**(源单号口径在变、别的账套列可能不同):查不出来只记 warn。</li>
+     * </ul>
+     */
+    private void assertSourceAlive(String panelCode, String docNo, Map<String, Object> head,
+                                   List<Map<String, Object>> lines) {
+        String srcPanel, what;
+        java.util.LinkedHashSet<String> want = new java.util.LinkedHashSet<>();
+        if ("PURCHASE_IN".equals(panelCode) || "QC_RETURN".equals(panelCode)) {
+            srcPanel = "PU_ORDER";
+            what = "采购订单";
+            addDocNos(want, str(head.get("采购订单号")));
+            for (Map<String, Object> l : lines) {
+                addDocNos(want, str(l.get("源单编号")));   // 采购入库行:金蝶源单号(采购订单号)
+                addDocNos(want, str(l.get("采购单号")));   // 暂收退料行:采购订单号
+            }
+        } else if ("SALE_OUT".equals(panelCode) || "SALE_IN".equals(panelCode)) {
+            srcPanel = "SO_ORDER";
+            what = "销售订单";
+            addDocNos(want, str(head.get("销售订单号")));
+        } else {
+            return;   // 其它转ERP 面板没有"来源订单"这一说
+        }
+        if (want.isEmpty()) return;
+        try {
+            String in = String.join(",", want.stream().map((x) -> "?").toList());
+            Object[] args = new Object[want.size() + 1];
+            args[0] = srcPanel;
+            int i = 1;
+            for (String w : want) args[i++] = w;
+            List<Map<String, Object>> dead = jdbc.queryForList(
+                    "SELECT doc_no, erp_close_state FROM yj_doc_status"
+                            + " WHERE panel_code = ? AND doc_no IN (" + in + ")"
+                            + " AND ISNULL(erp_close_state, N'') IN (N'D', N'Z')", args);
+            if (dead.isEmpty()) return;
+            StringBuilder sb = new StringBuilder();
+            for (Map<String, Object> d : dead) {
+                if (sb.length() > 0) sb.append("、");
+                sb.append(str(d.get("doc_no")))
+                        .append("D".equals(str(d.get("erp_close_state"))) ? "(金蝶已删除)" : "(金蝶已作废)");
+            }
+            log.warn("转ERP[{}] 被拦:来源{}{} 在 MES 里标着金蝶已删除/已作废", docNo, what, sb);
+            throw new IllegalStateException("来源" + what + " " + sb + " 在金蝶侧已失效,本单不能转ERP:"
+                    + "请先在金蝶恢复该" + what + "(或用另一张有效订单重新生成入库单)后再转;"
+                    + "若金蝶那边其实还在,刷新列表等下一轮同步(≤5 分钟)后重试");
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("转ERP[{}] 来源{}在册校验跳过(不影响本次推送):{}", docNo, what, e.getMessage());
+        }
+    }
+
+    /** 把"订单1、订单2"/"订单1,订单2"/带空白的串拆成单号集合(addDocNos 与 assertSourceAlive 配套) */
+    private static void addDocNos(java.util.Set<String> out, String raw) {
+        if (raw == null || raw.isBlank()) return;
+        for (String p : raw.split("[、,，;；/\\s]+")) {
+            String t = p.trim();
+            if (!t.isEmpty()) out.add(t);
+        }
+    }
 
     /** 采购订单引用缓存(单号→引用;转ERP 为低频操作,进程内缓存即可;失败不缓存以便重试) */
     private final Map<String, PoRefs> poRefsCache = new java.util.concurrent.ConcurrentHashMap<>();
