@@ -34,6 +34,7 @@
 | round-01(390×844 手机视口,壳内) | 登录页出现「服务器地址 http://36.140.66.163:8090 默认」+ 提示行;旧的黄色「首次使用…」横幅已消失;工厂下拉能加载(服务连接正常) | ✅ 见 `round-01-shell-login-390x844.png` |
 | round-02(切英语) | 这一行跟着翻译:`Server address http://36.140.66.163:8090 Default …`;行内**无残留中文** | ✅ 见 `round-02-shell-login-en.png` |
 | round-02(网页版,无 YjNative) | **不渲染**这一行(`.origin-info` 不存在)——网页同源,不暴露接口号 | ✅ 见 `round-02-web-login-1280.png` |
+| round-03(回归:登录失败) | CDP 屏蔽 `*auth/login*` 后提交 ⇒ 错误横幅照常出现、图标能解析(`WarningFilled` 走 main.js 的全局图标注册)、位置在「服务器地址」行上方 | ✅ 见 `round-03-login-error.png` |
 
 复跑:`ego-browser nodejs -e "await import('file:///<本目录>/round-01.mjs')"`(需 5173 在跑)。
 
