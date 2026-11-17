@@ -33,12 +33,16 @@
           <el-radio-button value="custom">{{ tt('自定义') }}</el-radio-button>
         </el-radio-group>
 
+        <!-- 日期区间:宽度只给两个日期 + 至 + 图标(2026-11-17 用户口径「太长了,能显示完全即可」)。
+             ⚠ 必须内联 width/flex:Element Plus 的 .el-range-editor 自带宽度,且工具条是 flex 行
+             (不写 flex:none 会被拉伸到 460px,只剩 250px 的类样式根本压不住)。 -->
         <el-date-picker
           v-model="range"
           type="daterange"
           value-format="YYYY-MM-DD"
           size="small"
           class="iss-range"
+          style="width: 272px; flex: none"
           :range-separator="tt('至')"
           :start-placeholder="tt('开始日期')"
           :end-placeholder="tt('结束日期')"
@@ -117,16 +121,16 @@
               </template>
             </el-table-column>
             <el-table-column prop="送样人" :label="tt('送样人')" min-width="120" fixed />
-            <el-table-column prop="送样单数" :label="tt('送样单数')" width="100" align="right" sortable />
-            <el-table-column prop="检测项目项次" :label="tt('检测项目项次')" width="120" align="right" sortable />
+            <el-table-column prop="送样单数" :label="tt('送样单数')" width="110" align="right" sortable />
+            <el-table-column prop="检测项目项次" :label="tt('检测项目项次')" width="132" align="right" sortable />
             <el-table-column prop="涉及样品" :label="tt('涉及样品')" min-width="220" show-overflow-tooltip />
             <el-table-column prop="检测项目" :label="tt('检测项目')" min-width="260" show-overflow-tooltip />
             <el-table-column prop="已审核单数" :label="tt('已审核单数')" width="110" align="right" />
             <el-table-column prop="待检单数" :label="tt('待检单数')" width="100" align="right" />
-            <el-table-column :label="tt('收费合计')" width="120" align="right" prop="收费合计" sortable>
+            <el-table-column :label="tt('收费合计')" width="130" align="right" prop="收费合计" sortable>
               <template #default="{ row }">{{ money(row['收费合计']) }}</template>
             </el-table-column>
-            <el-table-column prop="最近送样日期" :label="tt('最近送样日期')" width="130" sortable />
+            <el-table-column prop="最近送样日期" :label="tt('最近送样日期')" width="140" sortable />
           </el-table>
         </el-tab-pane>
 
@@ -155,7 +159,7 @@
                 </div>
               </template>
             </el-table-column>
-            <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" sortable />
+            <el-table-column prop="单据日期" :label="tt('单据日期')" width="120" sortable />
             <el-table-column :label="tt('单据编号')" width="150" fixed>
               <template #default="{ row }">
                 <el-link type="primary" :underline="false" @click="openDoc(row['单据编号'])">{{ row['单据编号'] }}</el-link>
@@ -166,13 +170,13 @@
             <el-table-column prop="样品名称" :label="tt('样品名称')" min-width="160" show-overflow-tooltip />
             <el-table-column prop="样品类别" :label="tt('样品型号/规格')" width="120" />
             <el-table-column prop="样品数量" :label="tt('样品数量')" width="100" />
-            <el-table-column prop="检测项目数" :label="tt('检测项目数')" width="100" align="right" sortable />
+            <el-table-column prop="检测项目数" :label="tt('检测项目数')" width="120" align="right" sortable />
             <el-table-column prop="检测项目" :label="tt('检测项目')" min-width="260" show-overflow-tooltip />
             <el-table-column prop="测试方法" :label="tt('测试方法')" min-width="130" show-overflow-tooltip />
-            <el-table-column :label="tt('收费合计')" width="120" align="right" prop="合计收费" sortable>
+            <el-table-column :label="tt('收费合计')" width="130" align="right" prop="合计收费" sortable>
               <template #default="{ row }">{{ money(row['合计收费']) }}</template>
             </el-table-column>
-            <el-table-column :label="tt('单据状态')" width="100" align="center" prop="单据状态" sortable>
+            <el-table-column :label="tt('单据状态')" width="110" align="center" prop="单据状态" sortable>
               <template #default="{ row }">
                 <el-tag size="small" :type="statusTag(row['单据状态'])">{{ tt(row['单据状态']) }}</el-tag>
               </template>
@@ -463,7 +467,7 @@ onMounted(() => {
   gap: 8px;
 }
 .iss-range {
-  width: 250px;
+  width: 272px;
 }
 .iss-kw {
   width: 150px;
@@ -523,6 +527,15 @@ onMounted(() => {
 }
 .iss-table {
   width: 100%;
+}
+/* 表头排序:文字与排序箭头必须同一行(2026-11-17 用户报障「检验项目数的排序按钮和文字不在同一行」)。
+   Element Plus 表头 .cell 是 block,列宽不足时 caret 会折到第二行 ⇒ 列宽已按内容加宽,
+   这里再加 nowrap 兜底(英文/长译名也不折)。 */
+.iss-table :deep(.el-table__header .cell) {
+  white-space: nowrap;
+}
+.iss-table :deep(.el-table__header .caret-wrapper) {
+  flex: none;
 }
 .iss-expand {
   padding: 8px 12px;

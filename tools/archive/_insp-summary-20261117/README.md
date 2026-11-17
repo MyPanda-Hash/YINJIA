@@ -22,6 +22,9 @@
 | `ego/round-06~10.mjs` | 导出无反应的分层诊断(最终定位 `aoa_to_sheet` 标题行不是数组) |
 | `ego/round-11.mjs` | 5173 切正式账套 YJ 后复验页面 + 导出(截图 12) |
 | `ego/round-12.mjs` | 快捷区间联动取证:今天/本周/本月/上月的区间值与取数(截图 13) |
+| `ego/round-13.mjs` | 量日期控件/表头排序格真实尺寸(修版式前的基线) |
+| `ego/round-14.mjs` | 复验:日期控件 272px 且输入不截断、4 个排序表头均单行(caret 顶距 5px)(截图 14) |
+| `ego/round-15.mjs` | 本月 + 按委托单,横向滚到「检测项目数」截图确认表头不折行(截图 15) |
 
 ## 复跑方式
 
@@ -57,6 +60,15 @@ ego-browser nodejs -e "await import('file:///D:/workspace/yinjia/tools/archive/_
    (见 `ego/round-05.mjs` / `round-11.mjs`)。
 2. **账套差异不是 Bug**:首轮 5173 报 0 行、8090 报 1 行 —— 5173 当时登录在「YJ_TEST 测试库」,
    正式库的委托单不在测试快照里;`ego/round-11.mjs` 切到 YJ 后数字一致(`ego/round-03.mjs` 取证)。
+3. **版式两处(2026-11-17 用户报障)**:
+   - 日期区间控件被 Element Plus 的宽度 + flex 拉伸到 **460px**(类样式 250px 压不住)⇒
+     改为内联 `width:272px; flex:none`,实测两个日期输入各 98px、`scrollWidth == clientWidth`
+     (完整显示,不截断);
+   - 「检测项目数」表头文字与排序箭头分成两行:Element Plus 表头 `.cell` 是 `block`,列宽 100px
+     不够放「5 个汉字 + 24px 排序箭头」⇒ 该列加宽到 120px,并把**全部**排序列按内容加宽
+     (送样单数 110 / 检测项目项次 132 / 收费合计 130 / 最近送样日期 140 / 单据日期 120 / 单据状态 110),
+     再加表头 `white-space: nowrap` 兜底。`ego/round-14/15.mjs` 实测:4 个排序表头 cell 高 23px(单行)、
+     caret 顶距 5px(与文字同一行)。
 
 ## 遗留观察(不在本任务范围)
 
