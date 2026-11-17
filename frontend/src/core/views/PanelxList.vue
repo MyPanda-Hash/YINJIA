@@ -2528,6 +2528,7 @@
       :me="myApplicantName"
       :owner-key="previewOwnerKey"
       :subject="previewSubject"
+      :panel-code="String(panelCode || '')"
       @close="approvalPreviewOpen = false"
       @jump="jumpToApprovalDoc"
     />

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
   PREVIEW_COMPACT_CAP, PREVIEW_FIELDS, PREVIEW_SKIP, PREVIEW_VALUE_CAP,
-  approvalStatusTree, filterApprovalPreview, previewLineText, previewSummaryOf,
+  approvalStatusTree, filterApprovalPreview, previewColumnsOf, previewLineText, previewSummaryOf,
 } from './docPreview.js'
 
 /**
@@ -244,4 +244,27 @@ test('产品信息表复用同一套预览：归属人字段可参数化为「�
   assert.deepEqual(
     filterApprovalPreview(rows, { me: '张三', scope: 'mine', ownerKey: '编辑人' }).map((r) => r.单据编号),
     ['P-1'])
+})
+
+/* ── 2026-11-17：表格列按面板配置（「单据编号是固定的，应展示重点字段」）── */
+test('产品信息表的预览列以业务字段为主，单据编号退到最后', () => {
+  const cols = previewColumnsOf('RD_PROD_INFO', '编辑人')
+  const keys = cols.map((c) => c.key)
+  // 业务识别字段必须在前
+  assert.equal(keys[0], '产品编号', '产品编号是最有区分度的识别字段')
+  assert.ok(keys.includes('产品名称') && keys.includes('客户名称'))
+  // 单据编号不能在首位（它可能是 YJ-QR-152 这类固定表单编号）
+  assert.notEqual(keys[0], '单据编号', '单据编号不能当第一列')
+  assert.equal(keys[keys.length - 1], '单据编号', '单据编号退到最后一列（仍保留，便于对账）')
+})
+
+test('立项申请沿用客户/等级/申请人三条找单线索', () => {
+  const keys = previewColumnsOf('RD_APPROVAL', '申请立项人').map((c) => c.key)
+  assert.deepEqual(keys, ['单据编号', '单据日期', '客户名', '项目等级', '申请立项人'])
+})
+
+test('未登记的面板退回最小集（单号/日期/归属人），不会渲染出空表头', () => {
+  const cols = previewColumnsOf('SOME_UNKNOWN', '编辑人')
+  assert.deepEqual(cols.map((c) => c.key), ['单据编号', '单据日期', '编辑人'])
+  assert.ok(cols.length > 0)
 })

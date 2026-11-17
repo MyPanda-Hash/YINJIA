@@ -168,6 +168,52 @@ export function filterApprovalPreview(rows, opts) {
 }
 
 /**
+ * 「单据预览」全屏表格的**列配置**（2026-11-17 用户口径）。
+ *
+ * <p>用户原话：「因为现在的单据编号是固定的，所以应该是展示其他的一些比较重点的字段」。</p>
+ *
+ * <p>问题：产品信息表的纸面右上角印的是**受控表单编号**（YJ-QR-152，逐页常量，见
+ * recordSheetConfigs 的 docNoStatic），拿它当"找单的第一列"没有区分度；
+ * 而且同名列下有的行是真实流水号（PI-2026-11-0006），语义本身是混的。
+ * ⇒ 每类单据按自己的**业务识别字段**排前面，单号退到后面（仍保留，便于对账）。</p>
+ *
+ * <p>`kind` 只有两档：`text` 普通左对齐 / `num` 右对齐+等宽（等级、数量类）。</p>
+ *
+ * @type {Record<string, Array<{key: string, label: string, width?: number, minWidth?: number, kind?: string}>>}
+ */
+export const PREVIEW_TABLE_COLUMNS = {
+  // 立项申请：客户 + 项目等级 + 申请人 是"找这张单"的三条线索（沿用卡片时代的登记口径）
+  RD_APPROVAL: [
+    { key: '单据编号', label: '单据编号', minWidth: 160 },
+    { key: '单据日期', label: '单据日期', width: 110 },
+    { key: '客户名', label: '客户名', minWidth: 200 },
+    { key: '项目等级', label: '项目等级', width: 90, kind: 'num' },
+    { key: '申请立项人', label: '申请立项人', width: 120 },
+  ],
+  // 产品信息表：产品编号 / 产品名称 / 客户名称 才是识别字段；单据编号排最后（它可能是固定表单号）
+  RD_PROD_INFO: [
+    { key: '产品编号', label: '产品编号', minWidth: 130 },
+    { key: '产品名称', label: '产品名称', minWidth: 200 },
+    { key: '客户名称', label: '客户名称', minWidth: 180 },
+    { key: '产品管控等级', label: '产品管控等级', width: 120 },
+    { key: '编辑人', label: '编辑人', width: 120 },
+    { key: '单据日期', label: '单据日期', width: 110 },
+    { key: '单据编号', label: '单据编号', minWidth: 140 },
+  ],
+}
+
+/** 取某面板的列配置；没登记的面板退回「单号/日期/归属人」的最小集 */
+export function previewColumnsOf(panelCode, ownerKey) {
+  const cols = PREVIEW_TABLE_COLUMNS[String(panelCode || '')]
+  if (Array.isArray(cols) && cols.length) return cols
+  return [
+    { key: '单据编号', label: '单据编号', minWidth: 160 },
+    { key: '单据日期', label: '单据日期', width: 110 },
+    { key: ownerKey || APPLICANT_KEY, label: ownerKey || APPLICANT_KEY, width: 130 },
+  ]
+}
+
+/**
  * 左侧「分类树」的节点 = 该面板里出现过的**单据状态**（按固定业务顺序，不按字符串排）。
  *
  * <p>用户口径（2026-11-17）：「左侧树按单据状态分」（参考金蝶的「商品类别」树）。</p>

@@ -115,25 +115,22 @@
                 <span class="apv-num">{{ $index + 1 }}</span>
               </template>
             </el-table-column>
-            <el-table-column prop="单据编号" :label="tt('单据编号')" min-width="170" show-overflow-tooltip>
+            <!-- 业务列按面板配置（2026-11-17 用户口径：「单据编号是固定的，应该展示其他比较重点的字段」）
+                 ⇒ 立项申请出 客户名/项目等级/申请人；产品信息表出 产品编号/名称/客户名称，
+                 单据编号退到最后（它可能是 YJ-QR-152 这种固定表单号，没有区分度）。 -->
+            <el-table-column
+              v-for="c in cols"
+              :key="c.key"
+              :label="tt(c.label)"
+              :min-width="c.minWidth || undefined"
+              :width="c.width || undefined"
+              :align="c.kind === 'num' ? 'right' : undefined"
+              show-overflow-tooltip
+            >
               <template #default="{ row }">
-                <span class="apv-no">{{ row['单据编号'] || '—' }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="单据日期" :label="tt('单据日期')" width="120" />
-            <el-table-column prop="申请立项人" :label="tt('申请立项人')" width="130">
-              <template #default="{ row }">
-                <span :class="{ 'apv-muted': !row['申请立项人'] }">{{ row['申请立项人'] || '—' }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column prop="客户名" :label="tt('客户名')" min-width="220" show-overflow-tooltip>
-              <template #default="{ row }">
-                <span :class="{ 'apv-muted': !row['客户名'] }">{{ row['客户名'] || '—' }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column :label="tt('项目等级')" width="100" align="right">
-              <template #default="{ row }">
-                <span class="apv-num">{{ row['项目等级'] || '—' }}</span>
+                <span :class="c.kind === 'num' ? 'apv-num' : (row[c.key] ? '' : 'apv-muted')">
+                  {{ row[c.key] || '—' }}
+                </span>
               </template>
             </el-table-column>
             <el-table-column :label="tt('状态')" width="120">
@@ -178,7 +175,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
-import { approvalStatusTree, filterApprovalPreview } from '@/core/panel/docPreview'
+import { approvalStatusTree, filterApprovalPreview, previewColumnsOf } from '@/core/panel/docPreview'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -190,6 +187,8 @@ const props = defineProps({
   ownerKey: { type: String, default: '' },
   /** 副标题里的面板名（如「项目立项申请」「产品信息表」） */
   subject: { type: String, default: '' },
+  /** 面板码：决定表格出哪些业务列（见 docPreview.PREVIEW_TABLE_COLUMNS） */
+  panelCode: { type: String, default: '' },
 });
 const emit = defineEmits(['close', 'jump'])
 
@@ -202,6 +201,9 @@ const status = ref('')           // 与 treeKey 联动（点树即设状态，�
 const grade = ref('')
 const dateRange = ref([])        // ['2026-11-01','2026-11-17'] 或 []
 const meName = computed(() => String(props.me || '').trim())
+
+/** 表格业务列（按面板配置；未登记的退回最小集） */
+const cols = computed(() => previewColumnsOf(props.panelCode, props.ownerKey))
 
 /** 左树节点 = 数据里出现过的单据状态（空节点不画） */
 const treeNodes = computed(() => approvalStatusTree(props.rows))
