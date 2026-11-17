@@ -36,28 +36,51 @@
       MobilePick.vue 同款单行:输入框 + 查询 + 扫码(44px 命中区、手机竖屏也不换行)。
    ③ **"没有模糊查询的栏框"**(同日第二批口径):手敲的工单号 / 产品名片段不走工单码解析,
       改走与「生产领料」同一个 {@code POST /px/workOrderList} 模糊查,命中多行列候选让人点。
+   ④ **"模糊查询单独再来一栏,上面的一栏是给扫码和输入单据的"**(同日第三批口径):
+      第一栏只做「扫工单码 / 输入单据号」的**精确**定位;第二栏(前缀「模糊查询」)才按
+      工单号 / 产品名 / 物料编码的片段查,查完在下面出候选。两栏各管一件事,不再让同一个框兼两种查法。
 -->
 <template>
   <div class="mm-scan">
-    <div class="mm-head">
-      <div class="mm-title">{{ tt('扫码混料') }}</div>
-      <div class="mm-sub">{{ tt('扫工单 → 扫物料取秤 → 整单保存打印') }}</div>
+    <!-- 2026-11-18:头部与「生产领料 / 生产退料」同一套(标题 + 接口地址 + 说明) -->
+    <div class="mm-top">
+      <div class="mm-head">
+        <span class="mm-title">{{ tt('扫码混料') }}</span>
+        <span v-if="baseUrl" class="mm-base" :title="baseUrl">{{ baseUrl }}</span>
+      </div>
+      <span class="mm-sub">{{ tt('扫工单 → 扫物料取秤 → 整单保存打印') }}</span>
     </div>
 
-    <!-- ① 扫工单码(2026-11-17 用户口径「界面要和生产领料一样:一个查询,一个输入框加扫码」)-->
+    <!-- ① 扫工单码 / 输入单据号(2026-11-17 用户口径:上面这一栏**只负责扫码和输入单据**,
+          按产品名/片段找单走下面独立的「模糊查询」栏) -->
     <div class="mm-bar">
       <el-input
         ref="woInput"
         v-model="woText"
         size="large"
         clearable
-        :placeholder="tt('扫工单码，或输入工单号/产品名片段查询')"
+        :placeholder="tt('扫工单码或输入工单号')"
         @keyup.enter="onScanWorkOrder"
       />
       <el-button size="large" :loading="woLoading" @click="onScanWorkOrder">{{ tt('查询') }}</el-button>
       <el-button v-if="nativeScan" size="large" :loading="scanning === 'wo'" @click="scanWoCamera">
         {{ tt('扫码') }}
       </el-button>
+    </div>
+
+    <!-- ② 模糊查询(独立一栏):工单号 / 产品名 / 物料编码的**片段**都能查,命中多行列候选 -->
+    <div class="mm-bar mm-bar-fuzzy">
+      <el-input
+        ref="fuzzyInput"
+        v-model="fuzzyText"
+        size="large"
+        clearable
+        :placeholder="tt('输入工单号/产品名/物料编码的片段查找')"
+        @keyup.enter="onFuzzySearch"
+      >
+        <template #prepend>{{ tt('模糊查询') }}</template>
+      </el-input>
+      <el-button size="large" :loading="fuzzyLoading" @click="onFuzzySearch">{{ tt('查询') }}</el-button>
     </div>
 
     <!-- 模糊查询命中多行 → 列候选让人点(与生产领料同一个交互;绝不默认第一行) -->
@@ -258,13 +281,20 @@ import { scanOnce, hasNativeScan } from '@/business/nativeScan'
 import { focusScanNow } from '@/business/scanFocus'
 import request from '@core/request'
 
+/** 接口地址(与生产领料/退料顶部同一行只读展示;网页版没有壳就为空) */
+const baseUrl = (() => {
+  try { return (window.YjNative && window.YjNative.getBaseUrl && window.YjNative.getBaseUrl()) || '' } catch { return '' }
+})()
 const nativeScan = hasNativeScan()
 
 const woInput = ref(null)
+const fuzzyInput = ref(null)
 const matInput = ref(null)
 const woText = ref('')
+const fuzzyText = ref('')
 const matText = ref('')
 const woLoading = ref(false)
+const fuzzyLoading = ref(false)
 const savingOne = ref(false)
 const savingAll = ref(false)
 const docsLoading = ref(false)
@@ -356,6 +386,16 @@ function scanErrText(r) {
   return map[r.reason] || (tt('扫码失败：') + (r.message || ''))
 }
 
+/**
+ * 上面这一栏:扫工单码 / 输入单据号(2026-11-17 用户口径「上面的一栏是给扫码和输入单据的」)。
+ *
+ * <p>只做**精确**定位,不做模糊:
+ * <ul>
+ *   <li>扫到/输入的工单码(带 @)→ 按码解析(公司代码@工单号@1000+行号);</li>
+ *   <li>只敲了工单号(无 @)→ 直接按工单号取行;</li>
+ *   <li>要按产品名/片段找单 → 走下面独立的「模糊查询」栏,别在这里猜。</li>
+ * </ul>
+ */
 async function onScanWorkOrder() {
   errText.value = ''
   okText.value = ''
@@ -366,25 +406,33 @@ async function onScanWorkOrder() {
     return
   }
   woCandidates.value = []
-  // 现场扫的工单码(含 @)= 精确路径;手敲/扫码枪敲进去的单号或拼音片段 = 模糊查(2026-11-17 用户口径
-  // 「扫码混料没有模糊查询的栏框」)—— 与「生产领料」同一条查询(/px/workOrderList),查法与候选列表也一样。
-  if (!raw.includes('@')) {
-    await fuzzySearchWorkOrder(raw)
-    return
-  }
-  const q = parseWorkOrderQr(raw)
-  if (!q.ok) {
-    errText.value = reasonText(q.reason)
+  // 带 @ = 工单二维码;不带 @ = 现场手敲的完整工单号(单据号)。两者都按精确查,片段请用下面那一栏。
+  const isQr = raw.includes('@')
+  let orderNo = raw
+  let lineNo = 0
+  if (isQr) {
+    const q = parseWorkOrderQr(raw)
+    if (!q.ok) {
+      errText.value = reasonText(q.reason)
+      return
+    }
+    orderNo = q.orderNo
+    lineNo = q.lineNo
+  } else if (!/^[A-Za-z0-9]/.test(raw)) {
+    // 明显不是单据号(比如敲了中文产品名):直接指路到下面的模糊查询,别报"不是工单码"让人困惑
+    errText.value = tt('这个不是单据号：按产品名或片段找单请用下面的「模糊查询」')
     return
   }
   woLoading.value = true
   try {
-    const params = { orderNo: q.orderNo }
-    if (q.lineNo) params.lineNo = q.lineNo
+    const params = { orderNo }
+    if (lineNo) params.lineNo = lineNo
     const res = await request.get('/px/mix/lines', { params })
     const rows = (res && (res.data?.list || res.list)) || []
     if (!rows.length) {
-      errText.value = tt('没找到这张工单') + (q.lineNo ? `(${tt('行号')} ${q.lineNo})` : '')
+      errText.value = tt('没找到这张工单')
+        + (lineNo ? `(${tt('行号')} ${lineNo})` : '')
+        + (isQr ? '' : ' · ' + tt('按产品名或片段找单请用下面的「模糊查询」'))
       order.value = null
       lines.value = []
       docs.value = []
@@ -398,7 +446,7 @@ async function onScanWorkOrder() {
       planQty: Number(r['排产数量']) || 0,
       line: r['生产线'] || '',
     }))
-    const hit = rows.find((r) => Number(r['工单行号']) === (q.lineNo || Number(rows[0]['工单行号']))) || rows[0]
+    const hit = rows.find((r) => Number(r['工单行号']) === (lineNo || Number(rows[0]['工单行号']))) || rows[0]
     await useWorkOrderRow(hit)
   } catch (e) {
     errText.value = errMsg(e) || tt('查询工单失败')
@@ -412,8 +460,22 @@ async function onScanWorkOrder() {
   }
 }
 
+/** 下面那一栏:模糊查询的入口(回车/点「查询」) */
+async function onFuzzySearch() {
+  errText.value = ''
+  okText.value = ''
+  printMsg.value = ''
+  const kw = String(fuzzyText.value || '').trim()
+  if (!kw) {
+    errText.value = tt('请输入工单号/产品名/物料编码的片段')
+    return
+  }
+  woCandidates.value = []
+  await fuzzySearchWorkOrder(kw)
+}
+
 /**
- * 模糊查工单(2026-11-17 新增):工单号 / 物料编码 / 产品名称 的**任意片段**都能查。
+ * 模糊查工单(2026-11-17 新增,独立一栏):工单号 / 物料编码 / 产品名称 的**任意片段**都能查。
  *
  * <p>口径与「生产领料」完全一致(同一个接口 {@code POST /px/workOrderList},同样的候选列表交互),
  * 用户原话「扫码混料没有模糊查询的栏框」—— 现场手上没有码纸时,敲 `0015` 或 `烧结` 就应该能找单。
@@ -422,7 +484,7 @@ async function onScanWorkOrder() {
  * 绝不默认第一行(混料落到错行的后果和领料一样:料记到别的产品上)。
  */
 async function fuzzySearchWorkOrder(kw) {
-  woLoading.value = true
+  fuzzyLoading.value = true
   try {
     const res = await request.post('/px/workOrderList', { keyword: kw })
     // request 拦截器已把响应解成 ApiResult 信封 ⇒ 行在 res.data(与「生产领料」同一写法)
@@ -451,7 +513,7 @@ async function fuzzySearchWorkOrder(kw) {
   } catch (e) {
     errText.value = errMsg(e) || tt('查询工单失败')
   } finally {
-    woLoading.value = false
+    fuzzyLoading.value = false
   }
 }
 
@@ -793,6 +855,7 @@ function resetOrder() {
   docs.value = []
   woCandidates.value = []
   woText.value = ''
+  fuzzyText.value = ''
   matText.value = ''
   okText.value = ''
   errText.value = ''
@@ -804,10 +867,25 @@ function resetOrder() {
 <style scoped>
 /* 手机扫码统一规范(与 MobileOtherScan / MobilePick 一致):限宽 900 居左、14/16 内边距、
    卡片 + 虚线分隔、底部主按钮撑满、行内数字等宽。 */
-.mm-scan { max-width: 900px; padding: 14px 16px 26px; }
-.mm-head { margin-bottom: 12px; }
-.mm-title { font-size: 18px; font-weight: 600; }
-.mm-sub { margin-top: 4px; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.6; }
+/* 2026-11-18:版面口径与「生产领料」(MobilePickList.vue) 一致 —— 灰底 + 48px 顶栏 + 卡片 */
+.mm-scan {
+  box-sizing: border-box; width: 100%; max-width: 1180px; margin: 0 auto;
+  padding: 0 0 16px; background: var(--el-bg-color-page); min-height: calc(100vh - 130px);
+}
+.mm-top {
+  display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 12px;
+  background: var(--el-bg-color); border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.mm-head { display: flex; flex-direction: column; min-width: 0; }
+.mm-title { font-size: 16px; font-weight: 600; }
+.mm-base {
+  max-width: 42vw; font-size: 11px; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mm-sub {
+  flex: 1; min-width: 0; margin-left: 4px; font-size: 12px; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 /* 扫码行(2026-11-17 与「生产领料」对齐):一个输入框 + 查询 + 扫码,同一行不放换行。
    `.mm-row` 是物料清单行,名字别混。 */
 .mm-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
@@ -815,6 +893,15 @@ function resetOrder() {
 .mm-bar :deep(.el-input__wrapper) { min-height: 44px; }
 .mm-bar :deep(.el-input__inner) { font-size: 16px; }   /* 16px 以下 iOS 会自动放大 */
 .mm-bar :deep(.el-button) { height: 44px; min-width: 64px; flex: none; }
+/* 模糊查询栏(2026-11-17 用户口径「模糊查询单独再来一栏」):前面挂一个「模糊查询」标签,
+   让人一眼看出这两栏各管什么 —— 上面那栏只扫/输单据,这一栏才按产品名、片段找单。 */
+.mm-bar-fuzzy { margin-top: -4px; }
+.mm-bar-fuzzy :deep(.el-input-group__prepend) {
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+  background: var(--el-fill-color-light);
+}
 .mm-alert { margin-bottom: 12px; }
 /* 模糊查询候选(2026-11-17):与「生产领料」的候选列表同形态 —— 一行一条工单行,点哪条用哪条 */
 .mm-cand { border: 1px solid var(--el-border-color-light); border-radius: 6px; padding: 8px 10px; margin-bottom: 12px; }
