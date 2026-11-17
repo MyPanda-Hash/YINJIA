@@ -26,7 +26,7 @@
       <el-button class="mr-refresh" size="small" :loading="loading" @click="refreshAll">{{ tt('刷新') }}</el-button>
     </div>
 
-    <div v-if="errText" class="mr-err mr-err-top">{{ errText }}</div>
+    <div v-if="errText && !workVisible" class="mr-err mr-err-top">{{ errText }}</div>
     <div v-if="okText" class="mr-ok mr-err-top">{{ okText }}</div>
 
     <!-- ① 查询单据(与「生产领料」同一套:关键词查询 + 扫码定位) -->
@@ -60,105 +60,122 @@
       </div>
     </section>
 
-    <!-- ② 可退单据列表 -->
+    <!-- ② 可退单据列表(2026-11-18 第二轮:加展开/收起,与生产领料的未完成/已完成分组同一套) -->
     <section class="mr-card">
-      <div class="mr-sec">
-        <span>{{ tt('可退单据') }}</span>
-        <span class="mr-sec-num">{{ list.length }}</span>
+      <div class="mr-grp-head" @click="openOpen = !openOpen">
+        <span class="mr-grp-title">{{ tt('可退单据') }}</span>
+        <span class="mr-grp-num">{{ list.length }}</span>
+        <span class="mr-grp-arrow" :class="{ open: openOpen }">›</span>
       </div>
 
-      <div v-if="!list.length" class="mr-empty">{{ tt('没有可退的领料单（需要先领料、且材料出库单被仓管审核）') }}</div>
-      <div
-        v-for="d in list"
-        :key="d.id"
-        class="mr-doc"
-        :class="{ 'is-cur': cur && cur.id === d.id }"
-        @click="select(d)"
-      >
-        <div class="mr-doc-l1">
-          <span class="mr-doc-no mono">{{ d.领料单号 }}</span>
-          <span class="mr-tag">{{ tt(d.领料类型 || '组装') }}</span>
-          <span class="mr-doc-can num">{{ tt('可退') }} {{ fmtQty(d.可退数量) }}</span>
+      <template v-if="openOpen">
+        <div v-if="!list.length" class="mr-empty">{{ tt('没有可退的领料单（需要先领料、且材料出库单被仓管审核）') }}</div>
+        <div
+          v-for="d in list"
+          :key="d.id"
+          class="mr-doc"
+          :class="{ 'is-cur': cur && cur.id === d.id }"
+          @click="select(d)"
+        >
+          <div class="mr-doc-l1">
+            <span class="mr-doc-no mono">{{ d.领料单号 }}</span>
+            <span class="mr-tag">{{ tt(d.领料类型 || '组装') }}</span>
+            <span class="mr-doc-can num">{{ tt('可退') }} {{ fmtQty(d.可退数量) }}</span>
+          </div>
+          <div class="mr-doc-l2">
+            <span>{{ d.工单号 }}<i v-if="d.工单行号"> #{{ d.工单行号 }}</i></span>
+            <span>{{ d.产品名称 || d.产品编号 || '—' }}</span>
+          </div>
+          <div class="mr-doc-l3">
+            <span>{{ tt('已领') }} {{ fmtQty(d.已领数量) }}</span>
+            <span>{{ tt('已退') }} {{ fmtQty(d.已退数量) }}</span>
+            <span>{{ tt('可退项数') }} {{ d.可退项数 || 0 }}</span>
+            <!-- 显式按钮:手机上比"整行点"更好按,也避免整行点击被内部元素吃掉 -->
+            <el-button text size="small" class="mr-pick" type="primary" @click.stop="select(d)">
+              {{ tt('选这张退料') }}
+            </el-button>
+          </div>
         </div>
-        <div class="mr-doc-l2">
-          <span>{{ d.工单号 }}<i v-if="d.工单行号"> #{{ d.工单行号 }}</i></span>
-          <span>{{ d.产品名称 || d.产品编号 || '—' }}</span>
+      </template>
+    </section>
+
+    <!-- ③ 退料作业:点「选这张退料」→ **弹窗到明细**里扫码退料(2026-11-18 第二轮用户口径:
+         「不要下面这个退料作业,应该是和生产领料一样弹窗到明细再扫码退料也可以点击」) -->
+    <el-dialog
+      v-model="workVisible"
+      :title="tt('退料') + (cur ? ' · ' + cur.领料单号 : '')"
+      width="92%"
+      align-center
+      append-to-body
+      class="mr-work-dlg"
+      @closed="onWorkClosed"
+    >
+      <div v-if="cur" class="mr-work">
+        <!-- 弹窗里的提示条:页面顶部的提示会被遮罩挡住,扫错料时现场看不见(2026-11-18 实测) -->
+        <div v-if="errText" class="mr-err mr-err-inside">{{ errText }}</div>
+        <div class="mr-work-head">
+          <span class="mr-tag">{{ tt(cur.领料类型 || '组装') }}</span>
+          <span class="mr-work-wo">{{ cur.工单号 }}<i v-if="cur.工单行号"> #{{ cur.工单行号 }}</i></span>
+          <span class="mr-work-prod">{{ cur.产品名称 || cur.产品编号 || '—' }}</span>
         </div>
-        <div class="mr-doc-l3">
-          <span>{{ tt('已领') }} {{ fmtQty(d.已领数量) }}</span>
-          <span>{{ tt('已退') }} {{ fmtQty(d.已退数量) }}</span>
-          <span>{{ tt('可退项数') }} {{ d.可退项数 || 0 }}</span>
-          <!-- 显式按钮:手机上比"整行点"更好按,也避免整行点击被内部元素吃掉 -->
-          <el-button text size="small" class="mr-pick" type="primary" @click.stop="select(d)">
-            {{ cur && cur.id === d.id ? tt('已选中') : tt('选这张退料') }}
+
+        <div class="mr-row">
+          <el-input
+            ref="scanInput"
+            v-model="matText"
+            :placeholder="tt('扫物料码或输入物料编码')"
+            size="large"
+            clearable
+            @keyup.enter="scan"
+          />
+          <el-button size="large" :loading="scanning" @click="scan">{{ tt('查询') }}</el-button>
+        </div>
+
+        <div v-if="mat" class="mr-mat">
+          <div class="mr-mat-main">
+            <div class="mr-mat-name">{{ mat.名称 || mat.编码 }}</div>
+            <div class="mr-mat-meta">
+              {{ mat.编码 }} · {{ mat.规格 || '—' }} · {{ mat.单位 || '—' }}
+              · {{ tt('已领') }} {{ fmtQty(mat.已领数量) }} / {{ tt('已退') }} {{ fmtQty(mat.已退数量) }}
+            </div>
+          </div>
+          <div class="mr-mat-can">
+            <b class="num">{{ fmtQty(mat.可退数量) }}</b>
+            <span>{{ tt('本次可退') }}</span>
+          </div>
+        </div>
+
+        <div v-if="mat" class="mr-qty">
+          <span class="mr-qty-lab">{{ tt('退料数量') }}</span>
+          <el-input-number v-model="qty" :min="0" :max="Number(mat.可退数量) || 0" :precision="4" :step="1" size="large" />
+          <span class="mr-qty-unit">{{ mat.单位 || '' }}</span>
+          <el-button type="primary" size="large" :disabled="!canAdd" @click="addLine">{{ tt('加入本次退料') }}</el-button>
+        </div>
+
+        <div class="mr-lines">
+          <div class="mr-lines-head">
+            <span>{{ tt('本次退料') }}</span>
+            <span class="mr-sec-num">{{ lines.length }}</span>
+          </div>
+          <div v-if="!lines.length" class="mr-empty">{{ tt('还没有扫码加入的物料') }}</div>
+          <div v-for="(l, i) in lines" :key="l.code" class="mr-line">
+            <div class="mr-line-main">
+              <span class="mr-line-name">{{ l.name || l.code }}</span>
+              <span class="mr-line-meta">{{ l.code }} · {{ l.spec || '—' }}</span>
+            </div>
+            <span class="mr-line-qty num">-{{ fmtQty(l.qty) }} {{ l.unit }}</span>
+            <el-button text type="danger" size="small" @click="removeLine(i)">{{ tt('移除') }}</el-button>
+          </div>
+        </div>
+
+        <div class="mr-foot">
+          <el-button size="large" @click="resetWork">{{ tt('清空') }}</el-button>
+          <el-button type="warning" size="large" :loading="submitting" :disabled="!lines.length" @click="submit">
+            {{ tt('提交退料') }}
           </el-button>
         </div>
       </div>
-    </section>
-
-    <!-- ③ 退料作业 -->
-    <section v-if="cur" class="mr-card">
-      <div class="mr-sec">
-        <span>{{ tt('退料作业') }}</span>
-        <span class="mr-cur-no mono">{{ cur.领料单号 }}</span>
-      </div>
-
-      <div class="mr-row">
-        <el-input
-          ref="scanInput"
-          v-model="matText"
-          :placeholder="tt('扫物料码或输入物料编码')"
-          size="large"
-          clearable
-          @keyup.enter="scan"
-        />
-        <el-button size="large" :loading="scanning" @click="scan">{{ tt('查询') }}</el-button>
-      </div>
-
-      <div v-if="mat" class="mr-mat">
-        <div class="mr-mat-main">
-          <div class="mr-mat-name">{{ mat.名称 || mat.编码 }}</div>
-          <div class="mr-mat-meta">
-            {{ mat.编码 }} · {{ mat.规格 || '—' }} · {{ mat.单位 || '—' }}
-            · {{ tt('已领') }} {{ fmtQty(mat.已领数量) }} / {{ tt('已退') }} {{ fmtQty(mat.已退数量) }}
-          </div>
-        </div>
-        <div class="mr-mat-can">
-          <b class="num">{{ fmtQty(mat.可退数量) }}</b>
-          <span>{{ tt('本次可退') }}</span>
-        </div>
-      </div>
-
-      <div v-if="mat" class="mr-qty">
-        <span class="mr-qty-lab">{{ tt('退料数量') }}</span>
-        <el-input-number v-model="qty" :min="0" :max="Number(mat.可退数量) || 0" :precision="4" :step="1" size="large" />
-        <span class="mr-qty-unit">{{ mat.单位 || '' }}</span>
-        <el-button type="primary" size="large" :disabled="!canAdd" @click="addLine">{{ tt('加入本次退料') }}</el-button>
-      </div>
-
-      <div class="mr-lines">
-        <div class="mr-lines-head">
-          <span>{{ tt('本次退料') }}</span>
-          <span class="mr-sec-num">{{ lines.length }}</span>
-        </div>
-        <div v-if="!lines.length" class="mr-empty">{{ tt('还没有扫码加入的物料') }}</div>
-        <div v-for="(l, i) in lines" :key="l.code" class="mr-line">
-          <div class="mr-line-main">
-            <span class="mr-line-name">{{ l.name || l.code }}</span>
-            <span class="mr-line-meta">{{ l.code }} · {{ l.spec || '—' }}</span>
-          </div>
-          <span class="mr-line-qty num">-{{ fmtQty(l.qty) }} {{ l.unit }}</span>
-          <el-button text type="danger" size="small" @click="removeLine(i)">{{ tt('移除') }}</el-button>
-        </div>
-      </div>
-
-      <div class="mr-foot">
-        <el-button size="large" @click="resetWork">{{ tt('清空') }}</el-button>
-        <el-button type="warning" size="large" :loading="submitting" :disabled="!lines.length" @click="submit">
-          {{ tt('提交退料') }}
-        </el-button>
-      </div>
-    </section>
+    </el-dialog>
 
     <!-- 扫工单码(分不出组装/混料)时的选择框;扫领料单纸面二维码不会走到这里 -->
     <PickKindDialog v-model="kindVisible" :docs="kindDocs" @pick="(d) => openDocById(d.id)" />
@@ -200,6 +217,10 @@ const locateLoading = ref(false)
 /** 工单码分不出组装/混料 ⇒ 弹窗选(de-bounce 同一工单只弹一次) */
 const kindVisible = ref(false)
 const kindDocs = ref([])
+/** 退料作业弹窗(2026-11-18 第二轮:作业区不再内联在列表下面) */
+const workVisible = ref(false)
+/** 可退单据分组展开/收起(与生产领料的未完成/已完成同一套) */
+const openOpen = ref(true)
 
 const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan)
 const baseUrl = (() => {
@@ -239,13 +260,16 @@ async function refreshAll() {
 }
 
 function select(d) {
-  if (cur.value && cur.value.id === d.id) return
-  // ⚠ must keep the doc: resetWork(false) clears cur —— 早先这里传了 false,
-  //   结果点行后作业区根本不出现(2026-11-18 实测)。
   cur.value = d
   resetWork(true)
-  // 选中单据后光标直接进物料扫码框(2026-11-16 PDA 连扫口径)
-  focusScanNow(() => scanInput.value, { delay: 150 })
+  // 2026-11-18 第二轮:作业区改成**弹窗**(点单即弹出明细),弹窗渲染完光标直接进物料扫码框
+  workVisible.value = true
+  focusScanNow(() => scanInput.value, { delay: 320 })
+}
+
+/** 弹窗关掉:连选中的单一起清(列表上的"当前"高亮随之消失) */
+function onWorkClosed() {
+  resetWork(false)
 }
 
 /** 清空作业区(keepDoc=false 时连选中的单据一起清) */
@@ -429,14 +453,16 @@ async function submit() {
     const no = String(d.退料单号 || '').trim()
     okText.value = `${tt('退料成功')}${no ? '：' + no : ''}`
     ElMessage.success(okText.value)
-    resetWork()
+    // 提交成功后关弹窗、回列表刷新(成功提示留在页面顶部)
+    workVisible.value = false
+    resetWork(false)
     await load()
   } catch (e) {
     errText.value = errMsgOf(e) || tt('退料失败')
   } finally {
     submitting.value = false
-    // 提交完光标回扫码框(下一项/下一单直接扫)
-    focusScanNow(() => scanInput.value, { delay: 200 })
+    // 提交完光标回「扫码定位」框(下一单直接扫)
+    focusScanNow(() => locateInput.value, { delay: 200 })
   }
 }
 
@@ -504,6 +530,28 @@ onActivated(() => {
   display: inline-block; min-width: 20px; text-align: center; padding: 0 6px; border-radius: 10px;
   background: var(--el-color-primary-light-9); color: var(--el-color-primary); font-size: 12px; font-weight: 400;
 }
+/* 分组头 = 展开/收起开关(与「生产领料」的未完成/已完成同一套观感) */
+.mr-grp-head {
+  display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; user-select: none;
+}
+.mr-grp-title { font-size: 14px; font-weight: 600; }
+.mr-grp-num {
+  min-width: 20px; padding: 0 6px; border-radius: 10px; text-align: center;
+  background: var(--el-color-primary-light-9); color: var(--el-color-primary); font-size: 12px;
+}
+.mr-grp-arrow {
+  margin-left: auto; font-size: 16px; color: var(--el-text-color-secondary);
+  transition: transform .15s ease; transform: rotate(0deg);
+}
+.mr-grp-arrow.open { transform: rotate(90deg); }
+
+/* 退料作业弹窗里的抬头(类型 / 工单 / 产品) */
+.mr-err-inside { margin: 0 0 10px; }
+.mr-work-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; font-size: 13px; color: var(--el-text-color-regular); }
+.mr-work-wo { font-variant-numeric: tabular-nums; }
+.mr-work-prod { margin-left: auto; color: var(--el-text-color-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mr-work-dlg :deep(.el-dialog__body) { padding-top: 8px; }
+
 .mr-row { display: flex; align-items: center; gap: 8px; }
 .mr-row-gap { margin-top: 8px; }
 .mr-row :deep(.el-input) { flex: 1; min-width: 0; }
