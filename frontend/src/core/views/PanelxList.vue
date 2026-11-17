@@ -2526,6 +2526,8 @@
       :visible="approvalPreviewOpen"
       :rows="list || []"
       :me="myApplicantName"
+      :owner-key="previewOwnerKey"
+      :subject="previewSubject"
       @close="approvalPreviewOpen = false"
       @jump="jumpToApprovalDoc"
     />
@@ -4960,12 +4962,17 @@ const canPreviewSide = computed(() => PREVIEW_SIDE_PANELS.has(String(panelCode.v
  * 挤在侧栏里根本看不清，所以单独开全屏浮层（组件 ApprovalPreviewOverlay）。
  * 其余面板（RD_PROD_INFO 等）继续走原来的右栏 DocSelectRail，行为逐字不变。</p>
  */
-const FULL_PREVIEW_PANELS = new Set(['RD_APPROVAL'])
+// 2026-11-17 用户口径：立项申请 + 产品信息表共用同一套「全屏单据预览」（左状态树 + 多条件查询栏）
+const FULL_PREVIEW_PANELS = new Set(['RD_APPROVAL', 'RD_PROD_INFO'])
 const canFullPreview = computed(() => FULL_PREVIEW_PANELS.has(String(panelCode.value)))
 /** 全屏预览浮层是否打开 */
 const approvalPreviewOpen = ref(false)
-/** 当前登录人姓名（= 表头「申请立项人」里存的值，用来筛「我申请的」） */
+/** 当前登录人姓名（用于「只看我申请的」判据） */
 const myApplicantName = computed(() => String(user.realName || '').trim())
+/** 全屏预览的「归属人」字段：立项申请看申请立项人；产品信息表没有该列，看编辑人（=制单人姓名） */
+const previewOwnerKey = computed(() => (String(panelCode.value) === 'RD_APPROVAL' ? '申请立项人' : '编辑人'))
+/** 全屏预览副标题里的面板名 */
+const previewSubject = computed(() => tt(String(panelName.value || '')))
 /** 右栏是否处于「单据预览」态 */
 const previewInSide = ref(false)
 /**

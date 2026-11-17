@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
   PREVIEW_COMPACT_CAP, PREVIEW_FIELDS, PREVIEW_SKIP, PREVIEW_VALUE_CAP,
-  filterApprovalPreview, previewLineText, previewSummaryOf,
+  approvalStatusTree, filterApprovalPreview, previewLineText, previewSummaryOf,
 } from './docPreview.js'
 
 /**
@@ -194,4 +194,54 @@ test('㉑ 当前登录人为空时不能误判成「全都不是我的」以外�
   // 拿不到姓名(未登录/匿名)时,「只看我的」应为空 —— 而不是把所有人的单都当自己的
   assert.deepEqual(filterApprovalPreview(APR_ROWS, { me: '', scope: 'mine' }), [])
   assert.equal(filterApprovalPreview(APR_ROWS, { me: '   ', scope: 'mine' }).length, 0)
+})
+
+/* ── 2026-11-17：参考金蝶「商品列表」升级预览（左状态树 + 多条件查询栏）── */
+test('filterApprovalPreview 支持 状态 / 等级 / 日期区间 三个新条件', () => {
+  const rows = [
+    { 单据编号: 'A-1', 申请立项人: '张三', 单据状态: '草稿', 项目等级: 'A', 单据日期: '2026-11-01' },
+    { 单据编号: 'A-2', 申请立项人: '张三', 单据状态: '已归档', 项目等级: 'B', 单据日期: '2026-11-10' },
+    { 单据编号: 'A-3', 申请立项人: '李四', 单据状态: '草稿', 项目等级: 'A', 单据日期: '2026-11-20' },
+  ]
+  const base = { me: '张三', scope: 'all' }
+  assert.equal(filterApprovalPreview(rows, base).length, 3)
+  // 状态
+  assert.deepEqual(filterApprovalPreview(rows, { ...base, status: '草稿' }).map((r) => r.单据编号), ['A-1', 'A-3'])
+  // 等级
+  assert.deepEqual(filterApprovalPreview(rows, { ...base, grade: 'A' }).map((r) => r.单据编号), ['A-1', 'A-3'])
+  // 日期区间（含边界）
+  assert.deepEqual(filterApprovalPreview(rows, { ...base, dateFrom: '2026-11-05', dateTo: '2026-11-15' }).map((r) => r.单据编号), ['A-2'])
+  assert.deepEqual(filterApprovalPreview(rows, { ...base, dateTo: '2026-11-01' }).map((r) => r.单据编号), ['A-1'], '只给结束日也要生效')
+  // 三个条件 AND
+  assert.deepEqual(filterApprovalPreview(rows, { ...base, status: '草稿', grade: 'A', dateFrom: '2026-11-15' }).map((r) => r.单据编号), ['A-3'])
+  // 没日期的行在按日期筛时不参与（不能当 0 通过）
+  assert.deepEqual(filterApprovalPreview([{ 单据编号: 'X', 单据状态: '草稿' }], { ...base, dateFrom: '2026-01-01' }).length, 0)
+})
+
+test('approvalStatusTree：按业务顺序排、只出有数据的状态、首项固定「全部」', () => {
+  const rows = [
+    { 单据状态: '已归档' }, { 单据状态: '草稿' }, { 单据状态: '草稿' }, { 单据状态: '审批中' },
+  ]
+  const tree = approvalStatusTree(rows)
+  assert.equal(tree[0].key, '')
+  assert.equal(tree[0].label, '全部')
+  assert.equal(tree[0].count, 4)
+  // 业务顺序：草稿 → 审批中 → 已归档（不是字典序）
+  assert.deepEqual(tree.slice(1).map((n) => n.label), ['草稿', '审批中', '已归档'])
+  assert.deepEqual(tree.slice(1).map((n) => n.count), [2, 1, 1])
+  // 空数据时只有「全部 0」
+  assert.deepEqual(approvalStatusTree([]), [{ key: '', label: '全部', count: 0 }])
+})
+
+test('产品信息表复用同一套预览：归属人字段可参数化为「编辑人」', () => {
+  const rows = [
+    { 单据编号: 'P-1', 编辑人: '张三' },
+    { 单据编号: 'P-2', 编辑人: '李四' },
+  ]
+  // 用 申请立项人 判据 → 一条都不匹配（产品信息表没这列）
+  assert.equal(filterApprovalPreview(rows, { me: '张三', scope: 'mine' }).length, 0)
+  // 传 ownerKey='编辑人' → 命中张三那张
+  assert.deepEqual(
+    filterApprovalPreview(rows, { me: '张三', scope: 'mine', ownerKey: '编辑人' }).map((r) => r.单据编号),
+    ['P-1'])
 })

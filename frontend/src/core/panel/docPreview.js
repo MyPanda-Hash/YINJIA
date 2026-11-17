@@ -117,12 +117,18 @@ function norm(v) {
   return v === undefined || v === null ? '' : String(v).trim().toLowerCase()
 }
 
-/** 范围：mine = 申请立项人 === 当前登录人；all = 不过滤 */
-export function inApplicantScope(row, me, scope) {
+/**
+ * 范围：mine = 该单的「归属人」=== 当前登录人；all = 不过滤。
+ *
+ * @param {string} [ownerKey] 归属人字段名。缺省 = 「申请立项人」（立项申请）；
+ *   产品信息表传 `'编辑人'`（它没有"申请立项人"这一列，制单人存在「编辑人」里）。
+ *   2026-11-17：产品信息表接入同一套全屏预览时参数化，避免把两套判据写死。
+ */
+export function inApplicantScope(row, me, scope, ownerKey = APPLICANT_KEY) {
   if (scope === 'all') return true
   const meName = norm(me)
   if (!meName) return false
-  const owner = norm(row && row[APPLICANT_KEY])
+  const owner = norm(row && row[ownerKey])
   return !!owner && owner === meName
 }
 
@@ -138,11 +144,55 @@ export function filterApprovalPreview(rows, opts) {
   const me = o.me || ''
   const scope = o.scope || 'mine'
   const kw = norm(o.keyword || '')
+  // 2026-11-17 新增三个条件（用户口径：参考金蝶「商品列表」的顶部查询栏）
+  const status = norm(o.status || '')     // 单据状态：'' = 不限
+  const grade = norm(o.grade || '')       // 项目等级：'' = 不限
+  const from = norm(o.dateFrom || '')     // 单据日期 >= from（yyyy-MM-dd，字符串比较即可）
+  const to = norm(o.dateTo || '')         // 单据日期 <= to
+  const ownerKey = o.ownerKey || APPLICANT_KEY
   const list = Array.isArray(rows) ? rows : []
   return list.filter(function (r) {
-    if (!inApplicantScope(r, me, scope)) return false
+    if (!inApplicantScope(r, me, scope, ownerKey)) return false
+    if (status && norm(r && r['单据状态']) !== status) return false
+    if (grade && norm(r && r['项目等级']) !== grade) return false
+    if (from || to) {
+      const d = norm(r && r['单据日期'])
+      if (!d) return false                      // 没日期的行在"按日期筛"时不参与
+      if (from && d < from) return false
+      if (to && d > to) return false
+    }
     if (!kw) return true
-    const hay = [r && r['单据编号'], r && r['客户名'], r && r[APPLICANT_KEY]].map(norm).join(' ')
+    const hay = [r && r['单据编号'], r && r['客户名'], r && r[ownerKey], r && r['产品名称']].map(norm).join(' ')
     return hay.indexOf(kw) >= 0
   })
+}
+
+/**
+ * 左侧「分类树」的节点 = 该面板里出现过的**单据状态**（按固定业务顺序，不按字符串排）。
+ *
+ * <p>用户口径（2026-11-17）：「左侧树按单据状态分」（参考金蝶的「商品类别」树）。</p>
+ *
+ * <p>为什么固定顺序：草稿 → 审批中 → 已审核 → 已归档 是业务推进顺序，
+ * 字典序排会变成「已归档、已审核、审批中、草稿」，读起来是倒的。</p>
+ *
+ * @returns {{ key: string, label: string, count: number }[]} count = 该状态的单据数，
+ *   只返回**有数据**的状态（空节点不画，避免满屏 0）；最前面固定一个「全部」。
+ */
+export function approvalStatusTree(rows) {
+  const ORDER = ['草稿', '修改中', '审批中', '待二级审批', '已审核', '已归档', '已作废']
+  const list = Array.isArray(rows) ? rows : []
+  const cnt = new Map()
+  for (const r of list) {
+    const k = String(r && r['单据状态'] || '').trim() || '未标注'
+    cnt.set(k, (cnt.get(k) || 0) + 1)
+  }
+  const keys = [...cnt.keys()].sort(function (a, b) {
+    const ia = ORDER.indexOf(a); const ib = ORDER.indexOf(b)
+    if (ia >= 0 && ib >= 0) return ia - ib
+    if (ia >= 0) return -1
+    if (ib >= 0) return 1
+    return a.localeCompare(b)
+  })
+  return [{ key: '', label: '全部', count: list.length }]
+    .concat(keys.map(function (k) { return { key: k, label: k, count: cnt.get(k) } }))
 }

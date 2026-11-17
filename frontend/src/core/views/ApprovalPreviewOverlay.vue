@@ -29,7 +29,7 @@
             <div class="apv-titles">
               <h1 class="apv-title">{{ tt('单据预览') }}</h1>
               <p class="apv-sub">
-                {{ tt('项目立项申请 · 按申请立项人筛选') }}
+                {{ props.subject ? tt(props.subject) + ' · ' : '' }}{{ tt('按归属人筛选') }}
               </p>
             </div>
           </div>
@@ -43,29 +43,63 @@
           </div>
         </header>
 
-        <!-- ② 筛选区：范围(我的/全部) + 关键字。搜索框走「信息池中找目标」的 Search 形态 -->
+        <!-- ② 查询栏（2026-11-17 参考金蝶「商品列表」的多条件形态）：
+             范围 → 关键字 → 单据状态 → 项目等级 → 日期区间 → 重置。
+             条件之间是 AND；「重置」只清条件、不动范围(我的/全部)。 -->
         <div class="apv-bar">
-          <el-radio-group v-model="scope" size="default" class="apv-scope">
-            <el-radio-button value="mine">
-              {{ tt('只看我申请的') }}
-            </el-radio-button>
+          <el-radio-group v-model="scope" size="default" class="apv-bar-item apv-scope">
+            <el-radio-button value="mine">{{ tt('只看我申请的') }}</el-radio-button>
             <el-radio-button value="all">{{ tt('全部') }}</el-radio-button>
           </el-radio-group>
           <el-input
             v-model="keyword"
-            class="apv-search"
+            class="apv-search apv-bar-item"
             clearable
             :placeholder="tt('搜索单据编号 / 客户名 / 申请立项人')"
           >
             <template #prefix><el-icon><Search /></el-icon></template>
           </el-input>
-          <span class="apv-me">
+          <el-select v-model="status" clearable class="apv-sel apv-bar-item" :placeholder="tt('单据状态')">
+            <el-option v-for="n in treeNodes.slice(1)" :key="n.key" :label="tt(n.label)" :value="n.key" />
+          </el-select>
+          <el-select v-model="grade" clearable class="apv-sel apv-bar-item" :placeholder="tt('项目等级')">
+            <el-option v-for="g in gradeOptions" :key="g" :label="g" :value="g" />
+          </el-select>
+          <el-date-picker
+            v-model="dateRange"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            class="apv-date apv-bar-item"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            unlink-panels
+          />
+          <el-button class="apv-bar-item" @click="resetFilter">{{ tt('重置') }}</el-button>
+          <span class="apv-me apv-bar-item">
             {{ tt('当前登录人') }}：<b>{{ meName || '—' }}</b>
           </span>
         </div>
 
-        <!-- ③ 内容：表格（重要列靠左、数字右对齐、操作列固定右侧） -->
+        <!-- ③ 内容：左侧「单据状态」分类树 + 右侧表格
+             （2026-11-17 参考金蝶「商品列表」：左树给"看哪一类"、右表给"逐条比"） -->
         <div class="apv-body">
+          <aside class="apv-tree" :aria-label="tt('按状态分类')">
+            <div class="apv-tree-head">{{ tt('状态') }}</div>
+            <ul class="apv-tree-list">
+              <li
+                v-for="n in treeNodes"
+                :key="n.key || 'all'"
+                class="apv-tree-item"
+                :class="{ on: n.key === treeKey }"
+                :title="tt('在当前的「我的/全部」范围内按状态筛选')"
+                @click="pickTree(n.key)"
+              >
+                <span class="apv-tree-label">{{ tt(n.label) }}</span>
+                <span class="apv-tree-count">{{ n.count }}</span>
+              </li>
+            </ul>
+          </aside>
+          <div class="apv-table-wrap">
           <el-table
             v-if="filtered.length"
             :data="filtered"
@@ -125,13 +159,14 @@
             </p>
             <p class="apv-empty-d">
               {{ scope === 'mine'
-                ? tt('单据的「申请立项人」要填你本人姓名，才会出现在这里')
+                ? tt('单据的「{f}」要填你本人姓名，才会出现在这里').replace('{f}', tt(props.ownerKey || '申请立项人'))
                 : tt('换个关键字，或切到「全部」看看') }}
             </p>
             <el-button v-if="scope === 'mine'" @click="scope = 'all'">
               {{ tt('查看全部单据') }}
             </el-button>
             <el-button v-else @click="resetFilter">{{ tt('清空筛选') }}</el-button>
+          </div>
           </div>
         </div>
       </section>
@@ -143,31 +178,76 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
-import { filterApprovalPreview } from '@/core/panel/docPreview'
+import { approvalStatusTree, filterApprovalPreview } from '@/core/panel/docPreview'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
   /** 当前面板已取全的单据行（父组件负责取数） */
   rows: { type: Array, default: () => [] },
-  /** 当前登录人姓名（= 表头字段「申请立项人」里的值，用来判「我申请的」） */
+  /** 当前登录人姓名（= 表头「申请立项人」/「编辑人」里的值，用来判「我申请的」） */
   me: { type: String, default: '' },
+  /** 归属人字段名：立项申请=申请立项人（缺省）；产品信息表=编辑人 */
+  ownerKey: { type: String, default: '' },
+  /** 副标题里的面板名（如「项目立项申请」「产品信息表」） */
+  subject: { type: String, default: '' },
 });
 const emit = defineEmits(['close', 'jump'])
 
 /** 'mine' = 只看我申请的（默认，用户口径的正面需求）；'all' = 代查/管理员 */
 const scope = ref('mine')
 const keyword = ref('')
+// 2026-11-17 新增：左侧分类树 + 三个查询条件（参考金蝶「商品列表」）
+const treeKey = ref('')          // '' = 全部
+const status = ref('')           // 与 treeKey 联动（点树即设状态，选状态下拉即跳树）
+const grade = ref('')
+const dateRange = ref([])        // ['2026-11-01','2026-11-17'] 或 []
 const meName = computed(() => String(props.me || '').trim())
+
+/** 左树节点 = 数据里出现过的单据状态（空节点不画） */
+const treeNodes = computed(() => approvalStatusTree(props.rows))
+
+/** 项目等级下拉候选 = 数据里去重后的非空值 */
+const gradeOptions = computed(() => {
+  const set = new Set()
+  for (const r of props.rows || []) {
+    const v = String(r && r['项目等级'] || '').trim()
+    if (v) set.add(v)
+  }
+  return [...set].sort()
+})
 
 const filtered = computed(() => filterApprovalPreview(props.rows, {
   me: meName.value,
   scope: scope.value,
   keyword: keyword.value,
+  ownerKey: props.ownerKey || undefined,
+  status: status.value,
+  grade: grade.value,
+  dateFrom: (dateRange.value && dateRange.value[0]) || '',
+  dateTo: (dateRange.value && dateRange.value[1]) || '',
 }))
+
+/**
+ * 点树节点 = 设状态（与状态下拉同一真源）。
+ *
+ * ⚠ 这里**不切 scope**（我的/全部）：
+ *   树是"在这些单据里按状态分类"，而「我的/全部」是"看谁的单据"，两者维度不同。
+ *   用户点「草稿」想表达的是"我草稿箱里的"，不是"所有人草稿"。
+ *   要看别人的单，明确点上方「全部」—— 这是金蝶那套交互的同一口径
+ *   （左树只管分类，范围由顶部范围控件决定）。
+ */
+function pickTree(key) {
+  treeKey.value = key || ''
+  status.value = key || ''
+}
 
 function resetFilter() {
   keyword.value = ''
   scope.value = 'mine'
+  treeKey.value = ''
+  status.value = ''
+  grade.value = ''
+  dateRange.value = []
 }
 
 /** 状态胶囊配色：完成=绿 / 进行中=蓝 / 草稿等=灰（与列表页同一套语义） */
@@ -180,6 +260,8 @@ function statusTone(s) {
 
 /** 每次打开都回到默认态（「只看我申请的」），避免上次的筛选残留让人误以为没数据 */
 watch(() => props.visible, (v) => { if (v) resetFilter() })
+/** 状态下拉与左树是同一真源，任一侧变化都要同步另一侧的高亮 */
+watch(status, (v) => { treeKey.value = v || '' })
 
 /** Esc 关闭（全屏浮层的常规预期） */
 function onKey(e) { if (e.key === 'Escape' && props.visible) emit('close') }
@@ -269,9 +351,66 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
 .apv-me { font-size: 13px; color: rgba(0, 0, 0, 0.45); }
 .apv-me b { color: rgba(0, 0, 0, 0.88); font-weight: 600; }
 
-/* ③ 内容区：表格撑满剩余高度，内部滚动 */
-.apv-body { flex: 1 1 auto; min-height: 0; padding: 16px 24px 24px; box-sizing: border-box; display: flex; flex-direction: column; }
+/* ③ 内容区：左「状态树」+ 右表格（2026-11-17 参考金蝶「商品列表」）
+   树宽 200px 固定；表格占余下全部并内部滚动。
+   取值仍是设计库：borderRadius 6 / colorBorderSecondary #f0f0f0 / padding 8·12 */
+.apv-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 16px 24px 24px;
+  box-sizing: border-box;
+  display: flex;
+  gap: 16px;
+  flex-direction: row;
+}
+.apv-tree {
+  flex: none;
+  width: 200px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+.apv-tree-head {
+  flex: none;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 20px;
+  color: rgba(0, 0, 0, 0.45);
+  border-bottom: 1px solid #f0f0f0;
+  background: rgba(0, 0, 0, 0.02);
+}
+.apv-tree-list { flex: 1 1 auto; min-height: 0; overflow: auto; margin: 0; padding: 4px; list-style: none; }
+.apv-tree-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 22px;
+  color: rgba(0, 0, 0, 0.88);
+}
+.apv-tree-item:hover { background: rgba(0, 0, 0, 0.04); }
+.apv-tree-item.on { background: #e6f4ff; color: #1677ff; font-weight: 600; }
+.apv-tree-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.apv-tree-count {
+  flex: none;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.45);
+  font-variant-numeric: tabular-nums;
+}
+.apv-tree-item.on .apv-tree-count { color: #1677ff; }
+.apv-table-wrap { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .apv-table { flex: 1 1 auto; min-height: 0; }
+/* 查询栏控件宽度：下拉 140、日期 260，避免把一行挤爆 */
+.apv-sel { width: 140px; }
+.apv-date { width: 260px; }
 /* 数字列右对齐 + 等宽（设计库硬规则） */
 .apv-num { font-variant-numeric: tabular-nums; color: rgba(0, 0, 0, 0.88); }
 .apv-no { font-variant-numeric: tabular-nums; letter-spacing: 0.2px; }
@@ -306,6 +445,12 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKey))
 .apv-empty-d { margin: 0 0 8px; font-size: 13px; line-height: 20px; color: rgba(0, 0, 0, 0.45); text-align: center; }
 
 /* 响应式三档：1440 / 768 / 375 都不得横向溢出 */
+@media (max-width: 900px) {
+  /* 窄屏：树改成横向一排，不占满高度 */
+  .apv-body { flex-direction: column; }
+  .apv-tree { width: 100%; max-height: 132px; }
+  .apv-tree-list { display: flex; flex-wrap: wrap; gap: 4px; }
+}
 @media (max-width: 768px) {
   .apv-mask { padding: 0; }
   .apv-panel { border-radius: 0; border: none; }
