@@ -81,11 +81,10 @@
         <el-table-column :label="tt('数量')" width="140">
           <template #default="{ row }">
             <span v-if="row.kind === 'line'" class="pmw-cur">{{ fmt(row.L.row['实收数量']) }}</span>
-            <!-- 最后一行是"自动"行:数量 = 可入库数量 − 其它行,不用手填(用户口径「填写要做到自动计算」) -->
+            <!-- 每一行都能改(用户口径「上下都可以改,只要提示不超过总数量」):
+                 不做自动分配;填多了底部红字提示、确定置灰,填少了余量留在原行 -->
             <el-input-number v-else v-model="row.a['数量']" :min="0" :max="maxOf(row.L)" :controls="false"
-                             size="small" :disabled="row.i === row.L.allocs.length - 1"
-                             :title="row.i === row.L.allocs.length - 1 ? tt('自动 = 可入库数量 − 其它仓库') : ''"
-                             style="width: 100%" @change="recalcRemainder(row.L)" />
+                             size="small" style="width: 100%" />
           </template>
         </el-table-column>
         <el-table-column :label="tt('已分配 / 剩余')" width="140" align="right">
@@ -109,6 +108,7 @@
       <div class="pmw-foot">
         <span>{{ tt('要拆分的行') }}: <b>{{ splitLineCount }}</b> · {{ tt('拆出来') }}: <b>{{ willSplitRows }}</b> {{ tt('行') }}</span>
         <span v-if="problem" class="pmw-problem">{{ problem }}</span>
+        <span v-else-if="remainderHint" class="pmw-hint">{{ remainderHint }}</span>
       </div>
     </div>
     <template #footer>
@@ -220,6 +220,12 @@ const problem = computed(() => {
 
 const canSubmit = computed(() => !saving.value && splitLineCount.value > 0 && !problem.value)
 
+/** 填少了不算错:余量留在原行(原仓库),这里只做一句非阻断提示 */
+const remainderHint = computed(() => {
+  const hit = lines.find((L) => (L.allocs || []).length >= 2 && remainingOf(L) > 0)
+  return hit ? tt('剩余 {n} 会留在原行（原仓库）').replace('{n}', fmt(remainingOf(hit))) : ''
+})
+
 /**
  * 打开时把"拆过的行"按 [源行id] 归组:**父行 + 缩进子行**(2026-11-17 用户口径
  * 「从那一行分出来的,进去的时候缩进还在」)。没拆过的行原样一条。
@@ -263,7 +269,6 @@ async function onOpen() {
         }))
       : []
     const L = { key: String(gid || r.id || 'new' + i), seq: i + 1, row: r, allocs, groupRows }
-    recalcRemainder(L)
     lines.push(L)
   }
   try {
@@ -276,19 +281,12 @@ async function onOpen() {
 }
 
 /**
- * 自动计算:每一行的**最后一条**仓库子行是"剩余行",数量 = 可入库数量 − 其它子行合计。
- * 用户只填前面的行,最后一行自动跟上(2026-11-17 用户口径「这个填写要做到自动计算」);
- * 增加/删除子行、改前面行的数量都会重算它,所以合计永远正好等于可入库数量。
+ * 每行最后一条仓库子行:
+ * (2026-11-17 第六轮用户口径「上下都可以改,只要提示不超过总数量。不用自动计算了」)
+ * —— 不再自动分配;所有子行都手填,填多了底部红字提示 + 确定置灰,填少了余量留在原行。
  */
-function recalcRemainder(L) {
-  const list = L?.allocs || []
-  if (!list.length) return
-  const last = list[list.length - 1]
-  const others = list.slice(0, -1).reduce((s, a) => s + Math.max(0, numOr0(a['数量'])), 0)
-  last['数量'] = Math.max(0, Math.round((maxOf(L) - others) * 10000) / 10000)
-}
 
-/** ▾:给这一行再加一个仓库子行(第一行默认原仓库 + 整行数量,后面加的从 0 起,用户自己分) */
+/** ▾:给这一行再加一个仓库子行(默认从 0 起,用户自己分) */
 function addAlloc(L) {
   if (!hasId(L)) {
     ElMessage.warning(tt('请先保存单据，再拆分仓库'))
@@ -300,12 +298,10 @@ function addAlloc(L) {
     仓位编码: first ? String(L.row['仓位编码'] || '') : '',
     数量: first ? maxOf(L) : 0,
   })
-  recalcRemainder(L)
 }
 
 function removeAlloc(L, index) {
   L.allocs.splice(index, 1)
-  recalcRemainder(L)
 }
 
 /** 「合并回一行」= 回退:只留第一个仓库子行(数量取整组合计),确定后服务端把子行合回父行 */
@@ -367,6 +363,7 @@ async function confirm() {
 .pmw-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; font-size: 12.5px; color: #46586e; }
 .pmw-foot b { color: #1e6fb8; }
 .pmw-problem { color: #c84d3f; }
+.pmw-hint { color: #8b9893; }
 .pmw .bad { color: #c84d3f; }
 :deep(.pmw-alloc-row) { background: #f6faf9; }
 :deep(.pmw-alloc-row td) { padding-top: 3px; padding-bottom: 3px; }

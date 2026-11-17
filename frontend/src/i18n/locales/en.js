@@ -6325,8 +6325,8 @@ export default {
     '该行各仓库数量合计不能超过可入库数量': 'The total per line cannot exceed the receivable qty',
     '该行还剩 {n} 没有分配，且原行没有仓库，请分完或先给原行选仓库': 'Line still has {n} unallocated and no warehouse on the original line; allocate it all or pick a warehouse for the line first',
     '合并回一行': 'Merge back into one line',
-    '自动 = 可入库数量 − 其它仓库': 'Auto = receivable qty − other warehouses',
     '同一行不能出现重复的仓库（仓位）': 'The same warehouse (bin) cannot appear twice on one line',
+    '剩余 {n} 会留在原行（原仓库）': 'The remaining {n} stays on the original line (original warehouse)',
   },
 
 }

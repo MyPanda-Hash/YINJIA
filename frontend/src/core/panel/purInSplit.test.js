@@ -120,12 +120,14 @@ test('② 弹窗:每行 ▾ 加一行仓库子行,合计不超过可入库数量
   assert.ok(/:disabled="!canSubmit"/.test(dlg), '校验不过时不许提交')
 })
 
-test('② 自动计算:最后一条仓库子行 = 可入库数量 − 其它行(禁用输入),并拦同仓重复', () => {
+test('② 数量:上下都能改,不做自动分配;超过可入库数量才提示并拦住', () => {
   const dlg = src('./../views/PurInMultiWhDialog.vue')
-  assert.ok(/function recalcRemainder\(/.test(dlg), '缺自动计算(最后一行吃余量)')
-  assert.ok(/recalcRemainder\(L\)/.test(dlg), '加行/删行/改数量后要重算余量')
-  assert.ok(/@change="recalcRemainder\(row\.L\)"/.test(dlg), '改前面的行要触发重算')
-  assert.ok(/:disabled="row\.i === row\.L\.allocs\.length - 1"/.test(dlg), '最后一行是自动行,不允许手填')
+  // 第六轮用户口径「上下都可以改,只要提示不超过总数量。不用自动计算了」
+  assert.ok(!/recalcRemainder/.test(dlg), '自动分配已按用户口径撤掉')
+  assert.ok(!/disabled="row\.i === row\.L\.allocs\.length - 1"/.test(dlg), '最后一行也要能改')
+  assert.ok(/@change="recalcRemainder/.test(dlg) === false, '不该再有自动重算')
+  assert.ok(/该行各仓库数量合计不能超过可入库数量/.test(dlg), '超过总数量要提示')
+  assert.ok(/剩余 \{n\} 会留在原行（原仓库）/.test(dlg), '填少了只是一句非阻断提示(余量留原行)')
   assert.ok(/同一行不能出现重复的仓库（仓位）/.test(dlg), '同仓同仓位重复要拦(否则金蝶收到两条一样的分录)')
 })
 

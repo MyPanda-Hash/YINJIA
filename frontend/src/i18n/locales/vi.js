@@ -3061,8 +3061,8 @@ export default {
     '该行各仓库数量合计不能超过可入库数量': 'Tổng theo dòng không được vượt số lượng có thể nhập',
     '该行还剩 {n} 没有分配，且原行没有仓库，请分完或先给原行选仓库': 'Dòng còn {n} chưa phân bổ và dòng gốc chưa có kho; hãy phân bổ hết hoặc chọn kho trước',
     '合并回一行': 'Gộp lại một dòng',
-    '自动 = 可入库数量 − 其它仓库': 'Tự động = số lượng có thể nhập − kho khác',
     '同一行不能出现重复的仓库（仓位）': 'Không được trùng kho (vị trí) trên cùng một dòng',
+    '剩余 {n} 会留在原行（原仓库）': 'Phần còn lại {n} giữ ở dòng gốc (kho gốc)',
   },
 
 }

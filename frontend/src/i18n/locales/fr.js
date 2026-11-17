@@ -3057,8 +3057,8 @@ export default {
     '该行各仓库数量合计不能超过可入库数量': 'La somme par ligne ne peut pas dépasser la quantité réceptionnable',
     '该行还剩 {n} 没有分配，且原行没有仓库，请分完或先给原行选仓库': 'La ligne a {n} non affecté et aucune ligne d’origine avec entrepôt ; affectez tout ou choisissez d’abord un entrepôt',
     '合并回一行': 'Refusionner en une ligne',
-    '自动 = 可入库数量 − 其它仓库': 'Auto = quantité réceptionnable − autres entrepôts',
     '同一行不能出现重复的仓库（仓位）': 'Le même entrepôt (emplacement) ne peut pas apparaître deux fois sur une ligne',
+    '剩余 {n} 会留在原行（原仓库）': 'Le reste ({n}) demeure sur la ligne d’origine (entrepôt d’origine)',
   },
 
 }
