@@ -174,7 +174,9 @@
               />
               <el-select
                 v-else-if="editable && c.kind === 'select'" v-model="row[c.key]" size="small"
-                class="as-cell-input sg-cell-input" :clearable="false" @change="emit('dirty')"
+                class="as-cell-input sg-cell-input"
+                :class="c.key === '样品状态' ? ('st-' + stateTone(row[c.key])) : ''"
+                :clearable="false" @change="emit('dirty')"
               >
                 <el-option v-for="o in (c.options || [])" :key="o" :label="tt(o)" :value="o" />
               </el-select>
@@ -198,6 +200,10 @@
                 :maxlength="c.max || 500" :rows="gridTextRows" resize="none"
                 class="as-fill-input sg-cell-area" :placeholder="c.hint ? tt(c.hint) : ''" @input="emit('dirty')"
               />
+              <!-- 样品状态底色（2026-11-17 用户口径，Excel #4）：
+                   「状态下拉描述：待确认（填充红色）/ 已确认（黄色）/ 已安排（黄色）/ 已完成（绿色）」。
+                   只读态给带底色的胶囊；编辑态仍是 el-select（下拉里给色块会干扰选择）。 -->
+              <span v-else-if="c.key === '样品状态' && row[c.key]" class="sg-state" :class="'st-' + stateTone(row[c.key])">{{ tt(row[c.key]) }}</span>
               <span v-else class="sg-ro">{{ row[c.key] || '' }}</span>
             </td>
           </tr>
@@ -975,6 +981,23 @@ const canStageComplete = computed(() => !props.editable && props.audited && prop
 const isGrid = computed(() => props.config?.layout === 'grid')
 const gridCfg = computed(() => props.config?.grid || {})
 const gridInfo = computed(() => props.config?.info || [])
+/**
+ * 样品状态 → 底色档位（2026-11-17 用户口径，Excel #4）。
+ *
+ * <p>用户原话：「状态下拉描述：样品状态选择后对样品状态的底色填充要求：
+ *   一待确认（填充红色）/ 二已确认（黄色）/ 三已安排（黄色）/ 四已完成（绿色）」。</p>
+ *
+ * <p>三档而不是四档：已确认与已安排**同为黄色**（用户就是这么给的）；
+ * 未知/空值落到 none（灰），不猜颜色。</p>
+ */
+function stateTone(v) {
+  const t = String(v ?? '').trim()
+  if (t === '待确认') return 'red'
+  if (t === '已确认' || t === '已安排') return 'yellow'
+  if (t === '已完成') return 'green'
+  return 'none'
+}
+
 const gridCols = computed(() => gridCfg.value.cols || [])
 const gridW = computed(() => gridCols.value.reduce((s, c) => s + (c.w || 0), 0))
 const gridInfoH = computed(() => gridCfg.value.infoH || 48)
@@ -1539,6 +1562,27 @@ defineExpose({ focusField })
   padding: 0 2px;
 }
 .sg-table .sg-cell-date { width: 100%; }
+/* 样品状态底色（2026-11-17，Excel #4）：待确认红 / 已确认·已安排黄 / 已完成绿。
+   取设计库语义色：error-1 #fff1f0·error-6 #cf1322 / warning-1 #fffbe6·warning-6 #d48806 /
+   success-1 #f6ffed·success-6 #389e0d；只读态给胶囊，编辑态给输入框描边+浅底。 */
+.sg-state {
+  display: inline-block;
+  min-width: 52px;
+  padding: 0 8px;
+  line-height: 20px;
+  border-radius: 10px;
+  font-size: 12px;
+  text-align: center;
+  border: 1px solid transparent;
+}
+.sg-state.st-red { color: #cf1322; background: #fff1f0; border-color: #ffa39e; }
+.sg-state.st-yellow { color: #d48806; background: #fffbe6; border-color: #ffe58f; }
+.sg-state.st-green { color: #389e0d; background: #f6ffed; border-color: #b7eb8f; }
+.sg-state.st-none { color: rgba(0, 0, 0, 0.45); background: #fafafa; border-color: #f0f0f0; }
+/* 编辑态：给 el-select 套同样的浅底（描边由组件自己画，只染底色避免打架） */
+.sg-cell-input.st-red { background: #fff1f0; border-radius: 4px; }
+.sg-cell-input.st-yellow { background: #fffbe6; border-radius: 4px; }
+.sg-cell-input.st-green { background: #f6ffed; border-radius: 4px; }
 .sg-ro {
   display: block;
   font-size: 13px;

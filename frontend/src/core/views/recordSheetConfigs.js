@@ -489,21 +489,31 @@ const RD_MOLD_FORMULA = {
       //   合计不能当一列普通数字相加(用户 2026-11-11 口径「设计添加量的和只需要计算 % 的就行,
       //   这个最终的数值一定是 100%」)⇒ 交给 core/mold/recipeExport.designTotalText 只加 % 行。
       //   其余列仍走 sumTotals 那套「位数跟明细走」。
-      { page: 1, bar: '配方表', autoSeqBar: true, totalCols: true, designTotal: '设计添加量', recipeCalc: true, blankRows: 10, filterKey: '表区', filterVal: '配方表', cols: [
-          { key: '序号', label: 'No.' },
+      // 2026-11-17 用户口径（Excel #9 打印截图，红字标注）：
+      //  · 「行距太大」—— 该表没给 rowH，行高被内容撑开（截图里一行 ≈ 100px+）。
+      //    给 rowH 43（与同面板其它页一致），行距立回纸面正常值；
+      //  · 「列宽太窄」—— 设计添加量按 grid 只分到 41px，而 `5.70%` 需要 ~52px，
+      //    于是数字被压成竖排（5/7/0/% 四行）。靠 span 调不动（grid 是固定 13 列），
+      //    改由 dataTable 的 cols 显式给 w（覆盖 span 兜底宽度），并让「物料名称」让出 17px 平账。
+      { page: 1, bar: '配方表', autoSeqBar: true, totalCols: true, designTotal: '设计添加量', recipeCalc: true, blankRows: 10, rowH: 43, filterKey: '表区', filterVal: '配方表', cols: [
+          { key: '序号', label: 'No.', w: 81 },
           // 物料种类:普通文本格(2026-10-16 用户口径)。原来这里是 type:'select' 的下拉 —— 页 2 这格
           // 没有"筛选候选"的职责(候选筛选在配方计算弹窗里),而"防写出引擎认不出的词"改由手填物料编号
           // 带出档案类别来承担(见 invCarry.pickInvKind;引擎认不出的类别一律不补)。
-          { key: '物料种类', label: '物料种类', span: 2 },
+          // ⚠ 本表一旦有列带 w，wideSheetNarrow.test 就要求**所有可见列 w 之和 = 780**
+          //   （colgroup 不能比章节宽/窄）。故这里逐列给足，替掉原来的 span 兜底。
+          { key: '物料种类', label: '物料种类', span: 2, w: 127 },
           // 物料编号:商品档案**远程模糊筛选下拉**(2026-10-16 用户口径:「输入 Y 或者 003 时
           // 模糊搜索到含这些数字字母的」,例 YJ-LL-003)。type='inv-code' 由 RecordSheetPanels 渲染成
           // el-select(remote + filterable + allow-create):打字才联网、候选封顶 50、档案里没有的编码照旧能手打;
           // 选中后仍走 onDetailTextCommit 把 物料名称/物料种类 一并带出。口径见 core/panel/invCarry.js。
-          { key: '物料编号', label: '物料编号', span: 4, type: 'inv-code' },
-          { key: '物料名称', label: '物料名称', span: 3 },
-          { key: '实际添加比例', label: '实际添加\n比例%' },
-          { key: '单支物料含量', label: '单支\n物料含量g' },
-          { key: '设计添加量', label: '设计添加\n量' },
+          { key: '物料编号', label: '物料编号', span: 4, w: 181, type: 'inv-code' },
+          { key: '物料名称', label: '物料名称', span: 3, w: 172 },
+          // 2026-11-17：三列都显式给宽（原来只靠 span 分 grid 余量，设计添加量只剩 41px）
+          //   58px 可容 `100.00%`（最长）；单支含量给 66px 容 `77.04`；比例给 91px 不变。
+          { key: '实际添加比例', label: '实际添加\n比例%', w: 91 },
+          { key: '单支物料含量', label: '单支\n物料含量g', w: 66 },
+          { key: '设计添加量', label: '设计添加\n量', w: 62 },
         ]},
     ],
     tailSections: [

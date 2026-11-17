@@ -314,7 +314,7 @@
                 </td>
               </template>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(pair.key) }" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
-                <div v-if="editable && isRefKey(pair.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(pair.key)">
+                <div v-if="editable && isRefKey(pair.key)" class="rs-ref-ctl" :class="{ 'has-dev': devStatus && devKey === pair.key }" :title="tt('点击选择')" @click="openProdRef(pair.key)">
                   <span class="rs-ref-text">{{ head[pair.key] || tt('点击选择') }}</span>
                   <span v-if="devStatus && devKey === pair.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
                   <el-icon class="rs-ref-ico"><Search /></el-icon>
