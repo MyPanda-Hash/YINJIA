@@ -1195,10 +1195,11 @@ export const recordSheetConfigs = {
     // 受影响的只有跨这几条内部竖线的格子,且幅度极小(产品名称 170→175、炭棒规格1/2/3 70→70/78/77);
     // B:C/D:G/H:I/J:K 这些**块宽一分未动**,其它行的格子宽度逐像素不变。
     grid: [98, 68, 68, 64, 52, 58, 58, 75, 52, 94, 93],
-    // 2026-11-17 用户口径(1117问题 #1)：右上角一律印**固定文件编号**，不是单据号；
+    // 2026-11-17 用户口径(1117问题 #1)：右上角一律印**固定文件编号**、且前缀写「文件编号」
+    //   （用户原话「重新改-编号有变动 / **不要写单据编号**」）——不是单据号；
     //   对照表给的是「烧结工艺管控清单 YJ-QR-146 / 烧结配方管控清单 YJ-QR-154」
     //   ⇒ 去掉原来的 -1 后缀，并给第 2 页(配方管控清单)单独一个号(页级 docNoStatic 覆盖顶层)。
-    head: { title: 7, infoLabel: 2, infoValue: 2, docnoPrefix: '单据编号', docNoKey: '单据编号' },
+    head: { title: 7, infoLabel: 2, infoValue: 2, docnoPrefix: '文件编号', docNoKey: '单据编号' },
     docNoStatic: 'YJ-QR-146',
     // ── 页签:三页**各用各的原始版式**(合并时曾统一成 11 列并把页 2 跨列重排,已恢复原设计)──
     // showHead:true —— 页 1/页 2 原本都是**独立一张单据**(工艺管控清单 / 配方管控清单),各自有自己的报告头;
@@ -1322,7 +1323,7 @@ export const recordSheetConfigs = {
     // 报告头三段跨度 7+2+3 = 12
     // 2026-11-17 用户口径(1117问题 #1 对照表)：X烧结工艺清单 = **YJ-QR-157**
     //   （11-06 那版按截图填了 146-1，与烧结工艺清单同号；本次按用户给的清单改正）
-    head: { title: 7, infoLabel: 2, infoValue: 3, docnoPrefix: '单据编号', docNoKey: '单据编号' },
+    head: { title: 7, infoLabel: 2, infoValue: 3, docnoPrefix: '文件编号', docNoKey: '单据编号' },
     docNoStatic: 'YJ-QR-157',
     pages: [
       { title: 'X烧结配方工艺管控清单', grid: [81, 52, 88, 70, 50, 50, 57, 122, 60, 50, 50, 50], showHead: true },
@@ -1556,7 +1557,7 @@ export const recordSheetConfigs = {
     // 2026-11-06 用户口径 A（截图「11.5 问题点汇总」第 1 条）：「产品文件右上角全部是文件编号，固定的」
     //   产品信息表 = YJ-QR-152。单据自身编号（PI-…）仍在左侧选单栏与产品文件列表里；
     //   两张单靠「产品编号」关联（用户口径：「单据之间就通过产品编号来关联就行和现在一样」）。
-    head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
+    head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '文件编号', docNoKey: '单据编号' },
     docNoStatic: 'YJ-QR-152',
     sections: [
       // 一、产品基本信息 = 设计 B25:E27 三行(产品编号|客户项目名称、客户料号|产品管控等级、产品功能类别|产品形态)
@@ -1735,7 +1736,7 @@ export const recordSheetConfigs = {
     // 与成型工艺管控清单(RD_MOLD_PROC)同一套;字段见 migrate-asm-proc-redesign-2026-09-20.sql §3。
     grid: [130, 260, 130, 260],
     // 2026-11-06 用户口径 A：组装工艺清单 = YJ-QR-144（固定表单编号；单据号 AP-… 仍在选单栏/产品文件列表）
-    head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
+    head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '文件编号', docNoKey: '单据编号' },
     docNoStatic: 'YJ-QR-144',
     info: [
       // 2026-10-28 用户口径「组装工艺的表单管理人修改为编辑人的账号姓名」:
@@ -2166,7 +2167,7 @@ export const recordSheetConfigs = {
     ],
     grid: [144, 144, 144, 144, 294, 165, 152],
     // 2026-11-06 用户口径 A：出货检验计划表 = YJ-QR-145（固定表单编号；单据号 IP-… 仍在选单栏）
-    head: { title: 5, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号', docNoKey: '单据编号' },
+    head: { title: 5, infoLabel: 1, infoValue: 1, docnoPrefix: '文件编号', docNoKey: '单据编号' },
     docNoStatic: 'YJ-QR-145',
     // 表头三行照设计 r5/r6/r7 逐格对位(每行 3 对 = 7 格;产品编号/产品功能类别/编写人 的值格跨 C:D):
     //   r5 [产品编号 | 客户项目名称 | 使用范围]
