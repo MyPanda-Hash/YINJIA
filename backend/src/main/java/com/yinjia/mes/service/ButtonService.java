@@ -901,6 +901,11 @@ public class ButtonService {
             // 明细行必填(2026-09-20):表头之外还有明细级必填(如 SO_ORDER 的
             // 数量/单价全在明细),只查表头等于这些面板没校验。
             ensureDetailRequiredFilled(def, items);
+            // 来料检验单「合格数量」必填(2026-11-17 用户口径「合格数量要设置为必填」):
+            // 上面那条通用校验对**缺键**的行是跳过的(视为选单/局部提交),而库里为 NULL 的列
+            // 在 getFormDescriptor 导出的明细行里**没有这个键** ⇒ 必填形同虚设(修前实测:「保存」200 通过)。
+            // 本面板改成"缺键按空算";草稿仍按用户口径豁免(只在本分支内)。
+            if ("QC_INSP".equals(def.code())) ensureInspOkQtyPresent(items);
         }
 
         Map<String, String> l2c = def.labelToCol();
@@ -1516,6 +1521,50 @@ public class ButtonService {
             if (ok + bad > qty + 1e-9) {
                 throw new IllegalStateException("第" + (i + 1) + "行 合格数量(" + trimZero(ok) + ")+不合格数量("
                         + trimZero(bad) + ") 超过送检数量(" + trimZero(qty) + ")，请核对");
+            }
+        }
+    }
+
+    /**
+     * 来料检验单「合格数量」必填 —— 保存路径(2026-11-17 用户口径「合格数量要设置为必填」)。
+     *
+     * <p>与通用 {@link #ensureDetailRequiredFilled} 的差别只有一条,但正是这条让"必填"形同虚设:
+     * 通用校验按「载荷里带了这个键」判,缺键视为选单/局部提交而跳过;而库里为 NULL 的列
+     * 在 getFormDescriptor 导出的明细行里**没有这个键** ⇒ 从界面载入一张"合格数量空着"的单
+     * 再保存,后端全部放行(2026-11-17 实测:保存 200)。这里对本面板改成**缺键按空算**;</p>
+     *
+     * <p>「保存为草稿」不经过这里(用户口径:草稿允许存一半),草稿态的兜底见
+     * {@link #ensureInspOkQtyFilledForAudit}。合格数量是审核分流入库/退料的依据,不能空。</p>
+     */
+    private void ensureInspOkQtyPresent(List<Map<String, Object>> items) {
+        for (int i = 0; i < items.size(); i++) {
+            Map<String, Object> it = items.get(i);
+            Object v = it == null ? null : it.get("合格数量");
+            if (v == null || String.valueOf(v).isBlank()) {
+                throw new IllegalStateException("明细第 " + (i + 1) + " 行合格数量不能为空");
+            }
+        }
+    }
+
+    /**
+     * 来料检验单审核前的必填兜底(2026-11-17):按**库里的行**复核每行「合格数量」非空。
+     *
+     * <p>保存路径已经拦一道({@link #ensureInspOkQtyPresent}),但「保存为草稿」按用户口径豁免必填,
+     * 草稿仍可被直接审核 ⇒ 审核是最后一道闸门。且审核下游(生单)正是按 合格数量 分流入库、
+     * 按 不合格数量 分流退料,空了会生成 0 数量入库单/空退料,数据链就断了。</p>
+     */
+    private void ensureInspOkQtyFilledForAudit(PanelRegistry.PanelDef def, String no) {
+        if (def.lineTable() == null || def.lineTable().isBlank()) return;
+        // ⚠ 必须排除软删行(asp_cancel='Y'):保存会"软删旧行 + 插新行",界面看不到旧行(getFormDescriptor 滤掉),
+        //   但不过滤的话旧行(合格数量还是 NULL)会先撞上这道闸门 —— 实测"补了合格数量还是审不过"。
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT [合格数量] FROM " + def.lineTable()
+                        + " WHERE [单据编号] = ? AND ISNULL(asp_cancel, 'N') <> 'Y' ORDER BY id", no);
+        for (int i = 0; i < rows.size(); i++) {
+            Object v = rows.get(i).get("合格数量");
+            if (v == null || String.valueOf(v).isBlank()) {
+                throw new IllegalStateException("明细第 " + (i + 1) + " 行合格数量不能为空，请先补全再审核"
+                        + "（审核后按 合格数量 / 不合格数量 分流入库与退料）");
             }
         }
     }
@@ -2663,6 +2712,9 @@ public class ButtonService {
         // 2026-11-13 用户口径:「如果已经提交审核了,就正常用审批通过来就行,不能点击审核按钮」。
         if ("审批中".equals(st.get("status")) || "待二级审批".equals(st.get("status")))
             throw new IllegalStateException("该单已提交审批：请用「审批通过」完成审批，不能直接「审核」");
+        // 来料检验单「合格数量」必填兜底(2026-11-17 用户口径):保存已拦一道,但「保存为草稿」豁免必填,
+        // 草稿仍可直接审核 ⇒ 审核这一环按**库里的行**复核;审核下游按合格数量分流入库/退料,空了就断链。
+        if ("QC_INSP".equals(def.code())) ensureInspOkQtyFilledForAudit(def, no);
         // 两级审批面板(2026-10-04 用户口径「取消直审」):一律走 提交审批 → 一级审批通过 → 超级管理员批准,
         // 直审会让第二级形同虚设(纸面「审核/批准」两格也就没了两级留痕)。接口层同口径拒绝。
         // · 固定超级管理员作二级的(ADMIN_L2_PANELS:特采单 + 质量单据一族 + 出厂检验报告)= 管理员也拒(原口径不变);
