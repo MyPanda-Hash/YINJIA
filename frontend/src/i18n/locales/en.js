@@ -5136,6 +5136,8 @@ export default {
     '扫码': 'Scan',
     '调不起相机,请改用输入框扫码枪或手工输入': 'Camera unavailable — use a scanner gun or type the code.',
     '服务器地址': 'Server address',
+    '默认': 'Default',
+    '默认已连服务器,如需修改请点顶部「设置」,改完自动重连': 'Connected to the server by default. To change it, tap Settings at the top; the page reloads automatically.',
     '保存并重连': 'Save & reconnect',
     '如 http://192.168.1.10:8090': 'e.g. http://192.168.1.10:8090',
     '地址要以 http:// 或 https:// 开头': 'The address must start with http:// or https://',
