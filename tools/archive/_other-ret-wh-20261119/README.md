@@ -63,6 +63,23 @@ cd frontend && node --test src/business/scanOther.test.js   # 14 条全绿
 cd frontend && node --test                                  # 2191 条全绿
 ```
 
+## 重新打包(用户「重新打包」,2026-11-19 二次)
+
+走的是仓库标准全量路线 `tools\scripts\rebuild-prod.ps1`(停 8090 → 等句柄 → 前端 build + static 镜像
+→ `mvn clean package` → fat jar 自检 → 重启),自检全过:
+
+| 项 | 值 |
+|---|---|
+| 部署产物 | `backend\target\app.jar`(93.8 MB)+ `backend\target\yinjia-mes-backend-0.1.0.jar` |
+| app.jar SHA256 | `19289B08A6165CC9638A6715DFFA7688A79433A2D953A03C240118B66F8E78D0`(旧 `80B87672…`) |
+| fat jar 自检 | `BOOT-INF/lib = 129` 条(≥50 才算 fat jar) |
+| 换包自检 | jar 已被 mvn 重写(16:42:11) |
+| 8090 下发入口 chunk | `assets/index-CT4iOomQ.js` |
+| 复检 | 其他退料页「退到仓库」默认 `华北工控仓`,与打包前一致(ego round-06 复跑) |
+
+> 入口 chunk 哈希从 `index-ocazD-QA.js` 变成 `index-CT4iOomQ.js`,原因只是
+> `MobileOtherScan.vue` 那条注释改动换了分包哈希、入口引用了它(功能无变化)。
+
 ## 遗留 / 与本次无关但发现的现象
 
 跑 `tools/scripts/apply-frontend-only.ps1` 时,`start-prod.ps1` 的增量同步里
