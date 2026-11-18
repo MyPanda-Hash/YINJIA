@@ -1,7 +1,7 @@
 # 银嘉 MES · 安卓壳(`android/`)
 
-> **日期**:2026-10-20(2026-11-17 连出 1.0.14 ~ 1.0.19)
-> **产物**:`android/dist/yinjia-mes-1.0.19.apk`(自签名,可直接侧载 / 覆盖升级)
+> **日期**:2026-10-20(2026-11-17 连出 1.0.14 ~ 1.0.20)
+> **产物**:`android/dist/yinjia-mes-1.0.20.apk`(自签名,可直接侧载 / 覆盖升级)
 > **不依赖 Gradle / Android Studio**:用 SDK 的 `aapt2 / javac / d8 / apksigner` 四步手搓出包,
 > 离线、几十秒、可重复构建(本机没有 Gradle,也没有装 Studio)。
 
@@ -10,9 +10,10 @@
 | 项 | 值 |
 |---|---|
 | 包名 | `com.yinjia.mes.app`(**永不改**;改了就是另一个 App,旧图标/旧数据都不跟着走) |
-| 本版 | `versionName=1.0.19`、`versionCode=20`(上一版 1.0.18 = 19;1.0.17 = 18;1.0.16 = 17) |
+| 本版 | `versionName=1.0.20`、`versionCode=21`(上一版 1.0.19 = 20;1.0.18 = 19;1.0.17 = 18;1.0.16 = 17) |
 | 签名证书 | `CN=Yinjia MES Debug`(仓库内 `android/debug.keystore`,SHA-256 `b455080b…9cbc`) |
 | 覆盖升级 | 与旧版 **同一把钥匙 + versionCode 更大** ⇒ 手机上直接装新 APK 就是「更新」,不用卸载 |
+| 1.0.20 内容 | **整站前端重打(原生壳代码未改)**:扫码混料改成与「生产领料」同构的**两页** —— 列表页(查询单据 + 扫工单码定位 + 未完成/已完成两组)→ 明细页;扫物料码**解锁** → 电子秤取数 → 点「确认」写入;**全部物料确认完毕才可提交**;提交后自动打印并跳只读明细(可补打印) |
 | 1.0.19 内容 | **整站前端重打(原生壳代码未改)**:生产退料的「退料作业」改成**弹窗到明细**里扫码退料(点行或「选这张退料」都弹),弹窗内直接给提示;「可退单据」分组**可展开/收起**;扫工单码弹窗选组装/混料,扫领料单码直接跳 |
 | 1.0.18 内容 | **整站前端重打(原生壳代码未改)**:生产退料**可扫码退料**(扫领料单码/工单号→打开单据→扫物料→提交)且版面与生产领料对齐;扫**工单码**弹窗选组装/混料、扫**领料单纸面码**直接跳转;其他领料/其他退料/扫码混料顶栏与生产领料统一 |
 | 1.0.17 内容 | **整站前端重打(原生壳代码未改)**:生产领料页扫**领料单纸面二维码**时按第 4 段标记打开对应那张单 —— 扫 @M(混料)开混料单、扫 @A(组装)开组装单;老的三段工单码仍按原口径(打开组装那张) |
@@ -109,8 +110,8 @@ SDK 位置探测见 `android/sdk.ps1`:`ANDROID_HOME` → `ANDROID_SDK_ROOT` →
 `%LOCALAPPDATA%\Android\Sdk` → **各盘根目录的 `\SDK` / `\Android\Sdk` / `\android-sdk` 等**
 (本机 SDK 就在 `E:\SDK`,不必再手工设环境变量)。
 
-**手机安装 / 升级**:把 `android/dist/yinjia-mes-1.0.19.apk` 拷到手机点安装(需允许「安装未知应用」)。
-手机上已装旧版的**直接装这个就是升级**(同包名同签名、versionCode 16>15);装完可从「我的桌面 → 设置」里
+**手机安装 / 升级**:把 `android/dist/yinjia-mes-1.0.20.apk` 拷到手机点安装(需允许「安装未知应用」)。
+手机上已装旧版的**直接装这个就是升级**(同包名同签名、versionCode 21>20);装完可从「我的桌面 → 设置」里
 看到壳版本,或看 APK 文件名核对。
 
 > 出包前先 `cd frontend && npm run build`(脚本会自己把 `frontend/dist` 收进 `assets/www`,
@@ -478,3 +479,37 @@ SDK 位置探测见 `android/sdk.ps1`:`ANDROID_HOME` → `ANDROID_SDK_ROOT` →
 | 体积/指纹 | **2.84 MB**(2,912,350 字节),SHA-256 `875B2161…364DF6AB` |
 | 前端资源 | APK 内 `assets/www/` **180 个文件**,与 `frontend/dist` 逐文件 SHA-256 全等(0 失配/0 缺失)、0 反斜杠 |
 | 界面实测 | 收缩 85→0 行 / 展开 0→85;弹窗打开即聚焦物料框;扫本单料显示「本次可退 7」;扫错料弹窗内红字提示 |
+
+---
+
+## 16. 2026-11-17:整站重打 **1.0.20**(扫码混料改成「生产领料」那套两页)
+
+> 用户口径:「扫码混料,应该和生产领料一样也是跳转到单据的明细里面再开始扫物料码,解锁对应的物料码,
+> 然后根据连接电子秤的取数,点击确认。再扫其他的物料解锁,根据电子秤再确认。全部物料确认完毕后,
+> 才可以提交。设计要和生产领料一致。不要独立的去设计。」+「打包apk」。
+
+- **做法**:`cd frontend && npm run build`(dist 命中 **184 个文件**)→
+  `powershell -ExecutionPolicy Bypass -File android\build.ps1`(第 1 步把 `frontend/dist` 整份收进 `assets/www`)。
+  **原生壳代码一行未改**(Java/资源/Manifest 均未动)⇒ 扫描 / 拍照 / 接口号逻辑与 1.0.19 完全一致,
+  本版只换包里的网页与版本号。`versionName=1.0.20`、`versionCode=21`(上一版 20 ⇒ 可覆盖升级)。
+  设计说明见 `docs/development/扫码混料-20261118.md` §七。
+- **本版带上的前端改动**(1.0.19 之后):扫码混料拆成列表页(`MobileMixScan`:查询单据 + 扫工单码定位 +
+  未完成/已完成两组)与明细页(`MobileMixDoc`:扫物料码解锁 → 电子秤取数 → 「确认」覆盖写入 → 全部确认才可提交并自动打印);
+  另有并行会话已提交的生产退料「弹窗到明细」等改动一并进包。
+- **验证**:
+
+| 项 | 结果 |
+|---|---|
+| 包信息 | `com.yinjia.mes.app`、`versionCode=21`、`versionName=1.0.20`、`minSdk 24`、`targetSdk 34`、label「银嘉MES」 |
+| 签名/对齐 | `apksigner verify` 通过(`CN=Yinjia MES Debug`,SHA-256 `b455080b…9cbc` —— 与上一版**同一把钥匙** ⇒ 可覆盖升级);`zipalign -c 4` exit 0 |
+| 体积/指纹 | `dist/yinjia-mes-1.0.20.apk` **2.79 MB**(2,920,886 字节),SHA-256 `6C86074E…2D5106` |
+| 前端资源 | APK 内 `assets/www/` **184 个文件**,与 `frontend/dist` 逐文件 SHA-256 全等(**0 失配 / 0 缺失 / 0 多余**)、**0 个反斜杠条目**;入口 chunk `index-BmtHM9TK.js` 与 8090 发布的一致 |
+| 本版改动在包内 | `assets/www/assets/MobileMixDoc-CNYrawkM.js` + `MobileMixScan-DWOrX0Nt.js`(两页版);单测 391/391、`npm run build` 通过 |
+| 装机后行为 | 与网页版一致(同一份 dist):手机端「手机扫码 → 扫码混料」即为两页流程;接口仍需服务器 8090(已含 `/px/mix/open`、`/px/mix/task`、`/px/mix/scanMaterial`) |
+| 真机 | `adb devices` 为空 ⇒ **仍未真机验证**(插上后跑 `android\install.ps1` 覆盖安装即可,脚本按 `LastWriteTime` 取 `dist\` 下最新 APK,即 1.0.20) |
+| 自证脚本 | `tools/archive/_mix-doc-20261118/verify-apk.mjs`(逐文件哈希 / 反斜杠 / 体积指纹,可复跑) |
+
+- **踩坑(本版再踩一次,README 已记过两回)**:改 `build.ps1` 的版本号时,编辑工具把文件开头的
+  **UTF-8 BOM 抹掉了** ⇒ `powershell -File` 直接报 `Unexpected token ')' in expression or statement`
+  (报的位置还在第 35 行的无关代码上)。修法:`node` 读成 UTF-8 再以 `\uFEFF` 前缀写回,
+  核对 `[System.IO.File]::ReadAllBytes(path)[0..2]` = `EF BB BF` 后再出包。
