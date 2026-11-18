@@ -5048,3 +5048,7 @@ migrate-finish-in-failqty-20261118.sql
 migrate-prodinfo-labels-and-size-20261118.sql
 # 2026-11-18 外部-开发样品单加「附件」字段（只这一张；头表加列 + yj_field 一行）
 migrate-sample-ext-attach-20261118.sql
+
+# 2026-11-18 产品信息表新版式收尾：① 立项编号/立项名称/整体外径/整体内径/整体长度 补 10 语种译名；
+#   ② 旧聚合格「产品整体尺寸」required 归 0（纸面已改三内格，避免必填挡提交）
+migrate-prodinfo-i18n-required-20261118.sql
