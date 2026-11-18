@@ -59,9 +59,12 @@ if (-not $javaHome -or -not (Test-Path (Join-Path $javaHome 'bin\javac.exe'))) {
 }
 if (-not $javaHome) { throw '找不到 JDK 25(设 JAVA_HOME)' }
 
-$version = '1.0.21'
+$version = '1.0.22'
 # ── 版本 —— versionName / versionCode 的**唯一真源**(Manifest 里不写,见 README §0)──
-# 1.0.21 = 本版(2026-11-18:整站前端重打,原生壳未改 —— 其他领料/其他退料的**单据明细页**
+# 1.0.22 = 本版(2026-11-18:整站前端重打,原生壳未改 —— 修「生产退料扫组装/混料二维码都跳混料明细」:
+#           明细页的单据标识从 ref 一次性取值改成 computed 跟随路由 + watch 重取(query 变了但
+#           keep-alive 复用实例时不再停在上一张单);其他领料/退料明细页同样补了切单 watch)。
+# 1.0.21 = 22(2026-11-18:整站前端重打 —— 其他领料/其他退料的**单据明细页**
 #           抬头与明细照「生产领料」补齐:抬头多出 业务类型/经手人/审核人/行数/金额合计/备注,
 #           明细每行摊开 物料编码/规格型号/计量单位/批号/仓库 + 数量(有金额再给金额);
 #           顺带带上生产退料「扫码到明细行再扫物料码退料」两页版(1.0.20 之后的前端改动)。
@@ -79,7 +82,7 @@ $version = '1.0.21'
 # 1.0.12 = 13 / 1.0.11 = 12 / 1.0.10 = 11 / 1.0.9 = 10 / 1.0.8 = 9 / 1.0.7 = 8(更早)。
 # versionCode 必须**单调递增**:安卓只在它变大时才允许「覆盖安装」;签名还必须与上一版同一把钥匙
 # (debug.keystore 随仓库保留,丢了就只能卸载重装)。
-$versionCode = 22
+$versionCode = 23
 $zxing = Join-Path $proj 'libs\zxing-core-3.5.3.jar'
 if (-not (Test-Path $zxing)) { throw "缺少 ZXing:$zxing(可从 Maven Central 下 core-3.5.3.jar)" }
 
