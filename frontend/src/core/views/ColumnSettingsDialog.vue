@@ -14,7 +14,9 @@
        两者都只改调用方的草稿,点「保存」才落库。
 
      契约(无状态,显隐/顺序草稿由调用方的 `useReportColumns` 持有):
-       · props.columns = [{ prop, label, visible }]  ← buildReportColumnSettings 的产物;**数组顺序即列顺序**
+       · props.columns = [{ prop, label, visible, locked? }]  ← buildReportColumnSettings 的产物;
+         **数组顺序即列顺序**;`locked: true` = 只能显隐、顺序锁定(2026-11-18 为「工单排产」的冻结列补的:
+         那 4 列必须始终 fixed 在最左,拖到滚动区中间会散掉冻结区 ⇒ 不给拖,▲▼ 换成一枚锁图标)。
        · emit('toggle',  { prop, visible })           ← 勾/取消勾某一列(父组件改草稿)
        · emit('move',    { prop, delta })              ← ▲/▼ 微调(delta=-1 上移/靠左,+1 下移/靠右)
        · emit('reorder', { from, to })                 ← 拖动换位(下标基于 props.columns 全量数组;to=拖动后的目标下标)
@@ -33,16 +35,21 @@
     </div>
     <el-input v-model="kw" size="small" clearable :placeholder="tt('搜索')" class="csd-search" />
     <div class="csd-tip">{{ tt('勾选决定显示哪几列;拖动 ⠿ 或点 ▲▼ 调整列顺序(上移=靠左)') }}</div>
+    <div v-if="hasLocked" class="csd-tip">{{ tt('带锁的列只能显隐,顺序固定(冻结列始终在最左侧)') }}</div>
     <div ref="listRef" class="csd-list" :class="{ 'is-dragging': dragging }">
       <template v-for="(c, i) in columns" :key="c.prop">
         <!-- 落点插入线:画在目标行之前(拖动时才出现) -->
         <div v-if="dragging && insertAt === i" class="csd-insert"></div>
-        <div v-show="match(c)" class="csd-item" :data-idx="i" :class="{ 'is-dragged': dragging && dragFrom === i }"
+        <div v-show="match(c)" class="csd-item" :data-idx="i"
+             :class="{ 'is-dragged': dragging && dragFrom === i, 'is-locked': c.locked }"
              @pointerdown="onRowPress(i, $event)" @mousedown="onMousePress(i, $event)">
-          <span class="csd-drag" :title="tt('拖动调整列顺序')">⠿</span>
+          <span class="csd-drag" :title="c.locked ? tt('顺序固定') : tt('拖动调整列顺序')">⠿</span>
           <el-checkbox :model-value="!!c.visible" @change="(v) => emit('toggle', { prop: c.prop, visible: !!v })" />
           <span class="csd-label" :title="c.prop">{{ tt(c.label || c.prop) }}</span>
-          <span class="csd-arrows">
+          <span v-if="c.locked" class="csd-lock" :title="tt('顺序固定')">
+            <el-icon><Lock /></el-icon>
+          </span>
+          <span v-else class="csd-arrows">
             <el-button link size="small" :disabled="i === 0" :title="tt('上移')"
                        @click="emit('move', { prop: c.prop, delta: -1 })">▲</el-button>
             <el-button link size="small" :disabled="i === columns.length - 1" :title="tt('下移')"
@@ -63,6 +70,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, ref } from 'vue'
+import { Lock } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
 
 const props = defineProps({
@@ -81,6 +89,9 @@ function match(c) {
 }
 const matchedAny = computed(() => props.columns.some((c) => match(c)))
 
+/** 是否有「顺序锁定」的列(2026-11-18):有才显示那条补充说明,免得普通页面多一行废话 */
+const hasLocked = computed(() => props.columns.some((c) => c.locked))
+
 /** 全选/全不选:逐列发 toggle,草稿由父组件统一改(保持单向数据流) */
 function setAll(visible) {
   for (const c of props.columns) if (!!c.visible !== visible) emit('toggle', { prop: c.prop, visible })
@@ -98,8 +109,10 @@ let startY = 0
 let movedEnough = false
 const hasPointerEvent = typeof window !== 'undefined' && !!window.PointerEvent
 
-/** 整行按下:控件(勾选框/按钮/输入)上放行原有点击,其余位置开始拖动 */
+/** 整行按下:控件(勾选框/按钮/输入)上放行原有点击,其余位置开始拖动
+ *  `locked` 的列(冻结区,顺序锁定)**整个不响应拖动**:拖了也不会换位,不如干脆不拖。 */
 function onRowPress(i, e) {
+  if (props.columns[i]?.locked) return
   if (e.button !== undefined && e.button !== 0) return   // 只认左键(触屏 button=0)
   const t = e.target
   if (t && typeof t.closest === 'function' && t.closest('.el-checkbox, .el-button, button, input, textarea, select')) return
@@ -202,5 +215,10 @@ onBeforeUnmount(stopDrag)
 .csd-label { flex: 1; font-size: 13px; color: #303133; }
 .csd-arrows { display: inline-flex; align-items: center; }
 .csd-arrows :deep(.el-button) { padding: 2px 4px; font-size: 12px; color: #606266; }
+/* 顺序锁定的列(2026-11-18 工单排产的冻结列):不给拖、不给 ▲▼,用一把锁代替箭头。
+   cursor 也要改掉 —— 否则鼠标停上去还是"能拖"的手型,点下去却没反应。 */
+.csd-item.is-locked { cursor: default; }
+.csd-item.is-locked .csd-drag { cursor: default; color: #dcdfe6; }
+.csd-lock { display: inline-flex; align-items: center; padding: 0 4px; color: #c0c4cc; font-size: 12px; }
 .csd-empty { color: #909399; font-size: 13px; padding: 8px 0; }
 </style>

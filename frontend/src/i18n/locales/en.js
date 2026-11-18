@@ -683,6 +683,11 @@ export default {
     // 2026-10-30 用户口径「让这个能拖动吧」:列设置支持拖动行排序(▲▼ 保留作微调兜底)
     '拖动调整列顺序': 'Drag to reorder',
     '勾选决定显示哪几列;拖动 ⠿ 或点 ▲▼ 调整列顺序(上移=靠左)': 'Tick to show columns; drag ⠿ or use ▲▼ to reorder (up = further left)',
+    // 2026-11-18 工单排产列设置:冻结区(产品编码/产品规格/订单数量/客户)顺序锁定,只能显隐;
+    // 日排产日期列整组用伪列统管(2026-11-13 生产工单列表已用到该伪列名,补上漏掉的译名)
+    '顺序固定': 'Order fixed',
+    '带锁的列只能显隐,顺序固定(冻结列始终在最左侧)': 'Locked columns can only be shown/hidden; their order is fixed (frozen columns always stay leftmost)',
+    '日排产日期列': 'Daily plan dates',
     // 当天没数据 → 弹窗询问是否跳到最近有数据的一天(2026-10-06 用户口径:不静默跳转)
     '没有数据': 'No data',
     '没有待结转数据': 'has no pending orders',

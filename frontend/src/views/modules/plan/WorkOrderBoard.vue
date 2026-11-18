@@ -16,7 +16,11 @@
      2026-11-14(用户口径「删除掉这个工序流转明细,这个作用不明显还很丑,除非有其他方法」):
      **展开行那道 8 列大表整体删除**;同样的数字收进「当前工序」格的悬停提示
      (business/woFlowChain.js;当前工序标 ▶、深链定位的那道标 ★),平时看不见,要看鼠标停一下;
-     全工序进度仍看「生产工序进度看板」的环/圆点链。 -->
+     全工序进度仍看「生产工序进度看板」的环/圆点链。
+     2026-11-18(用户口径「为当前的工单排产处也增加列设置。让用户可以调整当前查看的列和不查看的列」):
+     明细表加**列设置** —— 列定义搬进 business/woBoardColumns.js(冻结区顺序锁定、日期列组用伪列统管),
+     表格改为按列设置草稿渲染(显隐 + 顺序),持久化复用系统级 useReportColumns + /px/reportColumnSettings
+     (panelCode=WORK_ORDER_BOARD);锁定列 = 选择框 / 工单号 / 生产状态。 -->
 <template>
   <div class="wb-page">
     <!-- 顶部:开工日期 + 汇总条 -->
@@ -118,6 +122,11 @@
               <el-radio-button value="已完工">{{ tt('已完工') }}</el-radio-button>
               <el-radio-button value="全部">{{ tt('全部') }}</el-radio-button>
             </el-radio-group>
+            <!-- 列设置(2026-11-18 用户口径「增加列设置,让用户可以调整当前查看的列和不查看的列」):
+                 勾选决定这张明细表显示哪些列、拖动/▲▼ 调整列顺序;与订单结转、生产工单·列表共用系统级实现
+                 (useReportColumns + /px/reportColumnSettings,panelCode=WORK_ORDER_BOARD),保存后刷新仍生效。
+                 注意它是**全用户共享**的一份设置(后端按面板存一行),不是各人各一份。 -->
+            <el-button size="small" plain @click="openDialog">{{ tt('列设置') }}</el-button>
             <div class="wb-actions">
               <!-- 日排产(2026-10-29):日期列由后端按数据生成。
                    2026-10-31 用户口径「**当前不需要手填,能自动算就可以了**」⇒ 「保存日排产」按钮已撤,
@@ -178,209 +187,78 @@
                     @row-click="onRowClick"
                     @selection-change="(r) => (checkedSched = r)">
             <el-table-column type="selection" width="42" />
-            <!-- 按量流转·逐道明细(2026-11-12 方案A 的展开行)**已于 2026-11-14 删除**:
-                 用户口径「删除掉这个工序流转明细,这个作用不明显还很丑,除非有其他方法」——
-                 行内已有「当前工序/当前工序计划量/当前工序完工量/上道工序/上道完工量/可加工量/
-                 待报量/待流入量」八列,展开表把同样的数字再说一遍;全工序进度看
-                 「生产工序进度看板」。同样的数字改成「当前工序」格的悬停提示
-                 (business/woFlowChain.js),列与展开箭头都不再占位。 -->
-            <!-- ══════════ 冻结区(2026-11-08 用户口径)══════════
-                 用户原话:「排单界面物产品编码、产品规格、订单数量,显示在前面冻结,方便看。……进行修改还需要
-                 考虑当前冻结后如何显示其他的信息对其他信息进行处理要如何实现。」
-                 做法 = 把行身份拆成两块,按 el-table 的 fixed 列**声明在前即渲染在最左**:
-                   ① 工单身份:勾选 / 工单号 / 客户(原有冻结,保留);
-                   ② 产品身份:**产品编码 / 产品规格 / 订单数量**(新增冻结,宽度收到 110/120/84 —— 表格列已
-                      30+ 列,冻结区一宽会挤掉滚动区;长值一律走 show-overflow-tooltip/title,不靠拉宽列)。
-                 其余列(工单行号/排产日期/客户PO/产品名称/单位/批号/重点管控/日期列/工序/统计…)留在**横向滚动区**,
-                 滚到右边看日期/报工时左侧始终能看到"哪张工单、哪个产品、订单要多少";原来夹在滚动区里的
-                 「物料编码/规格型号/需求数量」三列随即删除(**位置前移,不复制**,避免同一信息出现两次)。
-                 ⚠ 订单数量 = plang.xq_sl(需求数量/本次转单量;2026-11-08 起备品场景可大于销售订单数量),
-                   表头 tooltip 写清,免得与旁边的「排产数量」混。 -->
+            <!-- 工单号(锁定常显·冻结左):「工单号#工单行号」是本页的行身份 —— 隐藏后勾选、追溯、
+                 打印都对不上号,所以它**不进列设置**(与「生产工单·列表」同一口径)。 -->
             <el-table-column :label="tt('工单号')" prop="加工单号" width="140" fixed />
-            <el-table-column :label="tt('产品编码')" prop="物料编码" width="110" fixed show-overflow-tooltip />
-            <el-table-column :label="tt('产品规格')" prop="规格型号" width="120" fixed show-overflow-tooltip />
-            <el-table-column prop="需求数量" width="84" align="right" fixed>
+            <!-- ══════════ 可调整列(2026-11-18 用户口径「为当前的工单排产处也增加列设置。
+                 让用户可以调整当前查看的列和不查看的列」)══════════
+                 显隐与顺序都由「列设置」决定 ⇒ 这里按 renderCols 的**草稿顺序**渲染(草稿即预览,
+                 点弹窗「保存」才落库,panelCode=WORK_ORDER_BOARD,与订单结转/生产工单列表同一套持久化)。
+                 列定义(宽/对齐/排序/溢出省略/表头 tooltip/冻结)集中在 business/woBoardColumns.js,
+                 本模板只负责"这一列的格子怎么画"(按 col.prop 分支)与日期列(数据驱动)的整组渲染。
+                 锁定列:选择框 / 工单号 / 生产状态(两端固定)—— 它们是行身份与页签判据,隐藏后按钮点不了、
+                 也看不出为什么不能操作,故不进列设置。
+                 冻结区(产品编码/产品规格/订单数量/客户)= 2026-11-08 用户口径「显示在前面冻结,方便看」,
+                 顺序锁定、只能显隐(WO_BOARD_COLUMNS 的 frozen,弹窗里带锁)。 -->
+            <el-table-column v-for="col in renderCols" :key="col.prop"
+                             :prop="col.key || col.prop" :label="col.date ? '' : tt(col.label || col.prop)"
+                             :width="col.width" :min-width="col.minWidth" :align="col.align"
+                             :sortable="!!col.sortable" :show-overflow-tooltip="!!col.showOverflow"
+                             :fixed="col.frozen ? 'left' : undefined"
+                             :label-class-name="col.date ? 'dp-col-' + dayColState(col.date, planToday) : undefined"
+                             :class-name="col.date ? 'dp-col-' + dayColState(col.date, planToday) : undefined">
               <template #header>
-                <span :title="tt('订单数量 = 本行需求数量(本次转单量);备品场景可大于销售订单数量')">{{ tt('订单数量') }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column :label="tt('客户')" prop="客户" min-width="110" fixed show-overflow-tooltip />
-            <!-- ── 以下为横向滚动区(不冻结)── -->
-            <el-table-column :label="tt('工单行号')" prop="工单行号" width="90" sortable />
-            <el-table-column :label="tt('排产日期')" prop="排产日期" width="95" />
-            <el-table-column :label="tt('客户PO')" prop="客户PO" width="110" show-overflow-tooltip />
-            <el-table-column :label="tt('产品名称')" prop="产品名称" min-width="140" show-overflow-tooltip />
-            <el-table-column :label="tt('单位')" prop="单位" width="55" />
-            <el-table-column :label="tt('批号')" prop="批号" width="100" show-overflow-tooltip />
-            <el-table-column :label="tt('重点管控')" prop="重点管控" width="80" />
-            <!-- 排产日期(2026-10-31):就地改「开工日 / 计划完工日」—— 双击进 date-picker;
-                 后端同步 plang + plang_pc + 工序台账区间(用户口径「该日期要同步吧」)。 -->
-            <el-table-column :label="tt('开工日期')" prop="开工日期" width="105">
-              <template #default="{ row }">
-                <span class="dp-date-cell" :title="tt('双击可改排产日期')"
-                      @dblclick="openQuick(row, planToday)">{{ row.开工日期 || '-' }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column :label="tt('计划完工日期')" prop="计划完工日期" width="115">
-              <template #default="{ row }">
-                <span class="dp-date-cell" :title="tt('双击可改排产日期')"
-                      @dblclick="openQuick(row, planToday)">{{ row.计划完工日期 || '-' }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column :label="tt('实际完工日期')" prop="实际完工日期" width="105" />
-            <!-- 本线排产数量(2026-11-11 用户口径):本页一行 = 一张工单行在**当前产线**做**当前工序**,
-                 所以「排产数量」列要看的是**本线要排/要做的量** = 排产数量 × 该道换算率
-                 (= 该行当前工序的台账计划数量,接口既有字段 `当前工序计划量`)。
-                 成品口径的排产数量 pl_sl 仍由接口返回,供打印/切单/未交量/领料使用 —— 本列不改任何数据。 -->
-            <el-table-column prop="本线排产数量" width="110" align="right">
-              <template #header>
-                <span :title="tt('本线排产数量 = 排产数量 × 该工序自己的换算率(取该行当前工序的台账计划数量);成品口径请用左侧「订单数量」')">{{ tt('本线排产数量') }}</span>
-              </template>
-              <!-- 后端 scheduled() 已返回同值别名 本线排产数量;老服务/老数据取不到时回退既有字段 当前工序计划量 -->
-              <template #default="{ row }">{{ num(row['本线排产数量'] ?? row['当前工序计划量']) }}</template>
-            </el-table-column>
-            <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
-            <!-- 工序口径(2026-11-12 用户口径「这些数据完成需要放在前面…放在工序那边」):
-                 工序块从左到右读成一条链 ——
-                 当前工序 → 本道计划量 → 本道已做 → 上道工序/上道已做 → 能做多少 → 还能报 → 还缺。
-                 上道工序/上道完工量从原来的"日期列后面"前移到这里;未交量属整单口径,留在原位不动。 -->
-            <!-- 当前工序(2026-11-14):悬停 = 该行逐道工序的计划量/已审完工/可加工量/待流入量
-                 (原「工序流转明细」展开区的内容收在这里,平时看不见;▶ = 当前工序,★ = 深链定位的那道) -->
-            <el-table-column :label="tt('当前工序')" prop="当前工序" width="95" sortable>
-              <template #default="{ row }">
-                <span :title="flowTip(row)">{{ row.当前工序 ? tt(row.当前工序) : '-' }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column :label="tt('当前工序计划量')" prop="当前工序计划量" width="120" align="right" />
-            <el-table-column :label="tt('当前工序完工量')" prop="当前工序完工量" width="120" align="right" />
-            <el-table-column :label="tt('上道工序')" prop="上道工序" width="95">
-              <template #default="{ row }">{{ row.上道工序 ? tt(row.上道工序) : '-' }}</template>
-            </el-table-column>
-            <el-table-column width="110" align="right">
-              <template #header>
-                <span :title="tt('上道完工量 = 上一道已审核报工数(上一道自己的计量单位,不折算);换算率不同时,本道能做多少看「可加工量」')">{{ tt('上道完工量') }}</span>
-              </template>
-              <template #default="{ row }">{{ flowNum(row.上道完工量) }}</template>
-            </el-table-column>
-            <!-- 按量流转(2026-11-12,只读展示):可加工量(= 上一道流下来、本道现在最多能做多少) /
-                 待报量(还能报) / 待流入量(还等上一道)。上道做了多少看上面前移的「上道完工量」。 -->
-            <el-table-column width="100" align="right">
-              <template #header>
-                <span :title="tt('可加工量 = 上一道流下来的量(已按换算率折到本道单位),也就是本道现在最多能做多少')">{{ tt('可加工量') }}</span>
-              </template>
-              <template #default="{ row }">{{ flowNum(row.当前工序可加工量) }}</template>
-            </el-table-column>
-            <el-table-column width="92" align="right">
-              <template #header>
-                <span :title="tt('待报量 = 可加工量 − 本工序已审报工(本道还能报多少)')">{{ tt('待报量') }}</span>
-              </template>
-              <template #default="{ row }">{{ flowNum(row.当前工序待报量) }}</template>
-            </el-table-column>
-            <el-table-column width="100" align="right">
-              <template #header>
-                <span :title="tt('待流入量 = 本工序计划量 − 可加工量(还等上一道流下来多少)')">{{ tt('待流入量') }}</span>
-              </template>
-              <template #default="{ row }">
-                <span :class="{ 'wb-flow-gap': Number(row.当前工序待流入量 || 0) > 0 }">{{ flowNum(row.当前工序待流入量) }}</span>
-              </template>
-            </el-table-column>
-            <!-- 日排产(2026-10-29):直接长在现有明细表里(不新增表格/块),紧跟工序完工口径。
-                 每个日期格都可填计划(含今天以前的日期 —— 用户口径「23~28 号填不了」);
-                 格下方小灰字 = 该天已审核报工量(含手机端),只读。 -->
-            <el-table-column :label="tt('交期紧迫度')" prop="交期紧迫度" width="90" align="right" />
-            <!-- 需交付三桶(2026-11-15 用户口径「这里原来也应该是工序计划量的」):后端已改成**工序计划量**
-                 (= 排产数量 × 该道换算率),与下面「已排」三桶(日计划合计)同一把尺;
-                 原来是「需求数量」(成品口径)⇒ 成型换算率 0.5 的行会出现 需交付 50 / 已排 25 两个单位在比。
-                 值走 num() 显式渲染:0 显示 0(与已排三桶一致,不用 prop 默认渲染)。
-                 ⚠ 2026-11-15 实测踩坑:同一行里 `prop` 默认渲染 `0` 竟然出空格(合并进 row 的 0 值),
-                 用默认插槽 + num() 才稳定显示 0。 -->
-            <el-table-column width="92" align="right">
-              <template #header>
-                <span :title="tt('需交付 = 工序计划量(排产数量 × 该道换算率),按交期落桶;与「已排」三桶同一口径')">{{ tt('7天需交付') }}</span>
-              </template>
-              <template #default="{ row }">{{ num(row['7天需交付']) }}</template>
-            </el-table-column>
-            <el-table-column width="96" align="right">
-              <template #header>
-                <span :title="tt('需交付 = 工序计划量(排产数量 × 该道换算率),按交期落桶;与「已排」三桶同一口径')">{{ tt('15天需交付') }}</span>
-              </template>
-              <template #default="{ row }">{{ num(row['15天需交付']) }}</template>
-            </el-table-column>
-            <el-table-column width="112" align="right">
-              <template #header>
-                <span :title="tt('需交付 = 工序计划量(排产数量 × 该道换算率),按交期落桶;与「已排」三桶同一口径')">{{ tt('大于15天需交付') }}</span>
-              </template>
-              <template #default="{ row }">{{ num(row['大于15天需交付']) }}</template>
-            </el-table-column>
-            <el-table-column :label="tt('7天已排')" prop="7天已排" width="88" align="right" />
-            <el-table-column :label="tt('15天已排')" prop="15天已排" width="92" align="right" />
-            <el-table-column :label="tt('大于15天已排')" prop="大于15天已排" width="108" align="right" />
-            <!-- 日期列(2026-10-31;2026-11-13 改「原计划/报工」两数):列头多一行「该线当天 已排/日产能」
-                 ——产能只显示、不拦截录入。超产能只把列头标红(不弹窗、不改数、不禁填);
-                 未配产能(档案日产能 0/空)写"未配",不判超载。
-                 列分段:今天列标「今」+ 浅蓝底;过去列灰底 = 历史对照段;
-                 格内 = **原计划/报工**(例 715/15;没报工只显示计划;当天已结束且原计划>0没报工 =
-                 `原计划/0`);日期 < 今天且报工 < 原计划 ⇒ 该格标红(short),顶部另有红色汇总条。 -->
-            <el-table-column v-for="d in planDates" :key="d" width="88" align="center"
-                             :label-class-name="'dp-col-' + dayColState(d, planToday)"
-                             :class-name="'dp-col-' + dayColState(d, planToday)">
-              <template #header>
-                <div class="dp-head" :class="{ over: isOverDay(d), past: dayColState(d, planToday) === 'past' }"
+                <!-- 日期列头(2026-10-31;2026-11-13 改「原计划/报工」两数):多一行「该线当天 已排/日产能」
+                     —— 产能只显示、不拦截录入。超产能只把列头标红(不弹窗、不改数、不禁填);
+                     未配产能(档案日产能 0/空)写"未配",不判超载。 -->
+                <div v-if="col.date" class="dp-head"
+                     :class="{ over: isOverDay(col.date), past: dayColState(col.date, planToday) === 'past' }"
                      :title="dayHeadTitle">
-                  <div class="dp-date">{{ d.slice(5) }}<span v-if="isToday(d, planToday)" class="dp-today">{{ tt('今') }}</span></div>
+                  <div class="dp-date">{{ col.date.slice(5) }}<span v-if="isToday(col.date, planToday)" class="dp-today">{{ tt('今') }}</span></div>
                   <div v-if="lineCap > 0" class="dp-cap" :title="tt('该线当天已排/日产能')">
-                    {{ qtyText(dayTotal[d]) }}/{{ qtyText(lineCap) }}
+                    {{ qtyText(dayTotal[col.date]) }}/{{ qtyText(lineCap) }}
                   </div>
                   <div v-else class="dp-cap unset" :title="tt('产线档案未配日产能,不做超载提示')">{{ tt('未配产能') }}</div>
                 </div>
+                <!-- 其余列:表头 tooltip(口径说明)与标签都在列定义里,这里只统一渲染 -->
+                <span v-else :title="col.headerTip ? tt(col.headerTip) : null">{{ tt(col.label || col.prop) }}</span>
               </template>
               <template #default="{ row }">
-                <el-input-number v-if="qtyEdit === qtyKey(row, d)" v-model="qtyDraft" size="small"
-                                 :controls="false" :min="0" class="dp-input" autofocus
-                                 @blur="commitQty(row, d)" @keyup.enter="commitQty(row, d)" @keyup.esc="cancelQtyEdit" />
-                <!-- 区间外(开工日~计划完工日之外)且当天无计划/原计划/实报:画「/」——这一天不归本行排
-                     (2026-11-01 用户口径;例:开工日改成 11-02 后,11-01 的格子要画斜杠) -->
-                <span v-else-if="isOutCell(row, d)" class="dp-out"
-                      :title="tt('不在本行排产区间(开工日~计划完工日)内')">/</span>
-                <span v-else class="dp-plan"
-                      :class="{ manual: isManual(row, d), actual: cell(row, d).hasActual, short: cell(row, d).short > 0 }"
-                      :title="dayTitle(row, d)" @click="startQtyEdit(row, d)">
-                  {{ cell(row, d).text }}<span v-if="isManual(row, d)" class="dp-hand"
-                    :class="{ over: Number(row.超分配 || 0) > 0 }" :title="overTitle(row)">{{ tt('手') }}</span>
-                </span>
+                <!-- ① 日排产日期格(数据驱动,整组显隐由列设置里的伪列「日排产日期列」控制):
+                     区间外画「/」;点了就地改当天数量(双击/单击皆可);格内 `原计划/报工` 两数。 -->
+                <template v-if="col.date">
+                  <el-input-number v-if="qtyEdit === qtyKey(row, col.date)" v-model="qtyDraft" size="small"
+                                   :controls="false" :min="0" class="dp-input" autofocus
+                                   @blur="commitQty(row, col.date)" @keyup.enter="commitQty(row, col.date)" @keyup.esc="cancelQtyEdit" />
+                  <!-- 区间外(开工日~计划完工日之外)且当天无计划/原计划/实报:画「/」——这一天不归本行排
+                       (2026-11-01 用户口径;例:开工日改成 11-02 后,11-01 的格子要画斜杠) -->
+                  <span v-else-if="isOutCell(row, col.date)" class="dp-out"
+                        :title="tt('不在本行排产区间(开工日~计划完工日)内')">/</span>
+                  <span v-else class="dp-plan"
+                        :class="{ manual: isManual(row, col.date), actual: cell(row, col.date).hasActual, short: cell(row, col.date).short > 0 }"
+                        :title="dayTitle(row, col.date)" @click="startQtyEdit(row, col.date)">
+                    {{ cell(row, col.date).text }}<span v-if="isManual(row, col.date)" class="dp-hand"
+                      :class="{ over: Number(row.超分配 || 0) > 0 }" :title="overTitle(row)">{{ tt('手') }}</span>
+                  </span>
+                </template>
+                <!-- ② 排产日期就地改(2026-10-31):双击进 date-picker,同步 plang + plang_pc + 工序台账区间 -->
+                <span v-else-if="col.cell === 'planDate'" class="dp-date-cell" :title="tt('双击可改排产日期')"
+                      @dblclick="openQuick(row, planToday)">{{ row[col.key || col.prop] || '-' }}</span>
+                <!-- ③ 本线排产数量(2026-11-11):后端已返回同值别名;老服务/老数据取不到时回退既有字段 -->
+                <span v-else-if="col.cell === 'lineQty'">{{ num(row['本线排产数量'] ?? row['当前工序计划量']) }}</span>
+                <!-- 当前工序(2026-11-14):悬停 = 该行逐道工序的计划量/已审完工/可加工量/待流入量 -->
+                <span v-else-if="col.cell === 'process'" :title="col.prop === '当前工序' ? flowTip(row) : null">{{ row[col.key || col.prop] ? tt(row[col.key || col.prop]) : '-' }}</span>
+                <!-- 按量流转(2026-11-12,只读展示):上道完工量 → 可加工量 → 待报量 → 待流入量(>0 标橙) -->
+                <span v-else-if="col.cell === 'flowNum'">{{ flowNum(row[col.key || col.prop]) }}</span>
+                <span v-else-if="col.cell === 'flowGap'"
+                      :class="{ 'wb-flow-gap': Number(row[col.key || col.prop] || 0) > 0 }">{{ flowNum(row[col.key || col.prop]) }}</span>
+                <!-- 需交付三桶:值走 num() 显式渲染,0 要显示 0(2026-11-15 实测:prop 默认渲染 0 会出空格) -->
+                <span v-else-if="col.cell === 'num'">{{ num(row[col.key || col.prop]) }}</span>
+                <!-- 结案(2026-10-18):'Y' 显示「已结案」,其余显示 '-' -->
+                <span v-else-if="col.cell === 'closed'" :class="row.结案 === 'Y' ? 'wb-closed' : ''">{{ row.结案 === 'Y' ? tt('已结案') : '-' }}</span>
+                <span v-else>{{ row[col.key || col.prop] }}</span>
               </template>
             </el-table-column>
-            <!-- 成品口径:未交量 = 排产数量 − 入库数量(此前误减工序口径报工量 ⇒ 换算率 >1 时出负数)
-                 ⚠ 2026-11-12 用户口径:未交量是**整张工单**的口径,不属于工序块 ⇒ 保持原位(日期列之后),
-                   不随「上道工序/上道完工量」一起前移到工序列。
-                 2026-11-15 用户再次确认:「未交量应该是当前整个工单剩余的成品数量」⇒ 本列**不折工序**,
-                   与上面需交付/已排(工序口径)刻意不同;表头 tooltip 写清,避免又按工序口径去读。 -->
-            <el-table-column width="85" align="right">
-              <template #header>
-                <span :title="tt('未交量 = 排产数量 − 入库数量(成品口径,整单剩余;不折工序)')">{{ tt('未交量') }}</span>
-              </template>
-              <template #default="{ row }">{{ flowNum(row.未交量) }}</template>
-            </el-table-column>
-            <!-- 「余量」列已隐藏(2026-11-08 用户口径「直接隐藏吧」):它是「本工单行需求 − 本行订单占用」
-                 (form_flow_link SO→PLANG)的口径 —— 新口径下需求=转单量、占用链也写同一个数,余量恒为 0
-                 (正式库实测 399 行里 397 行为 0),与「当前工序还剩多少未生产」无关、极易误读;
-                 后台字段照旧返回,只是界面不再展示。要看"还剩多少":用左侧「未交量」(排产−入库)
-                 或「当前工序计划量/当前工序完工量」。要恢复:把下面这行放开即可。 -->
-            <!-- <el-table-column :label="tt('余量')" prop="余量" width="80" align="right" /> -->
-            <el-table-column :label="tt('操作员')" prop="操作员" width="80" />
-            <el-table-column :label="tt('备注')" prop="备注" min-width="100" show-overflow-tooltip />
-            <el-table-column :label="tt('领料单号')" prop="领料单号" width="120" show-overflow-tooltip />
-            <el-table-column :label="tt('入库单号')" prop="入库单号" width="120" show-overflow-tooltip />
-            <el-table-column :label="tt('结案')" width="70">
-              <template #default="{ row }">
-                <span :class="row.结案 === 'Y' ? 'wb-closed' : ''">{{ row.结案 === 'Y' ? tt('已结案') : '-' }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column :label="tt('结案人')" prop="结案人" width="80" />
-            <el-table-column :label="tt('结案时间')" prop="结案时间" width="130" />
-            <el-table-column :label="tt('打印人')" prop="打印人" width="80" />
-            <el-table-column :label="tt('打印时间')" prop="打印时间" width="130" />
-            <el-table-column :label="tt('打印次数')" prop="打印次数" width="80" align="right" />
             <el-table-column :label="tt('生产状态')" prop="生产状态" width="90" fixed="right" />
           </el-table>
         </div>
@@ -402,6 +280,16 @@
         <el-button type="primary" @click="savePrintSet">{{ tt('保存') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 列设置弹窗(2026-11-18):通用组件 @core/views/ColumnSettingsDialog.vue —— 显隐**与列顺序**草稿由
+         useReportColumns 持有,保存走 /px/reportColumnSettings(panelCode=WORK_ORDER_BOARD),刷新后仍按
+         保存的显隐/顺序渲染。排序:拖动行(⠿)换位 + ▲▼ 微调;冻结区的 4 列带锁(order 固定,只能显隐)。
+         关闭/取消 = 丢弃未保存的勾选与顺序(回到后端已保存那份),否则"取消"后表格已经被改了。
+         列表里的伪列「日排产日期列」= 整组日期列的显隐开关 + 插入点(日期列本身不进列设置)。 -->
+    <ColumnSettingsDialog :model-value="columnVisible" :columns="dialogColumns"
+                          @update:model-value="onColumnDialogToggle"
+                          @toggle="onColToggle" @move="onColMove" @reorder="onColReorder"
+                          @reset="resetDraft" @save="saveColumns" />
 
     <!-- 调拨弹窗(9.29 批次②;2026-10-29 收口「调拨只能调拨到当前工序的产线中」;
          2026-10-30 排版:改**两列表单**(标签定宽右对齐 + 控件一列对齐 + 行距 14px),
@@ -473,6 +361,11 @@ import { toggleRowOnRowClick } from '@/business/rowSelect'
 import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
+// 列设置(2026-11-18):列定义/渲染列序在 business/woBoardColumns.js(纯函数,带单测);
+// 显隐+顺序的持久化走系统级 useReportColumns → /px/reportColumnSettings(panelCode=WORK_ORDER_BOARD)。
+import { WO_BOARD_COLUMNS, WO_BOARD_FROZEN_PROPS, boardColumnProps, boardRenderColumns, clampToScrollZone } from '@/business/woBoardColumns'
+import { useReportColumns } from '@core/report/useReportColumns'
+import ColumnSettingsDialog from '@core/views/ColumnSettingsDialog.vue'
 
 /**
  * 页面级动作权限(2026-10-16):页面面板 WORK_ORDER_BOARD
@@ -645,6 +538,70 @@ async function loadStats() {
 //   清空 = 恢复自动;格下方 = 当天已审核报工量。
 const planDates = ref([])
 const planToday = ref('')
+
+// ───────── 列设置(2026-11-18 用户口径「为当前的工单排产处也增加列设置。让用户可以调整当前查看的列和
+//   不查看的列」)────────────────────────────────────────────────────────────────────────────
+// 三件事分开放,避免这块又长成本页的第二个"大杂烩":
+//   ① 列定义 + 渲染列序(boardRenderColumns)= 纯数据/纯函数,business/woBoardColumns.js(带单测);
+//   ② 显隐/顺序的存储 = 系统级 useReportColumns + /px/reportColumnSettings(panelCode=WORK_ORDER_BOARD,
+//      与订单结转、生产工单·列表同一套;后端按面板存一行 ⇒ 全用户共享一份设置);
+//   ③ 本页只留弹窗事件(改草稿)与保存提示 —— 弹窗 UI 是通用组件 ColumnSettingsDialog(C4:列调整只有一套实现)。
+const BOARD_COL_PROPS = boardColumnProps()
+const {
+  columnVisible, columnDraft,
+  openDialog, saveDialog, cancelDialog, init: initColumns, resetDraft,
+} = useReportColumns(ref('WORK_ORDER_BOARD'), computed(() => BOARD_COL_PROPS), schedRows)
+
+/** 表格实际渲染的列序:冻结区(顺序锁定)在前 → 滚动区按草稿顺序,日期组在伪列位置整组展开 */
+const renderCols = computed(() => boardRenderColumns(columnDraft.value, WO_BOARD_COLUMNS, planDates.value))
+
+/** 弹窗里的列草稿:冻结区 4 列带 locked(只能显隐,顺序固定),其余可拖动/▲▼ */
+const dialogColumns = computed(() => columnDraft.value
+  .map((c) => ({ ...c, locked: WO_BOARD_FROZEN_PROPS.includes(c.prop) })))
+
+/** 勾选/取消勾选:只改草稿,点弹窗「保存」才落后端 */
+function onColToggle({ prop, visible }) {
+  const col = columnDraft.value.find((c) => c.prop === prop)
+  if (col) col.visible = visible
+}
+/** ▲/▼ 微调列顺序(只改草稿):delta=-1 上移/靠左,+1 下移/靠右;冻结列顺序锁定 ⇒ 直接忽略 */
+function onColMove({ prop, delta }) {
+  if (WO_BOARD_FROZEN_PROPS.includes(prop)) return
+  const arr = columnDraft.value
+  const i = arr.findIndex((c) => c.prop === prop)
+  if (i < 0) return
+  const j = clampToScrollZone(arr, i + (Number(delta) || 0))
+  if (j === i) return
+  const [moved] = arr.splice(i, 1)
+  arr.splice(j, 0, moved)
+}
+/** 拖动换位(下标基于草稿全量数组,只改草稿):冻结列不参与,滚动列不会被拖进冻结区 */
+function onColReorder({ from, to }) {
+  const arr = columnDraft.value
+  const a = Number(from)
+  const b = Number(to)
+  if (!Number.isInteger(a) || !Number.isInteger(b)) return
+  if (a < 0 || b < 0 || a >= arr.length || b >= arr.length || a === b) return
+  if (WO_BOARD_FROZEN_PROPS.includes(arr[a].prop)) return
+  const target = clampToScrollZone(arr, b)
+  if (target === a) return
+  const [moved] = arr.splice(a, 1)
+  arr.splice(target, 0, moved)
+}
+/**
+ * 弹窗开/关:关(取消按钮或右上角 X)= **丢弃未保存的勾选与顺序**,回到后端已保存那份。
+ * 不这么做的话,草稿即生效(renderCols 从草稿派生)⇒ 点「取消」列也已经被改掉了。
+ */
+function onColumnDialogToggle(open) {
+  if (open) { columnVisible.value = true; return }
+  cancelDialog()
+}
+/** 保存列设置(失败如实提示,不谎报「已保存」) */
+async function saveColumns() {
+  const ok = await saveDialog()
+  if (ok) ElMessage.success(tt('已保存'))
+  else ElMessage.warning(tt('保存失败'))
+}
 /** 「日排产」权(改当天数量/日期):两页任一授予即可;没权限时格内不给编辑 */
 const canDayPlan = computed(() => canDoAny(permUser, ['WORK_ORDER_LIST', 'WORK_ORDER_BOARD'], 'dayplan'))
 // ── 历史欠产汇总(2026-11-13 用户口径「当天结束后未完成会进行提示」)──────────────────
@@ -1246,6 +1203,9 @@ onMounted(async () => {
   //   ⚠ 必须在下面 await 之前同步读:深链的 stripFocusQuery 会 router.replace 重写 query
   const q = new URLSearchParams(location.hash.split('?')[1] || '')
   const tno = q.get('trace')
+  // 列设置(2026-11-18):**先把后端保存的显隐/顺序应用上**,再取数渲染 —— 否则首帧按全列闪一下,
+  //   列多的表还会明显重排一次。initColumns 自带缓存/异常兜底(读不到 = 全部可见,与旧行为一致)。
+  await initColumns()
   // 先跑完既有首屏取数(骨架+明细+统计+日计划),再消费深链 —— 深链要按 line 选线并定位行,
   // 必须等 linesSummary 落地;反过来则会与 loadAll 的取数互相覆盖。
   await loadAll()
