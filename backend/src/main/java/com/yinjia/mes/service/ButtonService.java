@@ -3046,11 +3046,16 @@ public class ButtonService {
     // ============ 状态机(照搬 light-mes:草稿⇄已审核 + 审批流) ============
 
     // ══════════════════════════════════════════════════════════════════════════════════
-    // 产成品入库单(FINISH_IN)与两张出货检验单的**关联门禁**(2026-11-12 立;2026-11-13 放宽)
+    // 产成品入库单(FINISH_IN)与两张出货检验单的**关联门禁**(2026-11-12 立;2026-11-13 放宽;
+    //   2026-11-18 按商品「是否过程检验」开关放开)
     //   2026-11-12 用户原话:「修改当前的产成品入库,让他需要关联当前的出货检验功能记录表和出货检验表观,
     //   当这两个完成后按照每天的批次实现对这个产成品入库单的入库数量进行填写和创建。」
     //   2026-11-13 用户口径:「门禁口径保持不变(仍要求两张检验单都已审核+全合格)这个只需要保持两个单据
     //   已审核即可,不需要实现全合格。」⇒ 现口径:
+    //     ⓪ **2026-11-18 新增豁免**(用户口径「当前物料如果没有选择是否过程检验就不强制这个实现了」):
+    //        本单明细商品在商品档案里**都没有勾「是否过程检验=是」** ⇒ 整条门禁跳过,提交审批/审核直接放行
+    //        (这类商品本来就不会自动出两张检验单,强求单号只会把产成品入库卡死);只要有一行勾了 = 是,
+    //        本单仍按下面 ①②③ 执行(表头两个单号是整单口径,不能只对部分行查)。判据见 finishInNeedsInsp。
     //     ① 表头「出货检验功能单号」「出货检验表观单号」必填;
     //     ② 两张检验单都必须**已审核**;
     //     ③ **不再**校验本单批次是否出现在检验单明细「内部批次」、**不再**要求该批次每行判「合格」。
@@ -3074,6 +3079,12 @@ public class ButtonService {
         //   (用户流程「等两张检验单审核完成后再提交」——不该再让人手挑单号)
         String wo = String.valueOf(h.get("wo") == null ? "" : h.get("wo")).trim();
         int xc = h.get("xc") instanceof Number n ? n.intValue() : 0;
+        // 2026-11-18 用户口径「当前物料如果没有选择是否过程检验就不强制这个实现了」:
+        //   商品档案没勾「是否过程检验=是」的入库单不强制关联两张检验单(判据见 finishInNeedsInsp)。
+        if (!finishInNeedsInsp(no, wo, xc)) {
+            log.info("[FINISH_IN] 单据 {} 的商品未勾「是否过程检验」,跳过两张出货检验单门禁", no);
+            return;
+        }
         if (func.isEmpty() && !wo.isEmpty()) {
             String auto = latestInsp("QC_PROC_INSP", "qc_proc_insp_head", wo, xc);
             if (!auto.isEmpty()) {
@@ -3089,10 +3100,60 @@ public class ButtonService {
             }
         }
         if (func.isEmpty() || look.isEmpty())
-            throw new IllegalStateException("产成品入库单必须关联「出货检验功能单号」和「出货检验表观单号」后才能提交审批/审核(等两张检验单审核完成后自动带入)");
+            throw new IllegalStateException("产成品入库单必须关联「出货检验功能单号」和「出货检验表观单号」后才能提交审批/审核(本单商品「是否过程检验」为是;等两张检验单审核完成后自动带入)");
         // 2026-11-13:只要求两张检验单已审核(不再按批次比明细、不再要求全合格)
         checkInspAudited("出货检验功能", "QC_PROC_INSP", func);
         checkInspAudited("出货检验表观", "QC_ASM_INSP", look);
+    }
+
+    /**
+     * 本单是否**需要**走上面的两张出货检验单门禁(2026-11-18 用户口径:
+     * 「当前物料如果没有选择是否过程检验就不强制这个实现了」)。
+     *
+     * <p>判据 = 本单明细产品编码对应的商品档案 {@code bs_inv.[是否过程检验]}(列见
+     * {@code tools/migrate-inv-process-inspection-20261114.sql};与自动出单
+     * {@code QcInspAutoService.processInspectionOn} 同一口径:只有明确 = 是才算):</p>
+     * <ul>
+     *   <li>明细里**只要有一行**商品勾了「是否过程检验=是」 ⇒ 需要门禁;</li>
+     *   <li>全部未勾(否 / NULL / 档案里查不到该编码) ⇒ **不强制**,提交审批/审核直接放行;</li>
+     *   <li>明细没有产品编码(极少见)⇒ 回退按 加工单号 + 工单行号 取工单行产品;</li>
+     *   <li>取数异常 / 连产品都定位不到 ⇒ 保持门禁(fail-closed:不能因为一次查询失败就放行)。</li>
+     * </ul>
+     * <p>为什么不按"有没有检验单"判:开关只管自动出单,商品勾了是但检验单还没做/手工建单时
+     * 门禁仍要生效;开关只管"这批货本来该不该走检验",与单据是否存在解耦。</p>
+     */
+    private boolean finishInNeedsInsp(String no, String wo, int xc) {
+        try {
+            java.util.Set<String> codes = new java.util.LinkedHashSet<>();
+            for (String c : jdbc.queryForList(
+                    "SELECT DISTINCT LTRIM(RTRIM(ISNULL(l.[产品编码],N''))) FROM dbo.bl_finish_in l"
+                            + " WHERE l.[单据编号]=? AND ISNULL(l.asp_cancel,'N')<>'Y'", String.class, no)) {
+                if (c != null && !c.isBlank()) codes.add(c);
+            }
+            if (codes.isEmpty() && !wo.isEmpty() && xc > 0) {
+                for (String c : jdbc.queryForList(
+                        "SELECT DISTINCT LTRIM(RTRIM(ISNULL(p.dm,N''))) FROM dbo.plang p"
+                                + " WHERE p.pl_no=? AND ISNULL(p.pl_xc,0)=? AND ISNULL(p.asp_cancel,'N')<>'Y'",
+                        String.class, wo, xc)) {
+                    if (c != null && !c.isBlank()) codes.add(c);
+                }
+            }
+            if (codes.isEmpty()) {
+                log.warn("[FINISH_IN] 单据 {} 定位不到明细产品编码(工单 {} 行 {}),门禁按需要检验处理", no, wo, xc);
+                return true;
+            }
+            for (String code : codes) {
+                Integer yes = jdbc.queryForObject(
+                        "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.bs_inv i"
+                                + "   WHERE LTRIM(RTRIM(i.[存货编码]))=? AND ISNULL(i.[是否过程检验],0)=1)"
+                                + " THEN 1 ELSE 0 END", Integer.class, code);
+                if (yes != null && yes == 1) return true;
+            }
+            return false;
+        } catch (RuntimeException e) {
+            log.warn("[FINISH_IN] 单据 {} 判定商品「是否过程检验」失败,门禁按需要检验处理: {}", no, e.getMessage());
+            return true;
+        }
     }
 
     /** 单张检验单必须已审核(2026-11-13 放宽后不再校验批次明细与合格项) */

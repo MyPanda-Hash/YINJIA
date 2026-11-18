@@ -5038,3 +5038,9 @@ migrate-mix-bom-strip-tb-20261118.sql
 
 # 2026-11-18 恢复 11-17 13:52 admin 连删的 10 张研发单据（疑似误删；其余删除保留）
 migrate-restore-rd-del-batch-20261117.sql
+
+# 2026-11-18 产成品入库单:①明细行加「不合格数量」decimal(18,4) + yj_field(detail/seq91/可编辑非必填)
+#   + 10 语种译名(只记录/展示,库存与转ERP 仍按实收数量,不扣减);
+#   ②门禁判据配套:提交/审批/审核时按本单商品 bs_inv.是否过程检验 判,没勾=是 的不再强制关联两张
+#   出货检验单(门禁代码在 ButtonService,本脚本只自检判据列,不重复建);幂等;两账套。
+migrate-finish-in-failqty-20261118.sql
