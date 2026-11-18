@@ -14,7 +14,7 @@ import assert from 'node:assert/strict'
 
 import {
   parseUsage, toRows, maxQtyOf, allocateForQty, allocateScannedFirst,
-  pickProgress, backIsEmpty, round4,
+  pickProgress, backIsEmpty, round4, printJobsOf, locateQueryOf,
 } from './mobilePick.js'
 
 // ─── ① BOM 用量解析 ───────────────────────────────────────────────
@@ -226,4 +226,59 @@ test('退料默认 0 不影响领料判定(两者互不牵连)', () => {
 
 test('round4:0.1 + 0.2 的浮点尾巴不误判', () => {
   assert.equal(round4(0.1 + 0.2), 0.3)
+})
+// ─── 生单后的「打几张纸」 ─────────────────────────────────────────
+
+test('printJobsOf:一个工单行出两张单(组装+混料)⇒ 两张都要打', () => {
+  // 2026-11-18 用户报障「只打组装领料,混料领料没打印」—— 顶层 打印 只是组装那张,
+  // 真正的清单在 单据[i].打印 里,必须逐张取。
+  const result = {
+    打印: { 领料单号: 'LL-1', 标题: '生产领料单', 二维码内容: '0@GD-1@1001' },
+    单据: [
+      { 领料单号: 'LL-1', 领料类型: '组装', 打印: { 领料单号: 'LL-1', 标题: '生产领料单' } },
+      { 领料单号: 'LL-2', 领料类型: '混料', 打印: { 领料单号: 'LL-2', 标题: '混料领料单' } },
+    ],
+  }
+  const jobs = printJobsOf(result)
+  assert.equal(jobs.length, 2)
+  assert.deepEqual(jobs.map((j) => j.领料单号), ['LL-1', 'LL-2'])
+  assert.equal(jobs[1].标题, '混料领料单')
+})
+
+test('printJobsOf:没有 单据 数组时退回顶层 打印(老结构 / 只有一张单)', () => {
+  const jobs = printJobsOf({ 打印: { 领料单号: 'LL-9', 标题: '生产领料单' } })
+  assert.equal(jobs.length, 1)
+  assert.equal(jobs[0].领料单号, 'LL-9')
+})
+
+test('printJobsOf:重复扫码把同一张单列两遍 ⇒ 只打一次', () => {
+  const one = { 领料单号: 'LL-7', 标题: '生产领料单' }
+  const jobs = printJobsOf({ 单据: [{ 打印: one }, { 打印: { ...one } }] })
+  assert.equal(jobs.length, 1)
+})
+
+test('printJobsOf:打印载荷为空(关掉自动打印)⇒ 一张都不打', () => {
+  assert.deepEqual(printJobsOf({ 打印: null, 单据: [{ 打印: null }, { 打印: null }] }), [])
+  assert.deepEqual(printJobsOf(null), [])
+})
+// ─── 生产领料扫码定位(领料标记) ─────────────────────────────────
+
+test('locateQueryOf:领料单纸面码 @M/@A → 带出工单行号与领料类型', () => {
+  // 2026-11-18 用户报障「扫混料和扫组装的二维码,都跳到组装的单据界面」——
+  // 前端必须把第 4 段的标记一起传给后端,否则后端只能按第一张(组装)打开。
+  assert.deepEqual(locateQueryOf('0@GD-2026-11-0007@1004@M'),
+    { wo: 'GD-2026-11-0007', line: 4, kind: '混料' })
+  assert.deepEqual(locateQueryOf('0@GD-2026-11-0007@1004@A'),
+    { wo: 'GD-2026-11-0007', line: 4, kind: '组装' })
+})
+
+test('locateQueryOf:老的三段工单码 → kind 为空(行为照旧)', () => {
+  assert.deepEqual(locateQueryOf('0@GD-2026-11-0007@1004'),
+    { wo: 'GD-2026-11-0007', line: 4, kind: '' })
+})
+
+test('locateQueryOf:纯工单号 / 领料单号 / 空串', () => {
+  assert.deepEqual(locateQueryOf('GD-2026-11-0007'), { wo: 'GD-2026-11-0007', line: 0, kind: '' })
+  assert.deepEqual(locateQueryOf('LL-2026-11-0044'), { wo: 'LL-2026-11-0044', line: 0, kind: '' })
+  assert.deepEqual(locateQueryOf('   '), { wo: '', line: 0, kind: '' })
 })

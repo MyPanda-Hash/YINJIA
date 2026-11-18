@@ -4914,6 +4914,19 @@ migrate-sample-insp-module-20261116.sql
 #   含中文注明(表+15 列)、pk/ix 命名与末尾自检(关键列 5/5、索引 1/1、注明 ≥15)。两账套已执行
 migrate-print-task-cache-20261116.sql
 
+# 2026-11-16 「金蝶同步重建订单明细行 → 下游单据认不出原来那行」的存量回填(form_flow_link 占用 +
+#   bl_pu_label 材料码):根因在 deploy/sync-core.mjs upsertLines()(改按 单据编号+行号 合并、保住 identity id);
+#   本脚本把已经断掉的占用按「目标行采购订单行号 / 采购入库源单行号 / 同单物料唯一」逐级接回现行行 id,
+#   销售链按「同单存货唯一」回填;认不出来的留在原地并报数(不猜)。单事务,自检不过整体回滚。
+migrate-erp-linekey-repair-20261116.sql
+
+# 2026-11-17 采购入库单「多仓库入库」:bl_purchase_in 加 [源行id](拆分组锚点,支持按行缩进展示 + 合并回一行回退)。
+migrate-pur-in-wh-group-20261117.sql
+
+# 2026-11-17 生产退料单整页 500(列名 '工单行号' 无效)修复:「工单行号」place 由 query,header,detail 改为 query,header
+#   (行表 bl_material_ret 无该列,该字段只落在单据头 bd_material_ret;口径同材料出库单)纯元数据,零改表零改代码。
+migrate-material-ret-wo-line-nodetail-20261117.sql
+
 # 2026-11-17 检验委托单第三次修订(用户新 .doc 标黄差异):单据编号可手工改号(editable=1)、
 #   委托单位/制造商/生产厂/样品型号规格/报告类型 五个字段转下拉框字典、headDefaults 去掉
 #   样品处理方式与检验报告有效期默认值、列注明同步(10 日/只读语义);幂等;两账套
@@ -4991,3 +5004,22 @@ migrate-datarec-auditor-from-shr-20261117.sql
 #   ③ 单据日期 置只读(各章节「日期」自动生成);④ BHC/BHZ/SCP/LYB 补 [附件] 列 + 附件字段(纸面「可附图片」
 #      章节内上传);两账套已执行;幂等
 migrate-qc-docs-twolevel-20261118.sql
+
+# 2026-11-17 核验补漏（具体问题点 行10）：炭棒工艺管控清单加「审核人」格（备用3，审批后自动生成）
+migrate-mold-proc-auditor-20261117.sql
+# 2026-11-17 核验补漏（产品信息表 行22）：主要性能描述改标准库
+migrate-prod-info-perf-stdlib-20261117.sql
+# 2026-11-18 出货检验计划：表单管理人默认改崔晓云（存量按旧默认冯敏的改成崔晓云）
+migrate-insp-plan-manager-20261118.sql
+# 2026-11-18 X烧结配方表：存量小数位订正为 2 位 + 删除全空配方行（回填过滤已在代码侧修）
+migrate-xsinter-formula-fix-20261118.sql
+
+# 2026-11-19 检验报告(YJ-QR-96,QC_INSP_REC)「检测结果」由固定五格改为**可增删列**:
+#   qc_insp_rec_detail 补 结果6..结果20 nvarchar(200)(逐列中文注明)+ qc_insp_rec.结果列数 int(计数载体,隐藏);
+#   yj_field 登记 结果1..结果20(全部可见列,否则"清空"落不了库)、单项判定 seq 40→60、结果列数(header,隐藏);
+#   存量回填 结果列数=5 + 结果6..20/结果列数 的 en/ja/ko/zh-TW 译名;幂等;两账套。
+migrate-qc-insp-rec-resultcols-20261119.sql
+# 2026-11-19 检验报告「检测结果」列数**默认改为 1 格**(用户口径「默认是1格。后面再自主增加。」):
+#   存量每张单的 qc_insp_rec.结果列数 按"实际用到的格数"重算(最少 1,有值的格子一列都不藏);
+#   列说明改成「默认 1」口径;零业务数据改动(结果1..结果20 一个字节不改);幂等;两账套。
+migrate-qc-insp-rec-resultcols-default1-20261119.sql

@@ -22,17 +22,27 @@ import java.util.Map;
  *  逐项扫物料码,自动获取电子秤的数量(我们系统已经有了(之前的工单扫码领料读的就是这个的数据)),
  *  提交保存一笔,全部扫完,整单保存。保存后自动打印,并且保留单据,重新扫码后进入可以补打印。」
  *
- * <h3>作业链路</h3>
+ * <h3>作业链路(2026-11-18 第四轮:两页结构 + 「解锁 → 确认」,与「生产领料」同一套)</h3>
+ *
+ * <p>用户原话:「扫码混料,应该和生产领料一样也是跳转到单据的明细里面再开始扫物料码,
+ * 解锁对应的物料码,然后根据连接电子秤的取数,点击确认。再扫其他的物料解锁,根据电子秤再确认。
+ * 全部物料确认完毕后,才可以提交。」</p>
+ *
  * <ol>
- *   <li><b>扫工单码</b> → {@link #workOrderLines} 取工单行({@code plang})、「{@link #bomOf}」取该产品的
- *       **一级BOM = 物料清单**(面板 {@code WLBOM},底表 {@code mate})按排产数量展开应投料量;</li>
- *   <li><b>逐项扫物料码</b> → 前端读电子秤({@code /api/dc/monitor})拿实际重量 →
- *       {@link #saveScan} **提交保存一笔**(落 {@code wo_mixing_list},标记 {@code N} = 保存前);</li>
- *   <li><b>全部扫完 → 整单保存</b> → {@link #saveDoc} 取混料单号({@code PL+yyMMdd+4位})、
- *       把本单各行标记置 {@code Y}(保存后);保存后前端自动打印;</li>
- *   <li><b>补打印</b> → 重新扫同一张工单码,{@link #docsOf} 列出该工单已保存的混料单,
- *       {@link #docRows} 取明细、{@link #markPrinted} 累加打印次数({@code asp_print})。</li>
+ *   <li><b>列表页</b>({@code MobileMixScan.vue})=「生产领料」列表页同款:查询 + 扫码定位 +
+ *       「未完成 / 已完成」两组 —— {@link #openDocs} = 已确认过料、还没整单提交的工单行;
+ *       {@link #docsOf} = 已保存的混料单;</li>
+ *   <li><b>明细页</b>({@code MobileMixDoc.vue})=「生产领料单」同款:{@link #taskOf} 一次取齐
+ *       抬头 + 明细(物料清单的应投 / 已确认实投);扫物料码 → {@link #scanMaterial}
+ *       <b>只解锁不落库</b> → 读电子秤 → 点「确认」→ {@link #saveScan} 写入该行;</li>
+ *   <li><b>全部物料确认完毕才可提交</b>:{@link #saveDoc} 会再按物料清单校一遍,
+ *       缺项直接拒绝(界面上的按钮同样置灰)。</li>
  * </ol>
+ *
+ * <p>与上一版(单页:扫工单→清单→逐笔保存→整单保存)的差别只有两处:① 拆成列表/明细两页;
+ * ② 扫物料码变成「解锁」,数量由电子秤填进数量框、点「确认」才落库。
+ * 「写入」的语义也与生产领料对齐:**覆盖**——同一物料再确认一次以最后一次秤值为准
+ * (上一版是累加,现场重复确认会把实际用量记成两倍)。</p>
  *
  * <h3>为什么落 {@code wo_mixing_list}(混料记录)而不是新开单据表</h3>
  * 那张表就是「混料时通过电子称自动获取的实际用量」的载体(服务器原话的表注释),
@@ -121,22 +131,49 @@ public class MixScanService {
      * @param productCode 产品编码({@code mate.m_no})
      */
     public List<Map<String, Object>> bomOf(String productCode) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> b : bomRowsOf(productCode)) {
+            Map<String, Object> v = new LinkedHashMap<>();
+            // 老键名保持原样(既有客户端/打印链路认这套键);新代码一律用 {@link #bomRowsOf} 的新键
+            v.put("子件代码", b.get("物料编号"));
+            v.put("子件名称", b.get("物料名称"));
+            v.put("规格型号", b.get("规格型号"));
+            v.put("子件单位", b.get("单位"));
+            v.put("标准用量", b.get("标准用量"));
+            v.put("损耗量", b.get("损耗量"));
+            v.put("备注", b.get("备注"));
+            out.add(v);
+        }
+        return out;
+    }
+
+    /**
+     * 物料清单的**归一化行**(内部统一键,明细页/扫料解锁/整单校验共用一份取数)。
+     *
+     * <p>同一产品可能有多张单(历史重复录入):按 {@code m_date} 倒序、{@code xc} 行序取;
+     * 同一物料在清单里出现多次时**只认第一行**(不累加,免得把重复录入算成两倍),
+     * 这是与「应投量」计算一致的口径。
+     *
+     * @param productCode 产品编码({@code mate.m_no})
+     * @return [{物料编号, 物料名称, 规格型号, 单位, 标准用量, 损耗量, 备注}]
+     */
+    public List<Map<String, Object>> bomRowsOf(String productCode) {
         String code = trim(productCode);
         if (code.isEmpty()) return List.of();
-        // 同一产品可能有多张单(历史重复录入):按 m_date 倒序取,子件按行序 xc 排
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT m_no, m_date, xc, wzdm2, wzmc2, gg2, jldw2, bzl, sl2, bz"
                         + " FROM dbo.mate WHERE m_no = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                         + " ORDER BY m_date DESC, xc, id", code);
         List<Map<String, Object>> out = new ArrayList<>();
+        java.util.Set<String> seen = new java.util.HashSet<>();
         for (Map<String, Object> r : rows) {
             String item = trim(r.get("wzdm2"));
-            if (item.isEmpty()) continue;
+            if (item.isEmpty() || !seen.add(item)) continue;
             Map<String, Object> v = new LinkedHashMap<>();
-            v.put("子件代码", item);
-            v.put("子件名称", trim(r.get("wzmc2")));
+            v.put("物料编号", item);
+            v.put("物料名称", trim(r.get("wzmc2")));
             v.put("规格型号", trim(r.get("gg2")));
-            v.put("子件单位", trim(r.get("jldw2")));
+            v.put("单位", trim(r.get("jldw2")));
             v.put("标准用量", dbl(r.get("bzl")));
             v.put("损耗量", dbl(r.get("sl2")));
             v.put("备注", trim(r.get("bz")));
@@ -145,19 +182,267 @@ public class MixScanService {
         return out;
     }
 
-    // ═══════════════════════ 逐笔保存(标记 N) ═══════════════════════
+    /**
+     * 按物料清单 + 排产数量算出**应投料量**:标准用量 × 排产数量 + 损耗量(与界面/纸面同一口径)。
+     *
+     * @param standard 标准用量({@code mate.bzl},单支产品用量)
+     * @param loss     损耗量({@code mate.sl2})
+     * @param planQty  排产数量({@code plang.pl_sl})
+     * @return 应投量(4 位小数)
+     */
+    private static double requiredOf(double standard, double loss, double planQty) {
+        return round4(standard * planQty + loss).doubleValue();
+    }
+
+    // ═══════════════════════ 列表页:未完成 / 已完成 ═══════════════════════
 
     /**
-     * 提交保存**一笔**:把一次扫码(物料 + 电子秤实际用量)写进混料记录。
+     * **未完成的混料单** = 已经确认过料、还没整单提交的工单行(草稿行标记 {@code N})。
      *
-     * <p>同一「工单行 + 物料」在未保存前重复扫时**累加到同一行**(实际用量相加),
-     * 不再像老系统那样每次扫码都插一行 —— 服务器那 8 行里就有 6 行完全重复的同一物料,
-     * 现场看不出到底投了几次,打印出来也没法用。
+     * <p>与「生产领料」的未完成组同一形态:{@code 工单号 + 工单行号} 就是这张单的身份
+     * (混料单号要等提交才生成 —— 见 {@link #saveDoc})。点进明细页后走
+     * {@link #taskOf}/{@link #scanMaterial}/{@link #saveScan}。
+     *
+     * @param keyword 可选:工单号 / 产品编码 / 产品名称 / 物料编号的片段
+     * @return [{工单号, 工单行号, 工单行id, 产品编码, 产品名称, 生产线, 排产数量,
+     *          已确认项数, 明细数, 应投合计, 实投合计, 开始时间, 更新时间, 操作人, 单据编号:''}]
+     */
+    public List<Map<String, Object>> openDocs(String keyword) {
+        String kw = trim(keyword);
+        StringBuilder sql = new StringBuilder(
+                "SELECT TOP 200 l.工单号, l.工单行号, COUNT(*) AS 已确认项数,"
+                        + " SUM(ISNULL(l.计划用量,0)) AS 应投合计, SUM(ISNULL(l.实际用量,0)) AS 实投合计,"
+                        + " MIN(l.asp_time1) AS 开始时间, MAX(ISNULL(l.asp_time2,l.asp_time1)) AS 更新时间,"
+                        + " MAX(l.asp_user1) AS 操作人, MAX(l.工单行id) AS 工单行id"
+                        + " FROM dbo.wo_mixing_list l"
+                        + " LEFT JOIN dbo.plang p ON p.pl_no = l.工单号 AND p.pl_xc = l.工单行号"
+                        + " WHERE l.标记 = ? AND ISNULL(l.asp_cancel,'N') <> 'Y'"
+                        + "   AND (l.单据编号 IS NULL OR LTRIM(RTRIM(l.单据编号)) = '')");
+        List<Object> args = new ArrayList<>();
+        args.add(MARK_DRAFT);
+        if (!kw.isEmpty()) {
+            sql.append(" AND (l.工单号 LIKE ? OR p.dm LIKE ? OR p.mc LIKE ? OR l.物料编号 LIKE ?)");
+            String like = "%" + kw + "%";
+            args.add(like);
+            args.add(like);
+            args.add(like);
+            args.add(like);
+        }
+        sql.append(" GROUP BY l.工单号, l.工单行号 ORDER BY MAX(ISNULL(l.asp_time2,l.asp_time1)) DESC");
+        List<Map<String, Object>> groups = jdbc.queryForList(sql.toString(), args.toArray());
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> g : groups) {
+            String woNo = trim(g.get("工单号"));
+            int woLine = intOf(g.get("工单行号"));
+            Map<String, Object> wo = tail(workOrderLines(woNo, woLine));
+            String product = wo == null ? "" : trim(wo.get("产品编码"));
+            Map<String, Object> v = new LinkedHashMap<>();
+            v.put("工单号", woNo);
+            v.put("工单行号", woLine);
+            v.put("工单行id", wo == null ? longOf(g.get("工单行id")) : longOf(wo.get("行id")));
+            v.put("产品编码", product);
+            v.put("产品名称", wo == null ? "" : trim(wo.get("产品名称")));
+            v.put("生产线", wo == null ? "" : trim(wo.get("生产线")));
+            v.put("排产数量", wo == null ? 0d : dbl(wo.get("排产数量")));
+            v.put("已确认项数", intOf(g.get("已确认项数")));
+            // 明细数 = 物料清单行数(提交闸门的分母;清单没维护时为 0,页面据此提示)
+            v.put("明细数", bomRowsOf(product).size());
+            v.put("应投合计", dbl(g.get("应投合计")));
+            v.put("实投合计", dbl(g.get("实投合计")));
+            v.put("开始时间", trim(g.get("开始时间")));
+            v.put("更新时间", trim(g.get("更新时间")));
+            v.put("操作人", trim(g.get("操作人")));
+            // 还没提交 ⇒ 没有混料单号(与生产领料列表的「未生成」同一写法)
+            v.put("单据编号", "");
+            out.add(v);
+        }
+        return out;
+    }
+
+    /**
+     * **单据明细页的取数**:工单行 + 物料清单(应投)+ 已确认的实投,一次给齐。
+     *
+     * <p>对应「生产领料单」明细页的 {@code GET /px/mobilePick/doc}:页面拿这一份就能画出
+     * 抬头、扫码解锁区与明细,不必再分别拉 BOM 和草稿。
+     *
+     * @param orderNo 工单号
+     * @param lineNo  工单行号
+     * @return {工单号, 工单行号, 工单行id, 产品编码, 产品名称, 规格型号, 计量单位, 生产线,
+     *          排产数量, 批号, 上次单号, 明细:[{行id, 物料编号, 物料名称, 规格型号, 单位,
+     *          应投, 实投, 待投, 物料批次, 已确认}], 进度:{done,total,ok}}
+     */
+    public Map<String, Object> taskOf(String orderNo, int lineNo) {
+        String woNo = trim(orderNo);
+        if (woNo.isEmpty()) throw new IllegalArgumentException("请先扫工单码或输入工单号");
+        Map<String, Object> wo = tail(workOrderLines(woNo, lineNo));
+        if (wo == null) {
+            throw new IllegalArgumentException(lineNo > 0
+                    ? "没有找到工单行 " + woNo + " #" + lineNo
+                    : "没有找到工单 " + woNo);
+        }
+        int useLine = intOf(wo.get("工单行号"));
+        String product = trim(wo.get("产品编码"));
+        double planQty = dbl(wo.get("排产数量"));
+
+        // 已确认的草稿行(标记 N):按物料编号索引
+        Map<String, Map<String, Object>> confirmed = new LinkedHashMap<>();
+        for (Map<String, Object> d : draftRows(woNo, useLine)) {
+            confirmed.put(trim(d.get("物料编号")), d);
+        }
+
+        List<Map<String, Object>> lines = new ArrayList<>();
+        java.util.Set<String> used = new java.util.HashSet<>();
+        double requiredSum = 0;
+        for (Map<String, Object> b : bomRowsOf(product)) {
+            String code = trim(b.get("物料编号"));
+            double required = requiredOf(dbl(b.get("标准用量")), dbl(b.get("损耗量")), planQty);
+            Map<String, Object> d = confirmed.get(code);
+            double actual = d == null ? 0d : dbl(d.get("实际用量"));
+            requiredSum += required;
+            used.add(code);
+            lines.add(lineRow(code, trim(b.get("物料名称")), trim(b.get("规格型号")), trim(b.get("单位")),
+                    required, actual, d));
+        }
+        // 清单后来改过、草稿里还有清单外的料:照样列出来(否则提交时会漏算它)
+        for (Map.Entry<String, Map<String, Object>> e : confirmed.entrySet()) {
+            if (used.contains(e.getKey())) continue;
+            Map<String, Object> d = e.getValue();
+            lines.add(lineRow(e.getKey(), trim(d.get("物料名称")), "", "",
+                    dbl(d.get("计划用量")), dbl(d.get("实际用量")), d));
+        }
+
+        int done = 0;
+        for (Map<String, Object> l : lines) {
+            if (dbl(l.get("实投")) > 0) done += 1;
+        }
+
+        String lastDocNo = first(jdbc.queryForList(
+                "SELECT TOP 1 单据编号 FROM dbo.wo_mixing_list WHERE 工单号 = ? AND 工单行号 = ?"
+                        + " AND 标记 = ? AND 单据编号 IS NOT NULL AND LTRIM(RTRIM(单据编号)) <> ''"
+                        + " ORDER BY id DESC", String.class, woNo, useLine, MARK_SAVED));
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("工单号", woNo);
+        out.put("工单行号", useLine);
+        out.put("工单行id", longOf(wo.get("行id")));
+        out.put("产品编码", product);
+        out.put("产品名称", trim(wo.get("产品名称")));
+        out.put("规格型号", specOf(product));
+        out.put("计量单位", uomOf(product));
+        out.put("生产线", trim(wo.get("生产线")));
+        out.put("排产数量", planQty);
+        out.put("批号", trim(wo.get("批号")));
+        out.put("上次单号", lastDocNo == null ? "" : lastDocNo);
+        out.put("应投合计", round4(requiredSum).doubleValue());
+        out.put("明细", lines);
+        Map<String, Object> prog = new LinkedHashMap<>();
+        prog.put("done", done);
+        prog.put("total", lines.size());
+        prog.put("ok", !lines.isEmpty() && done == lines.size());
+        out.put("进度", prog);
+        return out;
+    }
+
+    /** 明细页的一行(应投 / 实投 / 待投) */
+    private Map<String, Object> lineRow(String code, String name, String spec, String uom,
+                                        double required, double actual, Map<String, Object> draft) {
+        Map<String, Object> v = new LinkedHashMap<>();
+        v.put("行id", draft == null ? 0L : longOf(draft.get("行id")));
+        v.put("物料编号", code);
+        v.put("物料名称", name);
+        v.put("规格型号", spec);
+        v.put("单位", uom);
+        v.put("应投", round4(required).doubleValue());
+        v.put("实投", round4(actual).doubleValue());
+        v.put("待投", round4(required - actual).doubleValue());
+        v.put("物料批次", draft == null ? "" : trim(draft.get("物料批次")));
+        // 已确认 = 该行已有实投(>0) —— 与「全部确认完毕才能提交」同一判据
+        v.put("已确认", round4(actual).doubleValue() > 0);
+        return v;
+    }
+
+    /**
+     * 扫物料码 → **解锁该项**(2026-11-18 第四轮,对应「生产领料」的 {@code /scanMaterial})。
+     *
+     * <p>只做校验与取数,**不落库**:物料不在本工单行的《物料清单》里就明确拒绝并列出该投哪些料;
+     * 命中则回该行的应投/已投/待投与单位,页面据此把数量框解锁(默认填电子秤读数)。
+     *
+     * @param orderNo 工单号
+     * @param lineNo  工单行号
+     * @param code    物料编码(物料码 {@code 存货编码|批号} 的前半段)
+     * @return {物料编号, 物料名称, 规格型号, 单位, 应投, 实投, 待投, 物料批次, 行id, 排产数量}
+     */
+    public Map<String, Object> scanMaterial(String orderNo, int lineNo, String code) {
+        String woNo = trim(orderNo);
+        String matCode = trim(code);
+        if (woNo.isEmpty()) throw new IllegalArgumentException("请先扫工单码");
+        if (matCode.isEmpty()) throw new IllegalArgumentException("请先扫描或输入物料编码");
+        Map<String, Object> task = taskOf(woNo, lineNo);
+        int useLine = intOf(task.get("工单行号"));
+        double planQty = dbl(task.get("排产数量"));
+        String product = trim(task.get("产品编码"));
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> lines = (List<Map<String, Object>>) task.get("明细");
+        Map<String, Object> hit = null;
+        for (Map<String, Object> l : lines) {
+            if (matCode.equals(trim(l.get("物料编号")))) { hit = l; break; }
+        }
+        if (hit == null) {
+            // 说清"本来该投什么",现场好判断是扫错料还是清单没维护
+            StringBuilder names = new StringBuilder();
+            for (Map<String, Object> l : lines) {
+                if (names.length() > 0) names.append("、");
+                names.append(trim(l.get("物料编号")));
+            }
+            throw new IllegalArgumentException("该物料不在本工单行的物料清单里:" + matCode
+                    + (names.length() == 0
+                        ? "(该产品在《物料清单》里还没有维护用料)"
+                        : "(本单应投:" + names + ")"));
+        }
+        Map<String, Object> out = new LinkedHashMap<>(hit);
+        out.put("工单号", woNo);
+        out.put("工单行号", useLine);
+        out.put("产品编码", product);
+        out.put("排产数量", planQty);
+        out.put("应投合计", dbl(task.get("应投合计")));
+        return out;
+    }
+
+    /** 产品的主物料规格型号(抬头用:取物料清单第一行的规格;取不到就空) */
+    private String specOf(String product) {
+        List<Map<String, Object>> bom = bomRowsOf(product);
+        return bom.isEmpty() ? "" : trim(bom.get(0).get("规格型号"));
+    }
+
+    /** 产品的主物料计量单位(抬头用:取物料清单第一行的单位;取不到就空) */
+    private String uomOf(String product) {
+        List<Map<String, Object>> bom = bomRowsOf(product);
+        return bom.isEmpty() ? "" : trim(bom.get(0).get("单位"));
+    }
+
+    /** 取列表的最后一条(整单码扫进来时 workOrderLines 可能回多行,默认取最后一行=行号最大) */
+    private static Map<String, Object> tail(List<Map<String, Object>> list) {
+        return list == null || list.isEmpty() ? null : list.get(list.size() - 1);
+    }
+
+    // ═══════════════════════ 确认一笔(写入,标记 N) ═══════════════════════
+
+    /**
+     * **确认一笔**:把「扫到的物料 + 电子秤/手输的实际用量」**写入**该物料那一行混料记录。
+     *
+     * <p>🔴 2026-11-18 第四轮改口径(与「生产领料」的 {@code setQty} 完全对齐):
+     * <b>覆盖写入</b>,不再累加。上一版同一物料重复扫就相加,现场"扫一次看一眼再确认一次"
+     * 会把实际用量记成两倍;现在同一物料再确认一次 = 以最后一次秤值为准
+     * (要改回来就重扫该物料再确认,界面上还有「撤回本项」)。
+     *
+     * <p>同一「工单行 + 物料」只保留一行(标记 {@code N} 未保存),这样明细页/纸面/混料记录
+     * 都是一料一行,不会有老系统那 6 行重复物料的毛病。
      *
      * @param body {工单号, 工单行id?, 工单行号?, 产品编码?, 产品名称?, 物料编号, 物料名称?,
      *             物料批次?, 计划用量?, 实际用量, 单位?, 秤值?, 秤设备?, 秤时间?}
-     * @param user 登录账号(记 asp_user1)
-     * @return {行id, 序号, 单据编号(仍为空直到整单保存), 累计实际用量, 累计笔数}
+     * @param user 登录账号(记 asp_user1 / asp_user2)
+     * @return {行id, 序号, 单据编号(仍为空直到提交), 实际用量, 操作人}
      */
     @Transactional
     public Map<String, Object> saveScan(Map<String, Object> body, String user) {
@@ -177,32 +462,36 @@ public class MixScanService {
 
         if (exists != null) {
             long id = longOf(exists.get("id"));
-            BigDecimal sum = round4(exists.get("实际用量")).add(qty);
-            // 物料批次随最新一次扫码走(同一料换了批次,纸面印最后一次扫到的那个)
+            // 物料批次随最新一次扫码走(同一料换了批次,纸面印最后一次扫到的那个);
+            // 本次码里没带批号 ⇒ 保留原来的,别把已扫到的批次清空
             String batch = trim(body.get("物料批次"));
-            if (batch.isEmpty()) {
-                jdbc.update("UPDATE dbo.wo_mixing_list SET 实际用量 = ?, asp_user2 = ?, asp_time2 = GETDATE()"
-                        + " WHERE id = ?", sum, user, id);
-            } else {
-                jdbc.update("UPDATE dbo.wo_mixing_list SET 实际用量 = ?, 物料批次 = ?, asp_user2 = ?,"
-                        + " asp_time2 = GETDATE() WHERE id = ?", sum, batch, user, id);
-            }
-            return rowResult(id, woNo, woLine, materialCode, sum, user);
+            jdbc.update("UPDATE dbo.wo_mixing_list SET 实际用量 = ?, 计划用量 = ?, 物料名称 = ?,"
+                            + " 物料批次 = COALESCE(NULLIF(?, ''), 物料批次),"
+                            + " asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
+                    qty, round4(body.get("计划用量")),
+                    nonEmptyOr(trim(body.get("物料名称")), materialCode), batch, user, id);
+            return rowResult(id, woNo, woLine, materialCode, qty, user);
         }
 
         int seq = 1 + nullToInt(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM dbo.wo_mixing_list WHERE 工单号 = ? AND 工单行号 = ? AND 标记 = ?"
                         + " AND ISNULL(asp_cancel,'N') <> 'Y'", Integer.class, woNo, woLine, MARK_DRAFT));
 
+        // 单支物料含量/配料比/设计添加量 本版不写(官方口径走物料清单,不挂成型配方)
         jdbc.update("INSERT INTO dbo.wo_mixing_list ("
                         + "工单号, 工单行id, 工单行号, 序号, 物料编号, 物料名称, 计划用量, 实际用量, 物料批次, 标记,"
                         + "asp_user1, asp_time1, asp_cancel) VALUES (?,?,?,?,?,?,?,?,?,?,?,GETDATE(),'N')",
                 woNo, longOrNull(body.get("工单行id")), woLine, String.format("%d", seq),
-                materialCode, trim(body.get("物料名称")),
+                materialCode, nonEmptyOr(trim(body.get("物料名称")), materialCode),
                 round4(body.get("计划用量")), qty, trim(body.get("物料批次")), MARK_DRAFT, user);
         Long id = jdbc.queryForObject("SELECT MAX(id) FROM dbo.wo_mixing_list WHERE 工单号 = ? AND 工单行号 = ?"
                 + " AND 物料编号 = ? AND 标记 = ?", Long.class, woNo, woLine, materialCode, MARK_DRAFT);
         return rowResult(id == null ? 0 : id, woNo, woLine, materialCode, qty, user);
+    }
+
+    /** 空串用兜底值(物料名称为空时用编码,纸面才不会印出空名字) */
+    private static String nonEmptyOr(String v, String fallback) {
+        return v == null || v.trim().isEmpty() ? fallback : v;
     }
 
     private Map<String, Object> rowResult(long id, String woNo, int woLine, String code, BigDecimal qty, String user) {
@@ -237,11 +526,12 @@ public class MixScanService {
     // ═══════════════════════ 整单保存(标记 Y + 单号) ═══════════════════════
 
     /**
-     * **整单保存**:给本工单行的未保存行取一个混料单号,并把标记置 {@code Y}(保存后)。
+     * **提交(整单保存)**:给本工单行的未保存行取一个混料单号,并把标记置 {@code Y}(保存后)。
      *
-     * <p>用户口径「全部扫完,整单保存」。这里不校验"是否每一行都扫了" ——
-     * 缺料是车间常态(某料没到位),业务上要允许先保存已投的料;
-     * 页面负责在界面上把"还有 N 项未扫"显眼地提示出来。
+     * <p>🔴 2026-11-18 第四轮用户口径:「全部物料确认完毕后,才可以提交」——
+     * 上一版允许"先存已投的料"(缺料是车间常态),本版按用户口径改成**硬闸门**:
+     * 先按《物料清单》算出本单应投的料,再核对草稿行,缺任何一项都拒绝提交并点名缺哪几项。
+     * 界面上的「提交」按钮同样按这个判据置灰 —— 这里再挡一道,是防旧客户端/重放请求绕过。
      *
      * <p>单号口径与老系统一致:{@code PL + yyMMdd + 4 位流水},按当天已有单号取 max+1
      * (号池 {@code s_allno} 里没有 PL 段,故以业务表为准;本方法 synchronized,
@@ -262,8 +552,9 @@ public class MixScanService {
                         + " WHERE 工单号 = ? AND 工单行号 = ? AND 标记 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                         + " ORDER BY id", woNo, woLine, MARK_DRAFT);
         if (draft.isEmpty()) {
-            throw new IllegalStateException("这张工单行还没有已扫的料,不能整单保存");
+            throw new IllegalStateException("这张工单行还没有确认过的料,不能提交");
         }
+        requireAllConfirmed(woNo, woLine, draft);
 
         String docNo = nextDocNo();
         jdbc.update("UPDATE dbo.wo_mixing_list SET 单据编号 = ?, 标记 = ?, asp_user2 = ?, asp_time2 = GETDATE()"
@@ -277,6 +568,42 @@ public class MixScanService {
         out.put("行数", draft.size());
         out.put("明细", docRows(docNo).get("明细"));
         return out;
+    }
+
+    /**
+     * 提交前的硬闸门:**按《物料清单》核对本单每一项是否都确认了实投**。
+     *
+     * <p>用户口径「全部物料确认完毕后,才可以提交」。判据与界面完全一致:
+     * 物料清单里有的每一项物料,草稿里都要有一行且 {@code 实际用量 > 0}。
+     *
+     * <p>清单里没维护用料({@code mate} 空,2026-11-18 实测正式库就是 0 行)时**不拦** ——
+     * 那时明细页本身是空的,没有"该确认的项",拦下来只会让人提交不了已扫的料。
+     *
+     * @param woNo   工单号
+     * @param woLine 工单行号
+     * @param draft  本单未保存的草稿行
+     */
+    private void requireAllConfirmed(String woNo, int woLine, List<Map<String, Object>> draft) {
+        Map<String, Object> wo = tail(workOrderLines(woNo, woLine));
+        if (wo == null) return;
+        List<Map<String, Object>> bom = bomRowsOf(trim(wo.get("产品编码")));
+        if (bom.isEmpty()) return;
+        java.util.Set<String> done = new java.util.HashSet<>();
+        for (Map<String, Object> d : draft) {
+            if (dbl(d.get("实际用量")) > 0) done.add(trim(d.get("物料编号")));
+        }
+        List<String> missing = new ArrayList<>();
+        for (Map<String, Object> b : bom) {
+            String code = trim(b.get("物料编号"));
+            if (!done.contains(code)) {
+                String name = trim(b.get("物料名称"));
+                missing.add(name.isEmpty() ? code : code + " " + name);
+            }
+        }
+        if (!missing.isEmpty()) {
+            throw new IllegalStateException("还有 " + missing.size() + " 项物料没有确认投料,不能提交:"
+                    + String.join("、", missing));
+        }
     }
 
     /**
@@ -299,41 +626,64 @@ public class MixScanService {
     // ═══════════════════════ 单据查询 / 补打印 ═══════════════════════
 
     /**
-     * 重新扫码后进入可**补打印**的前提:列出该工单(可限定行)已保存的混料单。
+     * 列**已保存的混料单**(列表页「已完成」组 + 补打印入口)。
      *
-     * @param orderNo 工单号
+     * @param orderNo 工单号(可空 = 不限工单;列表页按关键字筛)
      * @param lineNo  工单行号(&lt;=0 = 该工单全部行)
-     * @return [{单据编号, 保存时间, 行数, 实际用量合计, 打印次数, 操作人}]
+     * @param keyword 可选:单据编号 / 工单号 / 产品编码 / 产品名称的片段
+     * @return [{单据编号, 保存时间, 行数, 实际用量合计, 计划用量合计, 打印次数, 操作人,
+     *          工单号, 工单行号, 产品编码, 产品名称, 生产线}]
      */
-    public List<Map<String, Object>> docsOf(String orderNo, int lineNo) {
+    public List<Map<String, Object>> docsOf(String orderNo, int lineNo, String keyword) {
         String woNo = trim(orderNo);
-        if (woNo.isEmpty()) return List.of();
+        String kw = trim(keyword);
         StringBuilder sql = new StringBuilder(
-                "SELECT 单据编号, MIN(asp_time1) AS 保存时间, COUNT(*) AS 行数,"
-                        + " SUM(ISNULL(实际用量,0)) AS 实际用量合计, MAX(ISNULL(asp_print,0)) AS 打印次数,"
-                        + " MAX(asp_user1) AS 操作人, MIN(工单行号) AS 工单行号"
-                        + " FROM dbo.wo_mixing_list"
-                        + " WHERE 工单号 = ? AND 标记 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
-                        + "   AND 单据编号 IS NOT NULL AND LTRIM(RTRIM(单据编号)) <> ''");
+                "SELECT TOP 200 l.单据编号, MIN(l.asp_time1) AS 保存时间, COUNT(*) AS 行数,"
+                        + " SUM(ISNULL(l.实际用量,0)) AS 实际用量合计, SUM(ISNULL(l.计划用量,0)) AS 计划用量合计,"
+                        + " MAX(ISNULL(l.asp_print,0)) AS 打印次数, MAX(l.asp_user1) AS 操作人,"
+                        + " MIN(l.工单行号) AS 工单行号, MIN(l.工单号) AS 工单号"
+                        + " FROM dbo.wo_mixing_list l"
+                        + " LEFT JOIN dbo.plang p ON p.pl_no = l.工单号 AND p.pl_xc = l.工单行号"
+                        + " WHERE l.标记 = ? AND ISNULL(l.asp_cancel,'N') <> 'Y'"
+                        + "   AND l.单据编号 IS NOT NULL AND LTRIM(RTRIM(l.单据编号)) <> ''");
         List<Object> args = new ArrayList<>();
-        args.add(woNo);
         args.add(MARK_SAVED);
+        if (!woNo.isEmpty()) {
+            sql.append(" AND l.工单号 = ?");
+            args.add(woNo);
+        }
         if (lineNo > 0) {
-            sql.append(" AND 工单行号 = ?");
+            sql.append(" AND l.工单行号 = ?");
             args.add(lineNo);
         }
-        sql.append(" GROUP BY 单据编号 ORDER BY MIN(asp_time1) DESC, 单据编号 DESC");
+        if (!kw.isEmpty()) {
+            sql.append(" AND (l.单据编号 LIKE ? OR l.工单号 LIKE ? OR p.dm LIKE ? OR p.mc LIKE ?)");
+            String like = "%" + kw + "%";
+            args.add(like);
+            args.add(like);
+            args.add(like);
+            args.add(like);
+        }
+        sql.append(" GROUP BY l.单据编号 ORDER BY MIN(l.asp_time1) DESC, l.单据编号 DESC");
         List<Map<String, Object>> rows = jdbc.queryForList(sql.toString(), args.toArray());
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> r : rows) {
+            String rowWo = trim(r.get("工单号"));
+            int rowLine = intOf(r.get("工单行号"));
+            Map<String, Object> wo = rowWo.isEmpty() ? null : tail(workOrderLines(rowWo, rowLine));
             Map<String, Object> v = new LinkedHashMap<>();
             v.put("单据编号", trim(r.get("单据编号")));
             v.put("保存时间", trim(r.get("保存时间")));
             v.put("行数", intOf(r.get("行数")));
             v.put("实际用量合计", dbl(r.get("实际用量合计")));
+            v.put("计划用量合计", dbl(r.get("计划用量合计")));
             v.put("打印次数", intOf(r.get("打印次数")));
             v.put("操作人", trim(r.get("操作人")));
-            v.put("工单行号", intOf(r.get("工单行号")));
+            v.put("工单号", rowWo);
+            v.put("工单行号", rowLine);
+            v.put("产品编码", wo == null ? "" : trim(wo.get("产品编码")));
+            v.put("产品名称", wo == null ? "" : trim(wo.get("产品名称")));
+            v.put("生产线", wo == null ? "" : trim(wo.get("生产线")));
             out.add(v);
         }
         return out;
@@ -431,10 +781,18 @@ public class MixScanService {
             realSum += dbl(r.get("实际用量"));
         }
 
+        // 明细页要显示「规格型号 / 计量单位」(与生产领料单同一口径):按物料清单补两份字典,
+        // 清单里查不到就留空(历史单可能已经不在清单里了,不能因此让整张单打不开)
+        Map<String, Map<String, Object>> bomIndex = new LinkedHashMap<>();
+        for (Map<String, Object> b : bomRowsOf(wo == null ? "" : trim(wo.get("dm")))) {
+            bomIndex.put(trim(b.get("物料编号")), b);
+        }
+
         List<Map<String, Object>> lines = new ArrayList<>();
         for (Map<String, Object> r : rows) {
             double plan = dbl(r.get("计划用量"));
             double real = dbl(r.get("实际用量"));
+            Map<String, Object> bom = bomIndex.get(trim(r.get("物料编号")));
             Map<String, Object> v = new LinkedHashMap<>();
             v.put("物料编号", trim(r.get("物料编号")));
             v.put("物料名", trim(r.get("物料名称")).isEmpty() ? trim(r.get("物料编号")) : trim(r.get("物料名称")));
@@ -443,6 +801,8 @@ public class MixScanService {
             v.put("应投重量", num(plan));
             v.put("实投重量", num(real));
             v.put("物料批次", trim(r.get("物料批次")));
+            v.put("规格型号", bom == null ? "" : trim(bom.get("规格型号")));
+            v.put("单位", bom == null ? "" : trim(bom.get("单位")));
             // 兼容旧调用方(明细页/老的 7 列版式)的键:同一份数据换个名字
             v.put("材料名称", v.get("物料名"));
             v.put("请领数量", plan);

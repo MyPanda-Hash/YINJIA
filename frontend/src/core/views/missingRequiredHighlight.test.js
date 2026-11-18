@@ -61,12 +61,19 @@ test('④ 没有纸面 sheet 时也要点亮（不能只依赖 approvalSheetRef�
   assert.match(list, /function applyHintByFieldName\(/, '缺 applyHintByFieldName')
 })
 
-test('⑤ 单据卡片表头与明细列头恢复红星；弹窗内的红星保持去掉', () => {
+test('⑤ 单据卡片表头与明细列头恢复红星；查询弹窗按 2026-11-17/18 口径也画', () => {
   const headCss = list.slice(list.indexOf('.field label.req::before'))
   assert.match(headCss.slice(0, 160), /content:\s*'\*'/, '单据卡片表头要画红星')
   const colCss = list.slice(list.indexOf('.col-hdr-text.req::before'))
   assert.match(colCss.slice(0, 160), /content:\s*'\*'/, '明细列头要画红星')
-  assert.doesNotMatch(list, /class="req-star"/, '查询弹窗红星仍是去掉状态（2026-11-13 口径不撤）')
+  // ⚠ 2026-11-18 合并说明:本行原为 `doesNotMatch(list, /class="req-star"/)`
+  //   (2026-11-13「把必填项的红点标识去掉」口径)。但用户 2026-11-17/18 又明确
+  //   「必填要标红。之前的标红也没了」⇒ 本地分支把查询弹窗/单据日期等处的红星一并画回来了
+  //   (`.req-star` span + `.query-dialog-field > label .req-star` 样式)。
+  //   两口径冲突时以**更晚的用户口径**为准 ⇒ 这里改成断言红星在,与
+  //   `pickDialogRowClick.test.js` ⑦(其它面板红星一并画回来)保持一致。
+  assert.match(list, /class="req-star"/, '查询弹窗红星(2026-11-17/18 口径)要画')
+  assert.match(list, /\.query-dialog-field > label \.req-star/, '查询弹窗红星的样式要在')
 })
 
 test('⑥ 换单据要清高亮（表头键各单同名，不清会亮到另一张单上）', () => {

@@ -48,8 +48,13 @@ export function splitScan(raw) {
 /**
  * 解析工单码。
  *
- * @param {string} raw `0@GD-2026-10-0221@1001`
- * @returns {{ ok: boolean, wo: string, line: number, reason?: 'empty'|'no-wo' }}
+ * <p>2026-11-18:**领料单纸面二维码多一段领料标记**(`A`=组装领料 / `M`=混料领料)——
+ * 用户口径「混料和组装的二维码是一样的,需要在二维码上多一位作为标记」。
+ * 例:`0@GD-2026-10-0221@1001@M` ⇒ { wo:'GD-2026-10-0221', line:1, kind:'混料' }。
+ * 老的三段码(打印工单/任务单上的)没有这一段,{@code kind} 记空串,行为与以前完全一致。
+ *
+ * @param {string} raw `0@GD-2026-10-0221@1001` 或 `0@GD-2026-10-0221@1001@M`
+ * @returns {{ ok: boolean, wo: string, line: number, kind?: '组装'|'混料'|'', reason?: 'empty'|'no-wo' }}
  *          line=0 表示码里没带行号(只有两段)
  */
 export function parseWorkOrderCode(raw) {
@@ -64,7 +69,21 @@ export function parseWorkOrderCode(raw) {
     // 1000+行号:减去固定前缀;万一厂商换了前缀,退化为「原样当行号」也不会崩
     line = n >= 1000 ? n - 1000 : n
   }
-  return { ok: true, wo, line }
+  return { ok: true, wo, line, kind: kindOf(segs[2]) }
+}
+
+/**
+ * 工单码第 4 段的「领料标记」→ 领料类型(`''` = 老码,没有这一位)。
+ *
+ * @param {any} seg 第 4 段原文
+ * @returns {'组装'|'混料'|''}
+ */
+export function kindOf(seg) {
+  const s = String(seg == null ? '' : seg).trim().toUpperCase()
+  if (!s) return ''
+  if (s === 'A' || s === '组装' || s === 'ASSEMBLY') return '组装'
+  if (s === 'M' || s === '混料' || s === 'MIX') return '混料'
+  return ''
 }
 
 /**

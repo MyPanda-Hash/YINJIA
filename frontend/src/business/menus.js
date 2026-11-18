@@ -255,22 +255,12 @@ export const menuTree = [
               { code: 'materialOut', title: '材料出库单', path: '/panelx/list/MATERIAL_OUT', icon: 'Upload', panelCode: 'MATERIAL_OUT', operationName: '新增流程' },
               // 生产退料单(2026-11-13 新增):金蝶 inv_pick_ret,MES 侧与材料出库单成对(领/退同组)。
               { code: 'materialRet', title: '生产退料单', path: '/panelx/list/MATERIAL_RET', icon: 'RefreshLeft', panelCode: 'MATERIAL_RET', operationName: '新增流程' },
-              // 生产领料(2026-10-22 用户口径「在库存核算里面加一个生产领料的查看面版,与混料记录一样;
-              //   把 outh 里面的材料出库单据显示出来」):只读报表,形态对齐「混料记录」——
-              //   flat + 报表,面板码 PROD_PICK_LIST,数据源 = 包装视图 v_prod_pick_list
-              //   (dbo.outh 里 src=6「材料出库」且未删除的行,即 SCLL-* 生产领料单)。
-              //   入口钉在「材料出库单」之后:先建单、再看已过账的领料明细,找单据的人不会跑错组。
-              //   面板/视图/译名/授权见 tools/migrate-prod-pick-outh-20261022.sql。
-              // 2026-11-16 改名:显示名 →「生产领料明细表」(面板码 PROD_PICK_LIST / 路径 / 数据源都不动,
-              //   页签恢复按 path、权限按 panelCode 认,改的只是这一层的标题 —— 见 migrate-prod-ret-list-20261116.sql)。
-              { code: 'prodPickList', title: '生产领料明细表', path: '/panelx/list/PROD_PICK_LIST', icon: 'List', panelCode: 'PROD_PICK_LIST' },
-              // 生产退料明细表(2026-11-16 新增,与上面那张成对):数据源 = 包装视图 v_prod_ret_list,
-              //   即生产退料单(bd_material_ret 头 + bl_material_ret 行)逐行展开。
-              //   ⚠ 与领料那张的取数差别是**刻意的**:手机扫码从 2026-10-30 第三轮起不再预生成
-              //   「0 数量的退料草稿」,只有现场真的退料才生一张生产退料单 —— 所以这里天然只列
-              //   「生成过退料单」的单据,不必也不该去补「每张领料单都有一行」。
-              //   多带一列「工单号」:手机扫码是扫工单号起手的,2026-11-13 起退料单上也写了工单号/工单行号。
-              { code: 'prodRetList', title: '生产退料明细表', path: '/panelx/list/PROD_RET_LIST', icon: 'List', panelCode: 'PROD_RET_LIST' },
+              // ══════════ 2026-11-17:生产领料明细表 / 生产退料明细表 已移到「库存明细」组 ══════════
+              // 用户口径:「图二红框的两个明细表要放在库存明细里面」——
+              //   PROD_PICK_LIST(生产领料明细表)与 PROD_RET_LIST(生产退料明细表)
+              //   是**只读明细报表**,与「库存明细」组的其它明细表同类,不该混在「库存核算」的单据里。
+              //   ⇒ 入口搬到下方 invDetail 组(紧挨 材料出库单明细表 / 生产退料单明细表),
+              //     面板码 / 路径 / 数据源 / 权限行 / 叶子 code 一个字节没动。
               // 2026-10-14 恢复:其他出库单(OTHER_OUT)—— 同其他入库单;委外发料单(OUTSOURCE_ISSUE)仍保持下架。
               { code: 'otherOut', title: '其他出库单', path: '/panelx/list/OTHER_OUT', icon: 'Upload', panelCode: 'OTHER_OUT', operationName: '新增' },
               // 2026-10-18 新增:调拨单 / 盘点单 —— 库存核算里两张**会改 kucun** 的单据
@@ -295,7 +285,20 @@ export const menuTree = [
           { code: 'saleOutDetail', title: '销售出库单明细表', path: '/panelx/list/SALE_OUT_DETAIL', panelCode: 'SALE_OUT_DETAIL', icon: 'List' },
           { code: 'saleInDetail', title: '销售退货单明细表', path: '/panelx/list/SALE_IN_DETAIL', panelCode: 'SALE_IN_DETAIL', icon: 'List' },
           { code: 'materialOutDetail', title: '材料出库单明细表', path: '/panelx/list/MATERIAL_OUT_DETAIL', panelCode: 'MATERIAL_OUT_DETAIL', icon: 'List' },
+          // 生产领料明细表(2026-10-22 建面板,2026-11-16 改名,2026-11-17 由「库存核算」移入本组):
+          //   只读报表,形态对齐「混料记录」—— flat + 报表,面板码 PROD_PICK_LIST,
+          //   数据源 = 包装视图 v_prod_pick_list(dbo.outh 里 src=6「材料出库」且未删除的行,
+          //   即 SCLL-* 生产领料单)。面板/视图/译名/授权见 tools/migrate-prod-pick-outh-20261022.sql。
+          //   位置钉在「材料出库单明细表」之后:领料明细与材料出库明细本来就是同一批单的一体两面。
+          { code: 'prodPickList', title: '生产领料明细表', path: '/panelx/list/PROD_PICK_LIST', icon: 'List', panelCode: 'PROD_PICK_LIST' },
           { code: 'materialRetDetail', title: '生产退料单明细表', path: '/panelx/list/MATERIAL_RET_DETAIL', panelCode: 'MATERIAL_RET_DETAIL', icon: 'List' },
+          // 生产退料明细表(2026-11-16 新增,2026-11-17 由「库存核算」移入本组):数据源 = 包装视图 v_prod_ret_list,
+          //   即生产退料单(bd_material_ret 头 + bl_material_ret 行)逐行展开。
+          //   ⚠ 与领料那张的取数差别是**刻意的**:手机扫码从 2026-10-30 第三轮起不再预生成
+          //   「0 数量的退料草稿」,只有现场真的退料才生一张生产退料单 —— 所以这里天然只列
+          //   「生成过退料单」的单据,不必也不该去补「每张领料单都有一行」。
+          //   多带一列「工单号」:手机扫码是扫工单号起手的,2026-11-13 起退料单上也写了工单号/工单行号。
+          { code: 'prodRetList', title: '生产退料明细表', path: '/panelx/list/PROD_RET_LIST', icon: 'List', panelCode: 'PROD_RET_LIST' },
           // 2026-10-18 新增:调拨单/盘点单明细表(视图 v_transfer_detail / v_stocktake_detail)
           { code: 'transferDetail', title: '调拨单明细表', path: '/panelx/list/TRANSFER_DETAIL', panelCode: 'TRANSFER_DETAIL', icon: 'List' },
           { code: 'stocktakeDetail', title: '盘点单明细表', path: '/panelx/list/STOCKTAKE_DETAIL', panelCode: 'STOCKTAKE_DETAIL', icon: 'List' },

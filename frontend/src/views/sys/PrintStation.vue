@@ -197,8 +197,9 @@
           <span class="ps-cache-n">
             {{ c.标题 }}<i v-if="c.单号 || c.工单号"> · {{ c.单号 || c.工单号 }}</i>
           </span>
-          <span class="ps-cache-tag" :class="{ wait: c.状态 === 'PENDING' }">
-            {{ c.状态 === 'SENT' ? tt('已发出,等回执') : tt('等待补打') }}
+          <span class="ps-cache-tag" :class="{ wait: c.状态 === 'PENDING', bad: c.状态 === 'FAILED' }">
+            {{ c.状态 === 'SENT' ? tt('已发出,等回执')
+              : (c.状态 === 'FAILED' ? tt('打印失败') : tt('等待补打')) }}
           </span>
         </div>
         <div class="ps-cache-meta">
@@ -303,10 +304,18 @@
         <span class="ps-sec-num">{{ recent.length }}</span>
       </div>
       <div v-if="!recent.length" class="ps-empty">{{ tt('还没有打印记录') }}</div>
-      <div v-for="(r, i) in recent" :key="i" class="ps-line">
-        <span class="ps-line-t">{{ r.时间 }}</span>
-        <span class="ps-line-n">{{ r.工单号 || '—' }}<i v-if="r.工单行号"> #{{ r.工单行号 }}</i></span>
-        <span class="ps-line-s" :class="{ bad: r.来源 === '失败' }">{{ r.来源 || tt('已出纸') }}</span>
+      <!-- 2026-11-18 用户报障「打印失败」:只看「失败」两个字等于没说 ——
+           一行里给出**单号**(扫码单没有工单号,单号在 领料单号 里)+ 失败原因,现场才知道卡在哪。 -->
+      <div v-for="(r, i) in recent" :key="i" class="ps-recent">
+        <div class="ps-line">
+          <span class="ps-line-t">{{ r.时间 }}</span>
+          <span class="ps-line-n">
+            {{ r.领料单号 || r.工单号 || '—' }}<i v-if="r.工单行号"> #{{ r.工单行号 }}</i>
+            <i v-if="r.标题 && r.标题 !== (r.领料单号 || r.工单号)"> · {{ r.标题 }}</i>
+          </span>
+          <span class="ps-line-s" :class="{ bad: r.来源 === '失败' }">{{ r.来源 || tt('已出纸') }}</span>
+        </div>
+        <div v-if="r.失败原因" class="ps-line-why">{{ tt('打印失败') }}：{{ r.失败原因 }}</div>
       </div>
     </section>
   </div>
@@ -761,6 +770,8 @@ async function saveAgentConfig() {
   background: var(--el-color-success-light-8); color: var(--el-color-success-dark-2);
 }
 .ps-cache-tag.wait { background: var(--el-color-warning-light-8); color: var(--el-color-warning-dark-2); }
+/* 没打出来的单子(2026-11-18):红底,和「等待补打/已发出」分开 */
+.ps-cache-tag.bad { background: var(--el-color-danger-light-9); color: var(--el-color-danger-dark-2); }
 .ps-cache-meta {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   margin-top: 2px; font-size: 11px; color: var(--el-text-color-secondary);
@@ -799,6 +810,14 @@ async function saveAgentConfig() {
 .ps-line-n i { font-style: normal; color: var(--el-text-color-secondary); }
 .ps-line-s { flex: none; font-size: 12px; color: var(--el-color-success); }
 .ps-line-s.bad { color: var(--el-color-danger); }
+/* 最近出纸里那条失败原因(2026-11-18):换行缩进显示,挂在对应记录下面 */
+.ps-recent { border-bottom: 1px dashed var(--el-border-color-lighter); }
+.ps-recent:last-child { border-bottom: 0; }
+.ps-recent .ps-line { border-bottom: 0; }
+.ps-line-why {
+  padding: 0 0 6px 160px; font-size: 12px; line-height: 1.5;
+  color: var(--el-color-danger-dark-2); word-break: break-all;
+}
 
 .ps-empty { padding: 16px 0; text-align: center; font-size: 13px; color: var(--el-text-color-secondary); }
 .num { font-variant-numeric: tabular-nums; }

@@ -42,7 +42,7 @@
 
       <!-- 一次可以勾**多行**,但服务端会**每行各出一张打印单**(用户口径「作废不希望连坐」+
            追加「一次是可以打印多行的」)—— 多行并进一张单会让作废连坐,所以粒度落在单上,不在弹窗上 -->
-      <div class="mlq-oneline">{{ tt('可一次勾选多行；每行各自出一张打印单（作废只影响对应那一行）') }}</div>
+      <div class="mlq-oneline">{{ tt('可一次勾选多行；每行各自出一张打印单（作废只影响对应那一行）') }} · {{ tt('未勾选的明细行置灰、不能填写') }}</div>
       <!-- 每箱数量(2026-11-11 用户口径「材料码多加一个每箱数量打印,每箱数量才等于标识卡上的数量」;
            同日追加「打印份数还是通过 打印数量/每箱数量 计算出来,零头箱也根据计算带出」):
            卡面「数量」印每箱数量,张数 = ⌈本次打印数量 ÷ 每箱数量⌉,最后一箱不足则单独一张印零头。
@@ -56,7 +56,10 @@
         <span class="mlq-lock-no">{{ sourcePrintNo }}</span>
       </div>
 
-      <el-table ref="tableRef" :data="rows" row-key="id" border size="small" :height="tableHeight" @selection-change="onPicked">
+      <!-- 未勾选的行置灰 + 行内不可填(2026-11-17 客户口径「没有勾选为灰色而且不能有输入」):
+           灰类见 core/selection/pickRowStyle.js,样式在 styles/index.css -->
+      <el-table ref="tableRef" :data="rows" row-key="id" border size="small" :height="tableHeight"
+                :row-class-name="rowClassMain" @selection-change="onPicked">
         <el-table-column type="selection" width="42" :selectable="rowSelectable" />
         <el-table-column prop="行号" :label="tt('行号')" width="70" />
         <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="130" show-overflow-tooltip />
@@ -69,7 +72,8 @@
         <el-table-column :label="tt('本次打印数量')" width="150">
           <template #default="{ row }">
             <el-input-number v-model="qtyOf[row.id]" :min="0" :max="capOf(row)" :controls="false"
-              :disabled="lockedBySource || !(capOf(row) > 0)" :precision="precisionOf(row)" style="width: 130px" />
+              :disabled="lockedBySource || !(capOf(row) > 0) || pickRowLocked(pickedKeys, row.id)"
+              :precision="precisionOf(row)" style="width: 130px" />
           </template>
         </el-table-column>
         <!-- 每箱数量(2026-11-11):**必填**(用户口径「这个设计为必填」) —— 卡面「数量」印它,
@@ -80,7 +84,8 @@
           <template #header><span class="mlq-req">{{ tt('每箱数量') }}</span></template>
           <template #default="{ row }">
             <el-input-number v-model="boxOf[row.id]" :min="0" :max="Number(qtyOf[row.id] || 0)" :controls="false"
-              :disabled="!(Number(qtyOf[row.id] || 0) > 0)" :precision="precisionOf(row)"
+              :disabled="!(Number(qtyOf[row.id] || 0) > 0) || pickRowLocked(pickedKeys, row.id)"
+              :precision="precisionOf(row)"
               :placeholder="tt('必填')" style="width: 130px" />
           </template>
         </el-table-column>
@@ -112,7 +117,7 @@
             {{ tt('补打只为留痕：不占用余量、不会在生单弹窗里多出一行；批次号取该批货单据上的号，不可改') }}
           </div>
           <el-table ref="suppRef" :data="suppRows" row-key="suppKey" border size="small" max-height="200"
-            @selection-change="onSuppPicked">
+            :row-class-name="rowClassSupp" @selection-change="onSuppPicked">
             <el-table-column type="selection" width="42" :selectable="suppSelectable" />
             <el-table-column prop="批次号" :label="tt('批次号')" min-width="150" show-overflow-tooltip />
             <el-table-column prop="行号" :label="tt('行号')" width="60" />
@@ -125,7 +130,8 @@
             <el-table-column :label="tt('本次打印数量')" width="150">
               <template #default="{ row }">
                 <el-input-number v-model="suppQty[row.suppKey]" :min="0" :max="Number(row['可补登数量'] || 0)"
-                  :controls="false" :disabled="lockedBySource || !(Number(row['可补登数量'] || 0) > 0)"
+                  :controls="false"
+                  :disabled="lockedBySource || !(Number(row['可补登数量'] || 0) > 0) || pickRowLocked(suppKeys, row.suppKey)"
                   :precision="precisionOf(row)" style="width: 130px" />
               </template>
             </el-table-column>
@@ -135,7 +141,8 @@
               <template #header><span class="mlq-req">{{ tt('每箱数量') }}</span></template>
               <template #default="{ row }">
                 <el-input-number v-model="suppBox[row.suppKey]" :min="0" :max="Number(suppQty[row.suppKey] || 0)"
-                  :controls="false" :disabled="!(Number(suppQty[row.suppKey] || 0) > 0)"
+                  :controls="false"
+                  :disabled="!(Number(suppQty[row.suppKey] || 0) > 0) || pickRowLocked(suppKeys, row.suppKey)"
                   :precision="precisionOf(row)" :placeholder="tt('必填')" style="width: 130px" />
               </template>
             </el-table-column>
@@ -251,6 +258,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'v
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
+// 未勾选的行置灰 + 不可填(2026-11-17 客户口径;四个打印/生单弹窗共用同一份,见该模块头注释)
+import { pickRowClass, pickRowLocked } from '@core/selection/pickRowStyle'
 
 const engine = usePanelRuntime()
 /** 纸质单据打印(与其让本组件直接依赖 atom print-formats,不如统一<｜hy_place▁holder▁no▁813｜>面板 runtime 下发) */
@@ -330,6 +339,9 @@ function cancelSource() {
 }
 
 const pickedKeys = computed(() => new Set(picked.value.map((r) => r.id)))
+/** 未勾选的行置灰(2026-11-17 客户口径):主表行键 = 采购订单行 id(与 el-table 的 row-key="id" 同源)
+ *  ⚠ 行键必须与表格 row-key 一致 —— 传错就会整表都灰(这种错只会在界面上看得出来,单测抓不到)。 */
+const rowClassMain = computed(() => pickRowClass(pickedKeys.value, (r) => r.id))
 const totalQty = computed(() => {
   let s = 0
   for (const r of rows.value) if (pickedKeys.value.has(r.id)) s += Number(qtyOf[r.id] || 0) || 0
@@ -412,6 +424,10 @@ const suppBox = reactive({})
 /** 补登行的唯一键(行id + 批次号;批次号里可能有特殊字符,故用 \u0001 拼) */
 const suppKeyOf = (row) => `${row['采购订单行id']}\u0001${row['批次号']}`
 const suppRows = computed(() => (data.value['补登行'] || []).map((r) => ({ ...r, suppKey: suppKeyOf(r) })))
+/** 补登表的勾选键 + 未勾选行置灰(2026-11-17 客户口径):补登行必须显式勾,未勾的同样灰且不可填。
+ *  行键 = suppKey(与 el-table 的 row-key="suppKey" 同源),不能拿 id —— 补登表里同一行 id 会出现多次。 */
+const suppKeys = computed(() => new Set(suppPicked.value.map((r) => r.suppKey)))
+const rowClassSupp = computed(() => pickRowClass(suppKeys.value, (r) => r.suppKey))
 function suppSelectable(row) {
   // 按打印记录带入后,补登行也不许再勾(数量/行都锁定)
   return !lockedBySource.value && Number(row['可补登数量'] || 0) > 0
@@ -743,10 +759,7 @@ async function doVoid(row) {
   background: #fdf6e3; border: 1px solid #f5e3b3; border-radius: 4px; padding: 4px 8px; }
 .mlq-box-line { white-space: normal; }
 /* 必填列表头:红色星号(每箱数量必填,2026-11-11 用户口径「这个设计为必填」) */
-/* 必填红星(2026-11-13 用户口径「把必填项的红点标识去掉，保留必填项的属性就行」):
-   只去掉视觉，.mlq-req 类名保留（它是"这列必填"的钩子，输入校验/placeholder 不受影响）。 */
-.mlq-req {
-}
+.mlq-req::before { content: '*'; color: #f56c6c; margin-right: 2px; }
 </style>
 
 <style>

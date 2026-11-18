@@ -60,6 +60,8 @@ import java.util.Map;
  *   <li>**不直接写库存**:领料提交走 {@code ButtonService.callButton(MATERIAL_OUT, "审核")},
  *       由 {@link com.yinjia.mes.service.StockLedgerService} 按既有链路过账 —— 与所有别的单据同一条路,
  *       不另写 SQL 记账(2026-10-16 的教训:自己算一遍必然和看板分叉)。</li>
+ *   <li>**不替仓管审批**(2026-11-18 用户口径「所有生成的单都要是草稿状态」):手机端生成的
+ *       材料出库单 / 生产退料单一律留**草稿**,审核(过账)在对应面板里由仓管点。</li>
  *   <li>**不做批次追溯口径的改动**:出库批次仍按既有「先进先出拆批」逻辑,可用量仍按
  *       物料+仓库 判断(验收期权宜口径,见 {@code StockLedgerService.LOT_STRICT} 与
  *       「上线前必验-库存批次追溯」文档)。</li>
@@ -120,6 +122,21 @@ public class MobilePickController {
     static boolean isSemiFinished(Object code) {
         if (code == null) return false;
         return String.valueOf(code).toUpperCase(Locale.ROOT).contains(SEMI_MARK);
+    }
+
+    /**
+     * 「领料标记」→ 领料类型(2026-11-18)。
+     *
+     * <p>领料单纸面二维码第 4 段带的就是它(用户口径「混料和组装的二维码是一样的,需要在二维码上
+     * 多一位作为混料领料还是组装领料的标记」):**A/组装 = 组装领料,M/混料 = 混料领料**。
+     * 空值或认不出的值一律返回空串(**不按类型过滤**,与老的三段码行为一致)。
+     */
+    static String pickKindOf(Object marker) {
+        String s = marker == null ? "" : String.valueOf(marker).trim().toUpperCase(Locale.ROOT);
+        if (s.isEmpty()) return "";
+        if ("A".equals(s) || "组装".equals(s) || "ASSEMBLY".equals(s)) return KIND_ASSEMBLY;
+        if ("M".equals(s) || "混料".equals(s) || "MIX".equals(s)) return KIND_MIX;
+        return "";
     }
 
     /** 明细行是不是半成品(以 normalizeLine 打的 {@code 半成品} 标记为准,免得各处重复判编码) */
@@ -738,13 +755,24 @@ public class MobilePickController {
      * 与生成接口的区别:这里**不生成**任何东西,只找已开的单把它打开。
      * 找不到时返回 {@code found:false} 而不是报错 —— 现场扫错了码不该弹红框,
      * 前端会提示"该工单行还没开过领料单,可以点『生成』"。
+     *
+     * <p>🔴 2026-11-18(用户报障「生产领料扫混料和扫组装的二维码,都是跳到组装的单据界面」):
+     * 领料单纸面二维码第 4 段带了领料标记(`A`=组装 / `M`=混料),这里新增可选参数 {@code kind}
+     * —— 传了就**只在那一种单里定位**,扫混料标签就打开混料单、扫组装标签就打开组装单;
+     * 不传时行为与以前一致(命中整组,前端按第一张=组装打开)。
+     *
+     * @param woNo 工单号(或领料单号 LL-…)
+     * @param line 工单行号(可空)
+     * @param kind 领料标记:组装/混料 或 A/M(可空 = 不按类型过滤);认不出的值按"不过滤"处理
      */
     @GetMapping("/locate")
     public ApiResult<Map<String, Object>> locate(@RequestParam String woNo,
-                                                 @RequestParam(required = false) Integer line) {
+                                                 @RequestParam(required = false) Integer line,
+                                                 @RequestParam(required = false) String kind) {
         perm.requirePanelView(PANEL_SELF);
         String no = str(woNo);
         if (no.isEmpty()) throw new IllegalArgumentException("请先扫描或输入工单号");
+        String wantKind = pickKindOf(kind);
 
         Map<String, Object> out = new LinkedHashMap<>();
 
@@ -796,6 +824,18 @@ public class MobilePickController {
             out.put("candidates", List.of());
             out.put("hint", "no-doc");
             return ApiResult.ok(out);
+        }
+        // 2026-11-18:带了领料标记(扫的是纸面二维码)⇒ 只留那一种单
+        //   —— 扫混料标签就打开混料单,别再默认跳到组装那张。
+        if (!wantKind.isEmpty()) {
+            hits.removeIf(d -> !wantKind.equals(d.pickKind()));
+            out.put("按类型", wantKind);
+            if (hits.isEmpty()) {
+                out.put("found", false);
+                out.put("candidates", List.of());
+                out.put("hint", "no-doc-kind");
+                return ApiResult.ok(out);
+            }
         }
         // 跨多行 ⇒ 让用户挑行(沿用旧口径)
         long distinctLines = hits.stream().map(WoPickDocService.PickDoc::woLine).distinct().count();
@@ -1358,7 +1398,11 @@ public class MobilePickController {
     }
 
     /**
-     * 提交退料:为本次退料生成一张**生产退料单**(业务类型「生产退料」)并审核入账。
+     * 提交退料:为本次退料生成一张**生产退料单**(业务类型「生产退料」),**状态保持草稿**。
+     *
+     * <p>🔴 2026-11-18 用户口径:「生产退料单怎么自动审批了,所有生成的单都要是草稿状态」——
+     * 生成后**不再**自动审核,库存等仓管在「生产退料单」面板点「审核」时才入账
+     * (与材料出库单"提交只建单、仓管审核才过账"完全同一口径)。
      *
      * <p>用户口径:「退多少生多少」(2026-10-30)+
      * 「手机扫码的生产退料扫码后退料后填入的单据从其他入库改成生产退料单」(2026-11-13)。
@@ -1465,10 +1509,18 @@ public class MobilePickController {
 
         String backNo = saveDoc(PANEL_BACK, backForm);
 
-        // ③ 审核 → StockLedgerService 按生产退料(+)过账,库存加回来
-        buttons.callButton(PANEL_BACK, "审核", docNoForm(backNo), null);
+        // ③ 🔴 2026-11-18 用户口径「生产退料单怎么自动审批了,所有生成的单都要是草稿状态」:
+        //   这里原来紧跟一句 `callButton(PANEL_BACK, "审核", …)` —— 手机一提交就**替仓管审了**,
+        //   库存当场加回来,面板里根本看不到待审的退料单(与「材料出库单提交时不审核、
+        //   等仓管点审核才过账」的既定口径也不一致)。
+        //   现在只生成**草稿**,审核是仓管在「生产退料单」面板点「审核」时的事,
+        //   过账(`StockLedgerService.postIn(MATERIAL_RET,…)`)仍在那一步发生。
+        //   ⇒ 不要在这里恢复智能审核:草稿被作废时 {@code ButtonService.voidDoc} 会把下面
+        //     第 ④ 步写的退料台账一并放回可退量。
 
         // ④ 退料台账:一行 = 一次退料(这是"已退数量"的唯一真源)
+        //   ⚠ 写在这里(而不是审核时):手机端"可退量 = 已领 − 已退"必须**提交即扣**,
+        //     否则两个操作员能先后把同一批料各退一遍。仓管作废这张草稿时台账会被放回。
         for (Map<String, Object> l : lines) {
             jdbc.update("INSERT INTO dbo.wo_pick_return"
                             + " (领料单号, 工单号, 工单行号, 物料编码, 物料名称, 计量单位, 仓库, 批号,"
@@ -1504,7 +1556,8 @@ public class MobilePickController {
         out.put("明细", lines);
         out.put("合计数量", total);
         out.put("剩余", remain);
-        out.put("说明", "已生成生产退料单 " + backNo + " 并审核入账");
+        out.put("单据状态", "草稿");
+        out.put("说明", "已生成生产退料单 " + backNo + "(草稿,待仓管在「生产退料单」里审核后入库)");
         return ApiResult.ok(out);
     }
 
@@ -1730,6 +1783,12 @@ public class MobilePickController {
                 : null);
         // 2026-11-18:同一工单行可能有**两张**单(组装 + 混料) —— 一并带回去,
         // 前端据此把两张都列出来、都能点进去(用户口径)。
+        // 🔴 2026-11-18(第二轮用户报障「生成工单领料扫码时,只有组装领料自动打印,混料领料没打印出来」):
+        //   这里以前只给**顶层**一个打印载荷(那是组装那张),{@code 单据} 数组里的每张单**没有**载荷
+        //   ⇒ 重复扫码(已开过单)走这条路径时,前端拿不到混料那张的纸面,重打只能打组装。
+        //   现在逐张给:每张单一个 {@code printPayload}(标题/领料类型/明细都按**自己**那张单取)。
+        String pName = wo == null ? "" : str(wo.get("产品名称"));
+        String pSpec = wo == null ? "" : str(wo.get("规格型号"));
         List<Map<String, Object>> made = new ArrayList<>();
         for (WoPickDocService.PickDoc x : docs.listActive(woNo, line)) {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -1740,6 +1799,7 @@ public class MobilePickController {
             m.put("物料项数", x.itemCount());
             m.put("已领项数", x.doneCount());
             m.put("重复", true);
+            m.put("打印", wantPrint && wo != null ? printPayload(woNo, line, pName, pSpec, x.id()) : null);
             made.add(m);
         }
         out.put("单据", made);
@@ -2079,38 +2139,42 @@ public class MobilePickController {
      *              只有在还没有台账的极少数路径下才为空(那时明细为空,纸面就是空白表)
      */
     private Map<String, Object> printPayload(String woNo, int line, String productName, String spec, Long docId) {
+        WoPickDocService.PickDoc d = docId == null ? null : docs.byId(docId);
+        // 领料类型:拿不到台账时按组装算(极少数"还没有台账"的路径)
+        String kind = d == null || d.pickKind() == null || d.pickKind().isBlank() ? KIND_ASSEMBLY : d.pickKind();
+        boolean mix = KIND_MIX.equals(kind);
+
         Map<String, Object> m = new LinkedHashMap<>();
-        // 与 print-formats.woQrText 同口径:公司代码@工单号@(1000+行号);公司代码全库为 '0'
-        m.put("二维码内容", "0@" + woNo + "@" + (1000 + Math.max(1, line)));
+        // 公司代码@工单号@(1000+行号)**@领料标记**(2026-11-18 用户口径:
+        //   「混料和组装的二维码是一样的,需要在二维码上多一位作为混料领料还是组装领料的标记」)
+        //   ⇒ 第 4 段 **A = 组装领料 / M = 混料领料**。前 3 段口径不变(工单码解析照旧能用):
+        //   scanCode.splitScan 只取工单号+行号,parseWorkOrderQr 只读前 3 段,多一段不影响。
+        m.put("二维码内容", "0@" + woNo + "@" + (1000 + Math.max(1, line)) + "@" + (mix ? "M" : "A"));
+        m.put("领料标记", mix ? "M" : "A");
         m.put("工单号", woNo);
         m.put("工单行号", line);
         m.put("产品名称", productName);
         m.put("规格型号", spec);
-        m.put("标题", "生产领料单");
+        // 纸面标题:两种都是「生产领料单」,后面括号注明这张是组装还是混料(2026-11-18 用户口径)
+        m.put("标题", "生产领料单（" + (mix ? "混料" : "组装") + "）");
         // 纸面抬头的「No」= 领料单号、「日期」= 单据日期
         Map<String, String> head = new LinkedHashMap<>();
         List<Map<String, Object>> rows = new ArrayList<>();
-        if (docId != null) {
-            WoPickDocService.PickDoc d = docs.byId(docId);
-            if (d != null) {
-                m.put("领料单号", d.outNo());
-                m.put("状态", d.state());
-                // 纸面标题按领料类型区分(2026-11-18):组装领料单 / 混料领料单,
-                // 现场拿到纸一眼看得出这是哪一张,不用去翻单号。
-                m.put("领料类型", d.pickKind());
-                m.put("标题", KIND_MIX.equals(d.pickKind()) ? "混料领料单" : "生产领料单");
-                m.put("打印日期", java.time.LocalDate.now().toString());
-                // 明细与页面同源(未完成读 wo_pick_line,已完成读材料出库单)
-                for (Map<String, Object> it : linesOf(d.outNo(), "pick")) {
-                    Map<String, Object> row = new LinkedHashMap<>();
-                    row.put("材料名称", str(it.get("名称")));
-                    row.put("规格", str(it.get("规格")));
-                    row.put("单位", str(it.get("单位")));
-                    row.put("请领数量", num(it.get("BOM用量")));
-                    row.put("实发数量", num(it.get("数量")));
-                    row.put("备注", str(it.get("批号")));
-                    rows.add(row);
-                }
+        if (d != null) {
+            m.put("领料单号", d.outNo());
+            m.put("状态", d.state());
+            m.put("领料类型", kind);
+            m.put("打印日期", java.time.LocalDate.now().toString());
+            // 明细与页面同源(未完成读 wo_pick_line,已完成读材料出库单)
+            for (Map<String, Object> it : linesOf(d.outNo(), "pick")) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("材料名称", str(it.get("名称")));
+                row.put("规格", str(it.get("规格")));
+                row.put("单位", str(it.get("单位")));
+                row.put("请领数量", num(it.get("BOM用量")));
+                row.put("实发数量", num(it.get("数量")));
+                row.put("备注", str(it.get("批号")));
+                rows.add(row);
             }
         }
         m.put("明细", rows);
@@ -2180,7 +2244,11 @@ public class MobilePickController {
      *
      * <p>{@code ButtonService.requireNo} 只读 {@code formData.get("编号")},而保存返回的也是
      * {@code {编号, 单据状态}} —— 两处键名一致。写「单据编号」会报"缺少表单编号"(实测)。
+     *
+     * <p>⚠ 当前**没有调用点**:2026-11-18 起手机端提交退料不再自动审核(生成的单保持草稿,
+     * 由仓管在面板上审)。保留它是因为将来若要恢复"提交即审核",单号必须按这个键传。
      */
+    @SuppressWarnings("unused")
     private static Map<String, Object> docNoForm(String no) {
         Map<String, Object> f = new LinkedHashMap<>();
         f.put("编号", no);

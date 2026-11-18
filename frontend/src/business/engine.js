@@ -759,6 +759,33 @@ export async function batchFlowSaveOverRatio(overRatio) {
   return unwrap(await request.post('/px/batchFlow/overRatio', { overRatio }))
 }
 
+/* ── 采购入库单「一行拆多个仓库」(2026-11-17 客户口径) ──
+ * 用户原话:「采购入库单在草稿状态下要可以实现一个明细划分多个仓库来存放」+
+ * 「来源采购订单行号和上游的行号不变」;数量口径「各仓库合计 = 该行实收数量」。
+ * 服务端在一个事务里做三件事:复制物理行(原样带上 源单行号/批次号)、按数量占比分摊金额、
+ * 把占用链 form_flow_link 一起拆 —— 前端只提交分配清单,口径以服务端为准。 */
+export async function splitPurInLine({ docNo, lineId, allocs }) {
+  return unwrapStrict(await request.post('/px/purIn/split', { docNo, lineId, allocs: allocs || [] }))
+}
+
+/**
+ * 采购入库单「多仓库入库」弹窗一次性提交多行(2026-11-17 用户口径:工具栏按钮 → 和生单一样的界面,
+ * 每行下拉展开成多个仓库子行)。服务端用一个事务包住全部行:任一行不合法整批回滚。
+ * @param {{docNo:string, lines:Array<{lineId:number, allocs:Array<{仓库:string,仓位编码?:string,数量:number}>}>}} p
+ */
+export async function splitPurInMultiWh({ docNo, lines }) {
+  return unwrapStrict(await request.post('/px/purIn/multiWh', { docNo, lines: lines || [] }))
+}
+
+/**
+ * 采购入库单每行的拆分组锚点 [{id, 源行id}](2026-11-17):
+ * 弹窗靠它把"从同一行分出来的几行"缩进到一起、并支持合并回一行。
+ * 源行id 是内部标记、不是面板字段,通用取数不会带出来,故单独查。
+ */
+export async function purInWhGroups(docNo) {
+  return unwrap(await request.get('/px/purIn/groups', { params: { docNo } }))
+}
+
 // ==================== 统一生单对话框(2026-10-31 用户口径) ====================
 /**
  * 生单预览:勾选的来源单据(一张 = 原「生单」,多张 = 「批量生单」)各自的明细行。

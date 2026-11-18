@@ -42,7 +42,8 @@ import android.widget.Toast;
  *   · 代价:前端改了要重新打包 APK(以前是改服务器即可);接口号仍然只决定"连哪台后端/哪个账套"。
  *
  * 这个 Activity 做三件事:
- *   ① 首次启动弹「接口地址」设置(存 SharedPreferences),之后 WebView 加载**内置页面**;
+ *   ① 接口号(服务器 IP:端口)**默认就是线上服务器**,首装直接加载内置页面(不再强制弹设置);
+ *      顶部工具条「设置」可改,存 SharedPreferences;
  *   ② 顶部一条细工具条:显示当前接口号 + 设置;
  *   ③ 向网页注入 window.YjNative 桥:
  *        YjNative.scan()        —— 打开原生扫码页,结果回调 window.__yjScanResult(code, ok)
@@ -54,10 +55,22 @@ public class MainActivity extends Activity {
     /** 2026-10-20 第二轮:整个前端打进 APK 的 assets/www,页面从本地加载(断网也能开界面) */
     public static final String LOCAL_URL = "file:///android_asset/www/index.html";
 
-    /** 接口号(= 连哪台 MES 服务器/哪个账套)的存储键;首次启动要求填 */
+    /** 接口号(= 连哪台 MES 服务器/哪个账套)的存储键;未设置过就用 {@link #DEFAULT_BASE} */
     public static final String PREF = "yj_mes";
     public static final String KEY_BASE = "base_url";
-    public static final String DEFAULT_BASE = "http://192.168.1.10:8090";
+    /**
+     * 默认接口号 = **服务器的 IP 和端口**(2026-11-17)。
+     *
+     * <p>用户口径:「手机端的登录界面的配置默认为服务器的 ip 和端口」——
+     * 以前这里是占位地址 `http://192.168.1.10:8090`,首装必须先手填一遍,填错就连不上、
+     * 登录页一直提示「首次使用请点顶部设置」。现在默认值就是线上服务器
+     * (deploy/部署说明.md:公网 `36.140.66.163` / 端口 `8090`),
+     * **首装直接进登录页、直接可用**;要连本机/测试服务器再点顶部「设置」覆盖。
+     *
+     * <p>⚠ 必须与前端默认值一致:`frontend/src/business/appConfig.js` 的 `API_ORIGIN`
+     * (取值优先级:原生 SharedPreferences → localStorage → 该默认值)。
+     */
+    public static final String DEFAULT_BASE = "http://36.140.66.163:8090";
 
     private static final int REQ_SCAN = 1001;
     /** 多选扫码(2026-11-05):一次扫多个码,回调 window.__yjScanResultMulti([...]) */
@@ -146,19 +159,25 @@ public class MainActivity extends Activity {
         });
         web.addJavascriptInterface(new Bridge(), "YjNative");
 
-        String base = getBase();
-        if (base == null || base.trim().length() == 0) {
-            showServerDialog();
-        } else {
-            reload();
-        }
+        // 2026-11-17:接口号**默认就是服务器 IP:端口** ⇒ 首装不再强制弹设置框,
+        // 直接加载登录页(登录页会把当前地址显示出来);要连别的服务器再点顶部「设置」。
+        reload();
     }
 
     // ───────────────────────── 接口地址 ─────────────────────────
 
+    /**
+     * 当前接口号。
+     *
+     * <p>2026-11-17:没设置过(首装)时返回**默认值**而不是空串 ——
+     * 空串会让网页跑到「未设置地址」的分支(登录页出黄色提醒、工厂列表拉不到),
+     * 而那本该是开箱即用的场景。
+     */
     private String getBase() {
         SharedPreferences sp = getSharedPreferences(PREF, MODE_PRIVATE);
-        return sp.getString(KEY_BASE, "");
+        String v = sp.getString(KEY_BASE, "");
+        if (v == null || v.trim().length() == 0) return DEFAULT_BASE;
+        return v;
     }
 
     private void setBase(String url) {
@@ -173,7 +192,8 @@ public class MainActivity extends Activity {
      */
     private void reload() {
         String base = getBase();
-        baseLabel.setText(base == null || base.length() == 0 ? "未设置接口地址(点右侧「设置」)" : base);
+        // 2026-11-17:getBase() 一定有值(默认 = 服务器 IP:端口),不再有"未设置"这一档
+        baseLabel.setText(base);
         web.loadUrl(LOCAL_URL);
     }
 
@@ -181,8 +201,9 @@ public class MainActivity extends Activity {
     private void showServerDialog() {
         final EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
-        input.setHint("http://192.168.1.10:8090");
+        input.setHint(DEFAULT_BASE);
         String cur = getBase();
+        // 2026-11-17:输入框**预填当前值**(首装即默认的服务器地址),不用手打
         input.setText(cur == null || cur.length() == 0 ? DEFAULT_BASE : cur);
         input.setSelection(input.getText().length());
 
@@ -191,7 +212,9 @@ public class MainActivity extends Activity {
         int p = (int) (16 * getResources().getDisplayMetrics().density);
         box.setPadding(p, p / 2, p, 0);
         TextView tip = new TextView(this);
-        tip.setText("填写 MES **后端**地址(接口号),例如 http://192.168.1.10:8090。\n界面已打包在 App 内,不需要联网加载;这里只决定连哪台服务器/哪个账套。\n手机需与服务器同一网络;保存后自动重新加载。");
+        tip.setText("默认已连服务器 " + DEFAULT_BASE + "(登录页「服务器地址」一行显示的就是它)。\n"
+                + "只有要连别的服务器/账套时才需要改这里;界面已打包在 App 内,不需要联网加载。\n"
+                + "手机需与服务器网络相通;保存后自动重新加载。");
         tip.setTextSize(13);
         tip.setTextColor(Color.parseColor("#666666"));
         box.addView(tip);

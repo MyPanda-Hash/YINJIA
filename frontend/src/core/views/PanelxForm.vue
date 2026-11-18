@@ -40,7 +40,7 @@
         <!-- data-code = 字段数据键:校验失败时靠它把缺必填的那一栏滚到视野里并高亮
              (2026-10-19 用户报「出货检验计划表提示标题不能为空,但不知道填哪」) -->
         <div v-for="r in visibleFormMeta" :key="r.code" class="field" :data-code="r.code">
-          <label :title="tt(r.name)">{{ tt(r.name) }}</label>
+          <label :title="tt(r.name)">{{ tt(r.name) }}<span v-if="r.isNotNull" class="req">*</span></label>
           <el-input v-if="isText(r)" v-model="form[r.code]" :disabled="!editable || fieldLocked(r)" :placeholder="tt(r.name)" />
           <el-input-number
             v-else-if="isNumber(r)"
@@ -128,7 +128,7 @@
           <div class="dt-head">
             <div class="dt-tabs">
               <span class="dt-tab" :class="{ on: (subActive[tab.key] || 'detail') === 'detail' }" @click="subActive[tab.key] = 'detail'">
-                {{ tab.label }}
+                {{ tab.label }}<span v-if="tab.isRequired" class="req">*</span>
               </span>
               <span
                 v-if="tab.summaryItems && tab.summaryItems.length"
@@ -211,7 +211,7 @@
                     <span
                       class="ref-cell"
                       :class="{ disabled: !detailRefEnabled(dr), 'dblclick-ref': detailRefTrigger(dr) === 'dblclick' }"
-                      :title="detailRefTrigger(dr) === 'dblclick' && detailRefEnabled(dr) ? '双击选择存货' : ''"
+                      :title="detailRefHint(dr)"
                       @click="openDetailRef(dr, row, tab, 'click')"
                       @dblclick.stop="openDetailRef(dr, row, tab, 'dblclick')"
                     >{{ drRefText(dr, row) }}</span>
@@ -341,6 +341,9 @@
       </el-dialog>
     </div>
     <RefPickDialog v-model="refVisible" :field="refPick?.field" :row="refPick?.row" :mode="refPick?.mode" @confirm="onRefConfirm" />
+    <!-- 采购入库单:工具栏「多仓库入库」弹窗(每行 ▾ 加一行仓库子行,合计不超过可入库数量) -->
+    <PurInMultiWhDialog v-model="purInMultiWhVisible" :doc-no="form['单据编号'] || ''" :rows="purInDetailRows"
+                        @saved="onPurInMultiWhSaved" />
 
     <!-- 下拉框字段弹窗模式(>20 条):字典项搜索选择 -->
     <el-dialog v-model="dictPickVisible" :title="tt('选择') + '：' + (dictPickField ? tt(dictPickField.name) : '')" width="440px" append-to-body :close-on-click-modal="false">
@@ -394,11 +397,13 @@ import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import { applyCalcRules } from '@core/panel/calcRules'
+import { blankRowOf } from '@core/panel/detailRows'
 import { sumKeepScale } from '@core/panel/sumTotals'
 import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
 import SelectVoucherDialog from './SelectVoucherDialog.vue'
+import PurInMultiWhDialog from './PurInMultiWhDialog.vue'
 import ImportDialog from './ImportDialog.vue'
 import BomImportDialog from './BomImportDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
@@ -434,6 +439,12 @@ const panelCode = computed(() => props.panelCodeProp || route.params.panelCode)
 const operationName = computed(() => route.query.operationName || '新增流程')
 const code = computed(() => props.codeProp || route.query.code)
 const isEdit = computed(() => !!code.value)
+/**
+ * 采购入库单专属:明细行「拆分仓库」(2026-11-17 客户口径「草稿状态下要可以实现一个明细划分多个仓库来存放」)。
+ * 只在采购入库单面板出现 —— 拆行之所以安全,是因为台账/流水/转ERP 都按「行 × 仓库」取数,
+ * 这套口径是为采购入库写的,别的面板不顺手推广(它们的仓库语义不同)。
+ */
+const isPurInPanel = computed(() => String(panelCode.value) === 'PURCHASE_IN')
 
 /**
  * 本实例「自己的」页签路径(实例私有快照)+ 「我现在是不是前台页签」。
@@ -777,7 +788,11 @@ const attachEditable = computed(() => {
   return status.value !== '已作废'
 })
 
-const STATUS_TAG = { 草稿: 'info', 已审核: 'primary', 已完成: 'success', 生产中: 'warning', 已完工: 'success', 已中止: 'danger', 已关闭: 'info' }
+// 金蝶已删除/已作废(2026-11-16 在册核对):红/橙 —— 让人一眼看出"不是我们这边能修改的状态"
+const STATUS_TAG = {
+  草稿: 'info', 已审核: 'primary', 已完成: 'success', 生产中: 'warning', 已完工: 'success',
+  已中止: 'danger', 已关闭: 'info', 金蝶已删除: 'danger', 金蝶已作废: 'warning',
+}
 function statusTag(s) {
   return STATUS_TAG[s] || 'info'
 }
@@ -833,6 +848,8 @@ function isDisabled(action) {
     审批通过: !['审批中', '待二级审批'].includes(s) || !isEdit.value,
     审批驳回: !['审批中', '待二级审批'].includes(s) || !isEdit.value,
     扫描填单: false,
+    // 多仓库入库(2026-11-17):只在"已保存的草稿"上可用 —— 拆行按行 id 动库,新单还没 id
+    多仓库入库: s !== '草稿' || !isEdit.value || !editable.value,
   }
   // 2026-08-25：所有「生成XX」生单按钮统一仅已审核可用（对齐 T+：已审核才能选择生单）
   // 2026-09-20：去掉残留的「生产中」档(状态推导无此档,全库无此值),与后端 PushGenerateHandler 的「仅已审核」一致
@@ -909,6 +926,31 @@ function isMultiline(r) {
 const refVisible = ref(false)
 const refPick = ref(null)
 
+/* ── 采购入库单:工具栏「多仓库入库」(2026-11-17 用户口径,第三轮) ──
+   用户原话:「写法还是改成有个多仓库入库按钮(在顶部)。点击后和生单一样的界面。
+     然后每行明细的头部有个下拉扩展的倒三角,点一下就多出一行明细来。但是总数量不超过最大数量。」
+   前两轮的做法(操作列拆分图标 / 仓库格子多选弹窗)都按用户口径撤掉了;
+   现在入口只有这一颗工具栏按钮,明细拆分全在弹窗里做(PurInMultiWhDialog)。 */
+const purInMultiWhVisible = ref(false)
+
+function openPurInMultiWh() {
+  if (!editable.value || !isEdit.value) {
+    ElMessage.warning(tt('请先保存单据，再拆分仓库'))
+    return
+  }
+  purInMultiWhVisible.value = true
+}
+
+/** 当前单据的明细行(弹窗按这份数据展开仓库子行;拆完重载单据) */
+const purInDetailRows = computed(() => {
+  const key = tabs.value?.[0]?.key
+  return key ? (detailData[key] || []) : []
+})
+
+async function onPurInMultiWhSaved() {
+  await load()
+}
+
 function isRef(r) {
   return r.dataType === '参照' && (r.ref || r.refPanel)
 }
@@ -943,6 +985,16 @@ function detailRefEnabled(dr) {
   const r = detailRefConfig(dr)
   const statuses = r.statuses || r.refStatuses
   return !Array.isArray(statuses) || statuses.length === 0 || statuses.includes(status.value)
+}
+
+/**
+ * 明细参照格的悬停提示:
+ * · 采购入库单的「仓库」→ 说明"可以选多个仓库,勾多个就把这行拆成多行";
+ * · 其它参照字段保持原口径(双击触发的存货参照才提示双击)。
+ */
+function detailRefHint(dr) {
+  if (!detailRefEnabled(dr)) return ''
+  return detailRefTrigger(dr) === 'dblclick' ? '双击选择存货' : ''
 }
 
 function openDetailRef(dr, row, tab, trigger = 'click') {
@@ -1045,12 +1097,8 @@ function tabHint(tab) {
 
 function addDetailRow(tab) {
   const rows = detailData[tab.key] || (detailData[tab.key] = [])
-  const row = {}
-  for (const dr of tab.fields || []) {
-    if (dr.dataType === '小数' || dr.dataType === '整数') row[dr.dataName] = dr.defaultValue ?? 0
-    else if (dr.dataType === '是否') row[dr.dataName] = dr.defaultValue ?? false
-    else row[dr.dataName] = dr.defaultValue ?? ''
-  }
+  // 新行默认值统一走 blankRowOf(2026-11-17):必填的数量字段留空、非必填的才预填 0
+  const row = blankRowOf(tab.fields)
   if (tab.subTable) row['子表材料'] = []
   // 材料明细：新增行自动归属当前选中的产成品（子件BOM=产品编码），保证联动过滤精确
   if (tab.key === 'materials' && selectedProduct.value) row['子件BOM'] = selectedProduct.value
@@ -1060,11 +1108,7 @@ function addDetailRow(tab) {
 
 function addSubRow(row, tab) {
   if (!row['子表材料']) row['子表材料'] = []
-  const sr = {}
-  for (const sr of tab.subTable.fields || []) {
-    if (sr.dataType === '小数' || sr.dataType === '整数') sr[sr.dataName] = sr.defaultValue ?? 0
-    else sr[sr.dataName] = sr.defaultValue ?? ''
-  }
+  const sr = blankRowOf(tab.subTable.fields)
   row['子表材料'].push(sr)
 }
 
@@ -1260,6 +1304,11 @@ async function onButton(action) {
   if (erpClickBlocked(action, erpPushing.value)) { ElMessage.warning(tt(ERP_BUSY_KEY)); return }
   if (APPROVE_ACTIONS.includes(action) && !user.isAdmin && !user.approvePanels.includes(panelCode.value)) {
     return ElMessage.warning('当前角色无审批权限')
+  }
+  // 多仓库入库(2026-11-17 用户口径):工具栏按钮 → 整单明细 + 每行 ▾ 展开仓库子行的分配界面
+  if (action === '多仓库入库') {
+    openPurInMultiWh()
+    return
   }
   if (action === '扫描填单') {
     if (!editable.value) {
@@ -1824,9 +1873,8 @@ watch(() => [panelCode.value, code.value], () => {
   text-align: left;
   white-space: nowrap;
 }
-/* 必填红星已于 2026-11-13 按用户口径去掉（「保留必填项的属性就行，只是去掉红点」）：
-   只删视觉，isNotNull/isRequired 判据与保存校验全部保留 */
 .field .req {
+  color: #dc2626;
 }
 .field .el-input,
 .field .el-select,
@@ -1839,6 +1887,7 @@ watch(() => [panelCode.value, code.value], () => {
   align-items: center;
   gap: 2px;
 }.field .req {
+  color: #dc2626;
 }
 .detail {
   margin-top: 12px;
@@ -2011,9 +2060,8 @@ watch(() => [panelCode.value, code.value], () => {
   font-weight: 700;
   border-bottom: 2px solid #3788FF;
 }
-/* 必填红星已于 2026-11-13 按用户口径去掉（「保留必填项的属性就行，只是去掉红点」）：
-   只删视觉，isNotNull/isRequired 判据与保存校验全部保留 */
 .dt-tab .req {
+  color: #dc2626;
 }
 .dt-actions {
   display: flex;
@@ -2087,6 +2135,7 @@ watch(() => [panelCode.value, code.value], () => {
   font-weight: 700;
 }
 .dt-tab .req {
+  color: #dc2626;
 }
 .dt-actions {
   display: flex;

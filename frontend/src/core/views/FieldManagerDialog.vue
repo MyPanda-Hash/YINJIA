@@ -79,6 +79,16 @@ const tabPool = computed(() => {
   return tp[form.value.tab] || null
 })
 /**
+ * 本表扩展池已满 / 只剩 1 个位置(2026-11-17)。
+ *
+ * 后端上限是**每张表各 20 个**(addExtField 按该页签那一段备用列判),不是整个面板 20 个;
+ * 这里同样按 tabPools 逐表判,满额时直接禁用「添加」并说明该停用什么 ——
+ * 以前只在服务器返回后才弹一句「已达上限(28/20)」,用户看不出是哪张表满了。
+ * 另有「父目录 + 两个子目录」一次占 2 个位置的口径(free<2),避免加了一半才失败。
+ */
+const tabFull = computed(() => !!(tabPool.value && Number(tabPool.value.used) >= Number(tabPool.value.capacity)))
+const pairShort = computed(() => !!(needTab() && tabPool.value && Number(tabPool.value.free) < 2))
+/**
  * 承载表**没有预置备用列池**(或表不存在):这张表加不了自定义字段。
  * 以前后端直接 500(逐列 `SELECT COUNT(*) ... WHERE [备用1] IS NOT NULL` 打到不存在的列),
  * 界面只弹「Request failed with status code 500」并把对话框关掉 —— 用户完全不知道发生了什么。
@@ -170,6 +180,17 @@ async function retire(f) {
         v-if="capInfo?.full && !loading"
         type="warning" :closable="false" show-icon
         :title="tt('自定义列已达上限（已用满），如需再加请先在下方列表「停用」不用的列')"
+      />
+      <!-- 分页签面板:上限是**每张表各 20 个**,满的是哪张表要说清楚(2026-11-17) -->
+      <el-alert
+        v-if="tabFull && !loading"
+        type="warning" :closable="false" show-icon
+        :title="`${tt('本表自定义列已达上限')}（${tabPool.used}/${tabPool.capacity}），${tt('如需再加请先停用这张表不用的列')}`"
+      />
+      <el-alert
+        v-else-if="pairShort && !loading"
+        type="warning" :closable="false" show-icon
+        :title="`${tt('本表只剩 1 个自定义列位置')}：${tt('父目录 + 两个子目录一次要占 2 个位置，请先停用这张表不用的列')}`"
       />
       <!-- 承载表没有备用列池:说清楚"为什么不能加",而不是让用户点添加再吃一个 500 -->
       <el-alert
@@ -280,7 +301,7 @@ async function retire(f) {
       <span v-if="capInfo" class="fm-cap" :class="{ full: capInfo.full }">
         {{ tt('自定义列') }} {{ capInfo.used }}/{{ capInfo.cap }}
       </span>
-      <el-button type="primary" :loading="saving" :disabled="poolUnavailable || !form.label || capInfo?.full || (needTab() && !form.label2)" @click="submit">{{ tt('添加') }}</el-button>
+      <el-button type="primary" :loading="saving" :disabled="poolUnavailable || !form.label || capInfo?.full || tabFull || pairShort || (needTab() && !form.label2)" @click="submit">{{ tt('添加') }}</el-button>
     </template>
   </el-dialog>
 </template>

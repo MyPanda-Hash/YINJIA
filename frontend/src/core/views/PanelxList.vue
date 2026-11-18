@@ -1762,7 +1762,7 @@
         </div>
         <!-- 查询弹窗面板(T+):单个「单据日期」区间控件(日期段必填的统一入口) -->
         <div v-if="reportQueryDialog" class="query-dialog-field">
-          <label class="req-label">{{ tt('单据日期') }}</label>
+          <label class="req-label">{{ tt('单据日期') }}<span class="req-star">*</span></label>
           <el-date-picker
             v-model="rqdRange"
             type="daterange"
@@ -1780,7 +1780,7 @@
         </div>
         <div v-for="field in queryDialogFields" :key="headerFieldKey(field)" class="query-dialog-field">
           <label :class="{ 'req-label': rqdFieldRequired(field) }">
-            {{ headerFieldLabel(field) }}
+            {{ headerFieldLabel(field) }}<span v-if="rqdFieldRequired(field)" class="req-star">*</span>
           </label>
           <!-- 参照双模(2026-09-21):按档案行数自动选控件 —— ≤20 行可搜索下拉(仓库 6 个),
                >20 行参照弹窗(存货 3838 个);都不开 allow-create,未建档值手输不进条件 -->
@@ -2515,6 +2515,9 @@
         <el-button type="primary" :disabled="!docNoDlg.allowed" @click="gotoDocNo">{{ tt('查看单据') }}</el-button>
       </template>
     </el-dialog>
+    <!-- 采购入库单·多仓库入库(2026-11-17):工具栏按钮 → 和生单一样的界面,每行 ▾ 展开仓库子行 -->
+    <PurInMultiWhDialog v-model="purInMultiWhVisible" :doc-no="purInMultiWhNo" :rows="purInMultiWhRows"
+                        @saved="onPurInMultiWhSaved" />
     <!-- 采购订单·打印材料码(2026-10-04):批次号在打印时登记 + 预约该行数量 -->
     <MaterialLabelDialog v-model="materialLabelVisible" :order-no="materialLabelNo" @printed="onMaterialLabelPrinted" />
     <!-- 采购订单·打印(2026-11-07 用户口径「打印报表的时候需要能够编辑,像打印材料码的编辑一样,
@@ -2812,6 +2815,7 @@ import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaul
 import { parseSamplingQty } from '@core/insp/samplingQty'
 import { applyInspectorDefault } from '@core/qc/qcInspector'
 import { applyCalcRules } from '@core/panel/calcRules'
+import { blankRowOf } from '@core/panel/detailRows'
 import { sumKeepScale } from '@core/panel/sumTotals'
 import { qtyDecimalsOf, formatQtyByUnit, floorTo } from '@core/panel/unitPrecision'
 import { SHEET_MARGIN, SHEET_MM, SHEET_PAGE_H, SHEET_PAGE_W, planSheetPages, sheetPrintBody } from '@core/panel/sheetPrintHtml'
@@ -2821,6 +2825,7 @@ import { useUnsavedStore } from '@/stores/unsaved'
 
 import QrLabelDialog from './QrLabelDialog.vue'
 import MaterialLabelDialog from './MaterialLabelDialog.vue'
+import PurInMultiWhDialog from './PurInMultiWhDialog.vue'
 import PurchaseOrderPrintDialog from './PurchaseOrderPrintDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
 import QcInspPlanDialog from '@core/qc/QcInspPlanDialog.vue'
@@ -6175,6 +6180,14 @@ const qrVisible = ref(false)
 const materialLabelVisible = ref(false)
 const materialLabelNo = ref('')
 /**
+ * 采购入库单「多仓库入库」弹窗(2026-11-17 用户口径:工具栏一颗按钮 → 和生单一样的界面,
+ * 每行 ▾ 展开仓库子行)。列表页与表单页**两处**都要开:列表页打开的单据是内联表单,
+ * 用户多半就在这一屏点 —— 只在 PanelxForm 接会漏(2026-11-17 实测报「未定义按钮规则:多仓库入库」)。
+ */
+const purInMultiWhVisible = ref(false)
+const purInMultiWhNo = ref('')
+const purInMultiWhRows = ref([])
+/**
  * 「打印材料码」弹窗适用的面板族(2026-10-29 用户报障「供应商登录打印材料码时,直接就显示打印成功了,
  * 没有和采购订单一样有弹窗」)。
  *
@@ -6190,6 +6203,10 @@ const MATERIAL_LABEL_PANELS = ['PU_ORDER', 'SUPPLIER_PU_ORDER']
 /** 打印登记完成后提示一句:这批量已从订单数量隔离成独立一行,去生单对话框勾它即可 */
 function onMaterialLabelPrinted({ docNo, batchNo, count }) {
   ElMessage.success(`${tt('已登记材料码')} ${docNo}（${tt('批次号')} ${batchNo}，${count} ${tt('张标签')}）——${tt('该批数量已从订单数量隔离出来，生单时在明细里直接勾选它')}`)
+}
+/** 多仓库入库拆完:重载列表(明细行已按仓库拆开,必须重新取数才看得到) */
+async function onPurInMultiWhSaved() {
+  await load()
 }
 /**
  * 采购订单·打印弹窗(2026-11-07):勾选明细行 + 填本次打印数量(有金额/无金额两个版式共用)。
@@ -6605,6 +6622,23 @@ const DOC_RAIL_PANELS = {
   //   · 检验类别 —— 本单从送样登记表带入的检验项目摘要(纸面/列表同源),
   //     左栏能看到"这单测了哪些项",不用逐张点开。
   INSP_COMMISSION: ['委托单位', '样品名称', '检验类别'],
+  // 生产退料单(MATERIAL_RET,2026-11-18 用户口径「生产退料少了这一块」——
+  //   截图里送料暂收单那张「XX选择」左栏,生产退料单没有,补成与其余出入库单同一栏):
+  //   中间列按**实测有值率**挑(HSDZ_MES_TEST 12 张:工单号 6/12、领用人 9/12、ERP 状态 5/12),
+  //   退料类别 / 来源单号 / 部门编码 / 生产车间 / 领料类型 / 金蝶单据状态 实测全 0 ⇒ 空列等于没配,一律不入列;
+  //   业务类型 12/12 但恒为「生产退料」= 常量列,不承载信息,同样不入列。
+  //   ERP 列复用 ERP_TAG_COL(本单 ERP单号/是否已转ERP 均已在 yj_field 且随列表行下发),
+  //   与 MATERIAL_OUT/PURCHASE_IN 等同款;最后一张是本单唯一的单据级线索来源(工单号 = 加工单号)。
+  MATERIAL_RET: ['工单号', '领用人', ERP_TAG_COL],
+  // 销售退货单(SALE_IN,2026-11-18 用户口径「销售退货页补齐」—— 与生产退料单同批补齐的姊妹单,
+  //   同样是 2026-11-13 新建、同样漏登记 ⇒ 页面没有左栏):
+  //   中间列按**实测有值率**挑(HSDZ_MES_TEST 现有 3 张:客户 3/3、是否已转ERP 2/3、退货原因 1/3;
+  //   销售订单号 0/3、退货类别 0/3、部门 0/3、经手人 0/3 —— 空列等于没配,故不进列)。
+  //   ⚠ 销售订单号暂不进左栏 ≠ 以后也不进:现有 3 张单都还没挂订单(手工建单),
+  //     等退货单真正从销售订单/出库单选单过来、该列有值了,在这里加一个字符串即可。
+  //   ERP 列复用 ERP_TAG_COL(本单 ERP单号/是否已转ERP 均在 yj_field 且随列表行下发),
+  //   与 SALE_OUT / MATERIAL_OUT 等出入库单同款。
+  SALE_IN: ['客户', ERP_TAG_COL],
 }
 /**
  * 左栏「单据状态」页签(2026-11-10,出货检验单 = 制程检验单 QC_PROC_INSP)。
@@ -10400,13 +10434,10 @@ function onDetailCellDblclick(row, column, event, b) {
 }
 
 function newDetailRow(tabKey) {
-  const row = {}
-  for (const field of detailTabDefOf(tabKey)?.fields || []) {
-    if (field.dataType === '小数' || field.dataType === '整数') row[field.dataName] = field.defaultValue ?? 0
-    else if (field.dataType === '是否') row[field.dataName] = field.defaultValue ?? false
-    else row[field.dataName] = field.defaultValue ?? ''
-  }
-  return row
+  // 新行默认值统一走 blankRowOf(2026-11-17 用户口径「只有不合格数量可以出现自动填 0 的情况」):
+  // 必填的数量字段留空、非必填的才预填 0 —— 来料检验单「合格数量」原来被预填成 0,
+  // 而 0 又算"已填",必填校验与审核闸门都被它绕过(审完一行都进不了采购入库)。
+  return blankRowOf(detailTabDefOf(tabKey)?.fields || [])
 }
 
 function addInlineDetailRow(b) {
@@ -11858,6 +11889,9 @@ function isDisabled(action) {
     保存为草稿: !draftEditable.value || inlineSaving.value,
     保存新增: !draftEditable.value || inlineSaving.value,
     扫描填单: reportMode.value,
+    // 多仓库入库(2026-11-17 用户口径:工具栏一颗按钮 → 和生单一样的界面,每行 ▾ 展开仓库子行):
+    // 只有"已保存的草稿"可拆 —— 拆行按行 id 动库,未保存的修改会让界面与库不一致
+    多仓库入库: !current.value || st !== '草稿' || !draftEditable.value || inlineSaving.value,
     // PANDA 工具栏动作(列表页语义)
     复制: !current.value,            // 整单复制=另存为一张新草稿
     放弃: false,                     // 丢弃内联草稿修改,恢复最近一次保存
@@ -12353,6 +12387,22 @@ async function onButton(action) {
   }
   if (action === '扫描填单') {
     scanVisible.value = true
+    return
+  }
+  // 多仓库入库(2026-11-17 用户口径):工具栏按钮 → 和生单一样的界面(整单明细 + 每行 ▾ 展开仓库子行)。
+  // 列表页这一屏打开的就是内联表单,所以这里也必须接;否则按钮会落到通用 callButton,
+  // 后端回一句「未定义按钮规则:多仓库入库」(2026-11-17 实测)。
+  if (action === '多仓库入库') {
+    const c = current.value || {}
+    const no = c['单据编号'] || c['编号'] || ''
+    if (!no) return ElMessage.warning(tt('请先选择一张单据'))
+    if (String(c['单据状态'] || '') !== '草稿') return ElMessage.warning(tt('只有草稿状态的采购入库单可以拆分'))
+    if (hasUnsavedChanges()) return ElMessage.warning(tt('单据有未保存的修改，请先保存再拆分'))
+    const d = (cur.value && cur.value.detail) || {}
+    const key = Object.keys(d).find((k) => Array.isArray(d[k]))
+    purInMultiWhNo.value = no
+    purInMultiWhRows.value = key ? d[key] : []
+    purInMultiWhVisible.value = true
     return
   }
   // **合单生单**(2026-11-13 用户口径:「采购订单新增一个合单生单在生单按钮下面,可以选择同一供应商的单据,
@@ -14079,6 +14129,18 @@ onUnmounted(() => {
   color: #4338ca;
   border: 1px solid #c7d2fe;
   background: #eef2ff;
+}
+/* 金蝶侧已删除/已作废(2026-11-16 在册核对):红/橙 —— 状态不是「已审核」,生单/分批送料会被拒,
+   这里红得显眼,免得现场反复点按钮(提示里会让他刷新页面等下一轮同步) */
+.doc-status.金蝶已删除 {
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+}
+.doc-status.金蝶已作废 {
+  color: #b45309;
+  border: 1px solid #fed7aa;
+  background: #fff7ed;
 }
 .doc-status.生产中,
 .doc-status.审批中 {

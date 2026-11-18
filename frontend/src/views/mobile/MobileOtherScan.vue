@@ -27,9 +27,13 @@
 -->
 <template>
   <div class="mo-scan">
-    <div class="mo-head">
-      <div class="mo-title">{{ tt(titleText) }}</div>
-      <div class="mo-sub">{{ tt(subText) }}</div>
+    <!-- 2026-11-18:头部与「生产领料 / 生产退料」同一套(标题 + 接口地址 + 说明) -->
+    <div class="mo-top">
+      <div class="mo-head">
+        <span class="mo-title">{{ tt(titleText) }}</span>
+        <span v-if="baseUrl" class="mo-base" :title="baseUrl">{{ baseUrl }}</span>
+      </div>
+      <span class="mo-sub">{{ tt(subText) }}</span>
     </div>
 
     <div class="mo-scanbar">
@@ -40,11 +44,13 @@
         clearable
         size="large"
         @keyup.enter="onScan"
-      >
-        <template #append>
-          <el-button :loading="probing" @click="onScan">{{ tt('查询') }}</el-button>
-        </template>
-      </el-input>
+      />
+      <el-button size="large" :loading="probing" @click="onScan">{{ tt('查询') }}</el-button>
+      <!-- 相机扫码(2026-11-17 用户口径「其他领料和其他退料没有扫码按钮」):
+           与生产领料/扫码混料同一条原生桥 window.YjNative.scan();网页版没有桥就不显示这颗按钮 -->
+      <el-button v-if="nativeScan" size="large" :loading="scanning" @click="scanMaterial">
+        {{ tt('扫码') }}
+      </el-button>
     </div>
 
     <el-alert v-if="errText" :title="errText" type="warning" :closable="false" show-icon class="mo-alert" />
@@ -192,11 +198,19 @@ import {
 } from '@/business/scanOther'
 import { printSlip } from '@/business/slipPrintFlow'
 import { focusScanNow } from '@/business/scanFocus'
+import { scanOnce, hasNativeScan } from '@/business/nativeScan'
 import request from '@core/request'
 
 const props = defineProps({
   side: { type: String, default: 'pick' },
 })
+
+/** 原生相机扫码(只在壳里出现,判据与其他手机扫码页一致:壳注入了 window.YjNative.scan) */
+const nativeScan = hasNativeScan()
+/** 接口地址(与生产领料/退料顶部同一行只读展示;网页版没有壳就为空) */
+const baseUrl = (() => {
+  try { return (window.YjNative && window.YjNative.getBaseUrl && window.YjNative.getBaseUrl()) || '' } catch { return '' }
+})()
 
 // 经手人/领用人 = 当前登录人(单头那一栏不该空着,现场出问题要能追到人)
 const userStore = useUserStore()
@@ -211,6 +225,7 @@ const subText = computed(() => (isReturn.value
 const scanInput = ref(null)
 const scanText = ref('')
 const probing = ref(false)
+const scanning = ref(false)         // 相机扫码进行中(与页面里 probing 区分:一个是查库存,一个是开相机)
 const saving = ref(false)
 const errText = ref('')
 const candidates = ref([])
@@ -304,6 +319,41 @@ const reasonText = (reason) => ({
   'no-warehouse': tt('请选择退到哪个仓库'),
   'no-docno': tt('请扫描单据二维码或输入单号'),
 }[reason] || '')
+
+/**
+ * 相机扫物料码(2026-11-17 新增,用户口径「其他领料和其他退料没有扫码按钮」)。
+ *
+ * <p>调用与生产领料 / 扫码混料**完全同一条**:business/nativeScan 的 {@link scanOnce}
+ * → 壳里 `window.YjNative.scan()` → 回传 `window.__yjScanResult(code, ok)`。
+ * 扫到就把码填进输入框并立刻查库存,等于"扫一次 = 查一次",不额外多点一次「查询」。
+ */
+async function scanMaterial() {
+  errText.value = ''
+  scanning.value = true
+  try {
+    const r = await scanOnce()
+    if (!r.ok) {
+      if (r.reason !== 'cancelled') errText.value = scanErrText(r)
+      return
+    }
+    scanText.value = r.text
+    await onScan()
+  } finally {
+    scanning.value = false
+    focusScanNow(() => scanInput.value, { delay: 150 })
+  }
+}
+
+/** 扫码失败原因 → 现场看得懂的话(与其他手机扫码页同一套文案) */
+function scanErrText(r) {
+  const map = {
+    denied: tt('未授予相机权限，请在系统设置里开启后重试'),
+    'not-native': tt('当前环境不支持相机扫码'),
+    timeout: tt('扫码超时，请重试或改用输入框'),
+    empty: tt('没有扫到内容'),
+  }
+  return map[r.reason] || (tt('扫码失败：') + (r.message || ''))
+}
 
 /** 扫/回车:解析码 → 按存货编码查 STOCK_PICK(批号级可用量) */
 async function onScan() {
@@ -530,11 +580,34 @@ async function submit() {
 </script>
 
 <style scoped>
-.mo-scan { max-width: 900px; padding: 14px 16px 26px; }
-.mo-head { margin-bottom: 12px; }
-.mo-title { font-size: 18px; font-weight: 600; }
-.mo-sub { margin-top: 4px; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.6; }
-.mo-scanbar { margin-bottom: 12px; }
+/* 2026-11-18:版面口径与「生产领料」(MobilePickList.vue) 一致 —— 灰底 + 48px 顶栏 + 卡片 */
+.mo-scan {
+  box-sizing: border-box; width: 100%; max-width: 1180px; margin: 0 auto;
+  padding: 0 0 16px; background: var(--el-bg-color-page); min-height: calc(100vh - 130px);
+}
+.mo-top {
+  display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 12px;
+  background: var(--el-bg-color); border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.mo-head { display: flex; flex-direction: column; min-width: 0; }
+.mo-title { font-size: 16px; font-weight: 600; }
+.mo-base {
+  max-width: 42vw; font-size: 11px; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mo-sub {
+  flex: 1; min-width: 0; margin-left: 4px; font-size: 12px; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* 扫码行(2026-11-17 与生产领料/扫码混料对齐):输入框 + 查询 + 扫码 同一行,44px 命中区 */
+.mo-scanbar {
+  display: flex; align-items: center; gap: 8px; margin: 10px 12px 0; padding: 12px;
+  background: var(--el-bg-color); border: 1px solid var(--el-border-color-lighter); border-radius: 8px;
+}
+.mo-scanbar :deep(.el-input) { flex: 1; min-width: 0; }
+.mo-scanbar :deep(.el-input__wrapper) { min-height: 44px; }
+.mo-scanbar :deep(.el-input__inner) { font-size: 16px; }   /* 16px 以下 iOS 会自动放大 */
+.mo-scanbar :deep(.el-button) { height: 44px; min-width: 64px; flex: none; }
 .mo-alert { margin-bottom: 12px; }
 .mo-card { border: 1px solid var(--el-border-color-light); border-radius: 6px; overflow: hidden; margin-bottom: 14px; }
 .mo-cand { display: flex; align-items: center; gap: 12px; padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--el-border-color-lighter); }
@@ -585,5 +658,7 @@ async function submit() {
 @media (max-width: 480px) {
   .mo-qty { flex-wrap: wrap; }
   .mo-qty :deep(.el-input-number) { width: 120px; }
+  /* 手机竖屏也不换行(输入框 + 查询 + 扫码一行),只收紧按钮内边距给输入框留宽度 */
+  .mo-scanbar :deep(.el-button) { min-width: 56px; padding: 8px 10px; }
 }
 </style>

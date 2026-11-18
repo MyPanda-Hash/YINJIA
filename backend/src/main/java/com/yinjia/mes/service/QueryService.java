@@ -118,7 +118,9 @@ public class QueryService {
                 //    写入**姓名**）。若走下面的默认覆盖，会被 yj_doc_status.shr 换成**账号**
                 //    （实测界面显示 "admin"），既丢了姓名也把账号当人名。
                 //   与质量单据同一处理：表内有值就用表内，为空才退回 shr 兜底。
-                || "RD_ASM_PROC".equals(panelCode));
+                || "RD_ASM_PROC".equals(panelCode)
+                // 2026-11-17 炭棒工艺管控清单同理（「具体问题点」行10 补的审核人格）
+                || "RD_MOLD_PROC".equals(panelCode));
     }
 
     private final PanelRegistry registry;
@@ -1135,7 +1137,7 @@ public class QueryService {
         return null;
     }
 
-    /** 状态推导:已作废 > 已中止 > 删除申请中 > 已终止/终止审批中(项目实施计划) > 修改申请中 > 待二级审批/审批中 > 修改中 > 已生效 > 已归档 > 已完成(金蝶自动关单) > 已审核 > 草稿
+    /** 状态推导:已作废 > 已中止 > 金蝶已删除/已作废 > 删除申请中 > 已终止/终止审批中(项目实施计划) > 修改申请中 > 待二级审批/审批中 > 修改中 > 已生效 > 已归档 > 已完成(金蝶自动关单) > 已审核 > 草稿
      *  ⚠ 与 ButtonService.docStatusOf **必须同改**(两处推导,一处管列表行、一处管按钮/保存门禁;
      *    2026-09-20 两级审批新增「待二级审批」时同改两处)。 */
     private String docStatus(Map<String, Object> st) {
@@ -1143,6 +1145,11 @@ public class QueryService {
         if (st != null && "Y".equals(st.get("stopped"))) return "已中止";
         // 金蝶「手动关闭」(erp_close_state='H')= 人工终止,与 MES 中止同义(方案 A,2026-09-20)
         if (st != null && "H".equals(st.get("erp_close_state"))) return "已中止";
+        // 金蝶侧「已删除」/「已作废」(2026-11-16 在册核对 deploy/sync-presence.mjs 写入 D/Z):
+        // 单子从金蝶消失了或不再有效,MES 不能再当「已审核」用(生单/分批送料闸门据此自动拒绝)。
+        // ⚠ 与 ButtonService.docStatusOf 必须同改(见上面那条注释)。
+        if (st != null && "D".equals(st.get("erp_close_state"))) return "金蝶已删除";
+        if (st != null && "Z".equals(st.get("erp_close_state"))) return "金蝶已作废";
         if (st != null && "Y".equals(st.get("deleting"))) return "删除申请中";
         // 项目实施计划:终止二级审批(P1 待立项人/P2 待管理员/T 已终止)
         if (st != null && "T".equals(st.get("term_state"))) return "已终止";

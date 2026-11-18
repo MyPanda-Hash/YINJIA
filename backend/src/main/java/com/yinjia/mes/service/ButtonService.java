@@ -1132,6 +1132,11 @@ public class ButtonService {
             // 明细行必填(2026-09-20):表头之外还有明细级必填(如 SO_ORDER 的
             // 数量/单价全在明细),只查表头等于这些面板没校验。
             ensureDetailRequiredFilled(def, items);
+            // 来料检验单「合格数量」必填(2026-11-17 用户口径「合格数量要设置为必填」):
+            // 上面那条通用校验对**缺键**的行是跳过的(视为选单/局部提交),而库里为 NULL 的列
+            // 在 getFormDescriptor 导出的明细行里**没有这个键** ⇒ 必填形同虚设(修前实测:「保存」200 通过)。
+            // 本面板改成"缺键按空算";草稿仍按用户口径豁免(只在本分支内)。
+            if ("QC_INSP".equals(def.code())) ensureInspOkQtyPresent(items);
         }
 
         Map<String, String> l2c = def.labelToCol();
@@ -1802,6 +1807,139 @@ public class ButtonService {
             if (ok + bad > qty + 1e-9) {
                 throw new IllegalStateException("第" + (i + 1) + "行 合格数量(" + trimZero(ok) + ")+不合格数量("
                         + trimZero(bad) + ") 超过送检数量(" + trimZero(qty) + ")，请核对");
+            }
+        }
+    }
+
+    /**
+     * 文档级必填闸门 —— 在「提交审批 / 审核 / 审批通过」三个状态推进点调用(2026-11-17 用户口径:
+     *   「为什么来料检验单没有必填的验证，必填没填也可以提交审批。不点保存可以直接提交审批和审核（而且没有必填校验）」)。
+     *
+     * <p>为什么不复用保存那两道: {@link #ensureRequiredFilled} / {@link #ensureDetailRequiredFilled}
+     * 看的是**本次载荷**，缺键一律当成「选单/局部提交」放行 —— 而不点保存直接点提交审批时，
+     * 载荷里常常只有单号，等于没校验。这里改成**拿库里的单据**说话:表头 + 明细逐字段核
+     * `yj_field.required=1` 的列(系统自动填的字段除外，见 {@link #REQUIRED_SYS_FIELDS})。</p>
+     *
+     * <p>只拦状态推进:草稿保存/保存为草稿仍按用户口径不做必填限制(允许存一半)。</p>
+     *
+     * @param phase 提示语里的动作名(提交审批 / 审核 / 审批通过),让用户知道是哪一步被拦
+     */
+    private void ensureDocRequiredFilled(PanelRegistry.PanelDef def, String no, String phase) {
+        if (no == null || no.isBlank() || !def.isDoc()) return;
+        String codeCol = def.codeCol();
+        if (codeCol == null || codeCol.isBlank()) return;
+        String act = phase == null || phase.isBlank() ? "提交" : phase;
+        // ---- 1) 表头:有独立头表才查(单表式 headTable 为空,表头值就存在行表里,按行校验覆盖) ----
+        if (def.hasHeadTable()) {
+            List<Map<String, Object>> heads = jdbc.queryForList(
+                    "SELECT * FROM " + def.headTable() + " WHERE [" + codeCol + "] = ?", no);
+            Map<String, Object> head = heads.isEmpty() ? null : heads.get(0);
+            if (head != null) {
+                for (PanelRegistry.FieldDef f : def.fieldsAt("header")) {
+                    if (!f.required() || REQUIRED_SYS_FIELDS.contains(f.col()) || REQUIRED_SYS_FIELDS.contains(f.label())) continue;
+                    Object v = head.get(f.col());
+                    if (v == null || String.valueOf(v).isBlank()) {
+                        throw new IllegalStateException("「" + f.displayName() + "」不能为空，请先补全再" + act);
+                    }
+                }
+            }
+        }
+        // ---- 2) 明细:逐行核(只报第一条违规,便于前端定位;软删行不算) ----
+        List<PanelRegistry.FieldDef> required = def.fieldsAt("detail").stream()
+                .filter(PanelRegistry.FieldDef::required)
+                .filter(f -> !REQUIRED_SYS_FIELDS.contains(f.col()))
+                .filter(f -> !REQUIRED_SYS_FIELDS.contains(f.label()))
+                .toList();
+        if (required.isEmpty() || def.lineTable() == null || def.lineTable().isBlank()) return;
+        boolean softDelete = hasSoftDeleteCol(def.lineTable());
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT * FROM " + def.lineTable() + " WHERE [" + codeCol + "] = ?"
+                        + (softDelete ? " AND ISNULL(asp_cancel,'N') <> 'Y'" : "") + " ORDER BY id", no);
+        for (int i = 0; i < rows.size(); i++) {
+            Map<String, Object> row = rows.get(i);
+            if (row == null) continue;
+            for (PanelRegistry.FieldDef f : required) {
+                Object v = row.get(f.col());
+                if (v == null || String.valueOf(v).isBlank()) {
+                    throw new IllegalStateException("明细第 " + (i + 1) + " 行「" + f.displayName()
+                            + "」不能为空，请先补全再" + act);
+                }
+            }
+        }
+    }
+
+    /** 行表是否有软删列 asp_cancel(老表可能没有 —— 没有就不加过滤条件,别让整条校验抛"列名无效") */
+    private boolean hasSoftDeleteCol(String table) {
+        try {
+            Integer n = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(?) AND name = 'asp_cancel'",
+                    Integer.class, table);
+            return n != null && n > 0;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * 来料检验单「合格数量」必填 —— 保存路径(2026-11-17 用户口径「合格数量要设置为必填」)。
+     *
+     * <p>与通用 {@link #ensureDetailRequiredFilled} 的差别只有一条,但正是这条让"必填"形同虚设:
+     * 通用校验按「载荷里带了这个键」判,缺键视为选单/局部提交而跳过;而库里为 NULL 的列
+     * 在 getFormDescriptor 导出的明细行里**没有这个键** ⇒ 从界面载入一张"合格数量空着"的单
+     * 再保存,后端全部放行(2026-11-17 实测:保存 200)。这里对本面板改成**缺键按空算**;</p>
+     *
+     * <p>「保存为草稿」不经过这里(用户口径:草稿允许存一半),草稿态的兜底见
+     * {@link #ensureInspOkQtyFilledForAudit}。合格数量是审核分流入库/退料的依据,不能空。</p>
+     */
+    private void ensureInspOkQtyPresent(List<Map<String, Object>> items) {
+        for (int i = 0; i < items.size(); i++) {
+            Map<String, Object> it = items.get(i);
+            Object v = it == null ? null : it.get("合格数量");
+            if (v == null || String.valueOf(v).isBlank()) {
+                throw new IllegalStateException("明细第 " + (i + 1) + " 行合格数量不能为空");
+            }
+        }
+    }
+
+    /**
+     * 来料检验单审核前的必填兜底(2026-11-17):按**库里的行**复核
+     * 「合格数量非空 + 送检数量 > 0 + 合格+不合格 ≤ 送检」。
+     *
+     * <p>保存路径已经拦一道({@link #ensureInspOkQtyPresent}),但「保存为草稿」按用户口径豁免必填,
+     * 草稿仍可被直接审核 ⇒ 审核是最后一道闸门。且审核下游(生单)正是按 合格数量 分流入库、
+     * 按 不合格数量 分流退料,空了会生成 0 数量入库单/空退料,数据链就断了。</p>
+     *
+     * <p>2026-11-17 第二轮用户口径:「新增明细行的时候会打入数据默认填 0,这个可能会帮助跳过检验」——
+     * 前端新行已不再预填 0({@code blankRowOf}),但"送检数量 0 / 合格数量 0"的行一旦落库,
+     * 审核时照样能过、审完既不进采购入库也不退料 ⇒ 这里补两条:送检数量必须 &gt; 0(没有送检数量的行
+     * 请删掉,别混进检验),数量守恒(合格+不合格 ≤ 送检)按库里的行再核一遍(草稿可能绕过了保存校验)。</p>
+     */
+    private void ensureInspOkQtyFilledForAudit(PanelRegistry.PanelDef def, String no) {
+        if (def.lineTable() == null || def.lineTable().isBlank()) return;
+        // ⚠ 必须排除软删行(asp_cancel='Y'):保存会"软删旧行 + 插新行",界面看不到旧行(getFormDescriptor 滤掉),
+        //   但不过滤的话旧行(合格数量还是 NULL)会先撞上这道闸门 —— 实测"补了合格数量还是审不过"。
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT [合格数量], [不合格数量], [送检数量] FROM " + def.lineTable()
+                        + " WHERE [单据编号] = ? AND ISNULL(asp_cancel, 'N') <> 'Y' ORDER BY id", no);
+        for (int i = 0; i < rows.size(); i++) {
+            int line = i + 1;
+            Map<String, Object> row = rows.get(i);
+            Object sent = row.get("送检数量");
+            if (sent == null || String.valueOf(sent).isBlank() || numOf(sent) <= 0) {
+                throw new IllegalStateException("明细第 " + line + " 行送检数量必须大于 0，请先补全"
+                        + "（没有送检数量的行不参与检验，请直接删掉）");
+            }
+            Object ok = row.get("合格数量");
+            if (ok == null || String.valueOf(ok).isBlank()) {
+                throw new IllegalStateException("明细第 " + line + " 行合格数量不能为空，请先补全"
+                        + "（审核后按 合格数量 / 不合格数量 分流入库与退料）");
+            }
+            double okQty = numOf(ok);
+            double badQty = numOf(row.get("不合格数量"));
+            double sentQty = numOf(sent);
+            if (okQty + badQty > sentQty + 1e-9) {
+                throw new IllegalStateException("明细第 " + line + " 行 合格数量(" + trimZero(okQty)
+                        + ")+不合格数量(" + trimZero(badQty) + ") 超过送检数量(" + trimZero(sentQty) + ")，请核对后再审核");
             }
         }
     }
@@ -2949,6 +3087,12 @@ public class ButtonService {
         // 2026-11-13 用户口径:「如果已经提交审核了,就正常用审批通过来就行,不能点击审核按钮」。
         if ("审批中".equals(st.get("status")) || "待二级审批".equals(st.get("status")))
             throw new IllegalStateException("该单已提交审批：请用「审批通过」完成审批，不能直接「审核」");
+        // 来料检验单「合格数量」必填兜底(2026-11-17 用户口径):保存已拦一道,但「保存为草稿」豁免必填,
+        // 草稿仍可直接审核 ⇒ 审核这一环按**库里的行**复核;审核下游按合格数量分流入库/退料,空了就断链。
+        if ("QC_INSP".equals(def.code())) ensureInspOkQtyFilledForAudit(def, no);
+        // 文档级必填(表头 + 明细全字段,按库里的单据判):审核/审批通过/提交审批三个状态推进点共用,
+        // 2026-11-17 用户口径「必填没填也可以提交审批」。
+        ensureDocRequiredFilled(def, no, "审核");
         // 两级审批面板(2026-10-04 用户口径「取消直审」):一律走 提交审批 → 一级审批通过 → 超级管理员批准,
         // 直审会让第二级形同虚设(纸面「审核/批准」两格也就没了两级留痕)。接口层同口径拒绝。
         // · 固定超级管理员作二级的(ADMIN_L2_PANELS:特采单 + 质量单据一族 + 出厂检验报告)= 管理员也拒(原口径不变);
@@ -3679,6 +3823,14 @@ public class ButtonService {
         // 修改态(文件类:申请修改经管理员审批通过)同样可提交审批,通过后 finalizeModify 再归档
         if (!"草稿".equals(st.get("status")) && !"修改中".equals(st.get("status")))
             throw new IllegalStateException("仅草稿或修改中状态可提交审批");
+        // 文档级必填(2026-11-17 用户口径「必填没填也可以提交审批」):
+        // 这里按**库里的单据**核表头+明细必填 —— 不点保存直接点提交审批时,载荷里只有单号,
+        // 保存那两道载荷校验等于没跑(见 ensureDocRequiredFilled 方法注释)。
+        ensureDocRequiredFilled(def, no, "提交审批");
+        // 来料检验单:送检数量必须 > 0、合格数量非空、数量守恒(2026-11-17 第二轮口径
+        // 「新增明细行会默认填 0,这个可能会帮助跳过检验」)。审核路径同一道闸门;
+        // 提交审批这里也核一遍,别让「0 送检 / 0 合格」的单先混进审批流。
+        if ("QC_INSP".equals(def.code())) ensureInspOkQtyFilledForAudit(def, no);
         // 工序报工单:报工的**整行校验**前移到「提交审批」(2026-11-01 用户口径:
         //   「这个需要在提交审批处来进行校验而不是点击审批通过的时候出现校验」/「当前这个也是」)。
         //   校验内容 = 审核同一份判据(行锚点 / 工序在本行工艺路线内 / 不跳序 / 数量上限 /
@@ -3761,6 +3913,10 @@ public class ButtonService {
         if ("FINISH_IN".equals(def.code())) assertFinishInInspLink(no);
         String operator = currentUserName();
         int node = pendingNodeOf(def.code(), no);
+        // 文档级必填(2026-11-17):一级/二级通过前都核一遍(库里数据可能被修改申请改过)
+        ensureDocRequiredFilled(def, no, "审批通过");
+        // 来料检验单的「送检数量 > 0 / 合格数量非空 / 数量守恒」在审批通过前再核一遍(同审核口径)
+        if ("QC_INSP".equals(def.code())) ensureInspOkQtyFilledForAudit(def, no);
         if (node == 2) return approveSecond(def, no, operator, formData);
         Map<String, Object> st = docStatusOf(def.code(), no);
         if (!"审批中".equals(st.get("status"))) throw new IllegalStateException("仅审批中状态可审批通过");
@@ -3839,7 +3995,12 @@ public class ButtonService {
         // 数据记录表(实验室 8 张)：审核人**审核后生成**（1117问题 #5）
         writeDataRecAuditor(def, no, operator);
         // 组装工艺管控清单：新增的「审核人」格 = 审批通过人（1117问题 #6「产品负责人审核后自动填充」）
-        if ("RD_ASM_PROC".equals(def.code())) writeFieldByLabel(def, no, "审核人", signNameOf(operator));
+        // 组装工艺 / 炭棒工艺管控清单：新增的「审核人」格 = 审批通过人
+        //   （1117问题 #6「产品负责人审核后自动填充」+「具体问题点」行10「炭棒工艺管控起单…
+        //    右上角加多一行审核人，审核完成后自动生成」）
+        if ("RD_ASM_PROC".equals(def.code()) || "RD_MOLD_PROC".equals(def.code())) {
+            writeFieldByLabel(def, no, "审核人", signNameOf(operator));
+        }
         // 规格书(RD_SPEC_DOC):「审核」格 = **审批通过的人**（2026-11-06 用户口径
         // 「审核的是在审批人审批之后，把对应的审批人的账号和日期回填进去」）。
         // 规格书不走两级审批（「一级审批就回填」）⇒ 落点就在这条单节点通过路径上。
@@ -5002,6 +5163,18 @@ public class ButtonService {
                 def.code(), no, user, user);
         jdbc.update("UPDATE form_flow_link SET link_status='RELEASED', release_time=SYSDATETIME()"
                 + " WHERE target_panel_code = ? AND target_form_no = ? AND link_status = 'ACTIVE'", def.code(), no);
+        // 生产退料单作废 ⇒ **把这次退料从"已退数量"台账里放回去**(2026-11-18)。
+        //
+        // 背景:手机端提交退料时只生成**草稿**(用户口径「生成的单都要是草稿状态」),但
+        // 「可退量 = 已领 − 已退」的台账({@code wo_pick_return})是在提交那一刻写的(必须即扣,
+        // 否则两人能各退一遍同一批料)。草稿被仓管作废 = 这次退料没发生 ⇒ 台账必须一并作废,
+        // 不然那张领料单的可退量被一张废单永久吃掉,现场再也退不了这份料。
+        if ("MATERIAL_RET".equals(def.code())) {
+            int released = jdbc.update("UPDATE dbo.wo_pick_return SET asp_cancel='Y', asp_user2=?,"
+                            + " asp_time2=GETDATE() WHERE 退料单号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    user, no);
+            if (released > 0) log.info("[生产退料作废] {} → 释放退料台账 {} 行(可退量已回补)", no, released);
+        }
         // 分批送料:作废**不回收**批次号与台账号(2026-09-21 口径 —— 批次号在采购入库单审核时已定,
         // 回收会让已编号批次重号;弃审/作废只作废单据,台账号原样保留,见 BatchService.RECYCLE_ON_RELEASE)
         batchService.releaseByTarget(def.code(), no);
@@ -5444,6 +5617,70 @@ public class ButtonService {
     // ==================== 来料检验单审核 → 自动生成采购入库单(2026-09-15) ====================
 
     /**
+     * 「上游审核自动生成下游草稿」的两类收件角色(2026-11-17 用户口径,第二轮修订)。
+     *
+     * <p>用户原话:「1. 生产销售**只用收到暂收退料**就行。2. 生成单据的时候就要有消息,
+     * **这个草稿单是需要他们去补充的**,不是待审批的消息。」
+     *
+     * <ul>
+     *   <li><b>fill</b>(草稿要去补充的人)= **仓库审核 `cksh`**:两张单一视同仁。文案说"请补充完善后再审核",
+     *       不说"待审批"——草稿不是审批节点;</li>
+     *   <li><b>fyi</b>(只需知情)= **生产销售 `scxs`**,且**只对暂收退料单**发;
+     *       ⚠ 采购入库单**不发**给生产销售(用户第二轮明确「只用收到暂收退料」)。</li>
+     * </ul>
+     *
+     * <p>角色编码取 {@code yj_role.role_code}。⚠ 刻意**不用**审批权解析
+     * ({@code MessageService.approversOf}):生产销售在这两张单上没有 audit 权限
+     * (perms 只有 view/query/export/print/warn)⇒ 按审批权找人它永远收不到;
+     * 而且自动生成的是**草稿**,草稿不进门户「待办」(待办只认 {@code pending='Y'})。
+     * 面板级要改收件人不必改代码:{@code yj_panel.config} 的
+     * {@code fillNotify}/{@code fillNotifyRoles}/{@code fyiNotify}/{@code fyiNotifyRoles},
+     * 见 {@link MessageService#draftNotifyTargets}。
+     */
+    private static final java.util.List<String> DRAFT_FILL_ROLES = java.util.List.of("cksh");
+
+    /** 只**知情**的角色(按下游面板区分;采购入库单 = 空 ⇒ 生产销售收不到它) */
+    private static final java.util.Map<String, java.util.List<String>> DRAFT_FYI_ROLES = java.util.Map.of(
+            "PURCHASE_IN", java.util.List.of(),
+            "QC_RETURN", java.util.List.of("scxs"));
+
+    /**
+     * 上游单据审核**自动生成了下游草稿** → 两条消息(2026-11-17 第二轮口径)。
+     *
+     * <p>时机 = **生单那一刻**(来料检验单审核时),不是审批节点:草稿是"要人补"的纸,不是"要人批"的单。
+     * <ul>
+     *   <li>{@link MessageService#AUTO_DRAFT_TO_FILL} → 仓库审核:请补充完善后再审核;</li>
+     *   <li>{@link MessageService#AUTO_DRAFT_FYI} → 生产销售:只在暂收退料单上发一条纯知会。</li>
+     * </ul>
+     * 消息挂在**下游草稿单**上({@code panelCode}=目标面板、{@code docNo}=新单号),
+     * 前端「消息」里点「去处理」直接跳到那张草稿。操作者本人不收自己的动作消息;
+     * 发送失败不影响生单({@link #notify} 内部吞异常)。
+     *
+     * @param targetPanel 下游面板编码(PURCHASE_IN / QC_RETURN)
+     * @param targetNo    自动生成的下游单号
+     * @param inspNo      来源来料检验单号(消息正文带出来源,收件人不用自己回查)
+     * @param actor       触发人(审核来料检验单的人)
+     */
+    private void notifyAutoDraft(String targetPanel, String targetNo, String inspNo, String actor) {
+        java.util.Map<String, Object> params = java.util.Map.of(
+                "docNo", targetNo, "actor", actor, "sourceNo", inspNo);
+        notify(() -> {
+            java.util.List<String> fill = messageService
+                    .draftNotifyTargets(targetPanel, "fill", DRAFT_FILL_ROLES)
+                    .stream().filter((u) -> !u.equals(actor)).toList();
+            return messageService.send(fill, MessageService.AUTO_DRAFT_TO_FILL, targetPanel, targetNo, params, actor);
+        });
+        java.util.List<String> fyiRoles = DRAFT_FYI_ROLES.getOrDefault(targetPanel, java.util.List.of());
+        if (fyiRoles.isEmpty()) return;   // 采购入库单:生产销售不收(用户口径「只用收到暂收退料」)
+        notify(() -> {
+            java.util.List<String> fyi = messageService
+                    .draftNotifyTargets(targetPanel, "fyi", fyiRoles)
+                    .stream().filter((u) -> !u.equals(actor)).toList();
+            return messageService.send(fyi, MessageService.AUTO_DRAFT_FYI, targetPanel, targetNo, params, actor);
+        });
+    }
+
+    /**
      * 来料检验单(QC_INSP)审核后,把 合格数量>0 的明细行自动生成采购入库单(PURCHASE_IN)草稿:
      * 实收数量=合格数量;存货编码/存货名称/规格型号 ← 物料编码/物料名称/型号;行仓库 ← 仓库代码;
      * 计量单位/单价随行带入(2026-09-17 补单价——此前清单漏列致入库单单价断流);
@@ -5569,6 +5806,11 @@ public class ButtonService {
             jdbc.update("UPDATE qc_insp_detail SET 入库单号 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
                     piNo, user, r.get("id"));
         }
+        // 消息(2026-11-17 第二轮口径「生成单据的时候就要有消息,草稿是要他们去补充的,不是待审批」):
+        // 自动生成的**草稿**入库单 → 仓库审核一条「请补充完善后再审核」;
+        // ⚠ 生产销售**不发**(用户口径「只用收到暂收退料」)。
+        // 草稿不进门户「待办」(只认 pending='Y'),所以这条消息是目前唯一的提醒入口。
+        notifyAutoDraft("PURCHASE_IN", piNo, no, user);
     }
 
     /**
@@ -5703,6 +5945,9 @@ public class ButtonService {
                     no, no + "#" + r.get("id"), thNo, thNo + "#" + tgtIds.get(i), r.get("物料编码"),
                     r.get("送检数量"), r.get("不合格数量"), h.get("批次号"), h.get("批次键"), user);
         }
+        // 消息(2026-11-17 第二轮同口径):自动生成的**草稿**暂收退料单 →
+        // 仓库审核「请补充完善后再审核」+ 生产销售「知会」两条(生产销售只对这张单知情)
+        notifyAutoDraft("QC_RETURN", thNo, no, user);
     }
 
     /** 来料检验单弃审联动:自动生成的采购入库单/暂收退回单草稿 → 作废留痕+释放占用+清 入库单号 回填;
@@ -9267,7 +9512,7 @@ public class ButtonService {
         return docStatusOf(panelCode, no);
     }
 
-    /** 状态推导:已作废 > 已中止(含金蝶手动关闭) > 删除申请中 > 修改申请中 > 待二级审批/审批中 > 修改中 > 已生效 > 已归档 > 已完成(金蝶自动关单) > 已审核 > 草稿
+    /** 状态推导:已作废 > 已中止(含金蝶手动关闭) > 金蝶已删除/已作废 > 删除申请中 > 修改申请中 > 待二级审批/审批中 > 修改中 > 已生效 > 已归档 > 已完成(金蝶自动关单) > 已审核 > 草稿
      *  (2026-09-20 两级审批:待一级=「审批中」,一级通过后=「待二级审批」—— 两处推导必须同改,
      *   另一处在 QueryService.docStatus,管列表行状态) */
     private Map<String, Object> docStatusOf(String panelCode, String no) {
@@ -9287,6 +9532,13 @@ public class ButtonService {
         } else if ("H".equals(r.get("erp_close_state"))) {
             // 金蝶「手动关闭」= 人工终止(方案 A,2026-09-20):与 MES 中止同义
             out.put("status", "已中止");
+        } else if ("D".equals(r.get("erp_close_state"))) {
+            // 金蝶侧已删除(2026-11-16 在册核对 deploy/sync-presence.mjs 写入):
+            // 单子从金蝶消失了,MES 不能再当"已审核"用 —— 状态不满足「已审核」⇒ 生单/分批送料自动被拒
+            out.put("status", "金蝶已删除");
+        } else if ("Z".equals(r.get("erp_close_state"))) {
+            // 金蝶侧已作废 / 已反审核回草稿(同上):同样不再算「已审核」
+            out.put("status", "金蝶已作废");
         } else if ("Y".equals(r.get("deleting"))) {
             out.put("status", "删除申请中");
         } else if ("T".equals(ts)) {

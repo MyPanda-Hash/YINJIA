@@ -1,0 +1,28 @@
+﻿ego-browser : Error: Cannot find context with specified id
+所在位置 行:1 字符: 129
++ ... ew($false); ego-browser nodejs -e "await import('file:///C:/Users/Len ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Error: Cannot f...th specified id:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    at handleMessage (file:///C:/Program%20Files/Citro%20Labs/ego%20lite/Application/0.6.3.14/[eval1]:9118:27)
+    at file:///C:/Program%20Files/Citro%20Labs/ego%20lite/Application/0.6.3.14/[eval1]:8184:47
+    at guardNativeCallback (file:///C:/Program%20Files/Citro%20Labs/ego%20lite/Application/0.6.3.14/[eval1]:8172:9)
+    at dispatchCdpMessage (file:///C:/Program%20Files/Citro%20Labs/ego%20lite/Application/0.6.3.14/[eval1]:8184:5)
+== 提交前 ==
+{
+  "ok": "已记下 YJ-XWR-016 · 退料 1 张",
+  "progress": "本次退料 1 项 / 1",
+  "foot": [
+    {
+      "text": "清空本次",
+      "disabled": false
+    },
+    {
+      "text": "提交退料 (1)",
+      "disabled": false
+    }
+  ]
+}
+
+ego's nodejs process exited with code 1.

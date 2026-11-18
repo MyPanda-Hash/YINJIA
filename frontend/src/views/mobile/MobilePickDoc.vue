@@ -299,13 +299,16 @@ const route = useRoute()
 const router = useRouter()
 
 /**
- * 去「生产退料」面板(2026-11-18 退料独立成页)。
+ * 去「生产退料」面板(2026-11-18 退料独立成页;2026-11-18 第四轮再拆出明细页)。
  *
  * <p>用户口径:「生产退料独立出来,就是已经领料且审核的领料单据,来扫码退料……
- * 让生产领料不用负责那么多功能」。本页只保留一个跳转,不再自己处理退料。
+ * 让生产领料不用负责那么多功能」+「生产退料也要扫码到明细行再扫物料码退料,
+ * 要和(扫码混料一样)对齐生产领料」。
+ * ⇒ 直接翻到那张单的**退料明细页**(带 ?no=领料单号,那一页自己按单号反查台账 id),
+ *   不再先落在列表页再让人找一遍。
  */
 function goReturn() {
-  router.push({ path: '/panelx/list/MOBILE_RETURN', query: { no: String(doc.value?.领料单号 || '').trim() } })
+  router.push({ path: '/panelx/list/MOBILE_RETURN/doc', query: { no: String(doc.value?.领料单号 || '').trim() } })
 }
 
 /**
@@ -767,7 +770,8 @@ function cancelReturn() {
 }
 
 /**
- * 提交退料:本次选中的所有物料一次生成**一张**生产退料单(MATERIAL_RET)并审核入账。
+ * 提交退料:本次选中的所有物料一次生成**一张**生产退料单(MATERIAL_RET),状态为**草稿**
+ * (2026-11-18 用户口径「生成的单都要是草稿状态」;仓管在「生产退料单」面板审核时才入账)。
  */
 async function submitReturn() {
   const items = Object.entries(returnQty.value)

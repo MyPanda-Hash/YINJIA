@@ -27,7 +27,9 @@ test('落库格式按列语义分精度（ratio/piece/weight 2 位、length 1 �
 
 test('关键列必须真的用上新精度', () => {
   assert.match(dlg, /添加比例: fmt\(percentOf\(actual\), 'ratio'\)/, '添加比例要 2 位')
-  assert.match(dlg, /'单支含量g': fmt\(c\.rows\[i\]\?\.perPiece, 'piece'\)/, '单支含量要 2 位')
+  // 2026-11-18：回填改为只写有物料的行（用户口径「没有数据的行自己去掉」），
+  //   过滤后原始下标改名 idx ⇒ 取值用 c.rows[idx]，精度口径不变。
+  assert.match(dlg, /'单支含量g': fmt\(c\.rows\[(i|idx)\]\?\.perPiece, 'piece'\)/, '单支含量要 2 位')
   assert.match(dlg, /'炭棒重量下限g': fmt\(c\.weight\.low, 'weight'\)/, '炭棒重量要 2 位')
   assert.match(dlg, /'切炭长度中间值mm': fmt\(c\.cut\.mid, 'length'\)/, '切炭长度 1 位')
 })
@@ -39,4 +41,13 @@ test('只读态给「%」列补百分号，编辑态不补', () => {
   assert.match(sheet, /\{\{ readCellText\(c, row\[c\.key\]\) \|\| ' \/ ' \}\}/, '只读格必须走 readCellText')
   // 不能把 % 塞进输入框
   assert.doesNotMatch(sheet, /v-model="row\[c\.key\]"\s*[^>]*%.*%/, '输入框不得拼 %')
+})
+
+test('回填必须过滤掉没有物料的行（用户 2026-11-18 口径）', () => {
+  // 「写了在配方计算回填的时候没有数据的行自己去掉，怎么现在还有显示的」
+  //   ⇒ detail 只写 物料编号/物料名称 任一非空的行，序号按输出顺序重排。
+  assert.match(dlg, /\.filter\(\(\{ r \}\) => String\(r\.code \|\| ''\)\.trim\(\) !== '' \|\| String\(r\.name \|\| ''\)\.trim\(\) !== ''\)/,
+    '要按 物料编号/物料名称 过滤')
+  assert.match(dlg, /序号: String\(i \+ 1\)/, '过滤后序号按输出顺序重排')
+  assert.match(dlg, /c\.rows\[idx\]/, '取计算结果要用**过滤前**的原始下标')
 })

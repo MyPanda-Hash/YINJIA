@@ -64,12 +64,15 @@
           :placeholder="tt('扫工单号/领料单号,或直接输入后点打开')"
           size="large"
           clearable
-          @keyup.enter="locate"
+          @keyup.enter="openByCode(locateText)"
         />
-        <el-button size="large" :loading="locateLoading" @click="locate">{{ tt('打开单据') }}</el-button>
+        <el-button size="large" :loading="locateLoading" @click="openByCode(locateText)">{{ tt('打开单据') }}</el-button>
         <el-button v-if="nativeScan" size="large" @click="scanInto">{{ tt('扫码') }}</el-button>
       </div>
-      <div class="mp-hint">{{ tt('已完成和未完成的单据都能打开;括号里带上工单行号(如 0@GD-…@1001)可精确定位') }}</div>
+      <div class="mp-hint">
+        {{ tt('扫领料单纸面二维码 → 直接打开对应那张(混料/组装);扫工单码 → 弹窗选混料还是组装。') }}
+        {{ tt('已完成和未完成的单据都能打开;括号里带上工单行号(如 0@GD-…@1001)可精确定位') }}
+      </div>
     </section>
 
     <!-- ③ 未完成 -->
@@ -151,6 +154,9 @@
         </div>
       </template>
     </section>
+
+    <!-- 扫工单码(分不出组装/混料)时的选择框;扫领料单纸面二维码不会走到这里 -->
+    <PickKindDialog v-model="kindVisible" :docs="kindDocs" @pick="(d) => openDoc(d.id)" />
   </div>
 </template>
 
@@ -159,8 +165,9 @@ import { onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref }
 import { useRouter } from 'vue-router'
 import request from '@core/request'
 import { tt } from '@/i18n'
-import { parseWorkOrderCode } from '@/business/scanCode'
+import { locateQueryOf } from '@/business/mobilePick'
 import { focusScanNow } from '@/business/scanFocus'
+import PickKindDialog from './PickKindDialog.vue'
 
 const router = useRouter()
 
@@ -177,6 +184,9 @@ let scanPending = false
 let scanTimer = null
 const openOpen = ref(true)
 const openDone = ref(false)
+/** 扫工单码时同一工单行有组装 + 混料两张 ⇒ 弹窗选(2026-11-18 用户口径) */
+const kindVisible = ref(false)
+const kindDocs = ref([])
 
 const list = reactive({ open: [], done: [], openTotal: 0, doneTotal: 0 })
 
@@ -218,10 +228,8 @@ function scanInto() {
 function applyScan(code) {
   const text = String(code || '').trim()
   if (!text) return
-  const p = parseWorkOrderCode(text)
-  if (!p.ok) { showErr(tt('这个码里没有工单号') + ':' + text); return }
-  locateText.value = p.wo
-  locate(p.line)
+  // 2026-11-18:扫领料单纸面码(带 @A/@M)⇒ 直接开对应那张;扫工单码 ⇒ openByCode 里弹窗选组装/混料
+  openByCode(text)
 }
 
 /**
@@ -305,6 +313,8 @@ onActivated(() => {
   bindScan()
   if (!activatedOnce) { activatedOnce = true; return }
   loadList()
+  // keep-alive 回来时也要把光标放回扫码框(2026-11-18:扫码页统一口径)
+  focusScanNow(() => scanInput.value, { delay: 250 })
 })
 
 onDeactivated(() => {
@@ -357,29 +367,49 @@ async function loadList() {
 }
 
 /**
- * 扫工单号 → 直接打开对应的领料单据。
+ * 扫工单号/领料单码 → 直接打开对应的领料单据。
  *
  * <p>本页**只定位不生成**(生单已独立成面板「生成工单领料/退料单」,2026-10-30 第二轮)。
+ *
+ * <p>🔴 2026-11-18 用户口径:
+ *   「生产领料扫混料和扫组装的二维码,都是跳到组装的单据界面,这个不对」+
+ *   「如果领料退料扫的是工单码,就要弹窗选择是混料还是组装。如果是领料单上的二维码就直接跳转」
+ * ⇒ 领料单纸面二维码第 4 段是领料标记(A=组装 / M=混料),解析出来当 kind 传给后端,
+ *   后端只回那一张 ⇒ **直接跳转**;工单码没有标记、同一工单行又开了两张 ⇒ **弹窗选**。
  */
-async function locate(line) {
-  const kw = String(locateText.value || '').trim()
+async function openByCode(raw) {
+  const q = locateQueryOf(raw)
   clearMsg()
-  if (!kw) { showErr(tt('请先扫描或输入工单号')); return }
+  if (!q.wo) { showErr(tt('请先扫描或输入工单号')); return }
   locateLoading.value = true
   try {
-    const res = await request.get('/px/mobilePick/locate', {
-      params: { woNo: kw, line: Number(line) || undefined },
-    })
+    const params = { woNo: q.wo }
+    if (q.line > 0) params.line = q.line
+    if (q.kind) params.kind = q.kind
+    const res = await request.get('/px/mobilePick/locate', { params })
     const d = res.data?.data || res.data || {}
+    locateText.value = q.wo
+    // ⚠ 先看「单据[]」再判 found:后端命中整组时 found=true 且带 2 张单(组装在前),
+    //   以前在这里直接 openDoc(d.id) ⇒ 扫工单码永远跳组装、弹窗永远出不来(2026-11-18 实测)。
+    const docs = Array.isArray(d.单据) ? d.单据 : []
+    if (docs.length > 1) {
+      kindDocs.value = docs
+      kindVisible.value = true
+      return
+    }
     if (d.found) {
       openDoc(d.id)
+      return
+    }
+    if (d.hint === 'no-doc-kind') {
+      showErr(`${tt('没有找到这个工单/单据')} · ${q.kind} (${q.wo})`)
       return
     }
     if (d.hint === 'multi-line' && Array.isArray(d.candidates) && d.candidates.length) {
       // 工单号下有多行,且都开过单 ⇒ 让用户选一行(不替他猜)
       showErr(`${tt('该工单有多个工单行已开单,请点下面任意一行打开')}`)
       list.open = d.candidates.map((c) => ({
-        id: c.id, 工单号: kw, 工单行号: c.工单行号, 领料单号: '', 状态: tt('未完成'),
+        id: c.id, 工单号: q.wo, 工单行号: c.工单行号, 领料单号: '', 状态: tt('未完成'),
         已领项数: 0, 物料项数: 0, 产品名称: '', 创建人: '', 创建时间: '',
       }))
       openOpen.value = true
@@ -387,10 +417,10 @@ async function locate(line) {
     }
     // 分情况说清楚(2026-11-01):现场最容易混淆的是"单据不存在"和"单据已作废"
     if (d.hint === 'voided') {
-      showErr(tt('这张单据已作废,不能再打开') + ' (' + kw + ')')
+      showErr(tt('这张单据已作废,不能再打开') + ' (' + q.wo + ')')
       return
     }
-    showErr(tt('没有找到这个工单/单据') + ' (' + kw + '):' +
+    showErr(tt('没有找到这个工单/单据') + ' (' + q.wo + '):' +
       tt('工单要先生成领料单;已完成、未完成的单据都可以直接打开'))
   } catch (e) {
     showErr(errMsgOf(e) || tt('查询失败'))

@@ -1,773 +1,481 @@
 <!--
-  MobileMixScan.vue — 手机扫码 · 扫码混料(2026-11-18,新增;接替已下架的「工单扫码领料」)
+  MobileMixScan.vue — 手机扫码 · **扫码混料(列表页)**(2026-11-18 第四轮重写)
 
   【用户口径(原话)】
-  「把 wms 管理-条码管理里面的扫码领料和扫码领料记录和工单扫码领料删除。然后在手机扫码里面
-   加一个扫码混料的面版。逻辑:扫工单码,带出一级BOM(就是物料清单,之前生产领料的是组装物料清单),
-   逐项扫物料码,自动获取电子秤的数量(我们系统已经有了(之前的工单扫码领料读的就是这个的数据)),
-   提交保存一笔,全部扫完,整单保存。保存后自动打印,并且保留单据,重新扫码后进入可以补打印。」
+  「扫码混料,应该和生产领料一样也是跳转到单据的明细里面再开始扫物料码,解锁对应的物料码,
+   然后根据连接电子秤的取数,点击确认。再扫其他的物料解锁,根据电子秤再确认。
+   全部物料确认完毕后,才可以提交。设计要和生产领料一致。不要独立的去设计。」
 
-  【作业链路(页面即流程)】
-   ① 扫工单码        → GET /px/mix/lines(工单行 plang)
-   ② 带出一级BOM     → GET /px/mix/bom  (《物料清单》WLBOM / 底表 mate;**不是**生产领料用的组装物料清单)
-   ③ 逐项扫物料码    → 命中清单行 → 取电子秤(/api/dc/monitor)或手输 → POST /px/mix/scan
-                        每次「提交本笔」= 往 wo_mixing_list 落一行(标记 N = 保存前)
-   ④ 全部扫完        → POST /px/mix/save 取混料单号(PL+yyMMdd+4位)+ 标记置 Y
-   ⑤ 保存后自动打印  → GET /px/mix/doc 取纸面数据 → 打印站点(MIX_SLIP)/ 本机打印兜底 → 记一次打印
-   ⑥ 重扫工单可补打印 → GET /px/mix/docs 列出该工单已保存的混料单 → 点「补打印」再来一次
+  ⇒ 本页 = 「生产领料」列表页(MobilePickList.vue)的**同一套结构与交互**:
+    ① 查询:关键字(工单号 / 混料单号 / 产品名)查未完成与已完成两组单据;
+    ② 扫码定位:扫工单码 → 直接进该工单行的混料单**明细**;输入/扫混料单号(PL…) → 进已保存单据;
+    ③ 两组列表(未完成 / 已完成)都可展开收起,点一行进明细。
 
-  【为什么落混料记录而不是开一张材料出库单】
-  「混料」投的是原料(炭粉/活性炭…),不扣成品库存、也没有出库单据链;现场真正要留的是
-  「这一锅投了多少料、秤上实际多少」。这正是 dbo.wo_mixing_list(混料记录,
-  表注释「混料时通过电子称自动获取的实际用量」)的语义 —— 保存后电脑端
-  「生产过程 → 混料记录」立刻能查到,不用再造一份数据。
+  【两台页面的分工(上一版是单页,什么都在一页里)】
+  · 本页只做「找单 / 进单」——不扫物料、不取秤、不提交;
+  · 扫物料码解锁、电子秤取数、确认、提交全在明细页(MobileMixDoc.vue)。
 
-  【为什么秤值要「提交本笔」才落库,而不是扫完就写】
-  用户口径是「提交保存一笔」:现场放过料、看一眼秤稳定了才点提交;写早了会把称重跳动值存进去。
-  取不到稳定值时页面要求手输(秤离线/故障不能让现场卡死)。
+  【为什么「未完成」按工单行而不是单号】
+  混料单号要等**提交**才生成(见 MixScanService#saveDoc),没提交的作业身份就是
+  「工单号 + 工单行号」——与「生产领料」未完成组里那些"未生成"的单同一写法。
 -->
 <template>
-  <div class="mm-scan">
-    <div class="mm-head">
-      <div class="mm-title">{{ tt('扫码混料') }}</div>
-      <div class="mm-sub">
-        {{ tt('扫工单码 → 带出物料清单 → 逐项扫物料码取电子秤 → 逐笔保存 → 全部扫完整单保存并自动打印') }}
+  <div class="mm">
+    <div class="mm-top">
+      <div class="mm-head">
+        <span class="mm-title">{{ tt('扫码混料') }}</span>
+        <span v-if="baseUrl" class="mm-base" :title="baseUrl">{{ baseUrl }}</span>
       </div>
-    </div>
-
-    <!-- ① 扫工单码 -->
-    <div class="mm-scanbar">
-      <el-input
-        ref="woInput"
-        v-model="woText"
-        size="large"
-        clearable
-        :placeholder="tt('扫描或输入工单二维码')"
-        @keyup.enter="onScanWorkOrder"
-      >
-        <template #append>
-          <el-button :loading="woLoading" @click="onScanWorkOrder">{{ tt('查询') }}</el-button>
-        </template>
-      </el-input>
-      <el-button v-if="nativeScan" size="large" :loading="scanning === 'wo'" class="mm-cam" @click="scanWoCamera">
-        {{ tt('相机扫码') }}
+      <span class="mm-sub">{{ tt('查询单据 → 扫工单码进明细 → 扫物料取秤确认 → 全部确认提交') }}</span>
+      <el-button class="mm-refresh" size="small" :loading="listLoading" @click="refreshAll">
+        {{ tt('刷新') }}
       </el-button>
     </div>
 
-    <el-alert v-if="errText" :title="errText" type="warning" :closable="false" show-icon class="mm-alert" />
-    <el-alert v-if="okText" :title="okText" type="success" :closable="false" show-icon class="mm-alert" />
+    <div v-if="errText" class="mm-err mm-topline">{{ errText }}</div>
+    <div v-if="okText" class="mm-ok mm-topline">{{ okText }}</div>
 
-    <!-- ② 工单内容 -->
-    <div v-if="order" class="mm-card">
-      <div class="mm-order-l1">
-        <span class="mm-no mono">{{ order.orderNo }}</span>
-        <span class="mm-tag">{{ tt('行号') }} {{ order.lineNo }}</span>
-        <el-button text size="small" class="mm-clear" @click="resetOrder">{{ tt('换工单') }}</el-button>
+    <!-- 查询 + 扫码定位(与生产领料列表页同一块两行) -->
+    <section class="mm-card">
+      <div class="mm-sec">{{ tt('查询单据') }}</div>
+      <div class="mm-row">
+        <el-input
+          v-model="keyword"
+          :placeholder="tt('工单号 / 混料单号 / 产品名称')"
+          size="large"
+          clearable
+          @keyup.enter="loadList"
+        />
+        <el-button type="primary" size="large" :loading="listLoading" @click="loadList">{{ tt('查询') }}</el-button>
       </div>
-      <div class="mm-kv">
-        <span class="mm-k">{{ tt('产品编码') }}</span><span class="mm-v mono">{{ order.productCode || '-' }}</span>
-        <span class="mm-k">{{ tt('产品名称') }}</span><span class="mm-v">{{ order.productName || '-' }}</span>
-        <span class="mm-k">{{ tt('生产线') }}</span><span class="mm-v">{{ order.line || '-' }}</span>
-        <span class="mm-k">{{ tt('排产数量') }}</span><span class="mm-v strong">{{ fmt(order.planQty) }}</span>
+      <div class="mm-row mm-row-gap">
+        <el-input
+          ref="scanInput"
+          v-model="locateText"
+          :placeholder="tt('扫工单码 / 输入工单号或混料单号')"
+          size="large"
+          clearable
+          @keyup.enter="openByCode(locateText)"
+        />
+        <el-button size="large" :loading="locateLoading" @click="openByCode(locateText)">{{ tt('打开单据') }}</el-button>
+        <el-button v-if="nativeScan" size="large" @click="scanInto">{{ tt('扫码') }}</el-button>
       </div>
-      <!-- 整单码(不带行号)扫进来时可能命中多行:让人自己选,别默认第一行当成对的 -->
-      <div v-if="lineOptions.length > 1" class="mm-linepick">
-        <span class="mm-k">{{ tt('工单行') }}</span>
-        <el-select v-model="order.lineNo" size="large" class="mm-linepick-sel" @change="onLineChange">
-          <el-option
-            v-for="o in lineOptions"
-            :key="o.lineNo"
-            :label="`${tt('行号')} ${o.lineNo} · ${o.productCode} ${o.productName}`"
-            :value="o.lineNo"
-          />
-        </el-select>
+      <div class="mm-hint">
+        {{ tt('扫工单码 → 进该工单行的混料单明细;扫/输入混料单号(PL…)→ 打开已保存的单据(可补打印)') }}
+        {{ tt('工单有多行时会列出候选让你选,不替你先猜一行') }}
       </div>
-    </div>
+    </section>
 
-    <!-- ③ 电子秤 -->
-    <div v-if="order" class="mm-scale" :class="{ live: scaleOk }">
-      <div class="mm-scale-main">
-        <span class="mm-scale-label">{{ tt('台车电子秤') }}</span>
-        <span class="mm-scale-num">{{ scaleText }}</span>
-        <span class="mm-scale-hint">{{ scaleHint }}</span>
+    <!-- 工单有多行(且没给行号)时的候选:点哪行开哪行 -->
+    <section v-if="candidates.length" class="mm-card">
+      <div class="mm-sec">
+        <span>{{ tt('选择工单行') }}</span>
+        <span class="mm-sec-num">{{ candidates.length }}</span>
       </div>
-      <div class="mm-scale-manual">
-        <span class="mm-k">{{ tt('手输数量') }}</span>
-        <el-input-number v-model="manualQty" :min="0" :precision="4" :step="0.1" size="large" controls-position="right" />
-      </div>
-    </div>
-
-    <!-- ④ 物料清单(一级BOM) -->
-    <div v-if="order" class="mm-list">
-      <div class="mm-list-head">
-        <span>{{ tt('物料清单') }}</span>
-        <span class="mm-prog">{{ progress.done }} / {{ progress.total }}</span>
-      </div>
-      <el-empty
-        v-if="!lines.length"
-        :description="tt('该产品在「物料清单」里还没有维护用料，请先在 数据建模 → 生产 → 物料清单 录入')"
-        :image-size="70"
-      />
       <div
-        v-for="(l, i) in lines"
-        :key="l.code"
-        class="mm-row"
-        :class="{ active: activeIdx === i, done: l.picked > 0, over: l.remain < 0 }"
-        @click="activeIdx = i"
+        v-for="(c, i) in candidates"
+        :key="`${c.orderNo}#${c.lineNo}-${i}`"
+        class="mm-cand"
+        @click="pickCandidate(c)"
       >
-        <div class="mm-row-main">
-          <span class="mm-code mono">{{ l.code }}</span>
-          <span class="mm-name">{{ l.name || '-' }}</span>
-        </div>
-        <div class="mm-row-qty">
-          <span>{{ tt('应投') }} {{ fmt(l.required) }} {{ l.uom }}</span>
-          <span class="mm-q-done">{{ tt('已记') }} {{ fmt(l.picked) }}</span>
-          <span class="mm-q-remain" :class="{ neg: l.remain < 0 }">{{ tt('待投') }} {{ fmt(l.remain) }}</span>
-        </div>
-        <el-button
-          v-if="l.picked > 0"
-          text
-          size="small"
-          type="danger"
-          class="mm-row-undo"
-          :loading="undoing === l.code"
-          @click.stop="undoLine(i)"
-        >
-          {{ tt('撤回本项') }}
-        </el-button>
-      </div>
-    </div>
-
-    <!-- ⑤ 扫物料码 -->
-    <div v-if="order && lines.length" class="mm-scanbar">
-      <el-input
-        ref="matInput"
-        v-model="matText"
-        size="large"
-        clearable
-        :placeholder="tt('扫描或输入物料码（存货编码|批号）')"
-        @keyup.enter="onScanMaterial"
-      >
-        <template #append>
-          <el-button :loading="savingOne" @click="onScanMaterial">{{ tt('提交本笔') }}</el-button>
-        </template>
-      </el-input>
-      <el-button v-if="nativeScan" size="large" :loading="scanning === 'mat'" class="mm-cam" @click="scanMatCamera">
-        {{ tt('相机扫码') }}
-      </el-button>
-      <el-button size="large" :disabled="!activeLine" @click="submitActive">{{ tt('取秤提交') }}</el-button>
-    </div>
-
-    <!-- ⑥ 整单保存 -->
-    <div v-if="order && lines.length" class="mm-foot">
-      <div class="mm-foot-info">
-        <span>
-          {{ tt('已记') }} {{ progress.done }} / {{ progress.total }} {{ tt('行') }}
-          <template v-if="progress.remainCount > 0">
-            · {{ tt('还有') }} {{ progress.remainCount }} {{ tt('项未扫') }}
-          </template>
+        <span class="mm-cand-no">{{ c.orderNo }}<i>#{{ c.lineNo }}</i></span>
+        <span class="mm-cand-p">{{ c.productCode }} · {{ c.productName }}</span>
+        <span class="mm-cand-qty" :class="{ warn: !(c.planQty > 0) }">
+          {{ c.planQty > 0 ? fmtQty(c.planQty) : tt('未排产') }}
         </span>
-        <span v-if="progress.allDone" class="mm-foot-ok">{{ tt('可以整单保存') }}</span>
       </div>
-      <el-button
-        type="primary"
-        size="large"
-        class="mm-foot-btn"
-        :loading="savingAll"
-        :disabled="!progress.anyDone"
-        @click="saveAll"
-      >
-        {{ tt('整单保存并打印') }}
-      </el-button>
-    </div>
+    </section>
 
-    <!-- ⑦ 已保存的混料单(重新扫码后进来补打印) -->
-    <section v-if="order" class="mm-docs">
-      <div class="mm-list-head">
-        <span>{{ tt('该工单已保存的混料单') }}</span>
-        <el-button text size="small" :loading="docsLoading" @click="loadDocs">{{ tt('刷新') }}</el-button>
+    <!-- 未完成:已确认过料、还没提交的工单行 -->
+    <section class="mm-card">
+      <div class="mm-grp-head" @click="openOpen = !openOpen">
+        <span class="mm-grp-title">{{ tt('未完成') }}</span>
+        <span class="mm-grp-num">{{ list.open.length }}</span>
+        <span class="mm-grp-arrow" :class="{ open: openOpen }">›</span>
       </div>
-      <el-alert v-if="printMsg" :title="printMsg" type="info" :closable="false" show-icon class="mm-print-msg" />
-      <div v-if="!docs.length" class="mm-empty">{{ tt('还没有保存过混料单') }}</div>
-      <div v-for="d in docs" :key="d.单据编号" class="mm-doc">
-        <div class="mm-doc-l1">
-          <span class="mm-no mono">{{ d.单据编号 }}</span>
-          <span class="mm-doc-print">{{ tt('打印次数') }} {{ d.打印次数 || 0 }}</span>
+      <template v-if="openOpen">
+        <div v-if="!list.open.length" class="mm-empty">{{ tt('没有未完成的单据') }}</div>
+        <div
+          v-for="d in list.open"
+          :key="`${d.工单号}#${d.工单行号}`"
+          class="mm-doc"
+          @click="openDoc(d.工单号, d.工单行号)"
+        >
+          <div class="mm-doc-l1">
+            <span class="mm-doc-no mono">{{ d.单据编号 || tt('未生成') }}</span>
+            <span class="mm-doc-state">{{ tt('未完成') }}</span>
+          </div>
+          <div class="mm-doc-l2">
+            <span class="mm-doc-wo">{{ d.工单号 }}<i v-if="d.工单行号"> #{{ d.工单行号 }}</i></span>
+            <span class="mm-doc-prog">{{ tt('已确认') }} {{ d.已确认项数 || 0 }}/{{ d.明细数 || 0 }}</span>
+          </div>
+          <div class="mm-doc-l3">
+            <span class="mm-doc-p">{{ d.产品名称 || d.产品编码 || '—' }}</span>
+            <span class="mm-doc-t">{{ d.操作人 || '' }} {{ d.更新时间 || '' }}</span>
+          </div>
+          <!-- 与生产领料/开单工作台同一口径:卡片上直接给 物料编码 / 规格型号 / 计量单位 -->
+          <div class="mm-doc-l4">
+            <span><i>{{ tt('物料编码') }}</i>{{ d.产品编码 || '—' }}</span>
+            <span><i>{{ tt('生产线') }}</i>{{ d.生产线 || '—' }}</span>
+            <span><i>{{ tt('实投合计') }}</i>{{ fmtQty(d.实投合计) }}</span>
+          </div>
         </div>
-        <div class="mm-doc-l2">
-          <span>{{ d.保存时间 || '-' }}</span>
-          <span>{{ tt('行数') }} {{ d.行数 || 0 }}</span>
-          <span>{{ tt('实际用量合计') }} {{ fmt(d.实际用量合计) }}</span>
-        </div>
-        <div class="mm-doc-l3">
-          <span>{{ d.操作人 || '' }}</span>
-          <el-button size="small" type="primary" plain :loading="printing === d.单据编号" @click="reprint(d.单据编号)">
-            {{ tt('补打印') }}
-          </el-button>
-        </div>
+      </template>
+    </section>
+
+    <!-- 已完成:已保存的混料单(点进去只读 + 补打印) -->
+    <section class="mm-card">
+      <div class="mm-grp-head" @click="openDone = !openDone">
+        <span class="mm-grp-title">{{ tt('已完成') }}</span>
+        <span class="mm-grp-num">{{ list.done.length }}</span>
+        <span class="mm-grp-arrow" :class="{ open: openDone }">›</span>
       </div>
+      <template v-if="openDone">
+        <div v-if="!list.done.length" class="mm-empty">{{ tt('还没有已完成的单据') }}</div>
+        <div
+          v-for="d in list.done"
+          :key="d.单据编号"
+          class="mm-doc is-done"
+          @click="openSaved(d.单据编号)"
+        >
+          <div class="mm-doc-l1">
+            <span class="mm-doc-no mono">{{ d.单据编号 }}</span>
+            <span class="mm-doc-state is-done">{{ tt('已完成') }}</span>
+          </div>
+          <div class="mm-doc-l2">
+            <span class="mm-doc-wo">{{ d.工单号 }}<i v-if="d.工单行号"> #{{ d.工单行号 }}</i></span>
+            <span class="mm-doc-prog">{{ tt('行数') }} {{ d.行数 || 0 }}</span>
+          </div>
+          <div class="mm-doc-l3">
+            <span class="mm-doc-p">{{ d.产品名称 || d.产品编码 || '—' }}</span>
+            <span class="mm-doc-t">{{ d.操作人 || '' }} {{ d.保存时间 || '' }}</span>
+          </div>
+          <div class="mm-doc-l4">
+            <span><i>{{ tt('物料编码') }}</i>{{ d.产品编码 || '—' }}</span>
+            <span><i>{{ tt('实投合计') }}</i>{{ fmtQty(d.实际用量合计) }}</span>
+            <span><i>{{ tt('打印次数') }}</i>{{ d.打印次数 || 0 }}</span>
+          </div>
+        </div>
+      </template>
     </section>
   </div>
 </template>
 
 <script setup>
 /**
- * 扫码混料(手机/电脑同一页:手机竖屏单列,电脑宽屏限宽 900)。
+ * 扫码混料列表页(2026-11-18 第四轮)。
  *
- * 纯逻辑(工单码解析、BOM 展开、秤值校验、纸面载荷)全在 business/mixScan.js,
- * 本组件只负责交互与请求 —— 与 MobileOtherScan / MobilePickDoc 同一套写法(手机扫码规范:
- * el-input + append 按钮的扫码框、顶部标题+一句说明、卡片式分区、底部大按钮)。
+ * 与 {@code MobilePickList.vue}(生产领料)刻意同构:同一套顶部条、同一块「查询 + 扫码定位」、
+ * 同样两组可展开收起、同样的卡片四行结构。**改版面时请对齐那一页**。
+ *
+ * 本页不发任何写请求:找单 → 明细页(MobileMixDoc.vue)才是作业现场。
  */
-import { computed, onBeforeUnmount, onMounted, nextTick, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { onActivated, onBeforeUnmount, onDeactivated, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import request from '@core/request'
 import { tt } from '@/i18n'
 import { errMsg } from '@/business/engine'
-import { parseBarcode } from '@/business/scanPick'
-import {
-  parseWorkOrderQr,
-  expandBom,
-  applyScan,
-  checkScaleReading,
-  scaleReadingOf,
-  mixProgress,
-  buildScanPayload,
-} from '@/business/mixScan'
-import { printSlip } from '@/business/slipPrintFlow'
+import { parseWorkOrderQr } from '@/business/mixScan'
 import { scanOnce, hasNativeScan } from '@/business/nativeScan'
 import { focusScanNow } from '@/business/scanFocus'
-import request from '@core/request'
 
-const nativeScan = hasNativeScan()
+const router = useRouter()
 
-const woInput = ref(null)
-const matInput = ref(null)
-const woText = ref('')
-const matText = ref('')
-const woLoading = ref(false)
-const savingOne = ref(false)
-const savingAll = ref(false)
-const docsLoading = ref(false)
-const undoing = ref('')
-const printing = ref('')
-const scanning = ref('')          // 'wo' | 'mat' | '' —— 相机扫码进行中
+const keyword = ref('')
+const listLoading = ref(false)
+const locateText = ref('')
+const locateLoading = ref(false)
+const scanInput = ref(null)
 const errText = ref('')
 const okText = ref('')
-const printMsg = ref('')
+const openOpen = ref(true)
+const openDone = ref(false)
+/** 整单码扫进来时的工单行候选 */
+const candidates = ref([])
 
-const order = ref(null)           // { orderNo, lineNo, lineId, productCode, productName, line, planQty }
-const lineOptions = ref([])       // 整单码命中多行时的可选项
-const lines = ref([])             // 物料清单(expandBom 结果,含 picked/remain)
-const activeIdx = ref(-1)
-const docs = ref([])
+const list = reactive({ open: [], done: [] })
 
-const manualQty = ref(0)          // 手输数量(秤离线时兜底)
-const scaleVal = ref(0)
-const scaleAt = ref(null)
-const scaleOk = ref(false)
-const prevScale = ref(null)
-let scaleTimer = null
+const nativeScan = hasNativeScan()
+const baseUrl = (() => {
+  try { return (window.YjNative && window.YjNative.getBaseUrl && window.YjNative.getBaseUrl()) || '' } catch { return '' }
+})()
 
-const activeLine = computed(() => (activeIdx.value >= 0 ? lines.value[activeIdx.value] : null))
-const progress = computed(() => mixProgress(lines.value))
-const scaleText = computed(() => (scaleVal.value > 0 ? `${fmt(scaleVal.value)} kg` : '—'))
-const scaleHint = computed(() => {
-  if (scaleOk.value) return tt('读数稳定，可取值')
-  if (scaleVal.value <= 0) return tt('等待称重')
-  return tt('读数跳动中')
-})
-
-function fmt(n) {
+function fmtQty(n) {
   const v = Number(n)
   if (!Number.isFinite(v)) return '0'
-  return String(Math.round(v * 10000) / 10000)
+  return Number.isInteger(v) ? String(v) : String(Math.round(v * 10000) / 10000)
 }
 
-const reasonText = (reason) => ({
-  empty: tt('请先扫描或输入工单二维码'),
-  'no-order': tt('不是工单码（工单码格式：公司代码@工单号@行号）'),
-  'bad-line': tt('工单码里的行号不是数字'),
-  'no-code': tt('条码里没有存货编码'),
-  'too-many': tt('条码格式不对（应为 存货编码|批号）'),
-  miss: tt('该物料不在本工单的物料清单里'),
-  'no-qty': tt('取不到数量：请确认电子秤已连接，或在「手输数量」填一个值'),
-}[reason] || '')
+function clearMsg() { errText.value = ''; okText.value = '' }
+function errMsgOf(e) { return errMsg(e) || e?.response?.data?.message || e?.message || '' }
+
+/**
+ * 红字提示 —— 同时把人**拽回页面顶部**(与生产领料同一个理由:现场操作在中间那条扫码框上,
+ * 手机屏小,提示写在顶部常常在视野之外,看起来就像"点了没反应")。
+ */
+function showErr(msg) {
+  errText.value = msg
+  okText.value = ''
+  try { window.scrollTo({ top: 0, behavior: 'smooth' }) } catch { /* 老 WebView 没有 options */ }
+}
+
+async function refreshAll() {
+  clearMsg()
+  await loadList()
+  okText.value = tt('已刷新')
+}
 
 onMounted(() => {
-  nextTick(() => woInput.value?.focus?.())
-  pollScale()
-  scaleTimer = setInterval(pollScale, 2000)
+  loadList()
+  focusScanNow(() => scanInput.value, { delay: 350 })
 })
 
-onBeforeUnmount(() => {
-  if (scaleTimer) clearInterval(scaleTimer)
-  scaleTimer = null
+/**
+ * keep-alive 下从明细页返回时实例是旧的(与生产领料同一个坑):再激活时重拉两组列表 ——
+ * 刚提交的单要从未完成组挪到已完成组。
+ */
+let activatedOnce = false
+onActivated(() => {
+  if (!activatedOnce) { activatedOnce = true; return }
+  loadList()
+  focusScanNow(() => scanInput.value, { delay: 250 })
 })
 
-// ═══════════ ① 工单码 → 工单行 + 物料清单 + 未保存草稿 ═══════════
-
-async function scanWoCamera() {
-  errText.value = ''
-  scanning.value = 'wo'
+/**
+ * 列表 = 两个接口并发拉:
+ * · `/px/mix/open`  未完成(已确认过料、还没提交的工单行)
+ * · `/px/mix/docs`  已完成(已保存的混料单)
+ */
+async function loadList() {
+  listLoading.value = true
+  clearMsg()
+  const kw = String(keyword.value || '').trim()
   try {
-    const r = await scanOnce({ formats: ['QR_CODE', 'CODE_128', 'CODE_39'] })
-    if (!r.ok) {
-      if (r.reason !== 'cancelled') errText.value = scanErrText(r)
-      return
-    }
-    woText.value = r.text
-    await onScanWorkOrder()
+    const [openRes, doneRes] = await Promise.all([
+      request.get('/px/mix/open', { params: { keyword: kw || undefined } }),
+      request.get('/px/mix/docs', { params: { keyword: kw || undefined } }),
+    ])
+    list.open = (openRes && (openRes.data?.list || openRes.list)) || []
+    list.done = (doneRes && (doneRes.data?.list || doneRes.list)) || []
+  } catch (e) {
+    errText.value = errMsgOf(e) || tt('查询失败')
   } finally {
-    scanning.value = ''
+    listLoading.value = false
   }
 }
 
-function scanErrText(r) {
-  const map = {
-    denied: tt('未授予相机权限，请在系统设置里开启后重试'),
-    'not-native': tt('当前环境不支持相机扫码'),
-    empty: tt('没有扫到内容'),
-  }
-  return map[r.reason] || (tt('扫码失败：') + (r.message || ''))
-}
-
-async function onScanWorkOrder() {
-  errText.value = ''
-  okText.value = ''
-  printMsg.value = ''
-  const q = parseWorkOrderQr(woText.value)
-  if (!q.ok) {
-    errText.value = reasonText(q.reason)
+/** 调起原生相机扫码(网页版没有壳就不显示这颗按钮) */
+async function scanInto() {
+  const r = await scanOnce({ formats: ['QR_CODE', 'CODE_128', 'CODE_39'] })
+  if (!r.ok) {
+    if (r.reason !== 'cancelled') showErr(tt('没有识别到二维码,请重试;也可以直接用扫码枪扫进输入框'))
     return
   }
-  woLoading.value = true
+  locateText.value = r.text
+  await openByCode(r.text)
+}
+
+/**
+ * 扫码/输入 → 打开单据。
+ *
+ * 三种输入,三种走法(与生产领料列表页的分流同一个思路):
+ * ① 工单码(`公司@工单号@(1000+行号)`)→ 解析后按工单行打开明细;
+ * ② 混料单号(`PL…`)→ 直接打开已保存的单据(只读 + 补打印);
+ * ③ 纯工单号 → 按工单号取行;多行时列候选让人选(**绝不默认第一行**——料会记到别的产品上)。
+ */
+async function openByCode(raw) {
+  const text = String(raw || '').trim()
+  clearMsg()
+  candidates.value = []
+  if (!text) { showErr(tt('请先扫描或输入工单号')); return }
+
+  // ② 混料单号
+  if (/^PL\d/i.test(text)) { openSaved(text); return }
+
+  let orderNo = text
+  let lineNo = 0
+  if (text.includes('@')) {
+    const q = parseWorkOrderQr(text)
+    if (!q.ok) {
+      showErr(q.reason === 'bad-line'
+        ? tt('工单码里的行号不是数字')
+        : tt('这个不是工单码（工单码格式：公司代码@工单号@行号）'))
+      return
+    }
+    orderNo = q.orderNo
+    lineNo = q.lineNo
+  }
+  locateLoading.value = true
   try {
-    const params = { orderNo: q.orderNo }
-    if (q.lineNo) params.lineNo = q.lineNo
+    const params = { orderNo }
+    if (lineNo > 0) params.lineNo = lineNo
     const res = await request.get('/px/mix/lines', { params })
     const rows = (res && (res.data?.list || res.list)) || []
     if (!rows.length) {
-      errText.value = tt('没找到这张工单') + (q.lineNo ? `(${tt('行号')} ${q.lineNo})` : '')
-      order.value = null
-      lines.value = []
-      docs.value = []
+      showErr(tt('没有找到这张工单') + ` (${orderNo})` + (lineNo > 0 ? ` #${lineNo}` : ''))
       return
     }
-    lineOptions.value = rows.map((r) => ({
+    if (rows.length === 1) {
+      openDoc(String(rows[0]['工单号'] || orderNo), Number(rows[0]['工单行号']) || 0)
+      return
+    }
+    candidates.value = rows.map((r) => ({
+      orderNo: String(r['工单号'] || orderNo).trim(),
       lineNo: Number(r['工单行号']) || 0,
-      lineId: Number(r['行id']) || 0,
-      productCode: r['产品编码'] || '',
-      productName: r['产品名称'] || '',
+      productCode: String(r['产品编码'] || '').trim(),
+      productName: String(r['产品名称'] || '').trim(),
       planQty: Number(r['排产数量']) || 0,
-      line: r['生产线'] || '',
     }))
-    const hit = rows.find((r) => Number(r['工单行号']) === (q.lineNo || Number(rows[0]['工单行号']))) || rows[0]
-    await useWorkOrderRow(hit)
+    okText.value = tt('这张工单有多行,请点下面任意一行打开')
   } catch (e) {
-    errText.value = errMsg(e) || tt('查询工单失败')
-    order.value = null
-    lines.value = []
+    showErr(errMsgOf(e) || tt('查询失败'))
   } finally {
-    woLoading.value = false
-    // PDA 连扫(2026-11-16):扫工单成功后焦点去物料扫码框(useWorkOrderRow 里已经落一次),
-    //   失败/没找到则回到工单扫码框,好重扫
-    focusScanNow(() => (order.value ? matInput.value : woInput.value), { delay: 150 })
+    locateLoading.value = false
+    focusScanNow(() => scanInput.value, { delay: 150 })
   }
 }
 
-/** 把某一行工单设成本次作业对象,并拉它的物料清单 + 未保存草稿 */
-async function useWorkOrderRow(r) {
-  order.value = {
-    orderNo: String(r['工单号'] || '').trim(),
-    lineNo: Number(r['工单行号']) || 0,
-    lineId: Number(r['行id']) || 0,
-    productCode: String(r['产品编码'] || '').trim(),
-    productName: String(r['产品名称'] || '').trim(),
-    line: String(r['生产线'] || '').trim(),
-    planQty: Number(r['排产数量']) || 0,
-  }
-  await loadBom()
-  await loadDraft()
-  await loadDocs()
-  activeIdx.value = lines.value.length ? 0 : -1
-  await nextTick()
-  matInput.value?.focus?.()
+function pickCandidate(c) {
+  candidates.value = []
+  openDoc(c.orderNo, c.lineNo)
 }
 
-async function onLineChange() {
-  const picked = lineOptions.value.find((o) => o.lineNo === order.value?.lineNo)
-  if (!picked) return
-  await useWorkOrderRow({
-    工单号: order.value.orderNo,
-    工单行号: picked.lineNo,
-    行id: picked.lineId,
-    产品编码: picked.productCode,
-    产品名称: picked.productName,
-    生产线: picked.line,
-    排产数量: picked.planQty,
-  })
+/** 打开某一工单行的混料单明细(未完成作业) */
+function openDoc(woNo, lineNo) {
+  const wo = String(woNo || '').trim()
+  if (!wo) return
+  router.push({ path: '/panelx/list/MOBILE_MIX_SCAN/doc', query: { wo, line: String(Number(lineNo) || 0) } })
 }
 
-/** 一级BOM = 物料清单(mate),按排产数量折算应投量 */
-async function loadBom() {
-  if (!order.value?.productCode) {
-    lines.value = []
-    return
-  }
-  const res = await request.get('/px/mix/bom', { params: { productCode: order.value.productCode } })
-  const bom = (res && (res.data?.list || res.list)) || []
-  lines.value = expandBom(bom, order.value.planQty)
-}
-
-/**
- * 恢复「扫了一半」的草稿(标记 N 的行)。
- *
- * 为什么要有:手机熄屏/App 被杀/现场换人接着扫 —— 已经投的料不该凭空消失,
- * 否则重复投料会把实际用量记成两倍。
- */
-async function loadDraft() {
-  try {
-    const res = await request.get('/px/mix/draft', {
-      params: { orderNo: order.value.orderNo, lineNo: order.value.lineNo },
-    })
-    const rows = (res && (res.data?.list || res.list)) || []
-    if (!rows.length) return
-    let restored = 0
-    for (const d of rows) {
-      const line = lines.value.find((l) => String(l.code).trim() === String(d['物料编号'] || '').trim())
-      if (!line) continue
-      line.picked = Math.round((Number(line.picked) + Number(d['实际用量'] || 0)) * 10000) / 10000
-      line.remain = Math.round((Number(line.required) - Number(line.picked)) * 10000) / 10000
-      line.rowId = Number(d['行id']) || 0
-      restored += 1
-    }
-    if (restored) okText.value = tt('已恢复本工单未保存的记录') + `：${restored}`
-  } catch {
-    // 恢复失败不影响接着扫(草稿还在库里,保存时会一起整单保存)
-  }
-}
-
-// ═══════════ ② 扫物料码 → 取秤 → 提交本笔 ═══════════
-
-async function scanMatCamera() {
-  errText.value = ''
-  scanning.value = 'mat'
-  try {
-    const r = await scanOnce({ formats: ['CODE_128', 'CODE_39', 'EAN_13', 'QR_CODE'] })
-    if (!r.ok) {
-      if (r.reason !== 'cancelled') errText.value = scanErrText(r)
-      return
-    }
-    matText.value = r.text
-    await onScanMaterial()
-  } finally {
-    scanning.value = ''
-  }
-}
-
-async function onScanMaterial() {
-  errText.value = ''
-  okText.value = ''
-  try {
-    const p = parseBarcode(matText.value)
-    if (!p.ok) {
-      errText.value = reasonText(p.reason)
-      return
-    }
-    const hit = lines.value.findIndex((l) => String(l.code).trim() === p.code)
-    if (hit < 0) {
-      errText.value = reasonText('miss') + `：${p.code}`
-      return
-    }
-    activeIdx.value = hit
-    // 物料码是 `存货编码|批号`:批号随码带下去落库,纸面《成型配料记录》要印「物料批次」
-    await submitLine(lines.value[hit], p.batch)
-  } finally {
-    // PDA 连扫(2026-11-16):扫完(命中/没命中)光标都回物料扫码框,好接着扫下一个物料
-    focusScanNow(() => matInput.value, { delay: 150 })
-  }
-}
-
-async function submitActive() {
-  if (!activeLine.value) return
-  errText.value = ''
-  okText.value = ''
-  await submitLine(activeLine.value)
-}
-
-/** 提交本笔:取数量(手输优先,否则读秤)→ 落库 → 累加到清单 → 跳下一项 */
-async function submitLine(line, batch) {
-  if (!line || !order.value) return
-  savingOne.value = true
-  try {
-    const qty = await qtyOf()
-    if (qty == null) {
-      errText.value = reasonText('no-qty')
-      return
-    }
-    const body = buildScanPayload({ order: order.value, line, qty, batch })
-    const res = await request.post('/px/mix/scan', body)
-    const saved = res?.data?.data || res?.data || res || {}
-    const r = applyScan(lines.value, { code: line.code }, qty)
-    if (!r.ok) {
-      errText.value = tt('本笔保存失败')
-      return
-    }
-    if (saved['行id']) lines.value[r.index].rowId = Number(saved['行id'])
-    okText.value = `${line.code} +${fmt(qty)} ${line.uom || ''}`
-    matText.value = ''
-    manualQty.value = 0
-    // 自动跳到下一个未记的项,减少点屏
-    const next = lines.value.findIndex((l) => Number(l.picked) <= 0)
-    if (next >= 0) activeIdx.value = next
-    await nextTick()
-    matInput.value?.focus?.()
-  } catch (e) {
-    errText.value = errMsg(e) || tt('提交本笔失败')
-  } finally {
-    savingOne.value = false
-    // 成功路径上面已经聚焦过;失败/取不到秤也要回来,别让光标掉在数量框上
-    focusScanNow(() => matInput.value, { delay: 180 })
-  }
-}
-
-/** 撤回本项:删掉该行未保存的草稿记录,并把界面上的已记数量清零 */
-async function undoLine(i) {
-  const line = lines.value[i]
-  if (!line?.rowId) {
-    // 草稿行 id 丢了(比如整页刷新后没恢复成功):只能清界面,库里那笔靠整单保存时一起处理
-    line.picked = 0
-    line.remain = line.required
-    return
-  }
-  undoing.value = line.code
-  errText.value = ''
-  try {
-    await request.post('/px/mix/undo', { 行id: line.rowId })
-    line.picked = 0
-    line.remain = line.required
-    line.rowId = 0
-    okText.value = tt('已撤回') + '：' + line.code
-  } catch (e) {
-    errText.value = errMsg(e) || tt('撤回失败')
-  } finally {
-    undoing.value = ''
-  }
-}
-
-/**
- * 本次数量:手输优先,否则读秤。
- *
- * 手输为什么必须有(2026-10-21 教训):台车秤离线/故障时若硬要读数,现场当场卡死;
- * 而且验证阶段常常没有秤硬件。
- *
- * @returns {Promise<number|null>} 可用数量;两者都取不到时 null
- */
-async function qtyOf() {
-  const m = Number(manualQty.value)
-  if (Number.isFinite(m) && m > 0) return Math.round(m * 10000) / 10000
-  try {
-    const res = await request.get('/dc/monitor')
-    const reading = scaleReadingOf(res)
-    if (!reading) return null
-    const chk = checkScaleReading(reading, prevScale.value)
-    prevScale.value = reading
-    return chk.ok ? chk.value : null
-  } catch {
-    return null
-  }
-}
-
-/** 轮询秤值,让用户扫之前就能看到读数是否稳定 */
-async function pollScale() {
-  try {
-    const res = await request.get('/dc/monitor')
-    const reading = scaleReadingOf(res)
-    if (!reading) {
-      scaleOk.value = false
-      return
-    }
-    const chk = checkScaleReading(reading, prevScale.value)
-    prevScale.value = reading
-    scaleVal.value = reading.value > 0 ? reading.value : 0
-    scaleAt.value = reading.at
-    scaleOk.value = chk.ok
-  } catch {
-    scaleOk.value = false
-  }
-}
-
-// ═══════════ ③ 整单保存 → 自动打印 ═══════════
-
-async function saveAll() {
-  if (!order.value || !progress.value.anyDone) return
-  errText.value = ''
-  okText.value = ''
-  // 「全部扫完,整单保存」是主路径;有漏项时给一次明确确认,免得少投的料被静默存成一张单
-  if (!progress.value.allDone) {
-    try {
-      await ElMessageBox.confirm(
-        `${tt('还有')} ${progress.value.remainCount} ${tt('项未扫，确定整单保存吗？')}`,
-        tt('整单保存'),
-        { confirmButtonText: tt('确定保存'), cancelButtonText: tt('返回继续扫'), type: 'warning' },
-      )
-    } catch {
-      return
-    }
-  }
-  savingAll.value = true
-  try {
-    const res = await request.post('/px/mix/save', {
-      工单号: order.value.orderNo,
-      工单行号: order.value.lineNo,
-    })
-    const saved = res?.data?.data || res?.data || res || {}
-    const docNo = String(saved['单据编号'] || '').trim()
-    if (!docNo) throw new Error(tt('保存后没有拿到混料单号'))
-    ElMessage.success(tt('整单保存成功') + '：' + docNo)
-    okText.value = tt('整单保存成功') + '：' + docNo
-    // 保存后自动打印(用户口径「保存后自动打印」)—— 打印失败不撤销单据
-    await doPrint(docNo, 'mobileMix.save')
-    // 清掉本次已记数量,同一张工单可以接着配下一锅
-    for (const l of lines.value) {
-      l.picked = 0
-      l.remain = l.required
-      l.rowId = 0
-    }
-    activeIdx.value = lines.value.length ? 0 : -1
-    await loadDocs()
-  } catch (e) {
-    errText.value = errMsg(e) || tt('整单保存失败')
-  } finally {
-    savingAll.value = false
-  }
-}
-
-/**
- * 打一张混料单:优先发打印站点(MIX_SLIP),没电脑在线就退回浏览器打印层。
- *
- * 打印**永远不该让业务回滚**(单据已经存了),失败只提示;成功则让后端累加打印次数,
- * 这样"补打印"列表里能看出这张单已经出过几张纸。
- */
-async function doPrint(docNo, source) {
-  printing.value = docNo
-  printMsg.value = ''
-  try {
-    const r = await printSlip({ kind: 'MIX', docNo, source })
-    if (r.ok) {
-      request.post('/px/mix/printed', { 单据编号: docNo }).catch(() => {})
-    }
-    printMsg.value = r.ok
-      ? `${r.mode === 'station' ? tt('已发送到打印电脑') : tt('已调用本机打印')}：${docNo}`
-      : `${tt('打印失败')}：${docNo}${r.message ? ' · ' + r.message : ''}`
-    return r
-  } finally {
-    printing.value = ''
-  }
-}
-
-/** 重新扫码后进来补打印(单据一直在库里,不做任何数据改动,只加打印次数) */
-async function reprint(docNo) {
-  await doPrint(docNo, 'mobileMix.reprint')
-  await loadDocs()
-}
-
-// ═══════════ ④ 单据列表 ═══════════
-
-async function loadDocs() {
-  if (!order.value) return
-  docsLoading.value = true
-  try {
-    const res = await request.get('/px/mix/docs', {
-      params: { orderNo: order.value.orderNo, lineNo: order.value.lineNo },
-    })
-    docs.value = (res && (res.data?.list || res.list)) || []
-  } catch (e) {
-    errText.value = errMsg(e) || tt('查询混料单失败')
-  } finally {
-    docsLoading.value = false
-  }
-}
-
-function resetOrder() {
-  order.value = null
-  lineOptions.value = []
-  lines.value = []
-  docs.value = []
-  woText.value = ''
-  matText.value = ''
-  okText.value = ''
-  errText.value = ''
-  activeIdx.value = -1
-  nextTick(() => woInput.value?.focus?.())
+/** 打开已保存的混料单(只读 + 补打印) */
+function openSaved(docNo) {
+  const no = String(docNo || '').trim()
+  if (!no) return
+  router.push({ path: '/panelx/list/MOBILE_MIX_SCAN/doc', query: { docNo: no } })
 }
 </script>
 
 <style scoped>
-/* 手机扫码统一规范(与 MobileOtherScan / MobilePick 一致):限宽 900 居左、14/16 内边距、
-   卡片 + 虚线分隔、底部主按钮撑满、行内数字等宽。 */
-.mm-scan { max-width: 900px; padding: 14px 16px 26px; }
-.mm-head { margin-bottom: 12px; }
-.mm-title { font-size: 18px; font-weight: 600; }
-.mm-sub { margin-top: 4px; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.6; }
-.mm-scanbar { display: flex; gap: 8px; margin-bottom: 12px; }
-.mm-scanbar :deep(.el-input) { flex: 1; min-width: 0; }
-.mm-cam { flex: none; }
-.mm-alert { margin-bottom: 12px; }
-.mm-card { border: 1px solid var(--el-border-color-light); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; }
-.mm-order-l1 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-.mm-no { font-size: 15px; font-weight: 600; }
-.mono { font-variant-numeric: tabular-nums; }
-.mm-tag { font-size: 11px; padding: 0 6px; border-radius: 8px; background: var(--el-color-primary-light-9); color: var(--el-color-primary); }
-.mm-clear { margin-left: auto; }
-.mm-kv { display: grid; grid-template-columns: 64px 1fr; gap: 4px 8px; font-size: 13px; }
-.mm-k { color: var(--el-text-color-secondary); font-size: 12px; }
-.mm-v { word-break: break-all; }
-.mm-v.strong { font-weight: 600; color: var(--el-color-primary); }
-.mm-linepick { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
-.mm-linepick-sel { flex: 1; min-width: 0; }
-.mm-scale { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; border: 1px solid var(--el-border-color-light); border-left: 3px solid var(--el-color-warning); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; }
-.mm-scale.live { border-left-color: var(--el-color-success); }
-.mm-scale-main { display: flex; align-items: baseline; gap: 10px; flex: 1; min-width: 0; flex-wrap: wrap; }
-.mm-scale-label { font-size: 12px; color: var(--el-text-color-secondary); white-space: nowrap; }
-.mm-scale-num { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.mm-scale-hint { font-size: 11px; color: var(--el-text-color-secondary); white-space: nowrap; }
-.mm-scale-manual { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
-.mm-scale-manual :deep(.el-input-number) { width: 132px; }
-.mm-list { margin-bottom: 12px; }
-.mm-list-head { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--el-text-color-regular); margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--el-border-color-lighter); }
-.mm-list-head :deep(.el-button) { margin-left: auto; }
-.mm-prog { margin-left: auto; font-size: 12px; color: var(--el-color-primary); }
-.mm-row { position: relative; padding: 8px 0; border-bottom: 1px dashed var(--el-border-color-lighter); cursor: pointer; }
-.mm-row.active { background: var(--el-color-primary-light-9); box-shadow: inset 3px 0 0 var(--el-color-primary); }
-.mm-row.done { background: var(--el-color-success-light-9); }
-.mm-row.over { background: var(--el-color-danger-light-9); }
-.mm-row-main { display: flex; align-items: baseline; gap: 8px; }
-.mm-code { font-size: 14px; font-weight: 600; }
-.mm-name { font-size: 12px; color: var(--el-text-color-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.mm-row-qty { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 3px; font-size: 12px; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
-.mm-q-done { color: var(--el-color-success); }
-.mm-q-remain { color: var(--el-color-warning); }
-.mm-q-remain.neg { color: var(--el-color-danger); font-weight: 600; }
-.mm-row-undo { position: absolute; right: 0; top: 6px; }
-.mm-foot { border: 1px solid var(--el-border-color-light); border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; }
-.mm-foot-info { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: var(--el-text-color-secondary); margin-bottom: 8px; }
-.mm-foot-ok { color: var(--el-color-success); }
-.mm-foot-btn { width: 100%; }
-.mm-docs { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--el-border-color-lighter); }
-.mm-print-msg { margin: 8px 0; }
-.mm-empty { padding: 14px 0; text-align: center; font-size: 13px; color: var(--el-text-color-secondary); }
-.mm-doc { padding: 8px 6px; border-bottom: 1px dashed var(--el-border-color-lighter); }
+/* 与「生产领料」列表页同一套视觉语言(灰底 + 48px 顶栏 + 卡片 + 两行查询块 + 两组列表)。 */
+.mm {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 0 16px;
+  background: var(--el-bg-color-page);
+  min-height: calc(100vh - 130px);
+}
+.mm * { box-sizing: border-box; }
+
+.mm-top {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: 8px;
+  height: 48px; padding: 0 12px;
+  background: var(--el-bg-color); border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.mm-head { display: flex; flex-direction: column; min-width: 0; }
+.mm-title { font-size: 16px; font-weight: 600; }
+.mm-base {
+  max-width: 42vw; font-size: 11px; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mm-sub {
+  flex: 1; min-width: 0; margin-left: 4px; font-size: 12px; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mm-refresh { flex: none; }
+
+.mm-card {
+  margin: 10px 12px 0; padding: 12px;
+  background: var(--el-bg-color); border-radius: 8px; border: 1px solid var(--el-border-color-lighter);
+}
+.mm-sec { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.mm-sec-num {
+  min-width: 20px; padding: 0 6px; border-radius: 10px; text-align: center;
+  background: var(--el-color-primary-light-9); color: var(--el-color-primary); font-size: 12px; font-weight: 400;
+}
+.mm-row { display: flex; align-items: center; gap: 8px; }
+.mm-row-gap { margin-top: 8px; }
+.mm-row :deep(.el-input) { flex: 1; min-width: 0; }
+.mm-row :deep(.el-input__wrapper) { min-height: 44px; }
+.mm-row :deep(.el-input__inner) { font-size: 16px; }   /* 16px 以下 iOS 会自动放大 */
+.mm-row :deep(.el-button) { height: 44px; min-width: 64px; margin-left: 0; }
+.mm-hint { margin-top: 8px; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.6; }
+
+/* 工单行候选(整单码扫进来时) */
+.mm-cand {
+  display: flex; align-items: baseline; gap: 8px; min-height: 44px; padding: 8px 2px;
+  border-top: 1px dashed var(--el-border-color-lighter); cursor: pointer;
+}
+.mm-cand:active { background: var(--el-color-primary-light-9); }
+.mm-cand-no { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.mm-cand-no i { font-style: normal; font-weight: 400; color: var(--el-color-primary); margin-left: 2px; }
+.mm-cand-p {
+  flex: 1; min-width: 0; font-size: 12px; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mm-cand-qty { font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mm-cand-qty.warn { color: var(--el-color-warning); }
+
+/* 分组头 = 展开/收起开关 */
+.mm-grp-head {
+  display: flex; align-items: center; gap: 8px; min-height: 44px;
+  cursor: pointer; user-select: none;
+}
+.mm-grp-title { font-size: 14px; font-weight: 600; }
+.mm-grp-num {
+  min-width: 20px; padding: 0 6px; border-radius: 10px; text-align: center;
+  background: var(--el-color-primary-light-9); color: var(--el-color-primary); font-size: 12px;
+}
+.mm-grp-arrow {
+  margin-left: auto; font-size: 18px; line-height: 1;
+  color: var(--el-text-color-secondary); transform: rotate(90deg); transition: transform .15s ease;
+}
+.mm-grp-arrow.open { transform: rotate(-90deg); }
+
+.mm-doc { padding: 8px 0; border-top: 1px solid var(--el-border-color-lighter); cursor: pointer; }
+.mm-doc:active { background: var(--el-fill-color-lighter); }
+.mm-doc.is-done { opacity: .82; }
 .mm-doc-l1 { display: flex; align-items: center; gap: 8px; }
-.mm-doc-print { margin-left: auto; font-size: 12px; color: var(--el-text-color-secondary); }
-.mm-doc-l2, .mm-doc-l3 { margin-top: 3px; display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
-.mm-doc-l3 :deep(.el-button) { margin-left: auto; }
+.mm-doc-no { font-size: 14px; font-weight: 600; }
+.mm-doc-state {
+  margin-left: auto; padding: 0 6px; border-radius: 4px; font-size: 11px; white-space: nowrap;
+  background: var(--el-color-warning-light-8); color: var(--el-color-warning-dark-2);
+}
+.mm-doc-state.is-done { background: var(--el-color-success-light-8); color: var(--el-color-success-dark-2); }
+.mm-doc-l2 { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; font-size: 12px; }
+.mm-doc-wo { color: var(--el-text-color-regular); }
+.mm-doc-wo i { font-style: normal; color: var(--el-text-color-secondary); }
+.mm-doc-prog { margin-left: auto; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
+.mm-doc-l3 { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; font-size: 12px; }
+.mm-doc-p {
+  flex: 1; min-width: 0; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mm-doc-t { flex: none; color: var(--el-text-color-placeholder); font-size: 11px; }
+.mm-doc-l4 { display: flex; flex-wrap: wrap; gap: 2px 12px; margin-top: 3px; font-size: 11px; color: var(--el-text-color-secondary); }
+.mm-doc-l4 > span { display: inline-flex; align-items: baseline; gap: 3px; min-width: 0; max-width: 100%; }
+.mm-doc-l4 > span > i { font-style: normal; flex: none; color: var(--el-text-color-placeholder); }
+
+.mm-empty { padding: 18px 0; text-align: center; font-size: 13px; color: var(--el-text-color-secondary); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace; }
+
+.mm-err, .mm-ok {
+  margin: 10px 12px 0; padding: 10px 12px; border-radius: 6px; font-size: 13px; line-height: 1.5;
+}
+.mm-err { background: var(--el-color-warning-light-9); color: var(--el-color-warning-dark-2); }
+.mm-ok { background: var(--el-color-success-light-9); color: var(--el-color-success-dark-2); }
+
+/* ── 电脑端:与生产领料列表页同一套两列(左:查询,右:两组单据) ── */
+@media (min-width: 900px) {
+  .mm { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 12px; align-items: start; }
+  .mm-top, .mm-err, .mm-ok { grid-column: 1 / -1; }
+  .mm-card { margin: 0 0 12px; }
+}
 @media (max-width: 480px) {
-  .mm-scan { padding: 10px 12px 22px; }
-  /* 手机上二维码/料码扫描框与三颗按钮一行放不下:让输入框独占一行,按钮平分下一行
-     (2026-11-18 手机竖屏走查:三颗按钮把输入框挤到只剩「扫描或输入物料」几个字) */
-  .mm-scanbar { flex-wrap: wrap; }
-  .mm-scanbar :deep(.el-input) { flex: 1 1 100%; }
-  .mm-scanbar :deep(.el-button) { flex: 1 1 0; margin-left: 0; }
-  .mm-scale-manual :deep(.el-input-number) { width: 110px; }
+  .mm-row :deep(.el-button) { min-width: 56px; padding: 8px 10px; }
 }
 </style>

@@ -1,0 +1,1 @@
+import{u}from"./vue-vendor-BQel3KgO.js";function l(o,{delay:t=0}={}){const f=()=>{var s,n;try{const r=typeof o=="function"?o():o;if(!r)return;const e=r.$el??r,c=e!=null&&e.querySelector&&e.querySelector("input, textarea")||e;(s=c==null?void 0:c.focus)==null||s.call(c),(n=c==null?void 0:c.select)==null||n.call(c)}catch{}};if(t>0){setTimeout(()=>u(f),t);return}u(f)}export{l as f};

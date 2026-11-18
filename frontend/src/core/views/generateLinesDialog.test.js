@@ -118,3 +118,33 @@ test('销售订单的生单只用「生成销售出库单」', () => {
   assert.match(list, /!hiddenGenerateActions\.value\.includes\(action\)/,
     '隐藏要落在 toolbarGroups 的动作过滤上(数据键与后端能力保留给订单结转/选单)')
 })
+
+test('全选放在勾选列表头(行号前面的格子),不占顶部条', () => {
+  // 【用户原话 2026-11-18】「批量生单和合单生单弹窗最顶部都没有全选按钮。」→ 先补在顶部;
+  // 紧接着 2026-11-18 第二轮:「全选按钮在**行号前面的格子上**就行,和生单保持一致」
+  //   ⇒ 移到每张来源单表格「勾选列」的表头格子里(标准表头全选的位置),顶部那颗撤掉。
+  const head = dialog.slice(dialog.indexOf('class="gl-bar"'), dialog.indexOf('class="gl-doc"'))
+  assert.ok(head.length > 100, '取不到顶部条,说明 gl-bar / gl-doc 的类名变了')
+  assert.ok(!/gl-pick-all|pickAllDocs/.test(dialog), '顶部那颗总全选按用户口径已撤掉,不要再挂回去')
+
+  // 勾选列 = 第一列(宽 42、在「行号」之前),它的 #header 里必须有全选框
+  const firstCol = dialog.slice(dialog.indexOf('<el-table-column width="42"'), dialog.indexOf("prop=\"行号\""))
+  assert.ok(firstCol.length > 80, '取不到勾选列,说明列顺序/宽度变了(全选必须紧挨行号左边)')
+  assert.match(firstCol, /<template #header>/, '勾选列表头不能是空格子')
+  assert.match(firstCol, /tt\('全选本单的全部明细行'\)/, '表头全选要有 title,且走 tt()(英文界面不掉回中文)')
+  assert.match(firstCol, /docStats\(doc\)\.all/, '表头勾选框要有"本单已全勾"状态')
+  assert.match(firstCol, /docStats\(doc\)\.some/, '部分勾选要显示成三态中间态')
+  assert.match(firstCol, /:disabled="!docStats\(doc\)\.total"/, '本单没有可勾行时表头全选要禁用,不能点了没反应')
+  // 口径复用单张的 selectAll / selectNone:只勾可选行(草稿单/可生单=0 的行不许被全选放进来)
+  assert.match(firstCol, /v \? selectAll\(doc\) : selectNone\(doc\)/, '表头勾上/取消必须就是本单的 selectAll/selectNone')
+  assert.match(dialog, /function docStats\(doc\) \{[\s\S]{0,400}?if \(!selectable\(doc, row\)\) continue/,
+    '三态基数只算可选行 —— 否则草稿单会显示"可全选"却点不动')
+
+  // 同一块里不许再留「全选 / 取消全选」文字链:表头那颗就是唯一入口,留两份是噪声
+  const docHead = dialog.slice(dialog.indexOf('class="gl-doc-head"'), dialog.indexOf('<el-table'))
+  assert.ok(!/tt\('全选'\)|tt\('取消全选'\)/.test(docHead), '单据行头不要再挂「全选/取消全选」文字链')
+})
+
+test('表头全选的文案在 en.js 有词条', () => {
+  assert.ok(en.includes("'全选本单的全部明细行'"), 'en.js 缺「全选本单的全部明细行」的译名')
+})

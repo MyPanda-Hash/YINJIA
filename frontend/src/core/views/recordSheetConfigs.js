@@ -1181,6 +1181,12 @@ export const recordSheetConfigs = {
     staticTitle: '炭棒工艺管控清单',
     info: [
       { label: '表单管理人', key: '表单管理人', type: 'text' },
+      // 2026-11-17 补（「具体问题点」行10 的遗漏项）：
+      //   「炭棒工艺管控起单及组装控制清单：右上角加多一行审核人，审核完成后自动生成」。
+      //   组装工艺那张当天已加，**烧结/炭棒这张漏了**（yj_field 实测无 审核人 字段）。
+      //   只读格；落库列 备用3；值由 ButtonService 在审批通过时写 = 审批人姓名
+      //   （见 migrate-mold-proc-auditor-20261117.sql）。
+      { label: '审核人', key: '审核人', type: 'text', readonly: true },
       { label: '密级', key: '密级', type: 'select' },
       { label: '使用范围', key: '使用范围', type: 'select' },
       { label: '版本号', key: '版本号', type: 'text' },
@@ -1656,7 +1662,10 @@ export const recordSheetConfigs = {
       //     纸面却读不到 ⇒ 用户看到的"审批人也不见了"是**读**的问题,同一个根因。
       { bar: '四、特殊性能描述', rows: [
         { pairs: [
-          { label: '主要性能描述', key: '主要性能描述', vspan: 3 },
+          // 2026-11-17（「产品信息表」表行22「主要性能描述：加标准库」）：
+          //   与本页其他四个下拉格一致，改标准库 + 维护入口。
+          //   元数据 data_type=标准库 / dict_sql=prod.perf，见 migrate-prod-info-perf-stdlib-20261117.sql。
+          { label: '主要性能描述', key: '主要性能描述', type: 'select', vspan: 3 },
         ]},
       ]},
       // 四、文件与签署 = 设计 B33 客户图纸或规格书 / B34-B35 两级审核 / B36 产品负责人 / B37 备注

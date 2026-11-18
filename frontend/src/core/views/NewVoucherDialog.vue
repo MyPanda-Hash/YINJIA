@@ -12,7 +12,7 @@
       <!-- 表头字段（fieldCols 列 × N 行，默认 2 列） -->
       <div class="fields udl-fields" :style="{ gridTemplateColumns: 'repeat(' + fieldCols + ', 1fr)' }">
         <div v-for="r in visibleMeta" :key="r.code" class="field">
-          <label :title="tt(r.name)">{{ tt(r.name) }}</label>
+          <label :title="tt(r.name)">{{ tt(r.name) }}<span v-if="r.isNotNull" class="req">*</span></label>
           <el-input v-if="isText(r)" v-model="form[r.code]" :disabled="fieldLocked(r)" :placeholder="tt(r.name)" />
           <el-input-number v-else-if="isNumber(r)" v-model="form[r.code]" :disabled="fieldLocked(r)" :controls="false" style="width: 100%" />
           <!-- 参照字段：点击弹窗拉取基础档案面板数据，勾选导入（开发约束十一-1） -->
@@ -41,7 +41,7 @@
         <el-tabs v-model="activeTab">
           <el-tab-pane v-for="tab in tabs" :key="tab.key" :name="tab.key">
             <template #label>
-              <span>{{ tab.label }}</span>
+              <span>{{ tab.label }}<span v-if="tab.isRequired" class="req">*</span></span>
             </template>
             <div class="tab-toolbar">
               <el-button size="small" type="primary" :icon="Plus" @click="addDetailRow(tab)">新增数据</el-button>
@@ -121,6 +121,7 @@ import RefPickDialog from './RefPickDialog.vue'
 import { tt } from '@/i18n'
 import { applyDocDefaults } from '@core/panel/docDefaults'
 import { applyCalcRules } from '@core/panel/calcRules'
+import { blankRowOf } from '@core/panel/detailRows'
 
 const engine = usePanelRuntime()
 const { user } = useAppContext()
@@ -250,13 +251,8 @@ watch(detailData, applyCalc, { deep: true })
 
 function addDetailRow(tab) {
   const rows = detailData[tab.key] || (detailData[tab.key] = [])
-  const row = {}
-  for (const dr of tab.fields || []) {
-    if (dr.dataType === '小数' || dr.dataType === '整数') row[dr.dataName] = dr.defaultValue ?? 0
-    else if (dr.dataType === '是否') row[dr.dataName] = dr.defaultValue ?? false
-    else if (dr.dataType === '日期') row[dr.dataName] = dr.defaultValue ?? ''
-    else row[dr.dataName] = dr.defaultValue ?? ''
-  }
+  // 新行默认值统一走 blankRowOf(2026-11-17):必填的数量字段留空、非必填的才预填 0
+  const row = blankRowOf(tab.fields)
   if (tab.subTable) row['子表材料'] = []
   rows.push(row)
   return row
@@ -349,9 +345,8 @@ async function onSave() {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* 必填红星已于 2026-11-13 按用户口径去掉（「保留必填项的属性就行，只是去掉红点」）：
-   只删视觉，isNotNull/isRequired 判据与保存校验全部保留 */
 .field .req {
+  color: #dc2626;
 }
 .detail {
   margin-top: 8px;

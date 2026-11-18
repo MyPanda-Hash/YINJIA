@@ -1,37 +1,37 @@
 <!--
-  MobileReturnList.vue — 手机扫码 · 生产退料(2026-11-18 独立成页)
+  MobileReturnList.vue — 手机扫码 · **生产退料(列表页)**(2026-11-18 第四轮重写)
 
   【用户口径(原话)】
-  「我还想生产退料独立出来,就是已经领料且审核的领料单据,来扫码退料。其实就是独立出来一个面版,
-   让生产领料不用负责那么多功能,操作也方便。」
+  「生产退料也要扫码到明细行再扫物料码退料,要和(扫码混料一样)对齐生产领料。」
 
-  ⇒ 本页 = 生产领料的退料部分**整块搬出来**:
-    ① 上面列出「已完成 + 材料出库单已审核」的领料单(没审批的不能退:库存还没扣,退了等于凭空加库存);
-    ② 选中一张 → 扫物料码 → 看这一项还能退多少(= 已领 − 已退)→ 填数量 → 加入本次退料清单;
-    ③ 提交 → 生成一张**生产退料单**(业务类型「生产退料」)。
+  ⇒ 本页 = 「生产领料」列表页(`MobilePickList.vue`)/「扫码混料」列表页(`MobileMixScan.vue`)
+    的**同一套结构**:
+    ① 查询:关键词(领料单号 / 工单号 / 产品名)查「可退单据」组(可展开收起);
+    ② 扫码定位:扫领料单纸面码(带 @A/@M)直接打开那张单;扫工单码 → 弹窗选组装/混料;
+    ③ 点一行 → **跳转到单据明细页**(`MobileReturnDoc.vue`)里扫物料码退料。
 
-  数据全部走既有接口(/px/mobilePick/returnables、returnScan、submitReturn),
-  本页只负责把"查单 → 扫码 → 提交"这条动线摆顺,不重复实现退料规则。
-
-  ⚠ 生产领料单据页里的退料入口已同时删除 —— 退料只有这一个入口,现场不用再记"去哪退"。
+  【为什么不再是"弹窗里作业"】
+  上一版(2026-11-18 第二轮)点单弹一个对话框,里面另开一份"本次退料"清单;
+  用户要求与生产领料/扫码混料对齐 ⇒ 作业全部搬到**单据明细页**:扫物料码**解锁对应的明细行**、
+  数量记在那一行上、底栏提交。两页的分工与本页只看单、明细页只作业,和生产领料完全一致。
 -->
 <template>
   <div class="mr">
-    <div class="mr-head">
-      <span class="mr-title">{{ tt('生产退料') }}</span>
-      <span class="mr-sub">{{ tt('只列已领料且材料出库单已审核的单据；扫物料码 → 填退料数量 → 提交生成生产退料单') }}</span>
+    <div class="mr-top">
+      <div class="mr-head">
+        <span class="mr-title">{{ tt('生产退料') }}</span>
+        <span v-if="baseUrl" class="mr-base" :title="baseUrl">{{ baseUrl }}</span>
+      </div>
+      <span class="mr-sub">{{ tt('查询单据 → 进单据明细 → 扫物料码退料 → 提交') }}</span>
+      <el-button class="mr-refresh" size="small" :loading="loading" @click="refreshAll">{{ tt('刷新') }}</el-button>
     </div>
 
-    <div v-if="errText" class="mr-err">{{ errText }}</div>
-    <div v-if="okText" class="mr-ok">{{ okText }}</div>
+    <div v-if="errText" class="mr-err mr-topline">{{ errText }}</div>
+    <div v-if="okText" class="mr-ok mr-topline">{{ okText }}</div>
 
-    <!-- ① 可退单据列表 -->
+    <!-- ① 查询单据(与「生产领料」同一套:关键词查询 + 扫码定位) -->
     <section class="mr-card">
-      <div class="mr-sec">
-        <span>{{ tt('可退单据') }}</span>
-        <span class="mr-sec-num">{{ list.length }}</span>
-        <el-button text size="small" class="mr-refresh" :loading="loading" @click="load">{{ tt('刷新') }}</el-button>
-      </div>
+      <div class="mr-sec">{{ tt('查询单据') }}</div>
       <div class="mr-row">
         <el-input
           v-model="keyword"
@@ -42,148 +42,124 @@
         />
         <el-button type="primary" size="large" :loading="loading" @click="load">{{ tt('查询') }}</el-button>
       </div>
-
-      <div v-if="!list.length" class="mr-empty">{{ tt('没有可退的领料单（需要先领料、且材料出库单被仓管审核）') }}</div>
-      <div
-        v-for="d in list"
-        :key="d.id"
-        class="mr-doc"
-        :class="{ 'is-cur': cur && cur.id === d.id }"
-        @click="select(d)"
-      >
-        <div class="mr-doc-l1">
-          <span class="mr-doc-no mono">{{ d.领料单号 }}</span>
-          <span class="mr-tag">{{ tt(d.领料类型 || '组装') }}</span>
-          <span class="mr-doc-can num">{{ tt('可退') }} {{ fmtQty(d.可退数量) }}</span>
-        </div>
-        <div class="mr-doc-l2">
-          <span>{{ d.工单号 }}<i v-if="d.工单行号"> #{{ d.工单行号 }}</i></span>
-          <span>{{ d.产品名称 || d.产品编号 || '—' }}</span>
-        </div>
-        <div class="mr-doc-l3">
-          <span>{{ tt('已领') }} {{ fmtQty(d.已领数量) }}</span>
-          <span>{{ tt('已退') }} {{ fmtQty(d.已退数量) }}</span>
-          <span>{{ tt('可退项数') }} {{ d.可退项数 || 0 }}</span>
-          <!-- 显式按钮:手机上比"整行点"更好按,也避免整行点击被内部元素吃掉 -->
-          <el-button text size="small" class="mr-pick" type="primary" @click.stop="select(d)">
-            {{ cur && cur.id === d.id ? tt('已选中') : tt('选这张退料') }}
-          </el-button>
-        </div>
-      </div>
-    </section>
-
-    <!-- ② 退料作业 -->
-    <section v-if="cur" class="mr-card">
-      <div class="mr-sec">
-        <span>{{ tt('退料作业') }}</span>
-        <span class="mr-cur-no mono">{{ cur.领料单号 }}</span>
-      </div>
-
-      <div class="mr-row">
+      <div class="mr-row mr-row-gap">
         <el-input
-          ref="scanInput"
-          v-model="matText"
-          :placeholder="tt('扫物料码或输入物料编码')"
+          ref="locateInput"
+          v-model="locateText"
+          :placeholder="tt('扫领料单码 / 工单号,或输入后点打开')"
           size="large"
           clearable
-          @keyup.enter="scan"
+          @keyup.enter="openByCode(locateText)"
         />
-        <el-button size="large" :loading="scanning" @click="scan">{{ tt('查询') }}</el-button>
+        <el-button size="large" :loading="locateLoading" @click="openByCode(locateText)">{{ tt('打开单据') }}</el-button>
+        <el-button v-if="nativeScan" size="large" @click="scanInto">{{ tt('扫码') }}</el-button>
       </div>
-
-      <div v-if="mat" class="mr-mat">
-        <div class="mr-mat-main">
-          <div class="mr-mat-name">{{ mat.名称 || mat.编码 }}</div>
-          <div class="mr-mat-meta">
-            {{ mat.编码 }} · {{ mat.规格 || '—' }} · {{ mat.单位 || '—' }}
-            · {{ tt('已领') }} {{ fmtQty(mat.已领数量) }} / {{ tt('已退') }} {{ fmtQty(mat.已退数量) }}
-          </div>
-        </div>
-        <div class="mr-mat-can">
-          <b class="num">{{ fmtQty(mat.可退数量) }}</b>
-          <span>{{ tt('本次可退') }}</span>
-        </div>
-      </div>
-
-      <div v-if="mat" class="mr-qty">
-        <span class="mr-qty-lab">{{ tt('退料数量') }}</span>
-        <el-input-number v-model="qty" :min="0" :max="Number(mat.可退数量) || 0" :precision="4" :step="1" size="large" />
-        <span class="mr-qty-unit">{{ mat.单位 || '' }}</span>
-        <el-button type="primary" size="large" :disabled="!canAdd" @click="addLine">{{ tt('加入本次退料') }}</el-button>
-      </div>
-
-      <div class="mr-lines">
-        <div class="mr-lines-head">
-          <span>{{ tt('本次退料') }}</span>
-          <span class="mr-sec-num">{{ lines.length }}</span>
-        </div>
-        <div v-if="!lines.length" class="mr-empty">{{ tt('还没有扫码加入的物料') }}</div>
-        <div v-for="(l, i) in lines" :key="l.code" class="mr-line">
-          <div class="mr-line-main">
-            <span class="mr-line-name">{{ l.name || l.code }}</span>
-            <span class="mr-line-meta">{{ l.code }} · {{ l.spec || '—' }}</span>
-          </div>
-          <span class="mr-line-qty num">-{{ fmtQty(l.qty) }} {{ l.unit }}</span>
-          <el-button text type="danger" size="small" @click="removeLine(i)">{{ tt('移除') }}</el-button>
-        </div>
-      </div>
-
-      <div class="mr-foot">
-        <el-button size="large" @click="resetWork">{{ tt('清空') }}</el-button>
-        <el-button type="warning" size="large" :loading="submitting" :disabled="!lines.length" @click="submit">
-          {{ tt('提交退料') }}
-        </el-button>
+      <div class="mr-hint">
+        {{ tt('扫领料单纸面二维码 → 直接打开对应那张(混料/组装);扫工单码 → 弹窗选混料还是组装;') }}
+        {{ tt('只列已领料且材料出库单已审核的单据,点一行进单据明细里扫物料码退料') }}
       </div>
     </section>
+
+    <!-- ② 可退单据(分组可展开/收起,与生产领料的未完成/已完成同一套) -->
+    <section class="mr-card">
+      <div class="mr-grp-head" @click="openOpen = !openOpen">
+        <span class="mr-grp-title">{{ tt('可退单据') }}</span>
+        <span class="mr-grp-num">{{ list.length }}</span>
+        <i v-if="canTotal > 0" class="mr-grp-sum">{{ tt('可退合计') }} {{ fmtQty(canTotal) }}</i>
+        <span class="mr-grp-arrow" :class="{ open: openOpen }">›</span>
+      </div>
+
+      <template v-if="openOpen">
+        <div v-if="!list.length" class="mr-empty">{{ tt('没有可退的领料单（需要先领料、且材料出库单被仓管审核）') }}</div>
+        <div
+          v-for="d in list"
+          :key="d.id"
+          class="mr-doc"
+          @click="openDoc(d.id)"
+        >
+          <div class="mr-doc-l1">
+            <span class="mr-doc-no mono">{{ d.领料单号 }}</span>
+            <span class="mr-tag">{{ tt(d.领料类型 || '组装') }}</span>
+            <span class="mr-doc-can num">{{ tt('可退') }} {{ fmtQty(d.可退数量) }}</span>
+          </div>
+          <div class="mr-doc-l2">
+            <span>{{ d.工单号 }}<i v-if="d.工单行号"> #{{ d.工单行号 }}</i></span>
+            <span class="mr-doc-prog">{{ tt('可退项数') }} {{ d.可退项数 || 0 }}</span>
+          </div>
+          <div class="mr-doc-l3">
+            <span class="mr-doc-p">{{ d.产品名称 || d.产品编号 || '—' }}</span>
+            <span class="mr-doc-t">{{ tt('已领') }} {{ fmtQty(d.已领数量) }} · {{ tt('已退') }} {{ fmtQty(d.已退数量) }}</span>
+          </div>
+        </div>
+      </template>
+    </section>
+
+    <!-- 扫工单码(分不出组装/混料)时的选择框;扫领料单纸面二维码不会走到这里 -->
+    <PickKindDialog v-model="kindVisible" :docs="kindDocs" @pick="(d) => openDoc(d.id)" />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+/**
+ * 生产退料 · 列表页(2026-11-18 第四轮)。
+ *
+ * 与 {@code MobilePickList.vue}(生产领料)、{@code MobileMixScan.vue}(扫码混料)刻意同构:
+ * 同一套顶栏、同一块「查询 + 扫码定位」、同样可展开收起的分组、同样的卡片三行结构。
+ * 本页**不发任何写请求**:点一行进 {@code MobileReturnDoc.vue},退料都在那一页做。
+ *
+ * 数据:GET /px/mobilePick/returnables(只列已完成 + 材料出库单已审核的领料单)。
+ */
+import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { tt } from '@/i18n'
 import request from '@core/request'
-import { fmtQty, round4 } from '@/business/mobilePick'
+import { fmtQty, locateQueryOf } from '@/business/mobilePick'
 import { focusScanNow } from '@/business/scanFocus'
+import PickKindDialog from './PickKindDialog.vue'
 
+const router = useRouter()
 const route = useRoute()
 
 const loading = ref(false)
-const scanning = ref(false)
-/** 物料扫码框:PDA 连扫用(2026-11-16 用户口径,见 business/scanFocus.js) */
-const scanInput = ref(null)
-const submitting = ref(false)
 const errText = ref('')
 const okText = ref('')
-
 const keyword = ref('')
 const list = ref([])
-const cur = ref(null)          // 选中的领料单(台账行)
-const matText = ref('')
-const mat = ref(null)          // 扫到的物料(可退量等)
-const qty = ref(0)
-const lines = ref([])          // 本次要退的 [{code,name,spec,unit,qty,can}]
+const canTotal = ref(0)
+/** 扫码定位框(与「生产领料」一致:扫领料单码/工单号直接打开) */
+const locateInput = ref(null)
+const locateText = ref('')
+const locateLoading = ref(false)
+/** 工单码分不出组装/混料 ⇒ 弹窗选 */
+const kindVisible = ref(false)
+const kindDocs = ref([])
+/** 分组展开/收起 */
+const openOpen = ref(true)
 
-const canAdd = computed(() => {
-  if (!mat.value) return false
-  const n = round4(qty.value)
-  return n > 0 && n <= round4(Number(mat.value.可退数量) || 0)
-})
+const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window.YjNative.scan)
+const baseUrl = (() => {
+  try { return (window.YjNative && window.YjNative.getBaseUrl && window.YjNative.getBaseUrl()) || '' } catch { return '' }
+})()
 
 const errMsgOf = (e) => e?.response?.data?.message || e?.message || ''
 function clearMsg() { errText.value = ''; okText.value = '' }
+
+/** 红字提示 —— 同时把人拽回页面顶部(与生产领料同一个理由:现场在中间的扫码框上操作) */
+function showErr(msg) {
+  errText.value = msg
+  okText.value = ''
+  try { window.scrollTo({ top: 0, behavior: 'smooth' }) } catch { /* 老 WebView 没有 options */ }
+}
 
 /** 可退单据(已完成 + 材料出库单已审核) */
 async function load() {
   loading.value = true
   clearMsg()
   try {
-    const res = await request.get('/px/mobilePick/returnables', { params: { keyword: keyword.value.trim() } })
+    const res = await request.get('/px/mobilePick/returnables', { params: { keyword: String(keyword.value || '').trim() } })
     const d = res.data?.data || res.data || {}
     list.value = Array.isArray(d.list) ? d.list : []
-    // 选中的那张如果已经不在列表里(退完/被作废),清掉作业区
-    if (cur.value && !list.value.some((x) => x.id === cur.value.id)) resetWork()
+    canTotal.value = Number(d.可退合计数) || 0
   } catch (e) {
     errText.value = errMsgOf(e) || tt('查询可退单据失败')
   } finally {
@@ -191,167 +167,218 @@ async function load() {
   }
 }
 
-function select(d) {
-  if (cur.value && cur.value.id === d.id) return
-  // ⚠ must keep the doc: resetWork(false) clears cur —— 早先这里传了 false,
-  //   结果点行后作业区根本不出现(2026-11-18 实测)。
-  cur.value = d
-  resetWork(true)
-  // 选中单据后光标直接进物料扫码框(2026-11-16 PDA 连扫口径)
-  focusScanNow(() => scanInput.value, { delay: 150 })
+async function refreshAll() {
+  await load()
+  okText.value = tt('已刷新')
 }
 
-/** 清空作业区(keepDoc=false 时连选中的单据一起清) */
-function resetWork(keepDoc = true) {
-  matText.value = ''
-  mat.value = null
-  qty.value = 0
-  lines.value = []
-  errText.value = ''
-  okText.value = ''
-  if (!keepDoc) cur.value = null
-}
+// ══════════════ 扫码定位(扫领料单码/工单号 → 直接进明细)══════════════
 
-/** 扫物料码:后端按「已领 − 已退」算本次可退 */
-async function scan() {
+/**
+ * 按扫到/输入的码打开单。
+ *
+ * 口径(用户原话):「如果领料退料扫的是工单码,就要弹窗选择是混料还是组装。如果是领料单上的
+ * 二维码就直接跳转」—— 领料单纸面二维码第 4 段是 @A/@M,解析出来当 kind 传给后端,
+ * 后端只回那一张;工单码没有标记 ⇒ 回两张 ⇒ 弹窗让人选。
+ */
+async function openByCode(raw) {
+  const q = locateQueryOf(raw)
   clearMsg()
-  mat.value = null
-  const code = String(matText.value || '').trim()
-  if (!code) { errText.value = tt('请先扫描或输入物料编码'); return }
-  scanning.value = true
+  if (!q.wo) { showErr(tt('请先扫描或输入工单号')); return }
+  locateLoading.value = true
   try {
-    const res = await request.post('/px/mobilePick/returnScan', { id: cur.value.id, code })
+    const params = { woNo: q.wo }
+    if (q.line > 0) params.line = q.line
+    if (q.kind) params.kind = q.kind
+    const res = await request.get('/px/mobilePick/locate', { params })
     const d = res.data?.data || res.data || {}
-    mat.value = d
-    qty.value = Number(d.可退数量) || 0
+    // ⚠ 先看「单据[]」再判 found:命中整组时 found=true 且带 2 张单(组装在前)
+    const docs = Array.isArray(d.单据) ? d.单据 : []
+    if (docs.length > 1) {
+      kindDocs.value = docs
+      kindVisible.value = true
+      return
+    }
+    if (d.found) { openDoc(d.id); return }
+    if (d.hint === 'voided') { showErr(tt('这张单据已作废,不能再打开') + ' (' + q.wo + ')'); return }
+    showErr(tt('没有找到这个工单/单据') + ' (' + q.wo + ')')
   } catch (e) {
-    errText.value = errMsgOf(e) || tt('查询可退数量失败')
+    showErr(errMsgOf(e) || tt('查询失败'))
   } finally {
-    scanning.value = false
-    // PDA 连扫(2026-11-16):扫完光标回到扫码框
-    focusScanNow(() => scanInput.value, { delay: 120 })
+    locateLoading.value = false
+    focusScanNow(() => locateInput.value, { delay: 150 })
   }
 }
 
-function addLine() {
-  if (!canAdd.value || !mat.value) return
-  const code = String(mat.value.编码 || '').trim()
-  const n = round4(qty.value)
-  const exist = lines.value.find((l) => l.code === code)
-  if (exist) {
-    const total = round4(exist.qty + n)
-    if (total > round4(Number(mat.value.可退数量) || 0)) { errText.value = tt('超过可退数量'); return }
-    lines.value = lines.value.map((l) => (l.code === code ? { ...l, qty: total } : l))
-  } else {
-    lines.value = [...lines.value, {
-      code, name: mat.value.名称, spec: mat.value.规格, unit: mat.value.单位, qty: n,
-    }]
-  }
-  matText.value = ''
-  mat.value = null
-  qty.value = 0
-  // 填完数量「加入」之后回扫码框(2026-11-16 用户口径)
-  focusScanNow(() => scanInput.value, { delay: 80 })
+/** 进单据明细页(退料作业都在那里;能不能退由那一页与后端判) */
+function openDoc(id) {
+  if (!id) return
+  router.push({ path: '/panelx/list/MOBILE_RETURN/doc', query: { id: String(id) } })
 }
 
-function removeLine(i) {
-  const next = lines.value.slice()
-  next.splice(i, 1)
-  lines.value = next
+/** 相机扫码:码交给 openByCode */
+function applyScan(code) {
+  const text = String(code || '').trim()
+  if (!text) return
+  locateText.value = text
+  openByCode(text)
 }
 
-/** 提交:一张退料单可以一次退多项 */
-async function submit() {
-  if (!lines.value.length || !cur.value) return
-  const total = lines.value.reduce((s, l) => s + round4(l.qty), 0)
-  try {
-    await ElMessageBox.confirm(
-      `${tt('将退')} ${lines.value.length} ${tt('项物料,合计')} ${fmtQty(total)}。${tt('提交后生成一张生产退料单并入库,库存会增加。确定提交?')}`,
-      tt('退料确认'),
-      { confirmButtonText: tt('确定退料'), cancelButtonText: tt('取消'), type: 'warning' },
-    )
-  } catch { return }
-  submitting.value = true
-  clearMsg()
-  try {
-    const res = await request.post('/px/mobilePick/submitReturn', {
-      id: cur.value.id,
-      items: lines.value.map((l) => ({ code: l.code, qty: round4(l.qty) })),
-    })
-    const d = res.data?.data || res.data || {}
-    const no = String(d.退料单号 || '').trim()
-    okText.value = `${tt('退料成功')}${no ? '：' + no : ''}`
-    ElMessage.success(okText.value)
-    resetWork()
-    await load()
-  } catch (e) {
-    errText.value = errMsgOf(e) || tt('退料失败')
-  } finally {
-    submitting.value = false
-    // 提交完光标回扫码框(下一项/下一单直接扫)
-    focusScanNow(() => scanInput.value, { delay: 200 })
+let scanPending = false
+let scanTimer = null
+
+function scanInto() {
+  if (!(window.YjNative && typeof window.YjNative.scan === 'function')) {
+    showErr(tt('调不起相机,请改用输入框扫码枪或手工输入'))
+    return
   }
+  // ⚠ 壳里同一时刻只能有一个扫码会话:连点两下只认最后一次
+  if (scanPending) return
+  scanPending = true
+  if (scanTimer) clearTimeout(scanTimer)
+  scanTimer = setTimeout(() => { scanPending = false }, 30000)
+  try { window.YjNative.scan() } catch { scanPending = false; showErr(tt('调不起相机,请改用输入框扫码枪或手工输入')) }
+}
+
+function onScanResult(code, ok) {
+  scanPending = false
+  if (scanTimer) { clearTimeout(scanTimer); scanTimer = null }
+  if (!ok || !String(code || '').trim()) {
+    showErr(tt('没有识别到二维码,请重试;也可以直接用扫码枪扫进下面的输入框'))
+    return
+  }
+  applyScan(code)
+}
+
+function bindScan() {
+  if (typeof window !== 'undefined') window.__yjScanResult = onScanResult
 }
 
 onMounted(async () => {
-  // 从「生产领料」单据页跳过来时带 ?no=领料单号 ⇒ 直接把那张单查出来并选中
+  bindScan()
+  // 从「生产领料」的已完成单点「去生产退料」会带 ?no=领料单号 ⇒ 直接翻到那张单的明细页
   const no = String(route.query.no || '').trim()
-  if (no) keyword.value = no
-  await load()
   if (no) {
-    const hit = list.value.find((d) => String(d.领料单号 || '').trim() === no)
-    if (hit) select(hit)
+    router.replace({ path: '/panelx/list/MOBILE_RETURN/doc', query: { no } })
+    return
   }
-  // PDA 连扫(2026-11-16):进页面就把光标放到物料扫码框
-  focusScanNow(() => scanInput.value, { delay: 350 })
+  await load()
+  // PDA 连扫(2026-11-16):进页面先落「扫码定位」框
+  focusScanNow(() => locateInput.value, { delay: 350 })
+})
+
+/** keep-alive 回来:重挂扫码桥 + 重拉列表(退过料的那张可退量变了) */
+let activatedOnce = false
+onActivated(() => {
+  bindScan()
+  if (!activatedOnce) { activatedOnce = true; return }
+  load()
+  focusScanNow(() => locateInput.value, { delay: 250 })
+})
+
+onDeactivated(() => {
+  if (typeof window !== 'undefined' && window.__yjScanResult === onScanResult) window.__yjScanResult = null
+  if (scanTimer) { clearTimeout(scanTimer); scanTimer = null }
+  scanPending = false
+})
+
+onBeforeUnmount(() => {
+  if (typeof window !== 'undefined' && window.__yjScanResult === onScanResult) window.__yjScanResult = null
 })
 </script>
 
 <style scoped>
-.mr { max-width: 900px; padding: 14px 16px 26px; }
-.mr-head { margin-bottom: 12px; }
-.mr-title { font-size: 18px; font-weight: 600; }
-.mr-sub { display: block; margin-top: 4px; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.6; }
-.mr-err, .mr-ok { margin-bottom: 10px; padding: 8px 10px; border-radius: 4px; font-size: 13px; }
-.mr-err { color: var(--el-color-danger); background: var(--el-color-danger-light-9); }
-.mr-ok { color: var(--el-color-success); background: var(--el-color-success-light-9); }
-.mr-card { border: 1px solid var(--el-border-color-light); border-radius: 6px; padding: 10px 12px; margin-bottom: 12px; }
-.mr-sec { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--el-text-color-regular); margin-bottom: 8px; }
-.mr-sec-num { display: inline-block; min-width: 20px; text-align: center; padding: 0 6px; border-radius: 10px; background: var(--el-color-primary-light-9); color: var(--el-color-primary); font-size: 12px; }
-.mr-refresh { margin-left: auto; }
-.mr-row { display: flex; gap: 10px; }
-.mr-row :deep(.el-input) { flex: 1; }
-.mr-empty { padding: 16px 0; text-align: center; font-size: 13px; color: var(--el-text-color-secondary); }
-.mr-doc { padding: 9px 8px; border-bottom: 1px dashed var(--el-border-color-lighter); border-radius: 4px; cursor: pointer; }
-.mr-doc:hover { background: var(--el-fill-color-lighter); }
-.mr-doc.is-cur { background: var(--el-color-primary-light-9); }
+/* 版面口径与「生产领料」列表页一致:48px 顶栏 + 灰底 + 卡片 + 两行查询块 + 可收起分组。 */
+.mr {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 0 16px;
+  background: var(--el-bg-color-page);
+  min-height: calc(100vh - 130px);
+}
+.mr * { box-sizing: border-box; }
+
+.mr-top {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: 8px;
+  height: 48px; padding: 0 12px;
+  background: var(--el-bg-color); border-bottom: 1px solid var(--el-border-color-lighter);
+}
+.mr-head { display: flex; flex-direction: column; min-width: 0; }
+.mr-title { font-size: 16px; font-weight: 600; }
+.mr-base {
+  max-width: 42vw; font-size: 11px; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mr-sub {
+  flex: 1; min-width: 0; margin-left: 4px; font-size: 12px; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mr-refresh { flex: none; }
+
+.mr-card {
+  margin: 10px 12px 0; padding: 12px;
+  background: var(--el-bg-color); border-radius: 8px; border: 1px solid var(--el-border-color-lighter);
+}
+.mr-sec { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.mr-row { display: flex; align-items: center; gap: 8px; }
+.mr-row-gap { margin-top: 8px; }
+.mr-row :deep(.el-input) { flex: 1; min-width: 0; }
+.mr-row :deep(.el-input__wrapper) { min-height: 44px; }
+.mr-row :deep(.el-input__inner) { font-size: 16px; }   /* 16px 以下 iOS 会自动放大 */
+.mr-row :deep(.el-button) { height: 44px; min-width: 64px; margin-left: 0; }
+.mr-hint { margin-top: 8px; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.6; }
+
+/* 分组头 = 展开/收起开关(与生产领料的未完成/已完成同一套观感) */
+.mr-grp-head { display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; user-select: none; }
+.mr-grp-title { font-size: 14px; font-weight: 600; }
+.mr-grp-num {
+  min-width: 20px; padding: 0 6px; border-radius: 10px; text-align: center;
+  background: var(--el-color-primary-light-9); color: var(--el-color-primary); font-size: 12px;
+}
+.mr-grp-sum { font-style: normal; font-size: 11px; color: var(--el-color-warning); }
+.mr-grp-arrow {
+  margin-left: auto; font-size: 18px; line-height: 1;
+  color: var(--el-text-color-secondary); transform: rotate(90deg); transition: transform .15s ease;
+}
+.mr-grp-arrow.open { transform: rotate(-90deg); }
+
+.mr-doc { padding: 8px 0; border-top: 1px solid var(--el-border-color-lighter); cursor: pointer; }
+.mr-doc:active { background: var(--el-fill-color-lighter); }
 .mr-doc-l1 { display: flex; align-items: center; gap: 8px; }
-.mr-doc-no { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mr-doc-no { font-size: 14px; font-weight: 600; }
 .mr-tag { padding: 0 6px; border-radius: 8px; font-size: 11px; background: var(--el-fill-color); color: var(--el-text-color-regular); }
-.mr-doc-can { margin-left: auto; font-size: 13px; color: var(--el-color-warning); }
-.mr-doc-l2, .mr-doc-l3 { margin-top: 3px; display: flex; gap: 12px; font-size: 12px; color: var(--el-text-color-secondary); word-break: break-all; }
-.mr-cur-no { font-size: 13px; color: var(--el-text-color-regular); }
-.mr-mat { display: flex; align-items: center; gap: 12px; margin-top: 10px; padding: 8px 10px; background: var(--el-fill-color-lighter); border-radius: 4px; }
-.mr-mat-main { flex: 1; min-width: 0; }
-.mr-mat-name { font-size: 14px; font-weight: 500; }
-.mr-mat-meta { margin-top: 2px; font-size: 12px; color: var(--el-text-color-secondary); word-break: break-all; }
-.mr-mat-can { text-align: right; flex: none; }
-.mr-mat-can b { font-size: 20px; color: var(--el-color-warning); }
-.mr-mat-can span { display: block; font-size: 11px; color: var(--el-text-color-secondary); }
-.mr-qty { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
-.mr-qty-lab { font-size: 13px; color: var(--el-text-color-regular); flex: none; }
-.mr-qty-unit { font-size: 13px; color: var(--el-text-color-secondary); min-width: 24px; }
-.mr-lines { margin-top: 14px; }
-.mr-lines-head { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--el-text-color-regular); margin-bottom: 6px; }
-.mr-line { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--el-border-color-lighter); }
-.mr-line-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.mr-line-name { font-size: 14px; }
-.mr-line-meta { font-size: 12px; color: var(--el-text-color-secondary); word-break: break-all; }
-.mr-line-qty { font-size: 14px; color: var(--el-color-warning); font-variant-numeric: tabular-nums; }
-.mr-foot { display: flex; gap: 10px; margin-top: 14px; }
-.mr-foot :deep(.el-button) { flex: 1; }
+.mr-doc-can { margin-left: auto; font-size: 13px; color: var(--el-color-warning); font-variant-numeric: tabular-nums; }
+.mr-doc-l2 { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; font-size: 12px; }
+.mr-doc-l2 i { font-style: normal; color: var(--el-text-color-secondary); }
+.mr-doc-prog { margin-left: auto; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }
+.mr-doc-l3 { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; font-size: 11px; }
+.mr-doc-p {
+  flex: 1; min-width: 0; color: var(--el-text-color-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.mr-doc-t { flex: none; color: var(--el-text-color-placeholder); font-variant-numeric: tabular-nums; }
+
+.mr-empty { padding: 18px 0; text-align: center; font-size: 13px; color: var(--el-text-color-secondary); }
+.mono { font-variant-numeric: tabular-nums; }
+
+.mr-err, .mr-ok {
+  margin: 10px 12px 0; padding: 10px 12px; border-radius: 6px; font-size: 13px; line-height: 1.5;
+}
+.mr-err { background: var(--el-color-warning-light-9); color: var(--el-color-warning-dark-2); }
+.mr-ok { background: var(--el-color-success-light-9); color: var(--el-color-success-dark-2); }
+
+/* 电脑端与生产领料列表页同一套两列(左:查询,右:可退单据) */
+@media (min-width: 900px) {
+  .mr { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 12px; align-items: start; }
+  .mr-top, .mr-err, .mr-ok { grid-column: 1 / -1; }
+  .mr-card { margin: 0 0 12px; }
+}
 @media (max-width: 480px) {
-  .mr-qty { flex-wrap: wrap; }
-  .mr-qty :deep(.el-input-number) { width: 120px; }
+  .mr-row :deep(.el-button) { min-width: 56px; padding: 8px 10px; }
 }
 </style>

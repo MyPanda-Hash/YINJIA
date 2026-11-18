@@ -93,6 +93,25 @@ public class MessageService {
     public static final String CHANGE_EFFECTIVE = "CHANGE_EFFECTIVE";
     /** 消息码:变更单审批被驳回 → 发起人与已填写部门(2026-09-21 变更线上流程⑤) */
     public static final String CHANGE_REJECTED = "CHANGE_REJECTED";
+    /**
+     * 消息码:上游单据审核**自动生成了下游草稿** → **该去补充的人**(默认 = 仓库审核 `cksh`)。
+     *
+     * <p>2026-11-17 用户口径(第二轮):「生成单据的时候就要有消息,**这个草稿单是需要他们去补充的**,
+     * 不是待审批的消息。」⇒ 文案不能说"待审批/等待审核",要说"草稿已生成、请补充完善后再审核";
+     * 触发时机就是**生单那一刻**(审核来料检验单时),不能等别的动作。
+     *
+     * <p>为什么不能用 {@link #APPROVAL_SUBMITTED}:那条路按**审批权**找人,而草稿本来就没有
+     * `pending='Y'`,也不进「待办」——它要的是"有人来补",不是"有人来批"。
+     * 收件人见 {@link #draftNotifyTargets}。
+     */
+    public static final String AUTO_DRAFT_TO_FILL = "AUTO_DRAFT_TO_FILL";
+    /**
+     * 消息码:上游审核自动生成了下游草稿 → **只需知情**的角色(默认 = 生产销售 `scxs`)。
+     *
+     * <p>2026-11-17 用户口径(第二轮):「生产销售**只用收到暂收退料**就行。」
+     * ⇒ 采购入库单**不发**给生产销售;暂收退料单发一条纯知会(不提"请补充",因为他没有编辑权)。
+     */
+    public static final String AUTO_DRAFT_FYI = "AUTO_DRAFT_FYI";
 
     private final JdbcTemplate jdbc;
     private final PanelRegistry registry;
@@ -231,22 +250,84 @@ public class MessageService {
      * @return 配置的账号列表;未配置返回空列表(调用方据此判断走哪条口径)
      */
     public List<String> approvalNotifyTargets(String panelCode) {
+        return configStringArray(panelCode, "approvalNotify");
+    }
+
+    /**
+     * 面板级配置里取一个**字符串数组**键({@code yj_panel.config} 是 JSON)。
+     *
+     * <p>未配置 / 不是数组 / 解析失败 ⇒ 返回空列表(调用方据此走各自兜底口径)。
+     * 目前走的键:{@code approvalNotify}(待审批提醒)与
+     * {@code fillNotify}/{@code fillNotifyRoles}/{@code fyiNotify}/{@code fyiNotifyRoles}
+     * (自动生单草稿:要补充的 / 只需知会的,见 {@link #draftNotifyTargets})。
+     */
+    private List<String> configStringArray(String panelCode, String key) {
         try {
             String raw = registry.panel(panelCode).config();
-            if (raw == null || !raw.contains("approvalNotify")) return List.of();
-            com.fasterxml.jackson.databind.JsonNode node =
-                    JSON.readTree(raw).path("approvalNotify");
+            if (raw == null || !raw.contains(key)) return List.of();
+            com.fasterxml.jackson.databind.JsonNode node = JSON.readTree(raw).path(key);
             if (!node.isArray()) return List.of();
             List<String> out = new ArrayList<>();
             for (com.fasterxml.jackson.databind.JsonNode n : node) {
-                String u = n.asText("").trim();
-                if (!u.isEmpty()) out.add(u);
+                String v = n.asText("").trim();
+                if (!v.isEmpty()) out.add(v);
             }
             return out;
         } catch (Exception e) {
-            log.warn("approvalNotify 解析失败(按未配置处理): panel={} err={}", panelCode, e.getMessage());
+            log.warn("panel config {} 解析失败(按未配置处理): panel={} err={}", key, panelCode, e.getMessage());
             return List.of();
         }
+    }
+
+    /**
+     * 角色编码 → 账号(2026-11-17)。只取**启用且未作废**的账号。
+     *
+     * <p>存在的理由:{@link #approversOf} 按**审批权**找人,而有些角色只需要**知情**
+     * (例:生产销售、仓库审核对「来料检验单审核自动生成的入库单/退料单草稿」)。
+     * 角色编码取 {@code yj_role.role_code}(如 {@code scxs} 生产销售、{@code cksh} 仓库审核)。
+     */
+    public List<String> accountsOfRoles(java.util.Collection<String> roleCodes) {
+        if (roleCodes == null || roleCodes.isEmpty()) return List.of();
+        List<String> codes = roleCodes.stream().filter((c) -> c != null && !c.isBlank()).distinct().toList();
+        if (codes.isEmpty()) return List.of();
+        String placeholders = String.join(",", codes.stream().map((c) -> "?").toList());
+        try {
+            return jdbc.queryForList(
+                    "SELECT DISTINCT u.username FROM yj_user u JOIN yj_role r ON r.id = u.role_id"
+                            + " WHERE r.role_code IN (" + placeholders + ")"
+                            + " AND ISNULL(u.asp_cancel,'N') <> 'Y' AND ISNULL(u.enabled,'1') = '1'"
+                            + " ORDER BY u.username",
+                    String.class, codes.toArray());
+        } catch (Exception e) {
+            log.warn("accountsOfRoles 失败(roles={}): {}", codes, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
+     * 「自动生成了下游草稿」的收件人(2026-11-17 口径第二版:分「要补充的」与「只需知会的」)。
+     *
+     * <p>三层口径,后者按需覆盖:
+     * <ol>
+     *   <li>代码默认:{@code defaultRoleCodes}(调用方按链路与 kind 指定,如 fill=仓库审核、fyi=生产销售);</li>
+     *   <li>面板配置 {@code yj_panel.config.<kind>NotifyRoles} = 角色编码数组 ⇒ **替换**默认角色;…</li>
+     *   <li>面板配置 {@code yj_panel.config.<kind>Notify} = 账号数组 ⇒ 与上面取并集(点名加人)。</li>
+     * </ol>
+     * <p>{@code kind}:{@code fill}=草稿要去补充的人 / {@code fyi}=只需知情的人。例(只把"请补充"发给某个具体人):
+     * <pre>UPDATE yj_panel SET config = JSON_MODIFY(config,'$.fillNotify',JSON_QUERY(N'["jxg","Smm"]')) WHERE panel_code=N'PURCHASE_IN';</pre>
+     *
+     * @param panelCode        目标(下游)面板编码,报错与配置都按它
+     * @param kind             {@code fill} 或 {@code fyi}(决定配置键名)
+     * @param defaultRoleCodes 代码默认角色编码(配置了对应 *NotifyRoles 时被替换)
+     * @return 去重后的账号列表;解析不到人返回空列表(调用方不必再判)
+     */
+    public List<String> draftNotifyTargets(String panelCode, String kind, List<String> defaultRoleCodes) {
+        String k = (kind == null || kind.isBlank()) ? "fill" : kind.trim();
+        List<String> roles = configStringArray(panelCode, k + "NotifyRoles");
+        if (roles.isEmpty()) roles = defaultRoleCodes == null ? List.of() : defaultRoleCodes;
+        Set<String> out = new LinkedHashSet<>(accountsOfRoles(roles));
+        out.addAll(configStringArray(panelCode, k + "Notify"));
+        return new ArrayList<>(out);
     }
 
     /**

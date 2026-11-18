@@ -324,6 +324,8 @@ export const DOCS = [
     listPath: '/jdy/v2/scm/sal_order',
     detailPath: '/jdy/v2/scm/sal_order_detail',
     headTable: 'bd_so_order', lineTable: 'bl_so_order',
+    // 明细行的「物料」列在本表叫 存货编码(upsertLines 用它给没有行号的老行做行键,2026-11-16)
+    lineCodeCol: '存货编码',
     fingerprintOf: (r) => [r.bill_status, r.bill_close_state, r.bill_date, r.customer_name,
       r.customer_number, r.dept_name, r.emp_name, r.total_amount, r.io_status, r.real_io_status]
       .map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
@@ -359,6 +361,8 @@ export const DOCS = [
     listPath: '/jdy/v2/scm/pur_order',
     detailPath: '/jdy/v2/scm/pur_order_detail',
     headTable: 'bd_pu_order', lineTable: 'bl_pu_order',
+    // 明细行的「物料」列(upsertLines 行键兜底用;本表即 物料编码)
+    lineCodeCol: '物料编码',
     // 采购列表行无金额字段,指纹以供应商/执行状态/备注等组合
     fingerprintOf: (r) => [r.bill_status, r.bill_close_state, r.bill_date, r.supplier_name,
       r.supplier_number, r.emp_name, r.io_status, r.real_io_status, r.remark]
@@ -486,7 +490,150 @@ function paramify(req, mssql, entries) {
   return { names, inputs };
 }
 
-/** 单据落库(通用):头表 upsert + 行表先删后插 + 审核状态镜像,单事务 */
+/**
+ * 明细行落库:**按(单据编号 + 行号)合并,保住行 identity id**(2026-11-16 根治「行 id 漂移」)。
+ *
+ * 【为什么必须改】
+ *   旧实现是「整单 DELETE + 逐行 INSERT」,每写一次,该单明细行就拿一批**全新的 identity id**。
+ *   而 MES 的行级占用/打印记录全靠 id 认行:
+ *     · `form_flow_link.source_line_key = {单据编号}#{行id}` —— 采购链(暂收/检验/退回/入库)的已送量;
+ *     · `bl_pu_label.采购订单行id` —— 材料码打印记录(已打印隔离行)。
+ *   而金蝶 5 分钟一轮,订单的列表级指纹(审核状态/执行状态/到货状态/备注…)一变就重写明细
+ *   ⇒ 行 id 全变 ⇒ 下游单据「认不出原来那行」。2026-11-16 实测一天之内:
+ *     · 分批送料弹窗报「送料行不存在或已失效:YJ-20261111-06#11039」(行 id 已从 11035..11043 变成 11103..11111);
+ *     · 417 条暂收占用 + 5 条采购入库占用指向已删行 → 已送量归零、可送上限虚高(有重复送料风险);
+ *     · 24 条材料码记录的 采购订单行id 失效 → 已打印隔离行整片消失。
+ *
+ * 【做法:行键 = 金蝶分录 seq(本表 `行号` 列),没有 seq 时退回「物料 + 同物料出现序号」】
+ *   seq 在 ERP 里就是分录身份(转 ERP 的 src_seq 也用它),改数量/改交期/审核/入库进度都不会变:
+ *     · 同一 行键 的旧行  → UPDATE(保留 id;不动 asp_time1,只盖 asp_user1/asp_time2);
+ *     · ERP 新增的行      → INSERT(拿新 id);
+ *     · ERP 已删除的行    → 硬删(与旧行为一致);若其上还挂着 ACTIVE 占用,打 ⚠ 日志留痕(能人工复核)。
+ *   行号缺失的老单(2026-09-27 之前的销售订单行、本地研发库的存量)用
+ *   `物料编码 + 该物料在本单的第几次出现` 当键 —— 它对"改了数量/改了交期/别的物料增删行"同样稳定。
+ *   两个键都算不出来(没有行号也没有物料编码)或库内同键重复 ⇒ 退回旧的「整单删插」并**告警**,
+ *   宁可保住与 ERP 的一致性,也不拿重复的键去覆盖错的 id。
+ *
+ * @returns {Promise<{ins:number, upd:number, del:number, mode:'merge'|'replace'}>}
+ */
+export async function upsertLines(doc, tx, mssql, docNo, lines, log = () => {}) {
+  const table = doc.lineTable;
+  const now = nowLocal();
+  const codeCol = doc.lineCodeCol || '物料编码';
+  // 行号归一:库里的 行号 可能是 nvarchar("1.0000",采购订单)或 int("1",销售订单),
+  // 接口给的是数字 1 ⇒ 必须按**数值**比,否则每一行都被当成新行、退化成整单删插(id 照样全变)。
+  const seqKey = (v) => {
+    if (v === null || v === undefined) return '';
+    const s = String(v).trim();
+    if (s === '') return '';
+    const n = Number(s);
+    return Number.isFinite(n) ? String(n) : s;
+  };
+  /** 行键:优先 行号;没有行号时用「物料 + 同物料出现序号」(按出现顺序,与 ERP 分录顺序一致) */
+  const keysOf = (list, seqOf, codeOf) => {
+    const occ = new Map();
+    return list.map((v) => {
+      const s = seqKey(seqOf(v));
+      if (s) return `s:${s}`;
+      const c = String(codeOf(v) ?? '').trim();
+      if (!c) return '';
+      const k = (occ.get(c) || 0) + 1;
+      occ.set(c, k);
+      return `m:${c}#${k}`;
+    });
+  };
+  // ① 旧行:id ↔ 行键(含已软删的行:同一行键回来时复活**原来那个 id**,不新开一行)
+  const rq = new mssql.Request(tx);
+  rq.input('docNo', mssql.NVarChar(100), docNo);
+  const oldRows = (await rq.query(
+    `SELECT id, CAST(t.[行号] AS nvarchar(50)) AS seq, t.[${codeCol}] AS code
+       FROM ${table} t WHERE t.[单据编号]=@docNo ORDER BY t.id`
+  )).recordset;
+  const oldKeys = keysOf(oldRows, (r) => r.seq, (r) => r.code);
+  const oldByKey = new Map();
+  let oldDup = false;
+  for (let i = 0; i < oldRows.length; i++) {
+    const k = oldKeys[i];
+    if (!k) continue;                       // 老数据既无行号也无物料:不参与映射(按"已删除"处理)
+    if (oldByKey.has(k)) { oldDup = true; continue; }
+    oldByKey.set(k, oldRows[i].id);
+  }
+  // ② 新行的行键必须都算得出来且不重复,否则不合并
+  const newKeys = keysOf(lines, (l) => l['行号'], (l) => l[codeCol]);
+  const keyOk = lines.length > 0 && newKeys.every((k) => k !== '') && new Set(newKeys).size === newKeys.length;
+  const mode = keyOk && !oldDup ? 'merge' : 'replace';
+
+  if (mode === 'replace') {
+    if (lines.length > 0 && !keyOk) {
+      log(`⚠ 【${doc.label}】${docNo} 明细行键缺失/重复,按旧方式(整单删插)重写 ⇒ 行 id 会变`);
+    } else if (oldDup) {
+      log(`⚠ 【${doc.label}】${docNo} 库内旧行键重复,无法合并,按旧方式重写 ⇒ 行 id 会变`);
+    }
+    const dr = new mssql.Request(tx);
+    dr.input('docNo2', mssql.NVarChar(100), docNo);
+    await dr.query(`DELETE FROM ${table} WHERE 单据编号=@docNo2`);
+    for (const l of lines) {
+      const lr = new mssql.Request(tx);
+      const entries = Object.entries(l).map(([col, val]) => [`[${col}]`, val]);
+      const { names: ln } = paramify(lr, mssql, entries);
+      lr.input('l_now', mssql.NVarChar(30), now);
+      await lr.query(`INSERT INTO ${table} (${entries.map(([c]) => c).join(', ')}, asp_user1, asp_time1, asp_cancel)
+        VALUES (${ln.join(', ')}, N'jdy-sync', @l_now, N'N')`);
+    }
+    return { ins: lines.length, upd: 0, del: oldRows.length, mode };
+  }
+
+  // ③ 合并:同行键 → UPDATE 保 id;新行键 → INSERT
+  let ins = 0, upd = 0;
+  const keptIds = new Set();
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    const oldId = oldByKey.get(newKeys[i]);
+    const lr = new mssql.Request(tx);
+    const entries = Object.entries(l).map(([col, val]) => [`[${col}]`, val]);
+    const { names } = paramify(lr, mssql, entries);
+    lr.input('l_now', mssql.NVarChar(30), now);
+    if (oldId) {
+      lr.input('l_id', mssql.Int, oldId);
+      const set = entries.map(([col], k) => `${col}=${names[k]}`).join(', ');
+      await lr.query(`UPDATE ${table} SET ${set}, asp_user1=N'jdy-sync', asp_user2=N'jdy-sync',
+        asp_time2=@l_now, asp_cancel=N'N' WHERE id=@l_id`);
+      keptIds.add(oldId);
+      upd++;
+    } else {
+      await lr.query(`INSERT INTO ${table} (${entries.map(([c]) => c).join(', ')}, asp_user1, asp_time1, asp_cancel)
+        VALUES (${names.join(', ')}, N'jdy-sync', @l_now, N'N')`);
+      ins++;
+    }
+  }
+  // ④ ERP 已删掉的行:硬删;先查它上面有没有 ACTIVE 占用,有就留痕(这类下游单据会随之失去来源行)
+  const orphanIds = oldRows.map((r) => r.id).filter((id) => !keptIds.has(id));
+  let del = 0;
+  if (orphanIds.length) {
+    try {
+      const ck = new mssql.Request(tx);
+      ck.input('pcode', mssql.NVarChar(50), doc.code);
+      ck.input('pno', mssql.NVarChar(100), docNo);
+      const keys = orphanIds.map((id) => `${docNo}#${id}`);
+      const inList = keys.map((_, i) => `@k${i}`).join(',');
+      keys.forEach((k, i) => ck.input(`k${i}`, mssql.NVarChar(200), k));
+      const used = (await ck.query(
+        `SELECT COUNT(*) AS n FROM form_flow_link WHERE source_panel_code=@pcode AND source_form_no=@pno
+           AND link_status='ACTIVE' AND source_line_key IN (${inList})`)).recordset[0];
+      if (used && Number(used.n) > 0) {
+        log(`⚠ 【${doc.label}】${docNo} 金蝶删除了 ${orphanIds.length} 行明细,其上有 ${used.n} 条下游占用随之失效(需人工核对)`);
+      }
+    } catch { /* form_flow_link 不存在时忽略(与其它容错口径一致) */ }
+    const dl = new mssql.Request(tx);
+    dl.input('docNo3', mssql.NVarChar(100), docNo);
+    orphanIds.forEach((id, i) => dl.input(`d${i}`, mssql.Int, id));
+    await dl.query(`DELETE FROM ${table} WHERE 单据编号=@docNo3 AND id IN (${orphanIds.map((_, i) => `@d${i}`).join(',')})`);
+    del = orphanIds.length;
+  }
+  return { ins, upd, del, mode };
+}
+
+/** 单据落库(通用):头表 upsert + 行表按行号合并 + 审核状态镜像,单事务 */
 async function upsertDoc(doc, mssql, pool, head, lines, fp) {
   const tx = new mssql.Transaction(pool);
   await tx.begin();
@@ -510,8 +657,7 @@ async function upsertDoc(doc, mssql, pool, head, lines, fp) {
       WHERE 外部数据ID=@p${base + 1} OR (外部数据ID IS NULL AND 单据编号=@p0);
       IF @@ROWCOUNT = 0
         INSERT INTO ${doc.headTable} (${insCols.join(', ')}, asp_user1, asp_time1, asp_cancel, 外部数据ID, 外部单据号, 外部指纹)
-        VALUES (${names.slice(0, base).join(', ')}, N'jdy-sync', COALESCE(@p${base}, @p${base + 3}), N'N', @p${base + 1}, @p0, @p${base + 2});
-      DELETE FROM ${doc.lineTable} WHERE 单据编号=@p0;`);
+        VALUES (${names.slice(0, base).join(', ')}, N'jdy-sync', COALESCE(@p${base}, @p${base + 3}), N'N', @p${base + 1}, @p0, @p${base + 2});`);
     // 审核状态镜像(工作流注册表)
     r.input('m_shr', mssql.NVarChar(50), head.单据状态 === '已审核' ? (head.审核人 || N_SYNC_USER) : null);
     r.input('m_shsj', mssql.NVarChar(30), head.单据状态 === '已审核' ? head.审核时间 : null);
@@ -526,14 +672,11 @@ async function upsertDoc(doc, mssql, pool, head, lines, fp) {
         shr = @m_shr, shsj = @m_shsj, canceled = N'N', erp_close_state = @m_close, pending = N'N', update_at = GETDATE()
       WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, shr, shsj, canceled, stopped, erp_close_state, pending, update_at)
         VALUES (s.panel_code, s.doc_no, @m_shr, @m_shsj, N'N', N'N', @m_close, N'N', GETDATE());`);
-    // 行表(列名直接用本地中文列;asp_time1 作为普通参数)
-    for (const l of lines) {
-      const lr = new mssql.Request(tx);
-      const entries = Object.entries(l).map(([col, val]) => [`[${col}]`, val]);
-      entries.push(['@__lnow', nowLocal()]);
-      const { names: ln } = paramify(lr, mssql, entries);
-      await lr.query(`INSERT INTO ${doc.lineTable} (${entries.slice(0, -1).map(([c]) => c).join(', ')}, asp_user1, asp_time1, asp_cancel)
-        VALUES (${ln.slice(0, -1).join(', ')}, N'jdy-sync', @p${entries.length - 1}, N'N');`);
+    // 行表(2026-11-16):按(单据编号 + 行号)合并,**保留行 id** —— 见 upsertLines 头注。
+    // 旧实现是"整单删插",每次同步都换一批新 id,下游占用/材料码就认不出原来那行。
+    const st = await upsertLines(doc, tx, mssql, head.单据编号, lines, log);
+    if (st.mode === 'merge' && (st.ins || st.del)) {
+      log(`【${doc.label}】${head.单据编号} 明细:更新 ${st.upd} 行(保 id)/ 新增 ${st.ins} 行 / 删除 ${st.del} 行`);
     }
     await tx.commit();
   } catch (e) {

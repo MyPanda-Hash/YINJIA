@@ -63,12 +63,19 @@
           <span>{{ errorMessage }}</span>
         </div>
 
-        <!-- 壳内首次使用:先让用户确认后端地址(否则工厂列表一定是空的)
-             ⚠ 2026-11-01:改地址入口已统一到**顶部原生工具条的「设置」**(见 showServerAddr 注释),
-                这里只提示"去哪儿改",不再自带输入框。 -->
-        <div v-if="needOrigin" class="origin-hint">
-          <el-icon><WarningFilled /></el-icon>
-          <span>{{ tt('首次使用请点顶部的「设置」确认服务器地址(如 http://192.168.1.10:8090),改完会自动重连') }}</span>
+        <!-- 服务器地址(2026-11-17):手机端(壳内)**默认就是服务器的 IP:端口**,
+             首装不用再手填。这里只做**只读展示**,一眼看到"现在连的是哪台服务器";
+             要改地址仍走**顶部原生工具条的「设置」**(唯一入口,理由见 showServerAddr 注释)。 -->
+        <div v-if="IN_SHELL" class="origin-info">
+          <div class="origin-info-main">
+            <el-icon><Connection /></el-icon>
+            <span class="origin-info-label">{{ tt('服务器地址') }}</span>
+            <span class="origin-info-value">{{ originText }}</span>
+            <span v-if="originIsDefault" class="origin-info-badge">{{ tt('默认') }}</span>
+          </div>
+          <p v-if="hasNativeSettings" class="origin-info-tip">
+            {{ tt('默认已连服务器,如需修改请点顶部「设置」,改完自动重连') }}
+          </p>
         </div>
 
         <!-- 服务器地址输入框已移除(2026-11-01)。
@@ -167,11 +174,11 @@ import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ArrowRight,
+  Connection,
   DataLine,
   Lock,
   OfficeBuilding,
   User,
-  WarningFilled,
 } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
@@ -179,7 +186,8 @@ import { tt } from '@/i18n'
 // 服务器地址读写统一走 appConfig(2026-10-25 合并:HEAD 侧从 @core/request 取,现由 appConfig 唯一真源)
 // 2026-11-01:网页内的改地址入口已全部去掉(统一到顶部原生工具条「设置」),
 // 这里只留读取 —— apiOrigin() 现在**优先读原生 SharedPreferences**,见 appConfig 注释。
-import { API_ORIGIN_KEY } from '@/business/appConfig'
+// 2026-11-17:壳内登录页加**只读**的「服务器地址」一行,默认值就是服务器的 IP:端口。
+import { API_ORIGIN, apiOrigin } from '@/business/appConfig'
 // 背景图 2026-09-28 转 WebP(1967KB→111KB,q80 视觉无损;原图已删)
 import manufacturingImage from '@/assets/login-manufacturing.webp'
 
@@ -224,22 +232,20 @@ const IN_SHELL = typeof window !== 'undefined'
 const showServerAddr = false
 
 /**
- * 首次进 App(还没配过地址)时给个置顶提示。
+ * 壳内登录页「服务器地址」一行的取值(2026-11-17)。
  *
- * <p>⚠ 2026-11-01:地址的**存储真源已改为原生 SharedPreferences**
- * (`YjNative.getBaseUrl()`,由顶部工具条「设置」写入),localStorage 只作兼容回退。
- * 所以这里判断"是否配过"要**两边都看**:只要任一处有合法地址,就不再打扰。
+ * <p>用户口径:「手机端的登录界面的配置默认为服务器的 ip 和端口」——
+ * 所以这里**不再要求首次使用手填地址**:{@link apiOrigin} 解析出的默认值就是
+ * `API_ORIGIN`(服务器 `36.140.66.163:8090`,见 appConfig),首装即可直接登录。
+ *
+ * <p>只读展示的理由同 `showServerAddr`:改地址的唯一入口是**顶部原生工具条的「设置」**
+ * (它在 WebView 外层,页面白屏时照样能点),这里再放输入框就又变成"上下两个设置"。
  */
-const savedOrigin = (() => {
-  try {
-    const nat = window.YjNative && typeof window.YjNative.getBaseUrl === 'function'
-      ? String(window.YjNative.getBaseUrl() || '').trim() : ''
-    if (nat && /^https?:\/\//i.test(nat)) return nat
-    return localStorage.getItem(API_ORIGIN_KEY) || ''
-  } catch { return '' }
-})()
-/** 还没配地址 ⇒ 顶部横幅提醒(配过后不再打扰) */
-const needOrigin = ref(IN_SHELL && !savedOrigin)
+const originText = apiOrigin()
+/** 是否还是默认服务器地址(是则显示「默认」小标,改过就不再标) */
+const originIsDefault = originText === API_ORIGIN
+/** 手搓壳(window.YjNative)才有顶部原生工具条;Capacitor 壳没有,别提"点顶部设置" */
+const hasNativeSettings = typeof window !== 'undefined' && !!window.YjNative
 
 // 原 keepVisible() 只服务于「服务器地址」输入框(软键盘遮挡时滚到可视区中部);
 // 该输入框已于 2026-11-01 移除,函数一并删除。登录表单本身用 el-form + 大尺寸输入,
@@ -633,24 +639,61 @@ onMounted(async () => {
   font-size: 17px;
 }
 
-/* 壳内首次使用的地址提示:比底部那行更醒目,配过就不再出现 */
-.origin-hint {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin: 0 0 14px;
+/* 壳内登录页的「服务器地址」(2026-11-17):默认 = 服务器的 IP:端口,只读展示。
+   中性配色(不是告警黄):它现在是**正常状态**,不是待办事项。 */
+.origin-info {
+  margin: 0 0 16px;
   padding: 10px 12px;
-  border: 1px solid #f0c78a;
+  border: 1px dashed #cfd8d4;
   border-radius: 8px;
-  background: #fff8ed;
-  color: #8a5a00;
+  background: #f7faf9;
+  color: #40504b;
   font-size: 12px;
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
-.origin-hint .el-icon {
+.origin-info-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.origin-info-main .el-icon {
   flex: none;
-  margin-top: 2px;
+  color: var(--login-accent);
+  font-size: 14px;
+}
+
+.origin-info-label {
+  flex: none;
+  color: #5d6b66;
+}
+
+.origin-info-value {
+  min-width: 0;
+  flex: 1 1 150px;
+  color: #17221f;
+  font-weight: 650;
+  word-break: break-all;
+}
+
+.origin-info-badge {
+  flex: none;
+  padding: 0 7px;
+  border: 1px solid #bcd7cf;
+  border-radius: 999px;
+  background: #e8f4f0;
+  color: var(--login-accent);
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 17px;
+}
+
+.origin-info-tip {
+  margin: 6px 0 0;
+  color: #7b8984;
+  font-size: 11px;
 }
 
 /* 服务器地址(只在安卓壳里渲染):一行三件套,窄屏自动换行。

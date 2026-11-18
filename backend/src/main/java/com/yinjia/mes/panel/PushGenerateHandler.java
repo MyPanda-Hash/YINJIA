@@ -98,10 +98,10 @@ public class PushGenerateHandler implements PanelActionHandler {
             return generateBatch(sourcePanel, target, sourceNo, context.userName(), null);
         }
 
-        // 1) 来源必须已审核(已中止/作废/审批中均不可生单,对齐 T+)
+        // 1) 来源必须已审核(已中止/作废/金蝶已删除/审批中均不可生单,对齐 T+)
         Map<String, Object> st = buttonService.docStatus(sourcePanel, sourceNo);
         String status = String.valueOf(st.get("status"));
-        if (!"已审核".equals(status)) throw new IllegalStateException("仅已审核单据可生单,当前状态:" + status);
+        if (!"已审核".equals(status)) throw new IllegalStateException(notAuditedMsg(status));
 
         // 2) 该来源→该目标已有占用(选单或生单)时拒绝整单重复生单;删除下游草稿自动释放后可重生
         //    —— 分批链路(目标面板有 批次号)不走这条:采购订单可以分多批送料,改由行级剩余量把关(见 generateBatch)
@@ -573,7 +573,7 @@ public class PushGenerateHandler implements PanelActionHandler {
         // 1) 来源必须已审核
         Map<String, Object> st = buttonService.docStatus(sourcePanel, sourceNo);
         String status = String.valueOf(st.get("status"));
-        if (!"已审核".equals(status)) throw new IllegalStateException("仅已审核单据可生单,当前状态:" + status);
+        if (!"已审核".equals(status)) throw new IllegalStateException(notAuditedMsg(status));
 
         // 2) 载入来源单(头 + 行)
         Map<String, Object> src = queryService.loadOneDoc(srcDef, sourceNo);
@@ -619,7 +619,11 @@ public class PushGenerateHandler implements PanelActionHandler {
                 double qty = e.getValue() == null ? 0d : e.getValue();
                 if (qty <= 0.000001) continue;                       // 本次不送
                 Map<String, Object> r = byKey.get(lineKey);
-                if (r == null) throw new IllegalStateException("送料行不存在或已失效:" + lineKey);
+                // 2026-11-16:以前只说"不存在或已失效",现场只能猜。行键 = `单号#行id`,而弹窗是打开
+                // 那一刻的快照 —— 打开之后该单在金蝶被改/明细行被重建(同步),行 id 就对不上了。
+                // 所以把唯一可行的操作写进提示(根因修复见 deploy/sync-core.mjs 的 upsertLines)。
+                if (r == null) throw new IllegalStateException("送料行不存在或已失效:" + lineKey
+                        + "(打开弹窗后该订单在金蝶有变动或明细行被重建,请关闭本窗口重新打开后再送料)");
                 Map<String, Object> m = sourceItemOf(srcItems, orderKeyOf(lineKey));
                 if (m == null) throw new IllegalStateException("送料行对应的来源明细已不存在:" + lineKey);
                 boolean isolated = isIsolatedKey(lineKey);
@@ -1037,13 +1041,28 @@ public class PushGenerateHandler implements PanelActionHandler {
      * 校验与 {@link #pushPreview} 共用同一份候选行口径(剩余量 = 数量 − 行级已生单量),
      * 「对话框里看到的」与「真正校验用的」永远是同一份数。
      */
+    /**
+     * 「仅已审核可生单」的拒绝文案(2026-11-16 金蝶在册核对)。
+     *
+     * <p>新增的两个状态 {@code 金蝶已删除} / {@code 金蝶已作废} 是**服务端标记**出来的(不是用户能改的),
+     * 所以提示里必须给出处置办法,否则现场只会反复点。用户口径:「出现这个问题时刷新一下就好」
+     * —— 若金蝶那边其实还在,下一轮同步(≤5 分钟)或刷新页面后标记会自愈。
+     */
+    private static String notAuditedMsg(String status) {
+        if (status != null && status.startsWith("金蝶已")) {
+            return "仅已审核单据可生单,当前状态:" + status
+                    + "(该单在金蝶侧已删除或作废;若金蝶那边仍然存在,请刷新页面或等下一轮同步(≤5 分钟)后重试)";
+        }
+        return "仅已审核单据可生单,当前状态:" + status;
+    }
+
     @SuppressWarnings("unchecked")
     private Map<String, Object> generateLines(String sourcePanel, String action, String target,
                                               String sourceNo, String user, Map<String, Double> qtyByLineKey,
                                               Map<String, Map<String, Object>> whBinByLine) {
         // 1) 来源必须已审核(与整单推式生单同一句话,前端置灰 + 后端兜底)
         String status = str(buttonService.docStatus(sourcePanel, sourceNo).get("status"));
-        if (!"已审核".equals(status)) throw new IllegalStateException("仅已审核单据可生单,当前状态:" + status);
+        if (!"已审核".equals(status)) throw new IllegalStateException(notAuditedMsg(status));
 
         // 2) 载入来源单(头 + 行),并按生单动作过滤
         PanelRegistry.PanelDef srcDef = registry.panel(sourcePanel);
@@ -1319,7 +1338,9 @@ public class PushGenerateHandler implements PanelActionHandler {
                 double qty = e.getValue() == null ? 0d : e.getValue();
                 if (qty <= 0.000001) continue;
                 Map<String, Object> r = byKey.get(lineKey);
-                if (r == null) throw new IllegalStateException("送料行不存在或已失效:" + lineKey);
+                // 同 generateBatch:行键对不上通常是"打开弹窗后金蝶又改了这张单",把处置办法写清楚
+                if (r == null) throw new IllegalStateException("送料行不存在或已失效:" + lineKey
+                        + "(打开弹窗后该订单在金蝶有变动或明细行被重建,请关闭本窗口重新打开后再送料)");
                 Map<String, Object> item = sourceItemOf(srcItems, orderKeyOf(lineKey));
                 if (item == null) throw new IllegalStateException("送料行对应的来源明细已不存在:" + lineKey);
                 double cap = isIsolatedKey(lineKey) ? numOf(r.get("剩余数量")) : numOf(r.get("可送上限"));

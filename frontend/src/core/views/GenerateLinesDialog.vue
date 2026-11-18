@@ -39,7 +39,7 @@
                            size="small" style="width: 62px" />
           %<span class="gl-tip">{{ tt('（本次生效；最高 50%，额度按来源行数量算）') }}</span>
         </span>
-        <span class="gl-tip">{{ tt('勾选要生单的明细行并填写本次数量；未勾选的行不会进入新单据') }}</span>
+        <span class="gl-tip">{{ tt('勾选要生单的明细行并填写本次数量；未勾选的行不会进入新单据') }} · {{ tt('未勾选的明细行置灰、不能填写') }}</span>
       </div>
 
       <div v-for="doc in docs" :key="doc.sourceNo" class="gl-doc">
@@ -55,8 +55,8 @@
             <span v-if="doc.batchInherited" class="gl-lock">{{ tt('继承来源单') }}</span>
           </span>
           <span class="gl-doc-pick">
-            <el-button link type="primary" size="small" @click="selectAll(doc)">{{ tt('全选') }}</el-button>
-            <el-button link size="small" @click="selectNone(doc)">{{ tt('取消全选') }}</el-button>
+            <!-- 「全选 / 取消全选」这对文字链已由**表头那颗全选框**取代(2026-11-18 用户口径:
+                 「全选按钮在行号前面的格子上就行」)—— 同一块里留两份全选是噪声,这里不再挂 -->
             <!-- 2026-11-13 用户口径「也可以所有行带入第一个填入的仓库和仓位」 -->
             <el-button v-if="showWhBin" link type="primary" size="small"
                        :title="tt('把本单第一行填好的仓库与仓位套用到本单所有行')"
@@ -66,9 +66,21 @@
         </div>
         <!-- 2026-11-13 用户口径「不要滚动，一次显示全部」:表不再限高(max-height 会出内层滚动条),
              全部行一次铺开;弹窗本身放到 96vw 宽,列宽收窄以免横向滚动。 -->
+        <!-- 未勾选的行置灰 + 行内不可填(2026-11-17 客户口径「没有勾选为灰色而且不能有输入」):
+             灰类见 core/selection/pickRowStyle.js,样式在 styles/index.css;每张来源单各按自己的勾选集合判 -->
         <el-table :data="doc.lines" row-key="lineKey" border size="small"
+                  :row-class-name="rowClassOfDoc(doc)"
                   :empty-text="tt('该单据没有可生单的明细行')">
+          <!-- 勾选列的表头 = **本单全选**(2026-11-18 用户口径「全选按钮在行号前面的格子上就行,
+               和生单保持一致」):三态勾选框(全勾 ✓ / 部分勾 ▬ / 全空),口径复用下面的 selectAll ——
+               只勾可选行(非已审核单据、已打印隔离行、可生单 = 0 的行都不会被顺手带进来)。 -->
           <el-table-column width="42" align="center">
+            <template #header>
+              <el-checkbox :model-value="docStats(doc).all" :indeterminate="docStats(doc).some"
+                           :disabled="!docStats(doc).total"
+                           :title="tt('全选本单的全部明细行')"
+                           @change="(v) => (v ? selectAll(doc) : selectNone(doc))" />
+            </template>
             <template #default="{ row }">
               <el-checkbox :model-value="isPicked(doc, row)" :disabled="!selectable(doc, row)"
                            @change="(v) => togglePick(doc, row, v)" />
@@ -89,6 +101,7 @@
           <el-table-column v-if="showWhBin" :label="tt('仓库')" width="130">
             <template #default="{ row }">
               <el-select v-model="whOf[row.lineKey]" size="small" filterable clearable
+                         :disabled="pickRowLocked(picksOfDoc(doc), row.lineKey)"
                          :placeholder="tt('选择仓库')" style="width: 120px" @change="onWhChange(row)">
                 <el-option v-for="w in whSrc.warehouses" :key="w.code || w.name" :label="w.name" :value="w.name" />
               </el-select>
@@ -97,7 +110,8 @@
           <el-table-column v-if="showWhBin" :label="tt('仓位')" width="130">
             <template #default="{ row }">
               <el-select v-model="binOf[row.lineKey]" size="small" filterable clearable
-                         :disabled="!whOf[row.lineKey]" :placeholder="whOf[row.lineKey] ? tt('选择仓位') : tt('先选仓库')"
+                         :disabled="!whOf[row.lineKey] || pickRowLocked(picksOfDoc(doc), row.lineKey)"
+                         :placeholder="whOf[row.lineKey] ? tt('选择仓位') : tt('先选仓库')"
                          style="width: 120px">
                 <el-option v-for="b in binsOfLine(row)" :key="b.code" :label="b.code" :value="b.code" />
               </el-select>
@@ -109,7 +123,9 @@
           <el-table-column :label="tt('本次数量')" width="140">
             <template #default="{ row }">
               <el-input-number v-model="qtyOf[row.lineKey]" :min="0" :max="capOf(row, ratioPct)" :controls="false"
-                               :precision="2" :disabled="!selectable(doc, row)" style="width: 120px" />
+                               :precision="2"
+                               :disabled="!selectable(doc, row) || pickRowLocked(picksOfDoc(doc), row.lineKey)"
+                               style="width: 120px" />
             </template>
           </el-table-column>
           <el-table-column v-if="meta.batchFlow" :label="tt('状态')" width="86" align="center">
@@ -150,6 +166,8 @@ import {
 } from '@core/selection/pushGenerateLines'
 // 生单时的「仓库 / 仓位」预填(2026-11-13 用户口径):取数、级联候选、提交键都在这一份纯函数里
 import { binsOfWarehouse, defaultBinOf, loadWhBinSources, whBinPayload } from '@core/selection/genWhBin'
+// 未勾选的行置灰 + 不可填(2026-11-17 客户口径;四个打印/生单弹窗共用同一份,见该模块头注释)
+import { pickRowClass, pickRowLocked } from '@core/selection/pickRowStyle'
 
 const engine = usePanelRuntime()
 
@@ -244,8 +262,29 @@ const count = computed(() => {
   return n
 })
 
+/* ── 表头全选框(2026-11-18 用户口径)──────────────────────────────
+   「全选按钮在行号前面的格子上就行,和生单保持一致」—— 全选放进每张来源单表格
+   勾选列的表头格子里(标准表头全选的位置),三态由本节派生:
+   · total  = 本单**可勾**行数(非已审核 / 可生单 = 0 的行不算,已打印隔离行也算可勾但要显式勾);
+   · picked = 本单已勾且**仍然可选**的行数(超送比例调小后,原来勾上的行可能不再可选);
+   · all    = 可勾的都勾了;some = 部分勾(中间态 ▬);一个都没勾 → 两个都 false(空格子)。
+   读的都是响应式数据(pickedByDoc / ratioPct),所以表头勾选框随行内勾选实时变。 */
+function docStats(doc) {
+  const set = picksOfDoc(doc)
+  let total = 0
+  let picked = 0
+  for (const row of doc?.lines || []) {
+    if (!selectable(doc, row)) continue
+    total++
+    if (set.has(row.lineKey)) picked++
+  }
+  return { total, picked, all: total > 0 && picked >= total, some: picked > 0 && picked < total }
+}
+
 /** 统一取勾选集合(组件里存数组,纯函数既收 Set 也收数组) */
 const picksOfDoc = (doc) => picksOf(pickedByDoc[doc.sourceNo])
+/** 未勾选的行置灰(2026-11-17 客户口径):每张来源单一张表,各按自己的勾选集合判;禁填见模板 pickRowLocked */
+const rowClassOfDoc = (doc) => pickRowClass(picksOfDoc(doc))
 
 function isPicked(doc, row) { return picksOfDoc(doc).has(row.lineKey) }
 /** 只读单据(非已审核)整张不可勾;没有可生单量的行也不可勾 */
@@ -443,6 +482,9 @@ async function confirm() {
 .gl-batch { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: #46586e; }
 .gl-lock { color: #b88230; font-size: 12px; }
 .gl-doc-pick { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; }
+/* 表头全选框(本单全选):宽度只有 42px 的格子里居中 —— el-checkbox 默认 margin-right:30px,
+   不清掉会把勾选框顶到格子外面(行内那颗在正文格子里没这个问题,故只针对表头) */
+.gl-doc :deep(th .el-checkbox) { margin-right: 0; }
 .gl-picked { color: #5d6c67; font-size: 12.5px; }
 .gl-empty { color: #909399; }
 .gl-foot { margin-right: auto; font-size: 12.5px; color: #46586e; }

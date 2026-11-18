@@ -67,7 +67,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$AgentVersion = '1.1.0'
+$AgentVersion = '1.2.0'
 $RunKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
 $RunName = 'YinjiaMesPrintAgent'
 $ScriptPath = $PSCommandPath
@@ -402,7 +402,9 @@ function Send-LabelToPrinter {
             $g.DrawImage($script:labelQr, 26, 20, $qrSize, $qrSize)
         }
         # 二维码外框:纸表风格细黑框(样张上的红框是用户标注,纸面本身是黑线表格)
-        $g.DrawRectangle($penLine, 22, 16, $qrSize + 8, $qrSize + 8)
+        # 2026-11-18:没有码就**不画框** —— 无码单据(其他领料/其他退料)留个空框,
+        #   现场会当成"码没打出来"去问;与浏览器兜底打印层(pickSlipHtml 空码不画框)保持同一口径。
+        if ($script:labelQr) { $g.DrawRectangle($penLine, 22, 16, $qrSize + 8, $qrSize + 8) }
 
         # ② 标题居中 + 右上 No 单号
         $titleRect = New-Object System.Drawing.RectangleF(0, 26, $pageW, 60)
@@ -839,13 +841,14 @@ function Invoke-PrintJob {
     $paper    = [string]($Job.'纸张')
     $printerN = [string]($Job.'printer')
     # 专用纸表(有 纸面)不看二维码:混料单《成型配料记录》本来就是无码的纸表
-    if (-not $qrText -and -not $sheet) {
-        if ($woNo) {
-            $n = 1000 + [Math]::Max(1, $woLine)
-            $qrText = "0@$woNo@$n"
-        } else {
-            throw '缺少打印内容(二维码内容与工单号都为空)'
-        }
+    # 🔴 无码单据(2026-11-18):「其他领料 / 其他退料 / 生产退料」这几张扫码单**纸上不打二维码**
+    #   (用户口径「二维码也不用打了」),服务端入队时就把 二维码内容/二维码图 清空了
+    #   (见 PrintStationController.NO_QR_TYPES);它们又都不挂工单号 ⇒ 以前这里
+    #   throw '缺少打印内容(二维码内容与工单号都为空)' —— 现场表现是「提交后自动打印 → 打印失败」。
+    #   现在:没有码也照常出纸 —— 版式、明细、抬头一个都不变,只是左上角不画码框。
+    if (-not $qrText -and -not $sheet -and $woNo) {
+        $n = 1000 + [Math]::Max(1, $woLine)
+        $qrText = "0@$woNo@$n"
     }
     if (-not $printerN) { $printerN = $Printer }
     if (-not $printerN) { $printerN = Get-SystemPrinterName }
@@ -985,20 +988,42 @@ if ($Server) {
                     $task = $pend.data.task
                     $did = $true
                     $pr = $null
+                    # 🔴 2026-11-18 用户报障「打印失败」:以前失败时**不把原因回给服务器** ⇒
+                    #   面板上只有「失败」两个字、yj_print_task.fail_reason 是空的,现场只能猜。
+                    #   现在把真正的错误文本(含本机代理 /print 返回的 JSON error)一起回执。
+                    $failMsg = ''
                     try { $pr = Api-Post "http://127.0.0.1:$AgentPort/print" @{} $task 180 }
-                    catch { Write-Output "[轮询] 本机打印失败(id=$($task.id)): $($_.Exception.Message)" }
+                    catch {
+                        $failMsg = $_.Exception.Message
+                        try {
+                            $bodyTxt = ''
+                            if ($_.ErrorDetails) { $bodyTxt = [string]$_.ErrorDetails.Message }
+                            if ($bodyTxt) {
+                                try {
+                                    $oj = ConvertFrom-Json $bodyTxt
+                                    if ($oj.error) { $failMsg = [string]$oj.error }
+                                } catch { $failMsg = $bodyTxt }
+                            }
+                        } catch { }
+                        Write-Output "[轮询] 本机打印失败(id=$($task.id)): $failMsg"
+                    }
+                    if ($pr -and -not $pr.ok -and -not $failMsg) { $failMsg = [string]$pr.error }
+                    if (-not $failMsg -and -not $pr) { $failMsg = '本机打印代理没有返回结果(可能已退出)' }
                     $ack = @{
                         taskId = $task.id
                         ok = [bool]($pr -and $pr.ok)
+                        error = $failMsg
                         printer = $(if ($pr) { [string]$pr.printer } else { '' })
+                        类型 = [string]$task.类型
                         标题 = [string]$task.标题
+                        领料单号 = [string]$task.领料单号
                         工单号 = [string]$task.工单号
                         工单行号 = [int]$task.工单行号
                         发起人 = [string]$task.发起人
                     }
                     try {
                         Api-Post "$base/px/print/ack" $hd $ack 30 | Out-Null
-                        Write-Output "[轮询] 任务 $($task.id) 完成 → $(if ($pr) { $pr.mode } else { '失败' })"
+                        Write-Output "[轮询] 任务 $($task.id) 完成 → $(if ($pr -and $pr.ok) { $pr.mode } else { '失败:' + $failMsg })"
                     } catch { Write-Output "[轮询] 回执失败: $($_.Exception.Message)" }
                 }
             } catch {

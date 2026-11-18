@@ -189,7 +189,9 @@ function addRow() {
   const base = {}
   for (const f of fields.value) {
     if (f.dataType === '是否') base[f.dataName] = false
-    else if (f.dataType === '小数') base[f.dataName] = 0
+    // 必填的小数不预填 0(2026-11-17 用户口径「只有不合格数量可以出现自动填 0 的情况」):
+    // 0 算"已填",预填就把必填校验变成摆设。整数这里默认是行序号(不是 0),不受影响。
+    else if (f.dataType === '小数') base[f.dataName] = f.isRequired ? '' : 0
     else if (f.dataType === '整数') base[f.dataName] = rows.value.length + 1
     else if (f.dataType === '下拉框') base[f.dataName] = f.defaultValue ?? (f.options?.[0]?.value ?? f.options?.[0] ?? '')
     else base[f.dataName] = f.defaultValue ?? ''

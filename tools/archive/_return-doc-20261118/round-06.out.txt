@@ -1,0 +1,43 @@
+﻿ego-browser : == 列表页(390 宽) ==
+所在位置 行:1 字符: 129
++ ... ew($false); ego-browser nodejs -e "await import('file:///C:/Users/Len ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (== 列表页(390 宽) ==:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+{
+  "groups": [
+    "可退单据 86 可退合计 266.8288 ›"
+  ],
+  "firstDoc": "LL-2026-11-0051\n组装\n可退 50\nGD-2026-11-0009 #1\n可退项数 1\nX烧结阻垢炭棒/滤芯\n已领 50 · 已退 0",
+  "hScroll": false,
+  "scrollWidth": 390,
+  "viewport": 390
+}
+== 明细页(390 宽) ==
+{
+  "title": "LL-2026-11-0006",
+  "state": "可退料",
+  "kv": [
+    "工单号 GD-2026-10-0217 #10",
+    "产品 A+级烧结炭棒/滤芯",
+    "物料编码 T042",
+    "规格型号 28*12*180",
+    "计量单位 支",
+    "生产线 成型1线",
+    "领料单号 LL-2026-11-0006",
+    "领料类型 组装",
+    "退料单号 TL-2026-11-0009,TL-2026-11-0013 含退料 补打印",
+    "本次退料 0 项 / 0"
+  ],
+  "hScroll": false,
+  "scrollWidth": 390,
+  "viewport": 390
+}
+== 明细页解锁(390 宽) ==
+{
+  "mat": "加工切无纺布\nYJ-XWR-016 · 200*300 · 张 · 已领 5 / 已退 0\n5\n本次可退",
+  "qty": "5.0000",
+  "hScroll": false
+}
+

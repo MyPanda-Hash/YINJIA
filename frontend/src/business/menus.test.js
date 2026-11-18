@@ -556,26 +556,32 @@ test('WMS管理 = 与智能供应链同级的一级目录,含 库存核算/库�
   //   (撤掉那对重复挂点后,挂点数与唯一数相等)。
   assert.equal(invCodes.length, 41, `WMS管理应有 41 个面板码挂点,实际 ${invCodes.length}`)
   assert.equal(new Set(invCodes).size, 41, 'WMS管理内唯一面板码应为 41(下架三个扫码入口后不再有共用面板码)')
-  // 生产领料:入口在「库存核算 > 单据」里,紧跟材料出库单(可点进通用列表页)
+  // 生产领料明细表 / 生产退料明细表:2026-11-17 用户口径「图二红框的两个明细表要放在库存明细里面」
+  //   ⇒ 由「库存核算 > 单据」移到「库存明细」组(只换导航位置,面板码/路径/权限都不动),
+  //   位置紧挨 材料出库单明细表 / 生产退料单明细表(领料↔材料出库、退料↔退料单,本是一体两面)。
   const invAcct = (inv.children || []).find((c) => c.code === 'invAcct')
   // ⚠ 子组 code 以远端改版为准:invAcctDoc(原 doc)
   const docGroup = (invAcct.children || []).find((c) => c.code === 'invAcctDoc')
-  const pickLeaf = (docGroup.children || []).find((c) => c.panelCode === 'PROD_PICK_LIST')
+  const detailGroup = (inv.children || []).find((c) => c.code === 'invDetail')
+  const docCodes = (docGroup.children || []).map((c) => c.panelCode)
+  const detailCodes = (detailGroup.children || []).map((c) => c.panelCode)
+  assert.ok(!docCodes.includes('PROD_PICK_LIST'), '生产领料明细表已移出「库存核算 > 单据」')
+  assert.ok(!docCodes.includes('PROD_RET_LIST'), '生产退料明细表已移出「库存核算 > 单据」')
+  const pickLeaf = (detailGroup.children || []).find((c) => c.panelCode === 'PROD_PICK_LIST')
   // 2026-11-16:显示名由「生产领料」改为「生产领料明细表」(面板码与路径都不动)
   assert.equal(pickLeaf?.title, '生产领料明细表')
   assert.equal(pickLeaf?.path, '/panelx/list/PROD_PICK_LIST')
-  const docCodes = (docGroup.children || []).map((c) => c.panelCode)
-  // 2026-11-13:材料出库单后面紧跟「生产退料单」(MATERIAL_RET,领/退成对),再往后才是只读报表「生产领料」
+  // 2026-11-13:材料出库单后面紧跟「生产退料单」(MATERIAL_RET,领/退成对)
   assert.equal(docCodes.indexOf('MATERIAL_RET'), docCodes.indexOf('MATERIAL_OUT') + 1,
     '生产退料单应紧跟材料出库单')
-  assert.equal(docCodes.indexOf('PROD_PICK_LIST'), docCodes.indexOf('MATERIAL_RET') + 1,
-    '生产领料明细表应紧跟生产退料单')
-  // 2026-11-16:生产退料明细表紧跟生产领料明细表(领/退两张明细表成对)
-  const retLeaf = (docGroup.children || []).find((c) => c.panelCode === 'PROD_RET_LIST')
+  // 2026-11-17:领料明细紧跟材料出库单明细表,退料明细紧跟生产退料单明细表(领/退两张明细表成对)
+  assert.equal(detailCodes.indexOf('PROD_PICK_LIST'), detailCodes.indexOf('MATERIAL_OUT_DETAIL') + 1,
+    '生产领料明细表应紧跟材料出库单明细表')
+  const retLeaf = (detailGroup.children || []).find((c) => c.panelCode === 'PROD_RET_LIST')
   assert.equal(retLeaf?.title, '生产退料明细表')
   assert.equal(retLeaf?.path, '/panelx/list/PROD_RET_LIST')
-  assert.equal(docCodes.indexOf('PROD_RET_LIST'), docCodes.indexOf('PROD_PICK_LIST') + 1,
-    '生产退料明细表应紧跟生产领料明细表')
+  assert.equal(detailCodes.indexOf('PROD_RET_LIST'), detailCodes.indexOf('MATERIAL_RET_DETAIL') + 1,
+    '生产退料明细表应紧跟生产退料单明细表')
   // 销售退货单紧跟销售出库单(一出一进配成对)
   assert.equal(docCodes.indexOf('SALE_IN'), docCodes.indexOf('SALE_OUT') + 1,
     '销售退货单应紧跟销售出库单')

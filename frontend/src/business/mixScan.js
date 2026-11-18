@@ -1,24 +1,28 @@
 /**
- * mixScan.js — 手机扫码 · **扫码混料**的纯逻辑(2026-11-18)
+ * mixScan.js — 手机扫码 · **扫码混料**的纯逻辑(2026-11-18;第四轮随「两页结构」改版)
  *
  * <h3>用户口径(原话)</h3>
  * 「在手机扫码里面加一个扫码混料的面版。逻辑:扫工单码,带出一级BOM(就是物料清单,
  *  之前生产领料的是组装物料清单),逐项扫物料码,自动获取电子秤的数量,
  *  提交保存一笔,全部扫完,整单保存。保存后自动打印,并且保留单据,重新扫码后进入可以补打印。」
  *
+ * <p>第四轮(2026-11-18):「扫码混料,应该和生产领料一样也是跳转到单据的明细里面再开始扫物料码,
+ * 解锁对应的物料码,然后根据连接电子秤的取数,点击确认。再扫其他的物料解锁,根据电子秤再确认。
+ * 全部物料确认完毕后,才可以提交。设计要和生产领料一致。」</p>
+ *
  * <h3>为什么单独一个模块</h3>
- * 工单码解析、BOM 展开、秤值有效性、纸面载荷拼装全是纯函数,能被 `node --test` 钉住边界;
- * 页面组件(views/mobile/MobileMixScan.vue)只负责交互与请求。
+ * 工单码解析、行模型归一、「全部确认完毕」的判据、秤值有效性、纸面载荷拼装全是纯函数,
+ * 能被 `node --test` 钉住边界;两个页面只负责交互与请求:
+ * · 列表页 {@code MobileMixScan.vue}(= 生产领料的 MobilePickList)
+ * · 明细页 {@code MobileMixDoc.vue} (= 生产领料的 MobilePickDoc,差别只在数量来自电子秤)
+ *
+ * <h3>「确认」是覆盖写入,不是累加(2026-11-18 第四轮改口径)</h3>
+ * 与生产领料「写入数量」同一语义:同一物料再确认一次 = 以最后一次秤值为准。
+ * 上一版扫一次加一次,现场"扫了看一眼再确认"会把实际用量记成两倍。
  *
  * <h3>码格式(沿用既有约定,不新造)</h3>
- * · 工单码 = `公司代码@工单号@(1000+工单行号)`,行号 3 位补零
- *   (见 print-formats.js 的 woQrText,2026-10-09 规则改版);
- * · 物料码 = `存货编码|批号`(见 scanPick.js 的 parseBarcode,条码三面板固定格式)。
- *
- * <h3>与「工单扫码领料」(2026-11-18 删除)的关系</h3>
- * 码解析、BOM 展开、秤读数校验这三段是那次留下的**同一套口径**(工单码和秤是同一个数据源),
- * 原样搬过来继续用;变的是出口:以前整单提交生成**材料出库单**,
- * 现在逐笔落**混料记录**(wo_mixing_list),整单保存只取单号 + 置标记。
+ * · 工单码 = `公司代码@工单号@(1000+工单行号)`,行号 3 位补零(见 print-formats.js 的 woQrText);
+ * · 物料码 = `存货编码|批号`(见 scanPick.js 的 parseBarcode)。
  */
 
 /**
@@ -30,8 +34,12 @@
  * 为什么要减 1000:行号加了 1000 前缀是为了让码里的行号恒为 4 位、便于人眼与扫码枪对齐;
  * 减回去才是 plang.pl_xc 的真实行号。
  *
+ * <p>本函数**只认工单二维码**(必须带 @)。手敲的工单号 / 产品名片段不走这里,
+ * 由页面的「查询单据」转服务端关键字查 —— 否则物料码 `YJ-SX-001|2026...`
+ * 会被误判成工单号(既有单测钉住了这条)。
+ *
  * @param {string} raw 扫码枪或手工输入的原串
- * @returns {{ ok: boolean, company: string, orderNo: string, lineNo: number, reason?: string }}
+ * @returns {{ ok: boolean, company: string, orderNo: string, lineNo: number, kind?: string, reason?: string }}
  */
 export function parseWorkOrderQr(raw) {
   const text = String(raw == null ? '' : raw).trim()
@@ -43,75 +51,138 @@ export function parseWorkOrderQr(raw) {
   if (!orderNo) return { ok: false, company, orderNo: '', lineNo: 0, reason: 'no-order' }
   // 第三段(行号)可选:整单码只到工单号时,行号记 0 表示「整单」
   const lineRaw = parts.length > 2 ? String(parts[2] || '').trim() : ''
-  if (!lineRaw) return { ok: true, company, orderNo, lineNo: 0 }
+  // 第四段(可选)= **领料标记**:2026-11-18 领料单纸面二维码多带一位,
+  //   `A`=组装领料 / `M`=混料领料(用户口径「混料和组装的二维码是一样的,需要在二维码上多一位作为标记」)。
+  //   老的三段工单码没有这段 ⇒ kind 记空串,行为与以前一模一样。
+  const kind = pickKindOf(parts[3])
+  if (!lineRaw) return { ok: true, company, orderNo, lineNo: 0, kind }
   const n = Number(lineRaw)
-  if (!Number.isFinite(n)) return { ok: false, company, orderNo, lineNo: 0, reason: 'bad-line' }
+  if (!Number.isFinite(n)) return { ok: false, company, orderNo, lineNo: 0, reason: 'bad-line', kind }
   const lineNo = n >= 1000 ? n - 1000 : n
-  return { ok: true, company, orderNo, lineNo }
+  return { ok: true, company, orderNo, lineNo, kind }
 }
 
 /**
- * 把**一级BOM(物料清单 mate 行)**按工单排产数量折算成「应投料量」。
+ * 二维码「领料标记」段 → 领料类型。
  *
- * 口径:BOM 里的 标准用量(bzl) 是**生产 1 个单位成品**的用量,
- * 故应投 = 标准用量 × 排产数量 + 损耗量。
+ * <p>领料单纸面二维码第 4 段:`A`/`组装` ⇒ 组装领料;`M`/`混料` ⇒ 混料领料;
+ * 其它值或没有这一段(老工单码)⇒ `''`,`parseWorkOrderQr` 的其余字段与以前一致。
  *
- * 数量按 4 位小数收敛(与 wo_mixing_list 的 decimal(18,8) / 界面显示对齐),避免浮点尾差。
- *
- * @param {any[]} bomRows 物料清单明细行(含 子件代码/子件名称/子件单位/标准用量/损耗量)
- * @param {number} planQty 排产数量
- * @returns {{ code: string, name: string, uom: string, required: number, loss: number, picked: number, remain: number }[]}
+ * @param {any} seg 第 4 段原文
+ * @returns {'组装'|'混料'|''}
  */
-export function expandBom(bomRows, planQty) {
-  const qty = Number(planQty) || 0
-  const round4 = (n) => Math.round((Number(n) || 0) * 10000) / 10000
-  const out = []
-  for (const r of Array.isArray(bomRows) ? bomRows : []) {
-    const code = String(r['子件代码'] || r['材料编码'] || '').trim()
-    if (!code) continue
-    const per = Number(r['标准用量']) || 0
-    const loss = Number(r['损耗量']) || 0
-    const required = round4(per * qty + loss)
-    out.push({
-      code,
-      name: String(r['子件名称'] || r['材料名称'] || '').trim(),
-      uom: String(r['子件单位'] || r['计量单位'] || '').trim(),
-      required,
-      loss: round4(loss),
-      picked: 0,
-      remain: required,
-    })
-  }
-  return out
+export function pickKindOf(seg) {
+  const s = String(seg == null ? '' : seg).trim().toUpperCase()
+  if (!s) return ''
+  if (s === 'A' || s === '组装' || s === 'ASSEMBLY') return '组装'
+  if (s === 'M' || s === '混料' || s === 'MIX') return '混料'
+  return ''
+}
+
+/** 四位小数取整(与后端 decimal(18,8) 落库、界面显示同口径) */
+export function round4(n) {
+  const v = Number(n)
+  if (!Number.isFinite(v)) return 0
+  return Math.round(v * 10000) / 10000
 }
 
 /**
- * 扫一个物料码 → 在混料清单里找到对应行并累加**已记**数量。
+ * 明细页行模型:后端 `GET /px/mix/task` 的 `明细` → 页面行。
  *
- * 匹配口径:**只按存货编码**(与 scanPick.matchPickRows 同一教训)——
- * 条码视图的批号是采购入库派生的,和 kucai 里的批号常常对不上,按「编码+批号」全等实测 0 命中。
+ * <p>应投量由**后端**按《物料清单》算(标准用量 × 排产数量 + 损耗量),页面不再自己乘 ——
+ * 一处算、一处显示,免得界面和提交时的校验各算一套。
  *
- * 找不到编码时**不猜**:返回 miss,由页面提示「该物料不在本工单的物料清单里」。
+ * @param {any[]} lines 后端明细行
+ * @returns {any[]} 每行 { 行号, 编码, 名称, 规格, 单位, 应投, 实投, 待投, 行id, 批号, 已确认 }
+ */
+export function toMixRows(lines) {
+  return (Array.isArray(lines) ? lines : []).map((l, i) => {
+    const required = round4(l?.['应投'])
+    const actual = round4(l?.['实投'])
+    return {
+      行号: String(l?.['行id'] ?? i + 1),
+      编码: String(l?.['物料编号'] ?? '').trim(),
+      名称: String(l?.['物料名称'] ?? '').trim(),
+      规格: String(l?.['规格型号'] ?? '').trim(),
+      单位: String(l?.['单位'] ?? '').trim(),
+      应投: required,
+      实投: actual,
+      待投: round4(required - actual),
+      行id: Number(l?.['行id']) || 0,
+      批号: String(l?.['物料批次'] ?? '').trim(),
+      // 已确认 = 该行已有实投(>0);与后端的提交闸门、mixProgress 同一判据
+      已确认: actual > 0,
+    }
+  })
+}
+
+/**
+ * 只读明细页的行模型:后端 `GET /px/mix/doc`(一张已保存的混料单)的 `明细` → 页面行。
  *
- * @param {any[]} lines expandBom 的结果(会被就地更新 picked/remain)
- * @param {{ code: string, batch?: string }} parsed parseBarcode 的结果
- * @param {number} qty 本次实际用量(来自电子秤或手输)
+ * <p>已保存的单**不能再改**:这里只做形状归一(纸面口径用的是字符串重量,页面要数字),
+ * 不给 `行id`/`已确认` —— 页面据此判断"这是只读单据"。
+ *
+ * @param {any[]} lines 后端明细行(应投重量 / 实投重量 / 添加比例 都是纸面口径的字符串)
+ * @returns {any[]} 每行 { 行号, 编码, 名称, 规格, 单位, 应投, 实投, 批号, 比例 }
+ */
+export function toSavedRows(lines) {
+  return (Array.isArray(lines) ? lines : []).map((l, i) => ({
+    行号: String(l?.['序号'] ?? i + 1),
+    编码: String(l?.['物料编号'] ?? '').trim(),
+    名称: String(l?.['物料名'] ?? l?.['物料名称'] ?? '').trim(),
+    规格: String(l?.['规格型号'] ?? '').trim(),
+    单位: String(l?.['单位'] ?? '').trim(),
+    应投: round4(l?.['应投重量']),
+    实投: round4(l?.['实投重量']),
+    批号: String(l?.['物料批次'] ?? '').trim(),
+    比例: String(l?.['添加比例'] ?? '').trim(),
+  }))
+}
+
+/**
+ * 「全部物料都确认完毕了吗」—— 提交闸门的唯一判据。
+ *
+ * <p>与「生产领料」的 {@code pickProgress} 完全同口径:**每一行都要有数量(>0)**,
+ * 不要求等于应投量(现场多投/少投由纸上体现,系统不在这里拦)。
+ * 后端 {@code saveDoc} 会按物料清单再校一遍,两边判据一致。
+ *
+ * @param {any[]} rows {@link toMixRows} 的结果
+ * @returns {{ ok: boolean, total: number, done: number, missing: string[] }}
+ */
+export function mixProgress(rows) {
+  const arr = (Array.isArray(rows) ? rows : [])
+  const missing = arr.filter((r) => round4(r?.实投) <= 0).map((r) => String(r?.编码 || r?.名称 || ''))
+  const total = arr.length
+  const done = total - missing.length
+  return { ok: total > 0 && missing.length === 0, total, done, missing }
+}
+
+/**
+ * 确认一项:**覆盖**该行的实投量(不是累加 —— 见文件头「确认是覆盖写入」)。
+ *
+ * <p>匹配口径**只按物料编码**(与物料清单同一键):条码里的批号是采购入库派生的,
+ * 拿它和清单做全等匹配实测 0 命中。
+ *
+ * @param {any[]} rows {@link toMixRows} 的结果(会被就地更新 实投/待投/已确认/批号)
+ * @param {{ code: string, qty: number, batch?: string }} p
  * @returns {{ ok: boolean, reason?: 'miss'|'no-qty', line?: any, index?: number, exceed?: boolean }}
  */
-export function applyScan(lines, parsed, qty) {
-  const code = String(parsed?.code || '').trim()
+export function applyConfirm(rows, p) {
+  const code = String(p?.code || '').trim()
   if (!code) return { ok: false, reason: 'miss' }
-  const n = Number(qty)
-  if (!Number.isFinite(n) || n <= 0) return { ok: false, reason: 'no-qty' }
-  const idx = (Array.isArray(lines) ? lines : []).findIndex((l) => String(l.code || '').trim() === code)
+  const qty = round4(p?.qty)
+  if (!(qty > 0)) return { ok: false, reason: 'no-qty' }
+  const list = Array.isArray(rows) ? rows : []
+  const idx = list.findIndex((r) => String(r?.编码 || '').trim() === code)
   if (idx < 0) return { ok: false, reason: 'miss' }
-  const line = lines[idx]
-  const picked = Math.round((Number(line.picked) + n) * 10000) / 10000
-  // 超投不拦死(现场常有多投一点),只把超出量标出来由页面提示;
-  // 真正的对账在混料记录里,系统不在这里做库存校验。
-  line.picked = picked
-  line.remain = Math.round((Number(line.required) - picked) * 10000) / 10000
-  return { ok: true, line, index: idx, exceed: line.remain < 0 }
+  const line = list[idx]
+  line.实投 = qty
+  line.待投 = round4(round4(line.应投) - qty)
+  line.已确认 = true
+  const batch = String(p?.batch || '').trim()
+  if (batch) line.批号 = batch
+  // 超投不拦死(现场常有多投一点),只把超出量标出来由页面提示
+  return { ok: true, line, index: idx, exceed: line.待投 < 0 }
 }
 
 /**
@@ -176,50 +247,32 @@ export function checkScaleReading(reading, prev, opt = {}) {
 }
 
 /**
- * 汇总进度:已记行数 / 总行数,以及是否可整单保存。
- *
- * 整单保存的判据 = **每一行都有实际用量**(picked > 0)。
- * 页面据此把「整单保存」按钮点亮,并提示还差几项。
- *
- * @param {any[]} lines expandBom 的结果
- * @returns {{ total: number, done: number, allDone: boolean, anyDone: boolean, remainCount: number }}
- */
-export function mixProgress(lines) {
-  const arr = Array.isArray(lines) ? lines : []
-  const total = arr.length
-  const done = arr.filter((l) => Number(l.picked) > 0).length
-  return { total, done, allDone: total > 0 && done === total, anyDone: done > 0, remainCount: total - done }
-}
-
-/**
- * 拼「提交保存一笔」的请求体(POST /px/mix/scan)。
+ * 拼「确认」的请求体(POST /px/mix/scan 的 {@code 确认写入})。
  *
  * 字段名与后端 {@code MixScanService.saveScan} 逐字对应(数据键中文,ADR-0001)。
  *
- * @param {{ order?: object, line?: object, qty: number, uom?: string }} p
- *   order = 工单行({工单号, 工单行号, 行id, 产品编码, 产品名称});
- *   line  = expandBom 的一行({code,name,uom,required});
- *   qty   = 本次实际用量(秤或手输)
+ * @param {{ order?: object, line?: object, qty: number, batch?: string }} p
+ *   order = 单据抬头({工单号, 工单行号, 工单行id, 产品编码, 产品名称});
+ *   line  = {@link toMixRows} 的一行({编码, 名称, 应投, 单位});
+ *   qty   = 本次实际用量(电子秤读数或手输)
  * @returns {object} 请求体
  */
 export function buildScanPayload(p) {
   const order = p?.order || {}
   const line = p?.line || {}
-  const round4 = (n) => Math.round((Number(n) || 0) * 10000) / 10000
   return {
-    工单号: String(order.orderNo || '').trim(),
-    工单行id: Number.isFinite(Number(order.lineId)) && Number(order.lineId) > 0 ? Number(order.lineId) : undefined,
-    工单行号: Number(order.lineNo) || 0,
-    产品编码: String(order.productCode || '').trim(),
-    产品名称: String(order.productName || '').trim(),
-    物料编号: String(line.code || '').trim(),
-    物料名称: String(line.name || '').trim(),
-    // 物料批次(2026-11-18 第二轮):物料码是 `存货编码|批号`,批号随码带下来 ——
-    // 纸面《成型配料记录》有「物料批次」一列,不存下来就印不出来。
+    工单号: String(order.工单号 || '').trim(),
+    工单行id: Number(order.工单行id) > 0 ? Number(order.工单行id) : undefined,
+    工单行号: Number(order.工单行号) || 0,
+    产品编码: String(order.产品编码 || '').trim(),
+    产品名称: String(order.产品名称 || '').trim(),
+    物料编号: String(line.编码 || '').trim(),
+    物料名称: String(line.名称 || '').trim(),
+    // 物料批次:物料码是 `存货编码|批号`,批号随码带下来 —— 纸面《成型配料记录》有「物料批次」一列
     物料批次: String(p?.batch || '').trim(),
-    计划用量: round4(line.required),
+    计划用量: round4(line.应投),
     实际用量: round4(p?.qty),
-    单位: String(line.uom || p?.uom || '').trim(),
+    单位: String(line.单位 || '').trim(),
   }
 }
 
@@ -276,4 +329,3 @@ export function buildMixSlipPayload({ docNo, data } = {}) {
     明细: Array.isArray(d['明细']) ? d['明细'] : [],
   }
 }
-

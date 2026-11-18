@@ -203,19 +203,39 @@ const routes = [
       // 手机扫码 · 生产退料(2026-11-18 从「生产领料」独立出来)。
       //   用户口径:「我还想生产退料独立出来,就是已经领料且审核的领料单据,来扫码退料。
       //     其实就是独立出来一个面版,让生产领料不用负责那么多功能,操作也方便。」
-      //   ⇒ 页面 = views/mobile/MobileReturnList.vue(查可退单据 → 扫物料 → 填数量 → 提交)。
+      //   ⇒ 页面 = views/mobile/MobileReturnList.vue(查可退单据 → 点一行进明细页)。
       //   静态路径,必须排在下面 `panelx/list/:panelCode` 之前。
       {
         path: 'panelx/list/MOBILE_RETURN', component: () => import('@/views/mobile/MobileReturnList.vue'),
         meta: { title: '生产退料', code: 'mobileReturn', panelCode: 'MOBILE_RETURN' },
       },
+      // 生产退料单明细(2026-11-18 第四轮新增;用户口径「生产退料也要扫码到明细行再扫物料码退料,
+      //   要和(扫码混料一样)对齐生产领料」)。版面/交互与「生产领料单」「混料单明细」同一套:
+      //   扫物料码解锁对应的明细行 → 填退料数量 → 确认 → 底栏提交生成生产退料单。
+      //   ?id=台账号(列表点进来) / ?no=领料单号(从生产领料的已完成单「去生产退料」过来)。
+      //   必须排在 `panelx/list/:panelCode` 之前,理由同上。
+      {
+        path: 'panelx/list/MOBILE_RETURN/doc', component: () => import('@/views/mobile/MobileReturnDoc.vue'),
+        meta: { title: '生产退料单', code: 'mobileReturnDoc', panelCode: 'MOBILE_RETURN' },
+      },
       // 手机扫码 · 扫码混料(2026-11-18,新增;接替已下架的「工单扫码领料」)。
-      // 扫工单码 → 带出一级BOM(物料清单)→ 逐项扫物料码 → 取电子秤数 → 逐笔保存 → 整单保存 →
-      // 自动打印混料单 → 重扫工单可补打印。页面级虚拟面板 MIX_SCAN(定义见后端 PagePanelRegistry)。
+      // 第四轮(2026-11-18 用户口径「应该和生产领料一样也是跳转到单据的明细里面再开始扫物料码,
+      //   解锁…取秤…确认…全部物料确认完毕后,才可以提交」)⇒ 与生产领料同构的**两页**:
+      //   列表页(本页)= 查询单据 + 扫工单码定位 + 未完成/已完成两组;
+      //   明细页(下面一条)= 扫物料码解锁 → 电子秤取数 → 确认 → 全部确认才可提交并打印。
+      // 页面级虚拟面板 MIX_SCAN(定义见后端 PagePanelRegistry)。
       // ⚠ 必须排在下面 `panelx/list/:panelCode` 参数路由**之前**(静态路径优先),否则会被当成面板码。
       {
         path: 'panelx/list/MOBILE_MIX_SCAN', component: () => import('@/views/mobile/MobileMixScan.vue'),
         meta: { title: '扫码混料', code: 'mobileMixScan', panelCode: 'MIX_SCAN' },
+      },
+      // 混料单明细(2026-11-18 第四轮新增;版面与交互照「生产领料单」MobilePickDoc.vue)。
+      //   ?wo=工单号&line=行号 ⇒ 未完成作业(扫物料解锁/取秤/确认/提交);
+      //   ?docNo=PL…          ⇒ 已保存的单据(只读 + 补打印)。
+      //   必须排在 `panelx/list/:panelCode` 之前,理由同上。
+      {
+        path: 'panelx/list/MOBILE_MIX_SCAN/doc', component: () => import('@/views/mobile/MobileMixDoc.vue'),
+        meta: { title: '混料单明细', code: 'mobileMixDoc', panelCode: 'MIX_SCAN' },
       },
       // 工序报工(2026-10-21 原样搬迁,页面逻辑一行不动):扫工单 → 选工序 → 填完工数量 → 提交。
       {

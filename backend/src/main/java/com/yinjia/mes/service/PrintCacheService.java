@@ -222,15 +222,21 @@ public class PrintCacheService {
         }
     }
 
-    /** 缓存列表(等补打 + 已发等回执)，新→旧，最多 100 条 */
+    /**
+     * 缓存列表(等补打 + 已发等回执 + **最近没打出来的**)，新→旧，最多 100 条。
+     *
+     * <p>2026-11-18 用户报障「打印失败」:FAILED 的行以前只落在库里,面板上一个字都看不见 ——
+     * 也就没有「失败原因」可看、更没法在修好打印机后点【补打】。现在一并列出来
+     * (状态仍是 FAILED,前端显示「打印失败」+ 原因;补打/删除按钮对它同样有效)。
+     */
     public List<Map<String, Object>> list() {
         List<Map<String, Object>> out = new ArrayList<>();
         try {
             List<CachedTask> rows = jdbc.query(
                     "SELECT TOP 100 id, task_type, title, slip_no, wo_no, targets, delivered, state,"
                             + " CONVERT(nvarchar(19), created_at, 120) AS created_at_txt, fail_reason, payload_json"
-                            + " FROM yj_print_task WHERE state IN (?, ?) ORDER BY id DESC",
-                    (rs, i) -> mapTask(rs), PENDING, SENT);
+                            + " FROM yj_print_task WHERE state IN (?, ?, ?) ORDER BY id DESC",
+                    (rs, i) -> mapTask(rs), PENDING, SENT, FAILED);
             for (CachedTask t : rows) out.add(t.json());
         } catch (RuntimeException e) {
             log.warn("读打印缓存失败:{}", e.toString());

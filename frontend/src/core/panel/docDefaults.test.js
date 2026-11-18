@@ -343,3 +343,15 @@ test('headDefaults:不传/为空串时行为与改造前一致（不给别的面
   assert.equal(b['密级'], '公开', '空串/null 默认值不得覆盖或写入')
   assert.ok(!('文件使用范围' in b), 'null 默认值不应写入空键')
 })
+
+test('出货检验计划的表单管理人默认崔晓云（2026-11-18 用户口径）', () => {
+  // 用户：「出货控制计划的表单管理员默认写崔晓云」——覆盖原默认「冯敏」，
+  // 与《流程》表行24「崔晓云制作 出货控制计划」一致。
+  const form = {}
+  applyDocDefaults('RD_INSP_PLAN', form, USER, { isNew: true, today: T })
+  assert.equal(form['表单管理人'], '崔晓云', '默认应为崔晓云')
+  assert.notEqual(form['表单管理人'], '冯敏', '不得再回落成旧默认冯敏')
+  // 其余默认值不受影响
+  assert.equal(form['标题'], '出货检验项目控制计划')
+  assert.equal(form['密级'], '保密')
+})

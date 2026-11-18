@@ -50,14 +50,18 @@ test('② colgroup 与 table 用同一个缩放系数（不能一边 dtFillK 一
   assert.match(block, /\(\s*c\.span \|\| 1\s*\)/, '缩放必须按 span 计入宽度（与 dtTableW/dtColSum 同口径）')
 })
 
-test('③ dtTableW 与 colgroup 完全同口径（span × 列宽 × 缩放）', () => {
+test('③ dtTableW 与 colgroup 完全同口径（列**总**宽 × 缩放，不再乘 span）', () => {
+  // 2026-11-18 口径变更：`w` = 该列总宽。
+  //   旧写法 `span × w` 会让 span 列被放大 N 倍（炭棒配方表 780 → 1779px 溢出纸面）。
+  //   现在三处同源：colgroup 宽度 = (w×K)/span，dtColSum / dtFillK.want = Σw。
   const m = sheet.match(/function dtTableW\(dt\)[\s\S]*?\n\}/)
   assert.ok(m, '找不到 dtTableW')
-  assert.match(m[0], /dtColSum\(dt\)/, 'dtTableW 必须基于 dtColSum（含 span）')
+  assert.match(m[0], /dtColSum\(dt\)/, 'dtTableW 必须基于 dtColSum')
   assert.match(m[0], /dtFillK\(dt\)/, 'dtTableW 必须乘 dtFillK')
   const s = sheet.match(/function dtColSum\(dt\)[\s\S]*?\n\}/)
   assert.ok(s, '找不到 dtColSum')
-  assert.match(s[0], /\(c\.span \|\| 1\)\s*\*\s*\(c\.w \|\| 100\)/, 'dtColSum 要按 span 计权')
+  assert.doesNotMatch(s[0], /\(c\.span \|\| 1\)\s*\*/, 'dtColSum 不得再乘 span')
+  assert.match(s[0], /sum \+ \(c\.w \|\| 100\)/, 'dtColSum 按列总宽累加')
 })
 
 test('④ 「＋ 新增数据记录行」条与表格同宽（不能被漏下）', () => {

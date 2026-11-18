@@ -236,7 +236,15 @@ public class PrintStationController {
                              /** 已经投递给哪些站点(每个站点只投一次;全部投完就出队) */
                              Set<String> delivered,
                              /** 入队时刻(过期丢弃) */
-                             long createdAt) {
+                             long createdAt,
+                             /**
+                              * 失败原因(2026-11-18,代理回执里的 error)。
+                              *
+                              * <p>为什么必须带出来:用户报障「打印失败」时就只有这俩字 ——
+                              * 代理侧真正的错(如「缺少打印内容」「打印机不可用」)以前只写到
+                              * 代理自己的日志里,面板上看不见,现场只能猜。空 = 没失败。
+                              */
+                             String 失败原因) {
         Map<String, Object> json() {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", id);
@@ -257,6 +265,7 @@ public class PrintStationController {
             m.put("产品名称", 产品名称);
             m.put("规格型号", 规格型号);
             m.put("来源", 来源);
+            if (失败原因 != null && !失败原因.isBlank()) m.put("失败原因", 失败原因);
             m.put("发起人", 发起人);
             m.put("时间", 时间);
             m.put("目标站点", new ArrayList<>(targets));
@@ -442,7 +451,13 @@ public class PrintStationController {
     /**
      * 打印电脑回报"这张已出纸"(或失败)。
      *
-     * @param body {taskId, ok:true/false, error?:文案, printer?:打印机名, 标题?, 类型?, 工单号?, 工单行号?, 发起人?}
+     * <p>🔴 2026-11-18 用户报障「打印失败」:回执以前只带 {@code ok},失败时面板上只有"失败"两个字。
+     * 现在代理会把**真正的错误**(本机 /print 返回的 error)塞进 {@code error},这里两处都用上:
+     * ① 落 {@code yj_print_task.fail_reason}(打印缓存列表里能看见);
+     * ② 进「最近出纸」那条记录({@code 失败原因}),刷新面板就能看出是哪一步打不出来。
+     *
+     * @param body {taskId, ok:true/false, error?:文案, printer?:打印机名, 类型?, 标题?,
+     *              领料单号?, 工单号?, 工单行号?, 发起人?}
      */
     @PostMapping("/ack")
     public ApiResult<Void> ack(@RequestBody Map<String, Object> body) {
@@ -450,20 +465,24 @@ public class PrintStationController {
         long id = toLong(body.get("taskId"));
         boolean ok = !Boolean.FALSE.equals(body.get("ok"));
         String printer = str(body.get("printer"));
+        String why = str(body.get("error"));
         if (!ok) {
-            log.warn("打印站点出纸失败 task={} printer={} error={}", id, printer, str(body.get("error")));
+            log.warn("打印站点出纸失败 task={} printer={} error={}", id, printer, why);
         }
         // 库里那条缓存任务落回执(成功=DONE / 失败=FAILED + 原因,失败的行面板上能看见)
-        cache.ack(id, ok, str(body.get("error")));
+        cache.ack(id, ok, why);
         synchronized (DONE) {
             DONE.addFirst(new PrintTask(id, typeOf(body.get("类型")), str(body.get("标题")), "",
                     str(body.get("工单号")), toInt(body.get("工单行号")), "", "",
                     ok ? "已出纸" : "失败", str(body.get("发起人")), LocalDateTime.now().format(TS), "",
-                    "", "", "", java.util.List.of(),
+                    // 领料单号(2026-11-18):扫码单没有工单号,不带这个的话「最近出纸」全是「—」,
+                    //   就认不出刚才提交的是哪张单(用户看的正是这一列)。
+                    str(body.get("领料单号")), "", "", java.util.List.of(),
                     // 2026-11-18:PrintTask 多了「纸面可变文案」三项(表头/部门标签/签名),回执不再出纸,
                     //   一律给空 —— 出纸记录只用于「自动打印」页显示最近打了什么。
                     java.util.List.of(), "", java.util.List.of(),
-                    Set.of(), Set.of(), System.currentTimeMillis()));
+                    Set.of(), Set.of(), System.currentTimeMillis(),
+                    ok ? "" : why));
             while (DONE.size() > MAX_DONE) DONE.removeLast();
         }
         return ApiResult.ok(null);

@@ -25,6 +25,12 @@ export const FIXED_SHEET_W = {
   RD_PLAN: 1242,
   // 样品两张单（2026-11-06 表格式纸面）：纸宽 = 模板各列宽之和，否则外层 flex 会把列宽拉伸变形
   RD_SAMPLE_EXT: 1188,
+  // 2026-11-18 修（研发管理版面审计发现）：`RD_SAMPLE_ND`（外部-非开发样品）复用
+  //   **同一份 `sampleExtSheetCfg`**（PanelxList 里 EXT/ND 共用一个配置），
+  //   但这里只登记了 EXT ⇒ ND 的 fixedSheetWidth=0 落回默认纸宽 940，
+  //   而表体是 13 列共 1188 ⇒ 表格比纸宽出 249px（实测 paperW=940 / .sg-table=1189）。
+  //   同一份配置必须同一纸宽。
+  RD_SAMPLE_ND: 1188,
   // 内部单 = 13 列合计 1220（2026-11-11 修正：原写 1450，比列宽和多 230 ⇒ 纸右缘一条空档、
   // 表体只占左侧 1221px，标题「内部（开发样品申请单）」也被纸面滚动容器裁掉 67px）。
   // 钉死口径：FIXED_SHEET_W 与 grid.cols 的 w 之和必须相等，见 docSheetWidth.test.js。
