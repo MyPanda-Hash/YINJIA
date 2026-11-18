@@ -4990,3 +4990,5 @@ migrate-mold-proc-auditor-20261117.sql
 migrate-prod-info-perf-stdlib-20261117.sql
 # 2026-11-18 出货检验计划：表单管理人默认改崔晓云（存量按旧默认冯敏的改成崔晓云）
 migrate-insp-plan-manager-20261118.sql
+# 2026-11-18 X烧结配方表：存量小数位订正为 2 位 + 删除全空配方行（回填过滤已在代码侧修）
+migrate-xsinter-formula-fix-20261118.sql

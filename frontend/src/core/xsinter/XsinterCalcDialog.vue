@@ -479,10 +479,19 @@ function apply() {
     '密度要求中间值': fmt(c.density.mid),
     '密度要求上限': fmt(c.density.high),
   }
-  const detail = lines.value.map((r, i) => {
+  // 2026-11-18 用户口径（X烧结截图）：「写了在配方计算回填的时候没有数据的行自己去掉，怎么现在还有显示的」
+  //   ⇒ 回填只写**有物料**的行（物料编号或物料名称任一非空），其余（默认 10 行里的空行）不进单据。
+  //   注意两点：
+  //   ① 过滤前先带**原始下标** idx 去查 c.rows[idx]（计算结果是按行下标对齐的），过滤后再重排序号；
+  //   ② `blankRows:10` 的默认空行是"新建空表时铺一次"（本表区为空才铺），
+  //      回填写入 N 行后表区非空 ⇒ 不会再把 10 行空行铺回来。
+  const detail = lines.value
+    .map((r, idx) => ({ r, idx }))
+    .filter(({ r }) => String(r.code || '').trim() !== '' || String(r.name || '').trim() !== '')
+    .map(({ r, idx }, i) => {
     const gram = isGramRow(r.kind)
-    const design = c.rows[i]?.design
-    const actual = c.rows[i]?.actual
+    const design = c.rows[idx]?.design
+    const actual = c.rows[idx]?.actual
     return {
       序号: String(i + 1),
       物料种类: r.kind,
@@ -493,7 +502,7 @@ function apply() {
       设计添加量: fmt(gram ? design : percentOf(design), 'ratio'),
       // 添加比例恒存百分数：颗粒料现在也有实际比例（克数 ÷ 总重），旧口径存的是 9 克本身
       添加比例: fmt(percentOf(actual), 'ratio'),
-      '单支含量g': fmt(c.rows[i]?.perPiece, 'piece'),
+      '单支含量g': fmt(c.rows[idx]?.perPiece, 'piece'),
     }
   })
   emit('applied', { head, detail })
