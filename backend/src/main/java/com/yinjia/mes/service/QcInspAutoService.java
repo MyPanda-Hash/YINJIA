@@ -220,12 +220,12 @@ public class QcInspAutoService {
                     drafts.add(new Draft(panel, head(panel, r, p, op, xc, opDone, repNo)));
                 }
             }
-        } else if (!FIRST_OP.equals(op) && !AsmInspEntry.OPS.contains(op)) {
+        } else if (!FIRST_OP.equals(op) && !AsmInspEntry.isAsmOp(op)) {
             reasons.add("工序「" + op + "」不出检验单");
         }
 
-        // ── ③ 出货检验表观:进入组装/装箱环节即出(2026-11-12 用户口径,判据在 AsmInspEntry)──
-        //    与①②互不绑定:切炭报工把量流进组装时会出;组装/装箱自己报工也会出(此时①②本来就没有这张单)。
+        // ── ③ 出货检验表观:进入**末道工序**即出(2026-11-18 口径;判据在 AsmInspEntry)──
+        //    与①②互不绑定:切炭报工把量流进组装/组装装箱时会出;末道自己报工也会出(此时①②本来就没有这张单)。
         AsmInspEntry.Status asm = AsmInspEntry.of(jdbc, rowId);
         if (asm.entered()) {
             if (existsLive(ASM_PANEL, wo, xc)) {
@@ -350,10 +350,10 @@ public class QcInspAutoService {
     }
 
     /**
-     * **出货检验表观**(QC_ASM_INSP,原组装成品检验单):进入组装/装箱环节即出单(2026-11-12 口径)。
+     * **出货检验表观**(QC_ASM_INSP,原组装成品检验单):进入末道工序即出单(2026-11-18 口径)。
      *
-     * <p>「工序」取**组装环节的工序**(组装/装箱),不是触发那条报工的工序 —— 切炭报工把量流进组装时,
-     * 表观单上的工序必须是「组装」而不是「切炭」。
+     * <p>「工序」取**末道工序**(组装 / 装箱 / 组装装箱 都算),不是触发那条报工的工序 ——
+     * 切炭报工把量流进末道时,表观单上的工序必须是末道那道而不是「切炭」。
      *
      * <p>「报工数量」= 进入本环节的**可加工量**(上游已审报工折成品流下来的量);若该道已经报过工,
      * 至少取已报工量 —— 原来写的是「组装累计已报工」,提前出单那一刻它还是 0,纸面会像个空单。
@@ -369,8 +369,8 @@ public class QcInspAutoService {
         head.put("单据日期", today);
         head.put("工单号", firstNonBlank(str(r.get("工单号")), str(p.get("pl_no"))));
         if (xc != 0) head.put("工单行号", xc);
-        // 报工单号只在「确实是组装/装箱报工」时留痕;切炭报工触发的提前出单不写,免得纸面看着像切炭单
-        if (!repNo.isBlank() && AsmInspEntry.OPS.contains(str(r.get("工序")))) head.put("报工单号", repNo);
+        // 报工单号只在「确实是组装/装箱类报工」时留痕;切炭报工触发的提前出单不写,免得纸面看着像切炭单
+        if (!repNo.isBlank() && AsmInspEntry.isAsmOp(str(r.get("工序")))) head.put("报工单号", repNo);
         head.put("工序", e.op());
         // 批次优先取**工单行**的批次(进入组装的是这一行的批次),报工行批次只在工单行没有时兜底
         String batch = firstNonBlank(str(p.get("批次号")), str(r.get("批次号")));
@@ -379,7 +379,7 @@ public class QcInspAutoService {
         head.put("产品名称", firstNonBlank(str(r.get("产品名称")), str(p.get("mc"))));
         String spec = firstNonBlank(str(r.get("规格型号")), str(p.get("gg")));
         if (!spec.isEmpty()) head.put("规格型号", spec);
-        // 生产线取**组装/装箱那道**的实际线(自动补线后 plang.scx 已切到该线;台账实际线更准)
+        // 生产线取**末道那道**的实际线(自动补线后 plang.scx 已切到该线;台账实际线更准)
         String line = firstNonBlank(e.line(), firstNonBlank(str(r.get("生产线")), str(p.get("scx"))));
         if (!line.isEmpty()) {
             head.put("生产线", line);

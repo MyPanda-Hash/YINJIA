@@ -974,12 +974,12 @@ export default {
     '生产工单行加载失败': 'Failed to load production work order lines',
     '生成出货检验单功能失败': 'Failed to create the outgoing functional inspection sheet',
     // ---- 选生产工单:出货检验表观(QC_ASM_INSP)接入,2026-11-12 ----
-    //   准入 = 已进入组装/装箱(判据在后端 AsmInspEntry);弹窗与制程共用一个组件,列多出
-    //   进入环节/进入量/已审报工量。中文源串见 QcProcInspWoPicker.vue / QcAsmInspController.java。
+    //   准入 = 已进入末道工序(2026-11-18 修订;判据在后端 AsmInspEntry);弹窗与制程共用一个组件,
+    //   列多出 进入环节/进入量/已审报工量。中文源串见 QcProcInspWoPicker.vue / QcAsmInspController.java。
     '进入环节': 'Entered Stage',
     '进入量': 'Entered Qty',
     '已审报工量': 'Approved Reported Qty',
-    '未进入组装/装箱': 'Not in Assembly/Packing',
+    '未进入末道工序': 'Not in final operation',
     // 弹窗共用列/按钮(此前只有中文,切 en 时露中文;2026-11-12 一并补齐)
     '可开单': 'Creatable',
     '强制开单': 'Force create',
@@ -988,19 +988,19 @@ export default {
     '免门禁': 'Gate exempt',
     '存量放行': 'Legacy pass',
     '预警放行': 'Warn pass',
-    '选择一条已进入组装/装箱工序的生产工单行（工单号 + 工单行号唯一确定）生成出货检验表观草稿；已建单的行会标出来，重复选择不会重复建单。':
-      'Pick a production work-order line that has entered assembly/packing (work order no. + line no. uniquely identify it) to create an outgoing appearance inspection sheet draft; lines that already have a sheet are marked, re-picking will not create a duplicate.',
-    '只列工艺路线含「组装/装箱」的工单行；尚未进入组装/装箱的行会置灰并写明原因。':
-      'Only work-order lines whose routing contains "Assembly/Packing" are listed; lines that have not entered assembly/packing are greyed out with the reason.',
+    '选择一条已进入末道工序的生产工单行（工单号 + 工单行号唯一确定）生成出货检验表观草稿；已建单的行会标出来，重复选择不会重复建单。':
+      'Pick a production work-order line that has entered its final operation (work order no. + line no. uniquely identify it) to create an outgoing appearance inspection sheet draft; lines that already have a sheet are marked, re-picking will not create a duplicate.',
+    '只列末道工序是「组装/装箱」的工单行（组装、装箱、组装装箱都算）；尚未进入末道工序的行会置灰并写明原因。':
+      'Only work-order lines whose final operation is Assembly/Packing (assembly, packing or assembly-packing) are listed; lines that have not entered the final operation are greyed out with the reason.',
     '未生成出货检验表观': 'No outgoing appearance inspection sheet was created',
     '该工单行已有出货检验表观': 'This work-order line already has an outgoing appearance inspection sheet',
     '已生成出货检验表观': 'Outgoing appearance inspection sheet created',
     '生成出货检验表观失败': 'Failed to create the outgoing appearance inspection sheet',
     // 后端判据话术(AsmInspEntry;前端用 tt() 包裹后显示,英文界面同样出英文)
-    '该工单行尚未进入组装/装箱工序（上一道工序还没有已审核报工流入），暂不能生成出货检验表观':
-      'This work-order line has not entered the assembly/packing stage yet (the previous operation has no approved reported quantity flowing in), so the outgoing appearance inspection sheet cannot be created yet.',
-    '该工单的工艺路线里没有「组装/装箱」工序，不出出货检验表观':
-      'This work order\'s routing has no assembly/packing operation, so no outgoing appearance inspection sheet is produced.',
+    '该工单行尚未进入末道工序（上一道工序还没有已审核报工流入），暂不能生成出货检验表观':
+      'This work-order line has not entered its final operation yet (the previous operation has no approved reported quantity flowing in), so the outgoing appearance inspection sheet cannot be created yet.',
+    '该工单的工艺路线末道工序不是「组装/装箱」，不出出货检验表观':
+      'The final operation of this work order\'s routing has no assembly/packing operation, so no outgoing appearance inspection sheet is produced.',
     // ---- 制程检验单横表「一个检验项目 = 一列,列内格数可加减」(2026-10-16)----
     // ---- 制程检验单纸张横表:固定列 + 表头「列数」动态列(2026-10-17)----
     '列数': 'Columns',
@@ -3328,6 +3328,8 @@ export default {
     '规格书': 'Specification',
     '组装BOM表': 'Assembly BOM',
     '组装物料清单': 'Assembly BOM',
+    // 混料物料清单(2026-11-18 新增;烧结侧基础数据,数据来自已归档的烧结工艺清单/X烧结工艺清单)
+    '混料物料清单': 'Mixing BOM',
     '组装工艺清单': 'Assembly Process List',
     '出货检验计划表': 'Outgoing Inspection Plan',
     '加标水配置记录表': 'Spike Water Preparation',

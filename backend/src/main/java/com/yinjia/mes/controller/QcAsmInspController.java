@@ -34,8 +34,10 @@ import java.util.Map;
  *   <li>{@code POST /api/qc/asmInsp/fromWoLine} —— 选中一行生成表观单草稿(幂等:已有存活单直接返回那张)。</li>
  * </ul>
  *
- * <p><b>准入判据与制程单不同</b>(制程单是「成型已报工」):表观单是「**已进入组装/装箱环节**」
- * (用户口径「在进入到组装/装箱这个工序或者产线的时候就生成」),判据/话术都在 {@link AsmInspEntry} 一处。
+ * <p><b>准入判据与制程单不同</b>(制程单是「成型已报工」):表观单是「**已进入末道工序**」
+ * (2026-11-18 用户口径「这个出货检验表观应该修改为进入末道工序的就能在这里被选择」;
+ * 末道工序名不统一 —— 组装 / 装箱 / 组装装箱 都算,见 {@link AsmInspEntry#isAsmOp}),
+ * 判据/话术都在 {@link AsmInspEntry} 一处。出货功能检验与首件检验的选单**不受影响**。
  * 未进入的行**照旧列出来并置灰**,写明原因;有「强制开单」权限的人可填原因越闸(留痕 {@code yj_usage_log}),
  * 与制程检验单的强制开单同一套执行层({@link WoInspGateGuard#enforceVerdict})。
  *
@@ -70,8 +72,8 @@ public class QcAsmInspController {
     }
 
     /**
-     * 可选的生产工单行:未作废、未结案({@link PlangClose})、工艺路线里含「组装/装箱」
-     * ({@link AsmInspEntry#routeHasAssembly})。
+     * 可选的生产工单行:未作废、未结案({@link PlangClose})、工艺路线**末道工序是组装/装箱类**
+     * ({@link AsmInspEntry#routeHasAssembly},含「组装装箱」这类合并命名)。
      *
      * <p>不按「是否已进入」过滤 —— 未进入的行也列出来并置灰 + 写原因,现场能看到"差什么"
      * (与制程检验单选单弹窗同一口径:门禁不藏行)。
@@ -155,7 +157,7 @@ public class QcAsmInspController {
         if (lines.isEmpty()) return ApiResult.error(400, "该生产工单行不存在、已作废或已结案：" + woNo + " #" + xc);
         long rowId = ((Number) lines.get(0).get("行id")).longValue();
 
-        // 准入:已进入组装/装箱(前端虽已置灰,这里**再硬校验一次** —— 直连接口同样拦得住)
+        // 准入:已进入末道工序(前端虽已置灰,这里**再硬校验一次** —— 直连接口同样拦得住)
         AsmInspEntry.Status st = AsmInspEntry.of(jdbc, rowId);
         if (!st.entered()) {
             WoInspGateGuard.Decision d = gate.enforceVerdict(PANEL,
@@ -177,7 +179,7 @@ public class QcAsmInspController {
         return ApiResult.ok(created(str(saved.get("编号")), false));
     }
 
-    /** 把「是否已进入组装/装箱」落到弹窗列表的每一行(键名与共享弹窗一致) */
+    /** 把「是否已进入末道工序」落到弹窗列表的每一行(键名与共享弹窗一致) */
     private void decorate(List<Map<String, Object>> rows) {
         Map<String, AsmInspEntry.Status> gateOf = AsmInspEntry.checkPage(jdbc, rows);
         for (Map<String, Object> r : rows) {
