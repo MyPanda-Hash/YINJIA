@@ -280,7 +280,7 @@ const groups = computed(() => {
     .filter((g) => g.items.length || g.key === '已作废')
 })
 
-// 退料兜底:库存里没有该物料时,仓库要手选
+// 仓库下拉(2026-11-19:其他退料改成"退到哪个仓由现场选",不再是库存没命中时的兜底)
 const warehouses = ref([])
 const warehouseCode = ref('')
 // 现场是否亲手选过仓库(选过就"粘住":同一批料连着扫,都退到同一个仓,不再被库存行的仓刷新)
