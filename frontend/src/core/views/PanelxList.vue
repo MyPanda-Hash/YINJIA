@@ -2890,7 +2890,7 @@ import { previewLineText, previewSummaryOf } from '@core/panel/docPreview.js'
 import { missingKeyFromMessage } from './recordSheetFocus'
 import QcInspReqSheet from './QcInspReqSheet.vue'
 import { isQcInspReqPanel } from './qcInspReqConfig'
-import { approvalSheetCfg, planSheetCfg, qcSheetCfgs, sampleExtSheetCfg, sampleIntSheetCfg } from './docSheetConfigs'
+import { approvalSheetCfg, planSheetCfg, qcSheetCfgs, sampleExtSheetCfg, sampleIntSheetCfg, sampleNdSheetCfg } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import BomImportDialog from './BomImportDialog.vue'
 import ProductImportDialog from './ProductImportDialog.vue'
@@ -3030,7 +3030,9 @@ const docSheetConfig = computed(() => {
   // 2026-11-06 样品二级目录两张单（各自版式，见 docSheetConfigs 的 sampleExt/IntSheetCfg）
   // 非开发样品申请单（2026-11-17 Excel #14）：用户口径「复制一份样品-外部开发样品单页面及入口」
   //   ⇒ 纸面版式**逐字复用** sampleExtSheetCfg，不另写一套。
-  if (panelCode.value === 'RD_SAMPLE_EXT' || panelCode.value === 'RD_SAMPLE_ND') return sampleExtSheetCfg
+  // 2026-11-18：非开发样品申请单独立配置（标题「非开发样品申请单」+ 一级审批只留申请/审核两格）
+  if (panelCode.value === 'RD_SAMPLE_ND') return sampleNdSheetCfg
+  if (panelCode.value === 'RD_SAMPLE_EXT') return sampleExtSheetCfg
   // 2026-11-17 用户口径（Excel #4 第 3 条）：
   //   「新增单据时默认填充 ****年**月 内部（开发样品申请单） 表名称」
   //   ⇒ 标题前半段按**这张单所属月份**动态生成（A1 是每月一张单，所以标题也跟着月度走）。
@@ -5205,6 +5207,11 @@ const hasApprovalBtns = computed(() => isStandardFlowSheet.value
   // 只放开**显示**：能不能点仍由 isDisabled(状态×身份) + 后端 ButtonService 裁决。
   // ⚠ 内部单 2026-11-06 起改成共享表（无审批），不在这里 —— 见 migrate-sample-int-flat-20261106.sql。
   || String(panelCode.value) === 'RD_SAMPLE_EXT'
+  // 外部-非开发样品申请单（2026-11-18 用户口径「加上审批流，要有提交然后审批，一级审批就行」）：
+  //   走**通用单级审批**（草稿 → 提交审批 → 审批中 → 审批通过 → 已审核 → 弃审回草稿），
+  //   **不**登记进 TWO_LEVEL_PANELS；纸面只有「申请 / 审核」两格，
+  //   提交写申请、单级通过写审核（后端 SAMPLE_SIGN_COLUMNS 的槽位映射）。
+  || String(panelCode.value) === 'RD_SAMPLE_ND'
   // 检验委托单(INSP_COMMISSION,2026-11-15 用户口径「需要完成基础的审批流程」):
   //   走**通用单级审批**(草稿 → 提交审批 → 审批中 → 审批通过 → 已审核 → 弃审 → 草稿),
   //   不进 ADMIN_L2_PANELS(两级)/ 不进 SINGLE_LEVEL_INSP_PANELS(那两张的编制格是「检验员」),
