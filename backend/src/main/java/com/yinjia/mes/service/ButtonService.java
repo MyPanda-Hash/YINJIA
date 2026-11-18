@@ -4505,10 +4505,17 @@ public class ButtonService {
     private static final String SAMPLE_SIGN_CONFIRM = "确认";
     private static final Map<String, String[]> SAMPLE_SIGN_COLUMNS = Map.of(
             "RD_SAMPLE_EXT", new String[]{"申请", "审核", "确认"},
-            "RD_SAMPLE_INT", new String[]{"申请人", "", "确认人"});
+            "RD_SAMPLE_INT", new String[]{"申请人", "", "确认人"},
+            // 外部-非开发样品申请单（2026-11-18 用户口径「加上审批流，要有提交然后审批，一级审批就行」）：
+            //   **单级审批** ⇒ 走单节点通过路径，那条路径写的是「确认」槽位（见 saveApproval 里
+            //   writeSampleSign(..., SAMPLE_SIGN_CONFIRM, operator)）。本单纸面只有「申请 / 审核」两格，
+            //   所以把该槽位**指向「审核」列** —— 等价于「审批通过的人回填审核」，
+            //   不需要在通过路径里再加面板分支（两级那条分支本单永远不会进，见 TWO_LEVEL_PANELS）。
+            "RD_SAMPLE_ND", new String[]{"申请", "审核", "审核"});
     private static final Map<String, String> SAMPLE_SIGN_TABLES = Map.of(
             "RD_SAMPLE_EXT", "rd_sample_ext_head",
-            "RD_SAMPLE_INT", "rd_sample_int_head");
+            "RD_SAMPLE_INT", "rd_sample_int_head",
+            "RD_SAMPLE_ND", "rd_sample_nondev_head");
 
     /** 样品申请单落款写入（列名走白名单，不拼外部输入；表缺失/列缺失静默跳过，不阻断审批） */
     private void writeSampleSign(String panelCode, String no, String which, String account) {

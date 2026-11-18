@@ -1179,7 +1179,22 @@ if ($Server) {
                 Start-Sleep -Seconds 10
             }
         }
-        $st = [uri]::EscapeDataString($Sta)
+        # 站点名要进 URL 查询串。Win7 的 CLR 2.0(.NET 2.0/3.5)上 [uri]::EscapeDataString
+        # 不一定存在(2026-11-18 兼容收口)⇒ 先试 .NET 原生(PS3+ 上行为一字不变),
+        # 没有就按 RFC3986 自己转义;对「仓库」「打印机-01」这类站点名,两者输出一致。
+        function Url-Encode {
+            param([string]$Text)
+            if (-not $Text) { return '' }
+            try { return [uri]::EscapeDataString($Text) } catch { }
+            $sb = New-Object System.Text.StringBuilder
+            foreach ($by in [System.Text.Encoding]::UTF8.GetBytes($Text)) {
+                $plain = (($by -ge 65 -and $by -le 90) -or ($by -ge 97 -and $by -le 122) -or
+                          ($by -ge 48 -and $by -le 57) -or $by -eq 45 -or $by -eq 46 -or $by -eq 95 -or $by -eq 126)
+                if ($plain) { [void]$sb.Append([char]$by) } else { [void]$sb.Append(('%' + $by.ToString('X2'))) }
+            }
+            return $sb.ToString()
+        }
+        $st = Url-Encode $Sta
         $pollErr = 0
         $pollErrMsg = ''
         JobLog "[轮询] 开始轮询(每 4 秒一次;站点:$Sta)"

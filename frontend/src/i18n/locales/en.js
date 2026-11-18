@@ -5227,6 +5227,13 @@ export default {
     '退到仓库': 'Return to warehouse',
     '请选择退到哪个仓库': 'Select the warehouse to return to',
     '请选择仓库': 'Select a warehouse',
+    // 2026-11-19 其他退料可自选仓库
+    '库存仓': 'Stock warehouse',
+    '仓库档案没加载出来，请返回重进': 'Warehouse list failed to load — please go back and reopen',
+    // 2026-11-19 补齐本页此前漏译的三条(单测 scanOther.test.js 已加守卫)
+    '加入清单': 'Add to list',
+    '还没有扫码加入的物料': 'No materials scanned yet',
+    '该批号可用量为 0': 'This lot has no available quantity',
     '数量要大于 0': 'Quantity must be greater than 0',
     '数量超过了该批号的可用量': 'Quantity exceeds the available amount of this lot',
     '输入单号或关键字查询': 'Enter a document no. or keyword',

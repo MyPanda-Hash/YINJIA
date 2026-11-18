@@ -9,9 +9,13 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   SIDE_PICK, SIDE_RET, panelOfSide, bizOfSide, titleOfSide, isRet, normalizeSide,
   lineKey, checkQty, mergeLine, buildForm, buildOtherOutForm, buildMaterialRetForm, doneMessage,
+  toWarehouseOptions, defaultWarehouseCode, withWarehouse,
 } from './scanOther.js'
 
 const cand = (over = {}) => ({
@@ -143,4 +147,89 @@ test('提交成功提示带单号,空单号也不出现 "null"', () => {
   assert.ok(doneMessage(SIDE_RET, 'TL-20261116-0001').includes('生产退料单'))
   assert.ok(!doneMessage(SIDE_PICK, '').includes('null'))
   assert.ok(!doneMessage(SIDE_RET, null).includes('undefined'))
+})
+
+// ── 其他退料「退到仓库」可自选(2026-11-19 用户口径)──────────────────────────
+
+test('toWarehouseOptions:停用仓不进下拉', () => {
+  const rows = [
+    { 仓库编码: 'CK00006', 仓库名称: '华北工控仓', 停用: 0 },
+    { 仓库编码: 'CK00005', 仓库名称: '原料不良品仓', 停用: false },
+    { 仓库编码: 'CK01', 仓库名称: '原料仓', 停用: 1 },
+    { 仓库编码: 'CK02', 仓库名称: '辅料仓', 停用: '1' },
+    { 仓库编码: 'CK03', 仓库名称: '成品仓', 停用: true },
+    { 仓库编码: 'CK04', 仓库名称: '半成品仓', 停用: '是' },
+    { 仓库编码: '', 仓库名称: '空编码', 停用: 0 },
+    { 仓库编码: 'CK-A', 仓库名称: 'A仓' },              // 字段缺失 = 启用,不误杀
+    { 仓库编码: 'CK-C' },                                 // 没名称就用编码顶上
+  ]
+  assert.deepEqual(toWarehouseOptions(rows), [
+    { code: 'CK00006', name: '华北工控仓' },
+    { code: 'CK00005', name: '原料不良品仓' },
+    { code: 'CK-A', name: 'A仓' },
+    { code: 'CK-C', name: 'CK-C' },
+  ])
+  assert.deepEqual(toWarehouseOptions(null), [])
+  assert.deepEqual(toWarehouseOptions([{}]), [])
+})
+
+test('defaultWarehouseCode:库存行有仓就用它,没有就留空逼现场选', () => {
+  assert.equal(defaultWarehouseCode(cand()), 'CK00006')
+  assert.equal(defaultWarehouseCode(cand({ 仓库编码: '  CK00005  ' })), 'CK00005')
+  assert.equal(defaultWarehouseCode(cand({ 仓库编码: '', 仓库: '' })), '')
+  assert.equal(defaultWarehouseCode(null), '')
+})
+
+test('withWarehouse:改仓要同时换掉 仓库名称 + 仓库编码', () => {
+  const out = withWarehouse(cand(), { code: 'CK00005', name: '原料不良品仓' })
+  assert.equal(out.仓库编码, 'CK00005')
+  assert.equal(out.仓库, '原料不良品仓', '只写编码会让纸面「仓库」那格空着')
+  assert.equal(out.批号, 'PC0000', '改仓不动批号')
+  assert.equal(cand().仓库编码, 'CK00006', '入参不能被就地改掉')
+  // 没选仓时原样返回(不能把仓库清成空)
+  assert.equal(withWarehouse(cand(), null).仓库编码, 'CK00006')
+  assert.equal(withWarehouse(cand(), { code: '  ' }).仓库编码, 'CK00006')
+  // 只有编码没有名称 ⇒ 用编码兜底
+  assert.equal(withWarehouse(cand(), { code: 'CK00005' }).仓库, 'CK00005')
+})
+
+test('改仓后退料单落的是选中的仓,同物料退两个仓 = 两行', () => {
+  const lines = mergeLine([], withWarehouse(cand(), { code: 'CK00005', name: '原料不良品仓' }), 2, SIDE_RET).lines
+  const form = buildMaterialRetForm(lines, { date: '2026-11-19' })
+  assert.equal(form.detail.items[0].仓库编码, 'CK00005')
+  assert.equal(form.detail.items[0].仓库, '原料不良品仓')
+
+  const back = mergeLine(lines, cand(), 1, SIDE_RET).lines   // 原仓再退一条
+  assert.equal(back.length, 2, '同一物料退到不同仓必须是两行,不能合并')
+  assert.deepEqual(back.map((l) => l.warehouseCode), ['CK00005', 'CK00006'])
+})
+
+// ── 页面守卫:别在下次改版里把「退到仓库」又改回"库存没命中才让选"──────────────
+
+const here = dirname(fileURLToPath(import.meta.url))
+const vue = readFileSync(join(here, '../views/mobile/MobileOtherScan.vue'), 'utf8')
+const en = readFileSync(join(here, '../i18n/locales/en.js'), 'utf8')
+
+test('其他退料/领料页:退料一律给「退到仓库」,领料不给', () => {
+  // 判定逻辑钉在 showWh:ret 恒真;pick 只保留"库存行没仓"的老兜底
+  assert.match(vue, /if \(isReturn\.value\) return true/, '其他退料必须始终显示仓库下拉')
+  assert.match(vue, /return !current\.value\['仓库'\] && !current\.value\['仓库编码'\]/,
+    '其他领料只在库存行没有仓库时才需要手选')
+  assert.match(vue, /v-if="showWh"/, '下拉必须挂在 showWh 上(别再冒出第二个条件)')
+  // 加入清单时必须把选中的仓盖到候选行上,否则落库还是库存行的仓
+  assert.match(vue, /withWarehouse\(c, \{ code: warehouseCode\.value, name: whNameOf\(warehouseCode\.value\) \}\)/,
+    '加入清单必须用现场选的仓覆盖候选项')
+  // 手选后粘住(同一批连着退同一个仓),提交/清空复位
+  assert.match(vue, /if \(whTouched\.value\) return/, '手选过就不能再被库存行刷掉')
+  assert.match(vue, /whTouched\.value = false/, '提交/清空后必须复位')
+  // 退料一进页就把仓库档拉好,不能等"库存没命中"才拉
+  assert.match(vue, /if \(isReturn\.value\) loadWarehouses\(\)/, '退料进页必须预拉仓库档案')
+  assert.match(vue, /toWarehouseOptions\(/, '仓库下拉必须过滤停用仓')
+})
+
+test('其他退料/领料页:文案都有英文译名', () => {
+  const keys = [...new Set([...vue.matchAll(/tt\('([^']+)'\)/g)].map((m) => m[1]))]
+  assert.ok(keys.length > 30, '本页文案不该被抽空')
+  const missing = keys.filter((k) => !en.includes("'" + k + "'") && !en.includes('"' + k + '"'))
+  assert.deepEqual(missing, [], '这些文案缺英文译名: ' + missing.join(' / '))
 })

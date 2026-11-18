@@ -1,7 +1,7 @@
 # 银嘉 MES · 安卓壳(`android/`)
 
-> **日期**:2026-10-20(2026-11-17 连出 1.0.14 ~ 1.0.20)
-> **产物**:`android/dist/yinjia-mes-1.0.20.apk`(自签名,可直接侧载 / 覆盖升级)
+> **日期**:2026-10-20(2026-11-17 连出 1.0.14 ~ 1.0.20;2026-11-18~19 出 1.0.21 ~ **1.0.24**)
+> **产物**:`android/dist/yinjia-mes-1.0.24.apk`(自签名,可直接侧载 / 覆盖升级)
 > **不依赖 Gradle / Android Studio**:用 SDK 的 `aapt2 / javac / d8 / apksigner` 四步手搓出包,
 > 离线、几十秒、可重复构建(本机没有 Gradle,也没有装 Studio)。
 
@@ -10,9 +10,13 @@
 | 项 | 值 |
 |---|---|
 | 包名 | `com.yinjia.mes.app`(**永不改**;改了就是另一个 App,旧图标/旧数据都不跟着走) |
-| 本版 | `versionName=1.0.20`、`versionCode=21`(上一版 1.0.19 = 20;1.0.18 = 19;1.0.17 = 18;1.0.16 = 17) |
+| 本版 | `versionName=1.0.24`、`versionCode=25`(1.0.23 = 24;1.0.22 = 23;1.0.21 = 22;1.0.20 = 21;1.0.19 = 20;1.0.18 = 19;1.0.17 = 18;1.0.16 = 17) |
 | 签名证书 | `CN=Yinjia MES Debug`(仓库内 `android/debug.keystore`,SHA-256 `b455080b…9cbc`) |
 | 覆盖升级 | 与旧版 **同一把钥匙 + versionCode 更大** ⇒ 手机上直接装新 APK 就是「更新」,不用卸载 |
+| 1.0.24 内容 | **整站前端重打(原生壳代码未改)**:**「手机扫码 · 其他退料」的退料仓库改成现场可选** —— 扫到物料就出「退到仓库」下拉,默认带库存行所在的仓、可改成别的仓;手选后**粘住**(连扫几条退同仓),提交/清空复位;下拉**排掉停用仓**;其他领料仍固定按库存所在仓。验证与指纹见 §17 |
+| 1.0.23 内容 | **整站前端重打(原生壳代码未改)**:生产退料提交只生成【草稿】(不再自动审批),确认框改成「生成生产退料单(草稿),等仓管审核后库存才增加」 |
+| 1.0.22 内容 | **整站前端重打(原生壳代码未改)**:修「生产退料扫组装/混料二维码都跳混料明细」——明细页单据标识改 computed 跟随路由 + watch 重取 |
+| 1.0.21 内容 | **整站前端重打(原生壳代码未改)**:其他领料/退料**单据明细页**抬头与明细照「生产领料」补齐,外加生产退料「扫码到明细行再扫物料码退料」两页版 |
 | 1.0.20 内容 | **整站前端重打(原生壳代码未改)**:扫码混料改成与「生产领料」同构的**两页** —— 列表页(查询单据 + 扫工单码定位 + 未完成/已完成两组)→ 明细页;扫物料码**解锁** → 电子秤取数 → 点「确认」写入;**全部物料确认完毕才可提交**;提交后自动打印并跳只读明细(可补打印) |
 | 1.0.19 内容 | **整站前端重打(原生壳代码未改)**:生产退料的「退料作业」改成**弹窗到明细**里扫码退料(点行或「选这张退料」都弹),弹窗内直接给提示;「可退单据」分组**可展开/收起**;扫工单码弹窗选组装/混料,扫领料单码直接跳 |
 | 1.0.18 内容 | **整站前端重打(原生壳代码未改)**:生产退料**可扫码退料**(扫领料单码/工单号→打开单据→扫物料→提交)且版面与生产领料对齐;扫**工单码**弹窗选组装/混料、扫**领料单纸面码**直接跳转;其他领料/其他退料/扫码混料顶栏与生产领料统一 |
@@ -513,3 +517,36 @@ SDK 位置探测见 `android/sdk.ps1`:`ANDROID_HOME` → `ANDROID_SDK_ROOT` →
   **UTF-8 BOM 抹掉了** ⇒ `powershell -File` 直接报 `Unexpected token ')' in expression or statement`
   (报的位置还在第 35 行的无关代码上)。修法:`node` 读成 UTF-8 再以 `\uFEFF` 前缀写回,
   核对 `[System.IO.File]::ReadAllBytes(path)[0..2]` = `EF BB BF` 后再出包。
+
+---
+
+## 17. 2026-11-19:出 **1.0.24**(整站前端重打 —— 其他退料可选退到哪个仓库)
+
+> 用户口径:「手机扫码的其他退料,改为可以选择退料的仓库。」→ 改完 →「打包 apk」。
+
+- **做法**:前端已由 `tools/scripts/rebuild-prod.ps1` 全量重打过(dist 191 个文件,与
+  `backend/src/main/resources/static` 同一份产物)→ `powershell -ExecutionPolicy Bypass -File android\build.ps1`
+  (第 1 步把 `frontend/dist` 整份收进 `assets/www`)。**原生壳代码一行未改**(Java/资源/Manifest 均未动)
+  ⇒ 扫描 / 拍照 / 接口号 / 多码选择逻辑与 1.0.23 完全一致,本版只换包里的网页与版本号。
+  `versionName=1.0.24`、`versionCode=25`(上一版 24 ⇒ 可覆盖升级)。
+- **本版带上的前端改动**:「手机扫码 · 其他退料」的「退到仓库」下拉 —— 扫到物料就出现(库存命中也照样可改),
+  默认带库存行所在的仓、可改成别的仓;手选后**粘住**(一次退好几条到同一个仓是常态),提交/清空复位;
+  下拉**排掉停用仓**(`bs_wh` 15 个仓里 6 个停用、结存全为 0);其他领料不给选(仓位以库存行为准)。
+  改动与实测细节见 `tools/archive/_other-ret-wh-20261119/README.md`。
+- **验证(不需要手机的部分全绿)**:
+
+| 项 | 结果 |
+|---|---|
+| 构建 | `aapt2 / javac / d8 / zip / zipalign / apksigner` 全绿;`assets/www` 收进 **191 个文件 / 8231 KB** |
+| 包信息 | `com.yinjia.mes.app`、`versionCode=25`、`versionName=1.0.24`、`minSdk 24`、`targetSdk 34`、label「银嘉MES」、launcher `MainActivity` |
+| 签名/对齐 | `apksigner verify` 通过(`CN=Yinjia MES Debug`,SHA-256 `b455080b…9cbc` —— 与上一版**同一把钥匙** ⇒ 可覆盖升级);`zipalign -c 4` exit 0 |
+| 体积/指纹 | `dist/yinjia-mes-1.0.24.apk` **2.82 MB**(2,958,382 字节),SHA-256 `AC39AA42AD78B7BA60DC20384DE14FE86860ED75A444E35AD78AD1D3DE254193` |
+| 前端资源 | APK 内 `assets/www/` **191 个文件**,与 `frontend/dist` 逐文件 SHA-256 全等(**0 失配 / 0 缺失 / 0 多余**)、**0 个反斜杠条目**;入口 chunk `index-CT4iOomQ.js` 与 dist 一致 |
+| 本版改动在包内 | `verify-apk-feature.mjs` 8 条全 PASS:`MobileOtherScan-C6ILIBwJ.js` 含「退到仓库」「库存仓」「仓库档案没加载出来」「mo-wh-sel/请选择仓库」;`scanOther-B_2u_sme.js` 含「仓库编码/仓库名称」「停用」 |
+| 权限/明文 | INTERNET / ACCESS_NETWORK_STATE / CAMERA / VIBRATE(与上一版一致) |
+| 真机 | `adb devices` 为空 ⇒ **仍未真机验证**(手机插上后跑 `powershell -ExecutionPolicy Bypass -File android\install.ps1`,脚本按 `LastWriteTime` 取 `dist\` 下最新 APK,即 1.0.24) |
+| 自证脚本 | `tools/archive/_other-ret-wh-20261119/verify-apk-feature.mjs`(功能是否真在包里) + `tools/archive/_mix-doc-20261118/verify-apk.mjs`(逐文件哈希 / 反斜杠 / 指纹),都可复跑 |
+
+- **BOM 又踩一次(第三次)**:用编辑器改 `build.ps1` 的版本号后,文件开头 BOM 又被抹掉
+  (`23 20 62` 而不是 `EF BB BF`),`Parser::ParseFile` 直接 2 个语法错误。
+  已按老办法写回 UTF-8 with BOM 并复验 **0 errors** 才出包 ⇒ 改完 `android/*.ps1` **先验三字节再出包**。

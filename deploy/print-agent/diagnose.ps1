@@ -221,12 +221,21 @@ try {
 } catch { Out2 ('  列打印机失败:' + $_.Exception.Message) }
 
 # ── 9 日志 ───────────────────────────────────────────────────────
+# Win7/PS2 兼容(2026-11-18):-Tail 是 PowerShell 3.0 才有的参数 —— 客户那台 Win7 上
+# 会报「找不到与参数名称 Tail 匹配的参数」,而这两段日志正是判断"代理到底还在不在"的关键,
+# 所以整篇读进来再截尾(输出与 -Tail 完全一致)。-Encoding UTF8 对应日志的写入编码。
+function Out-LogTail {
+    param([string]$Path, [int]$Count)
+    $ls = @(Get-Content -LiteralPath $Path -Encoding UTF8 -ErrorAction SilentlyContinue)
+    $from = [Math]::Max(0, $ls.Count - $Count)
+    for ($i = $from; $i -lt $ls.Count; $i++) { Out2 ('  ' + $ls[$i]) }
+}
 Head '9 agent.log 最后 30 行'
 $al = Join-Path $here 'agent.log'
-if (Test-Path $al) { Get-Content $al -Tail 30 | ForEach-Object { Out2 ('  ' + $_) } } else { Out2 '  (没有 agent.log)' }
+if (Test-Path $al) { Out-LogTail -Path $al -Count 30 } else { Out2 '  (没有 agent.log)' }
 Head '10 watchdog.log 最后 20 行'
 $wl = Join-Path $here 'watchdog.log'
-if (Test-Path $wl) { Get-Content $wl -Tail 20 | ForEach-Object { Out2 ('  ' + $_) } } else { Out2 '  (没有 watchdog.log:守护任务还没跑过,或没注册)' }
+if (Test-Path $wl) { Out-LogTail -Path $wl -Count 20 } else { Out2 '  (没有 watchdog.log:守护任务还没跑过,或没注册)' }
 
 # ── 11 结论(自动判定,给非技术的人也能看懂) ────────────────────
 Head '11 结论'

@@ -24,6 +24,8 @@ tools/
 │                    menu-check*.cjs、analyze-panels.cjs、architecture-audit.mjs、
 │                    DbNormAudit.java(数据库规范 12 项体检,见 docs/development/数据库规范.md)、
 │                    StockReportFieldAudit.java(库存报表字段重复/幽灵列体检)
+├── printing/        打印代理(客户电脑部署)的源版与发布闸门:print-agent.ps1(源版,PS5 开发用)、
+│                    check-ps2-compat.ps1(Win7/PS2 兼容闸门)、make-print-agent-zip.ps1(打客户分发包)
 └── archive/         一次性探针与任务产物(_ 前缀,入库保档;历史会话的诊断脚本)
 ```
 
@@ -52,6 +54,8 @@ tools/
 | **桌面看板 e2e**(概览口径 / 销售取数与界面 / 折线可分辨性 / 顶栏) | `node verify\dashboard-overview-api-e2e.cjs`、`dashboard-overview-ui-e2e.cjs`、`dashboard-sales-api-e2e.cjs`、`dashboard-sales-ui-e2e.cjs`、`dashboard-line-ui-e2e.cjs`、`dashboard-topbar-e2e.cjs`(需 8090 已启动;`*-api-*` 只读,`*-ui-*` 走 CDP 无头浏览器) |
 | **组织架构 e2e**(重置密码 / 权限配置态返回 / userSave 自锁守卫) | `node verify\orgadmin-password-reset-e2e.cjs`、`orgadmin-perm-back-e2e.cjs`、`user-save-guard-e2e.cjs` ⚠ 最后一个会**写测试账套**(YJ_TEST)并自带夹具与还原 —— 守住「不能停用自己 / 不能自我降权 / 不能停用降权最后一个可用管理员」三条自锁护栏,别在 HSDZ_MES 上跑 |
 | 热更新包(仅后端 class) | `pwsh -File scripts\build-hot-update.ps1`(在仓库根或见 deploy/部署说明.md) |
+| **打印代理 Win7/PS2 兼容闸门**(改完打印代理、发客户前必跑;13 条规则 + BOM/编码/compat 加载顺序) | `powershell -NoProfile -ExecutionPolicy Bypass -File printing\check-ps2-compat.ps1`(在仓库根或 tools\ 下跑;判定与踩坑见 `tools\archive\_print-agent-win7-20261110\README.md`) |
+| **打打印代理分发包**(先过闸门再打,打完回读 zip 里的 `$AgentVersion` 核对) | `powershell -NoProfile -ExecutionPolicy Bypass -File printing\make-print-agent-zip.ps1` → 覆盖 `deploy\yinjia-print-agent.zip` |
 | **只换前端增量发布**(不动数据库、不编译后端 class) | `pwsh -File scripts\apply-frontend-only.ps1`(在仓库根运行;`-DryRun` 只检查前置、`-NoBuild` 复用已有 dist、`-Package` 另存 `deploy\app.jar`;做法与坑见脚本头注释) |
 | 生成器重跑 | `node gen\gen-xxx.cjs`(历史迁移数据生成,一般不重跑;重跑前先读脚本内注释) |
 | **刷新数据库表清单**(表结构变更后必跑) | `java -cp lib\mssql-jdbc.jar gen\GenDbCatalogDump.java` → `node gen\gen-db-catalog.cjs`(重写 `docs\development\数据库表清单.md`) |

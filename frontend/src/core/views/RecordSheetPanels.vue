@@ -5406,9 +5406,13 @@ function onXSinterApplied(payload) {
   if (dt) {
     const arr = touch()
     const rows = detail.map((r) => ({ ...r, [dt.filterKey]: dt.filterVal }))
-    const kept = dt.filterKey
-      ? arr.filter((r) => String(r[dt.filterKey] || '') !== String(dt.filterVal || ''))
-      : []
+    // ⚠ 2026-11-18 修「回填后每行出现两次」（用户截图：1,1,2,2,3,3,4,4）：
+    //   原实现按 `r[filterKey] !== filterVal` 判"旧行"，但**行对象上的 `表区` 不一定存在**
+    //   （隐藏列/服务端投影都可能不带它）⇒ 旧行被当成"别的表"留下，再 splice 追加新行 = 翻倍。
+    //   改为**引用身份**判定：`rowsOf(dt)` 已经用 `表区` 正确筛出本表行，直接按引用剔除，
+    //   不依赖行上有没有那个键；没有任何本表行时退化为"整表替换"。
+    const mine = new Set(rowsOf(dt))
+    const kept = dt.filterKey ? arr.filter((r) => !mine.has(r)) : []
     arr.splice(0, arr.length, ...kept, ...rows)
   }
   emit('dirty')
@@ -7050,6 +7054,80 @@ body.approval-printing .rs-mold-pick { display: none !important; }
    「浏览器 Ctrl+P / 侧栏打印按钮(打印时会挂 body.approval-printing,由下面的规则集兜底)」;
    截图导出那条路(modern-screenshot)不认 CSS,由 PanelxList.snapSheetPage 里摘节点。 */
 @media print { .no-print, .rs-lib-btn, .rsp-lib-pick { display: none !important; } }
+
+/* ═══ 打印/导出：控件退化成**纯文本**（2026-11-18 用户报障）═══
+   现象：打印预览里表格出现 select 的选择框痕迹（灰边框 + 下拉箭头），
+        长文本还被压在一格里叠字。
+   根因：纸面上这些格在可编辑态渲染的是 el-select / el-input / el-textarea，
+        打印只按 `body.approval-printing` 藏了角标和按钮，**没有去掉控件外壳**。
+   两条打印路径都要管：① `@media print`（Ctrl+P / 系统打印对话框）
+                        ② `body.approval-printing`（侧栏「打印」按钮）
+   漏一条就会在纸上留下选择框（本文件 2026-11-11 同类事故的教训）。 */
+@media print {
+  .rs-t .el-select__wrapper,
+  .rs-t .el-input__wrapper,
+  .rs-t .el-textarea__inner,
+  .rsp-sheet .el-select__wrapper,
+  .rsp-sheet .el-input__wrapper,
+  .rsp-sheet .el-textarea__inner {
+    box-shadow: none !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    font-size: inherit !important;
+    color: #222 !important;
+  }
+  /* 下拉箭头 / 放大镜 / 后缀图标 / 清除按钮：纸上只留文字 */
+  .rsp-sheet .el-select__suffix,
+  .rsp-sheet .el-select__caret,
+  .rsp-sheet .el-select__icon,
+  .rsp-sheet .el-input__suffix,
+  .rsp-sheet .el-input__icon,
+  .rsp-sheet .el-input__clear,
+  .rsp-sheet .el-textarea__suffix {
+    display: none !important;
+  }
+  .rsp-sheet .el-select__placeholder,
+  .rsp-sheet .el-input__inner,
+  .rsp-sheet .el-textarea__inner {
+    color: #222 !important;
+    -webkit-text-fill-color: #222 !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    text-overflow: clip !important;
+    overflow: visible !important;
+  }
+  /* 单元格内的长文本不要在打印时被 ellipsis 裁掉 */
+  .rsp-sheet .rs-td {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+}
+/* 同一条规则给「侧栏打印」路径（body.approval-printing 是独立规则集，不会继承上面的 @media print） */
+body.approval-printing .rs-t .el-select__wrapper,
+body.approval-printing .rs-t .el-input__wrapper,
+body.approval-printing .rs-t .el-textarea__inner,
+body.approval-printing .rsp-sheet .el-select__wrapper,
+body.approval-printing .rsp-sheet .el-input__wrapper,
+body.approval-printing .rsp-sheet .el-textarea__inner {
+  box-shadow: none !important;
+  border: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+}
+body.approval-printing .rsp-sheet .el-select__suffix,
+body.approval-printing .rsp-sheet .el-select__caret,
+body.approval-printing .rsp-sheet .el-select__icon,
+body.approval-printing .rsp-sheet .el-input__suffix,
+body.approval-printing .rsp-sheet .el-input__icon,
+body.approval-printing .rsp-sheet .el-input__clear {
+  display: none !important;
+}
 .stdlib-tip { font-size: 12px; color: #8ba6bd; margin-bottom: 8px; line-height: 1.6; }
 .stdlib-add { display: flex; gap: 8px; margin-bottom: 10px; }
 .stdlib-list { max-height: 320px; overflow: auto; border: 1px solid #e4edf5; border-radius: 4px; }

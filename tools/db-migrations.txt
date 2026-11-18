@@ -5035,3 +5035,6 @@ migrate-mix-bom-20261118.sql
 #   存量数据归一化(bs_mix_bom.产品编号 → 原始产品编码;幂等,只剥结尾一层、大小写不敏感);
 #   代码侧同批:ProcBomArchiveSyncService.syncSinterProc 写库前用 DevTaskService.baseProductCode 归一化。
 migrate-mix-bom-strip-tb-20261118.sql
+
+# 2026-11-18 恢复 11-17 13:52 admin 连删的 10 张研发单据（疑似误删；其余删除保留）
+migrate-restore-rd-del-batch-20261117.sql

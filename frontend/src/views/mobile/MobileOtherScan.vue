@@ -24,6 +24,13 @@
   /px/callButton(panelCode=OTHER_OUT|MATERIAL_RET, buttonName=保存) —— 与扫码领料
   (views/scm/ScanPick.vue)完全同一条路:保存 = 提交为**待审核**单据,真正的过账仍在
   「其他出库单 / 生产退料单」里由仓管审核,本页不碰库存数字。
+
+  【其他退料的仓库由现场选(2026-11-19)】
+  用户口径:「手机扫码的其他退料,改为可以选择退料的仓库。」
+  ⇒ 扫到物料后**不论库存里有没有这个料**都出「退到仓库」下拉:默认带库存行所在的仓,
+   现场可改成别的仓(退的是手上这批货,不一定要回原仓);改过一次后**粘住**,
+   后面连扫的几条都退到同一个仓(一次退好几条到同仓是常态),提交/清空后复位。
+  其他领料**不给选**:领料只能从有货的仓出,仓库以库存行为准。
 -->
 <template>
   <div class="mo-scan">
@@ -70,13 +77,13 @@
         :key="i"
         class="mo-cand"
         :class="{ picked: i === candIndex }"
-        @click="candIndex = i"
+        @click="pickCand(i)"
       >
         <div class="mo-cand-main">
           <div class="mo-cand-name">{{ c['存货名称'] || c['存货编码'] }}</div>
           <div class="mo-cand-meta">{{ c['存货编码'] }} · {{ c['规格型号'] || '—' }} · {{ c['计量单位'] || '—' }}</div>
           <div class="mo-cand-meta">
-            {{ tt('仓库') }}：{{ c['仓库'] || c['仓库编码'] || '—' }} · {{ tt('批号') }}：{{ c['批号'] || tt('无批次') }}
+            {{ tt(isReturn ? '库存仓' : '仓库') }}：{{ c['仓库'] || c['仓库编码'] || '—' }} · {{ tt('批号') }}：{{ c['批号'] || tt('无批次') }}
           </div>
         </div>
         <div class="mo-cand-stock">
@@ -85,12 +92,22 @@
         </div>
       </div>
 
-      <!-- 退料且库存里没有这个物料时:仓库必须手选(否则不知道退回哪个仓) -->
-      <div v-if="needWarehouse" class="mo-wh">
+      <!-- 退料到哪个仓(2026-11-19 用户口径「手机扫码的其他退料,改为可以选择退料的仓库」):
+           库存里查得到就默认它所在的仓,现场随时可改成别的仓 —— 退的是手上这批货,
+           不一定回原仓(如退到原料不良品仓)。其他领料不显示这一栏:领料只能从有货的仓出。 -->
+      <div v-if="showWh" class="mo-wh">
         <span class="mo-qty-label">{{ tt('退到仓库') }}</span>
-        <el-select v-model="warehouseCode" :placeholder="tt('请选择仓库')" size="large" filterable class="mo-wh-sel">
-          <el-option v-for="w in warehouses" :key="w.code" :label="w.name" :value="w.code" />
+        <el-select
+          v-model="warehouseCode"
+          :placeholder="tt('请选择仓库')"
+          size="large"
+          filterable
+          class="mo-wh-sel"
+          @change="markWhTouched"
+        >
+          <el-option v-for="w in whOptions" :key="w.code" :label="w.name" :value="w.code" />
         </el-select>
+        <span v-if="!whOptions.length" class="mo-wh-hint">{{ tt('仓库档案没加载出来，请返回重进') }}</span>
       </div>
 
       <div class="mo-qty">
@@ -194,7 +211,7 @@ import { queryFormDataList, callButton, errMsg } from '@/business/engine'
 import { parseBarcode, matchPickRows } from '@/business/scanPick'
 import {
   SIDE_RET, isRet, panelOfSide, titleOfSide, checkQty, mergeLine, buildForm,
-  doneMessageKey,
+  doneMessageKey, toWarehouseOptions, defaultWarehouseCode, withWarehouse,
 } from '@/business/scanOther'
 import { printSlip } from '@/business/slipPrintFlow'
 import { focusScanNow } from '@/business/scanFocus'
@@ -263,15 +280,35 @@ const groups = computed(() => {
     .filter((g) => g.items.length || g.key === '已作废')
 })
 
-// 退料兜底:库存里没有该物料时,仓库要手选
+// 仓库下拉(2026-11-19:其他退料改成"退到哪个仓由现场选",不再是库存没命中时的兜底)
 const warehouses = ref([])
 const warehouseCode = ref('')
+// 现场是否亲手选过仓库(选过就"粘住":同一批料连着扫,都退到同一个仓,不再被库存行的仓刷新)
+const whTouched = ref(false)
 
 const current = computed(() => candidates.value[candIndex.value] || null)
-const needWarehouse = computed(() => !!current.value && !current.value['仓库'] && !current.value['仓库编码'])
+/**
+ * 「退到仓库」这一栏什么时候出现。
+ *
+ * <p>2026-11-19 用户口径「手机扫码的其他退料,改为可以选择退料的仓库」:
+ * 其他退料**库存命中也照样可改**(退的是手上这批货,不一定回原仓),故 ret 一律显示;
+ * 其他领料保持原样 —— 只有库存行本身没有仓库时才需要手选(领料只能从有货的仓出)。
+ */
+const showWh = computed(() => {
+  if (!current.value) return false
+  if (isReturn.value) return true
+  return !current.value['仓库'] && !current.value['仓库编码']
+})
+/** 下拉项:停用仓已排掉;默认仓若落在停用仓里也要能显示(否则下拉是空的) */
+const whOptions = computed(() => {
+  const list = warehouses.value.slice()
+  const code = String(warehouseCode.value || '').trim()
+  if (code && !list.some((w) => w.code === code)) list.push({ code, name: whNameOf(code) })
+  return list
+})
 const canAdd = computed(() => {
   if (!current.value) return false
-  if (needWarehouse.value && !warehouseCode.value) return false
+  if (showWh.value && !warehouseCode.value) return false
   return checkQty(props.side, qty.value, Number(current.value['现存量'])).ok
 })
 
@@ -279,6 +316,8 @@ onMounted(() => {
   nextTick(() => scanInput.value?.focus?.())
   // 进页就把历史单据拉出来(生产领料同样是"上面查询、下面列单")
   loadList()
+  // 其他退料一进来就把仓库档拉好:选仓是主流程的一部分,不能等"库存没命中"才拉
+  if (isReturn.value) loadWarehouses()
 })
 
 const fmt = (n) => {
@@ -369,6 +408,8 @@ async function onScan() {
   }
   probing.value = true
   try {
+    // 退料的仓库下拉必须就绪(退料 = 选仓 + 扫码);进页那次没拉到就这里再补一次
+    if (isReturn.value && !warehouses.value.length) await loadWarehouses()
     // ⚠ 只按「存货编码」查,不带批号 —— 标签批号与 kucun 实际批号常常对不上,
     //   带批号会把可用行全查空(2026-10-18 实测 849 个材料码全空)。批号只用于排序优先。
     const res = await queryFormDataList({
@@ -380,6 +421,8 @@ async function onScan() {
     const hits = matchPickRows(res.list || [], parsed)
     if (hits.length) {
       candidates.value = hits
+      candIndex.value = 0
+      syncWarehouse()
       qty.value = isReturn.value ? 1 : (Number(hits[0]['现存量']) || 1)
       return
     }
@@ -417,7 +460,7 @@ async function onScan() {
       结存单价: 0,
     }]
     qty.value = 1
-    warehouseCode.value = ''
+    syncWarehouse()
   } catch (e) {
     errText.value = errMsg(e) || tt('查询可用量失败')
   } finally {
@@ -427,14 +470,46 @@ async function onScan() {
   }
 }
 
-/** 退料兜底态需要仓库下拉:仓库档案(WH)只拉一次 */
+/**
+ * 「退到仓库」下拉默认值(2026-11-19)。
+ *
+ * <p>规则:库存里查得到 ⇒ 默认它所在的仓;查不到 ⇒ 空,逼现场选。
+ * 但**现场亲手选过就粘住** —— 退料多半一次退好几条到同一个仓(如全退到原料不良品仓),
+ * 每扫一条都把下拉刷回库存仓,等于逼人每条都重新选一次。
+ */
+function syncWarehouse() {
+  if (!isReturn.value) return
+  if (whTouched.value) return
+  warehouseCode.value = defaultWarehouseCode(current.value)
+}
+
+/** 现场改了下拉:从此按他的选择走,不再被库存行覆盖 */
+function markWhTouched() {
+  whTouched.value = true
+}
+
+/** 仓库编码 → 显示名(档案里没有就用候选行自带的名称兜底,再不行显示编码) */
+function whNameOf(code) {
+  const key = String(code || '').trim()
+  const hit = warehouses.value.find((w) => w.code === key)
+  if (hit) return hit.name
+  const c = current.value
+  if (c && String(c['仓库编码'] || '').trim() === key && c['仓库']) return String(c['仓库']).trim()
+  return key
+}
+
+/** 点候选行:切到这一行,仓库默认值跟着这一行走(除非现场已经手选过) */
+function pickCand(i) {
+  candIndex.value = i
+  syncWarehouse()
+}
+
+/** 仓库档案(WH):其他退料一进页就拉,退料兜底时也用它;只拉一次 */
 async function loadWarehouses() {
   if (warehouses.value.length) return
   try {
     const res = await queryFormDataList({ panelCode: 'WH', pageNo: 1, pageSize: 300 })
-    warehouses.value = archiveRows(res, 'wh')
-      .map((w) => ({ code: String(w['仓库编码'] || '').trim(), name: String(w['仓库名称'] || w['仓库编码'] || '').trim() }))
-      .filter((w) => w.code)
+    warehouses.value = toWarehouseOptions(archiveRows(res, 'wh'))
   } catch {
     warehouses.value = []
   }
@@ -443,14 +518,14 @@ async function loadWarehouses() {
 function addLine() {
   const c = current.value
   if (!c) return
-  // 手选仓库时把它盖到候选项上(后续合键/落库都按这个仓)
-  const cand = needWarehouse.value
-    ? { ...c, 仓库编码: warehouseCode.value, 仓库: (warehouses.value.find((w) => w.code === warehouseCode.value) || {}).name || '' }
-    : c
-  if (needWarehouse.value && !cand['仓库编码']) {
+  // 退料的仓库以现场选择为准(合键/落库都按这个仓);领料仍用库存行自带的仓
+  if (showWh.value && !warehouseCode.value) {
     errText.value = reasonText('no-warehouse')
     return
   }
+  const cand = showWh.value
+    ? withWarehouse(c, { code: warehouseCode.value, name: whNameOf(warehouseCode.value) })
+    : c
   const res = mergeLine(lines.value, cand, qty.value, props.side)
   if (!res.ok) {
     errText.value = reasonText(res.reason)
@@ -474,7 +549,9 @@ function reset() {
   scanText.value = ''
   candidates.value = []
   errText.value = ''
+  // 清空 = 开始另一张单:带着上一张选的仓进去只会把货记错仓,一并复位
   warehouseCode.value = ''
+  whTouched.value = false
   nextTick(() => scanInput.value?.focus?.())
 }
 
@@ -621,6 +698,7 @@ async function submit() {
 .mo-stock-cap { font-size: 11px; color: var(--el-text-color-secondary); }
 .mo-wh { display: flex; align-items: center; gap: 10px; padding: 12px; border-top: 1px solid var(--el-border-color-lighter); }
 .mo-wh-sel { flex: 1; min-width: 0; }
+.mo-wh-hint { flex: none; font-size: 12px; color: var(--el-color-warning); }
 .mo-qty { display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--el-fill-color-lighter); }
 .mo-qty-label { font-size: 13px; color: var(--el-text-color-regular); flex: none; }
 .mo-qty-unit { font-size: 13px; color: var(--el-text-color-secondary); min-width: 24px; }

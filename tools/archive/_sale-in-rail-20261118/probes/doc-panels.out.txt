@@ -1,0 +1,53 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== doc-panels.sql ==
+  | ASM_BOM|组装物料清单|数据建模|Assembly BOM | 
+  | CGD|采购单|智能供应链|Purchase Order | 
+  | DAY_REPORT|生产日报表|生产过程| | 
+  | DISPATCH|工序派工单|生产计划|Process Dispatch Sheet | 
+  | EQUIP_CHECK|设备点检记录|系统管理平台| | 
+  | FEED_CONFIRM|投料确认单|生产过程| | 
+  | FINISH_IN|产成品入库单|WMS管理|Finished Goods Receipt Form | 
+  | GRAN_RECORD|造粒记录|生产过程| | 
+  | KHDD|客户订单|智能供应链|Customer Order | 
+  | MAINT_PLAN|保养计划|系统管理平台| | 
+  | MANU_ORDER|生产工单|生产计划|Production Work Order | 
+  | MATERIAL_OUT|材料出库单|WMS管理|Material Issue Slip | 
+  | MATERIAL_RET|生产退料单|WMS管理|Production Return Note | 
+  | MIX_RECORD|物料混合记录|生产过程| | 
+  | OTHER_IN|其他入库单|WMS管理|Other inbound delivery notes | 
+  | OTHER_OUT|其他出库单|WMS管理|Other delivery notes | 
+  | OUTSOURCE_ORDER|委外加工单|生产计划|subcontracting document | 
+  | PACK_CONFIRM|封箱确认|生产过程| | 
+  | PU_ORDER|采购订单|智能供应链|Purchase Order | 
+  | PURCHASE_IN|采购入库单|WMS管理|Purchase Receiving Order | 
+  | QC_ASM_INSP|出货检验表观|品质管理|Outgoing Inspection Sheet (Appearance) | 
+  | QC_BHC|不合格品处理单(制程)|品质管理| | 
+  | QC_BHG|不合格报告(制程)|品质管理| | 
+  | QC_BHZ|不合格品处理单(自制物料)|品质管理| | 
+  | QC_CATALOG|待检验目录|品质管理|Pending Inspections | 
+  | QC_CUT_INSP|切炭检验单|生产计划| | 
+  | QC_FIN_SPEC|成品检验规范|品质管理| | 
+  | QC_FIRST_INSP|首件检验单|生产制造| | 
+  | QC_INSP|来料检验单|品质管理| | 
+  | QC_INSP_REC|检验数据记录|品质管理|Inspection Data Record | 
+  | QC_JJF|紧急放行申请单|品质管理| | 
+  | QC_LYB|来料异常分析报告|品质管理| | 
+  | QC_MOLD_INSP|成型检验单|生产计划| | 
+  | QC_OQC_REPORT|出厂检验报告|品质管理| | 
+  | QC_PROC_INSP|出货检验单功能|生产制造|Outgoing Inspection Sheet (Functional) | 
+  | QC_RECV|送料暂收单|WMS管理|Temporary Material Receipt | 
+  | QC_RETURN|暂收退回单|WMS管理| | 
+  | QC_SCP|试产材料使用申请单|品质管理| | 
+  | QC_SCY|生产异常分析报告|品质管理| | 
+  | QC_TC_IN|特采单|智能供应链|Incoming Special Procurement | 
+  | RD_ALKALINE|碱性|研发管理| | 
+  | RD_ANTIBACT|抑菌|研发管理| | 
+  | RD_APPROVAL|立项申请|研发管理| | 
+  | RD_ASM_BOM|组装BOM表|研发管理| | 
+  | RD_ASM_PROC|组装工艺清单|研发管理| | 
+  | RD_CHANGE|产品变更申请单|研发管理|Product Change Request | 
+  | RD_DOM_TEST|测试申请单|研发管理|Test Application | 
+  | RD_DROP_PREC|压降精度|研发管理| | 
+  | RD_EQUIP_USE|设备使用登记表|研发管理| | 
+  | RD_FILTER_EFF|功能性滤效|研发管理| | 
+[OK] doc-panels.sql (1 batches)

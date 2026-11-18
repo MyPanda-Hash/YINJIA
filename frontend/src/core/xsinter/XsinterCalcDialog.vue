@@ -293,8 +293,16 @@ const fmt = (v, kind = 'plain') => {
   if (v === null || v === undefined || v === '') return ''
   const n = Number(v)
   if (!Number.isFinite(n)) return ''
+  // 2026-11-18 用户口径（X烧结打印截图红字标注）：
+  //   成型切炭/冷却长度 = **2 位小数**（180.00 / 180.50，原来 1 位）、
+  //   炭棒重量 = **2 位小数且补零**（112.40，原来 112.4）、
+  //   密度要求 = **3 位小数**（0.550 / 0.565，原来按 plain 落到最多 6 位）。
+  //   带固定位数的用 toFixed（补零），比例/单支含量仍是"去掉多余尾零"的口径。
+  if (kind === 'len2') return n.toFixed(2)
   if (kind === 'length') return String(Math.round(n * 10) / 10)
-  if (kind === 'ratio' || kind === 'piece' || kind === 'weight') return String(Math.round(n * 100) / 100)
+  if (kind === 'density') return n.toFixed(3)
+  if (kind === 'weight') return n.toFixed(2)
+  if (kind === 'ratio' || kind === 'piece') return String(Math.round(n * 100) / 100)
   return String(Math.round(n * 1e6) / 1e6)
 }
 
@@ -465,19 +473,19 @@ function apply() {
     [HEAD_MAP.densLow]: form.densLow,
     [HEAD_MAP.densHigh]: form.densHigh,
     // 切炭/冷却长度：1 位小数（Excel 原表就是 179.5 / 180.5）
-    '切炭长度下限mm': fmt(c.cut.low, 'length'),
-    '切炭长度中间值mm': fmt(c.cut.mid, 'length'),
-    '切炭长度上限mm': fmt(c.cut.high, 'length'),
-    '冷却长度下限mm': fmt(c.cool.low, 'length'),
-    '冷却长度中间值mm': fmt(c.cool.mid, 'length'),
-    '冷却长度上限mm': fmt(c.cool.high, 'length'),
+    '切炭长度下限mm': fmt(c.cut.low, 'len2'),
+    '切炭长度中间值mm': fmt(c.cut.mid, 'len2'),
+    '切炭长度上限mm': fmt(c.cut.high, 'len2'),
+    '冷却长度下限mm': fmt(c.cool.low, 'len2'),
+    '冷却长度中间值mm': fmt(c.cool.mid, 'len2'),
+    '冷却长度上限mm': fmt(c.cool.high, 'len2'),
     // 炭棒重量：2 位小数（原来是 109.414949 这种 6 位，用户截图标了「小数位错误」）
     '炭棒重量下限g': fmt(c.weight.low, 'weight'),
     '炭棒重量中间值g': fmt(c.weight.mid, 'weight'),
     '炭棒重量上限g': fmt(c.weight.high, 'weight'),
-    '密度要求下限': fmt(c.density.low),
-    '密度要求中间值': fmt(c.density.mid),
-    '密度要求上限': fmt(c.density.high),
+    '密度要求下限': fmt(c.density.low, 'density'),
+    '密度要求中间值': fmt(c.density.mid, 'density'),
+    '密度要求上限': fmt(c.density.high, 'density'),
   }
   // 2026-11-18 用户口径（X烧结截图）：「写了在配方计算回填的时候没有数据的行自己去掉，怎么现在还有显示的」
   //   ⇒ 回填只写**有物料**的行（物料编号或物料名称任一非空），其余（默认 10 行里的空行）不进单据。

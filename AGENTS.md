@@ -167,6 +167,11 @@ YINJIA-MES = light-mes 面板引擎(Vue3) + Spring Boot + SQL Server `HSDZ_MES`,
    - macOS / 当前主用工具链 = `deploy/winrm/deploy_src.py`(拉取 → 构建 → 备份 → 换 jar → 重启;
      `--app-only` 只换 jar,`--check` 只体检)。**它不跑 SQL**,迁移必须另跑
      `deploy/winrm/run_migrations.py`。
+   - 🔴 **`--ref` 取的是「远端」提交,不是本地工作区**:本地提交没 push 时,
+     `deploy_src.py --ref HEAD` 部上去的仍是**旧的 origin/main**(2026-11-18 实际踩到:
+     09:50 那次部署没带上刚写完的过滤逻辑,用户复测后仍复现,误判成"修了没用")。
+     **铁律:部署前先 `git push`,再用 `--ref <已推送的 SHA>`**,并在部署输出里核对
+     `chunk assets/index-*.js` 是否变化(同名 = 前端没更新,先怀疑 ref 不对)。
    - **全量恢复**只允许三种场景:①首次安装空服务器;②演示/演练环境;③**明确确认「服务器现有数据可整库丢弃」**的重建。
      走全量时 `deploy-all.bat GO` / `GO DB` **必须带 `CONFIRM-FULL-REPLACE`**,否则脚本一开始即
      `RESULT: FAIL-FULL-REPLACE-NOT-CONFIRMED` 退出,不停应用、不动库;`GO APP`(只换 jar)不受限。
