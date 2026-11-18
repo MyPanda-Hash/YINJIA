@@ -5015,3 +5015,5 @@ migrate-qc-insp-rec-resultcols-20261119.sql
 #   存量每张单的 qc_insp_rec.结果列数 按"实际用到的格数"重算(最少 1,有值的格子一列都不藏);
 #   列说明改成「默认 1」口径;零业务数据改动(结果1..结果20 一个字节不改);幂等;两账套。
 migrate-qc-insp-rec-resultcols-default1-20261119.sql
+# 2026-11-18 恢复 11-17 13:52 admin 连删的 10 张研发单据（疑似误删；其余删除保留）
+migrate-restore-rd-del-batch-20261117.sql
