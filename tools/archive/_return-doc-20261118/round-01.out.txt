@@ -1,0 +1,49 @@
+﻿ego-browser : [
+所在位置 行:1 字符: 180
++ ... k-20261118; ego-browser nodejs -e "await import('file:///C:/Users/Len ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  {
+    "base": "http://127.0.0.1:8090",
+    "before": {
+      "hash": "#/panelx/list/MOBILE_RETURN/doc?id=823",
+      "chunk": "http://127.0.0.1:8090/assets/index-CSDNs0aM.js",
+      "title": "LL-2026-11-0006",
+      "state": "可退料",
+      "scanInput": true,
+      "scanPlaceholder": "扫物料码或输入物料编码",
+      "overlay": false,
+      "hasLogin": false
+    },
+    "scanned": {
+      "err": "",
+      "unlocked": "加工切无纺布\nYJ-XWR-016 · 200*300 · 张 · 已领 5 / 已退 1\n4\n本次可退",
+      "qty": "4.0000",
+      "confirmDisabled": false
+    },
+    "shot": "C:/Users/Lenovo/ego/return-scan-check-20261118/scan-8090.png"
+  },
+  {
+    "base": "http://localhost:5173",
+    "before": {
+      "hash": "#/panelx/list/MOBILE_RETURN/doc?id=823",
+      "chunk": "",
+      "title": "LL-2026-11-0006",
+      "state": "可退料",
+      "scanInput": true,
+      "scanPlaceholder": "扫物料码或输入物料编码",
+      "overlay": false,
+      "hasLogin": false
+    },
+    "scanned": {
+      "err": "",
+      "unlocked": "加工切无纺布\nYJ-XWR-016 · 200*300 · 张 · 已领 5 / 已退 1\n4\n本次可退",
+      "qty": "4.0000",
+      "confirmDisabled": false
+    },
+    "shot": "C:/Users/Lenovo/ego/return-scan-check-20261118/scan-5173.png"
+  }
+]
+

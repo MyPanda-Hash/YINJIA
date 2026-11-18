@@ -1,0 +1,4 @@
+SET NOCOUNT ON;
+SELECT STUFF((SELECT N';' + p.panel_code + N'|' + p.panel_name + N'|' + ISNULL(p.module_group,N'')
+                FROM yj_panel p WHERE p.mode = N'doc' AND p.panel_code NOT IN ('FINISH_IN','INSP_COMMISSION','MATERIAL_OUT','MATERIAL_RET','OTHER_IN','OTHER_OUT','PU_ORDER','PURCHASE_IN','QC_ASM_INSP','QC_BHC','QC_BHG','QC_BHZ','QC_FIRST_INSP','QC_INSP','QC_JJF','QC_LINE_PATROL','QC_LYB','QC_OQC_REPORT','QC_PROC_INSP','QC_RECV','QC_RETURN','QC_SCP','QC_SCY','QC_TC_IN','SALE_IN','SALE_OUT','SO_ORDER','STOCKTAKE','SUPPLIER_PU_ORDER','TRANSFER')
+               ORDER BY p.panel_code FOR XML PATH(''), TYPE).value('.', 'nvarchar(max)'), 1, 1, N'') AS 无左栏单据面板;
