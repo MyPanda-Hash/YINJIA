@@ -61,8 +61,11 @@ test('① 已有值时一律不覆盖(不冒名),没有登录人时不写空姓�
 })
 
 test('① 后端:建单/保存时按创建人预填「填写人」(只填空值;提交审批仍刷成提交人)', () => {
-  assert.match(JAVA, /PREPARER_CREATOR_PREFILL\s*=\s*java\.util\.Set\.of\("QC_BHG"\)/,
-    '缺少「创建人预填」面板登记')
+  // 2026-11-17:登记集合新增 QC_JJF(紧急放行申请单的「责任人」= 编制格,同样要求建单即预填),
+  // 故这里按「集合里必须含 QC_BHG」钉住,不再逐字比对整行(否则每加一张单都要改这行断言)。
+  const setLine = JAVA.match(/PREPARER_CREATOR_PREFILL\s*=\s*java\.util\.Set\.of\(([^)]*)\)/)
+  assert.ok(setLine, '缺少「创建人预填」面板登记')
+  assert.match(setLine[1], /"QC_BHG"/, 'QC_BHG 必须仍在「创建人预填」名单里')
   assert.match(JAVA, /private void prefillPreparerName\(PanelRegistry\.PanelDef def, String no, String user\)/,
     '缺少预填实现')
   // 两个调用点:空白草稿分支(直接 return,走不到保存末尾)+ 保存末尾

@@ -1069,7 +1069,13 @@
         />
         <div class="doc-rail-main">
           <div class="fields header-fields udl-fields" :class="{ 'is-draft': draftEditable }">
-      <div class="field" v-for="field in headerEditFields" :key="headerFieldKey(field)">
+      <!-- data-code + field-blink:保存时缺必填的表头字段由本组件自己点亮(2026-11-17 用户报障
+           「点击保存后并没高亮提示是那个数据行」—— 本布局没有纸面 sheet 组件,原来只有 sheet 才有高亮) -->
+      <div
+        class="field" v-for="field in headerEditFields" :key="headerFieldKey(field)"
+        :data-code="headerFieldKey(field)"
+        :class="{ 'field-blink': isMissingHintHead(headerFieldKey(field)) }"
+      >
         <label :class="{ req: field.isRequired }">{{ headerFieldLabel(field) }}<span
           v-if="printBatchLockReason(field)" class="field-lock-badge" :title="printBatchLockReason(field)"
         >{{ tt('已按材料码批次号锁定') }}</span></label>
@@ -1314,7 +1320,7 @@
               trigger="click"
               @command="(cmd) => onAddDetailCommand(cmd, b)"
             >
-              <el-button size="small" type="primary" :icon="Plus">
+              <el-button size="small" type="primary" :icon="Plus" :class="{ 'btn-blink': isMissingHintTab(b) }">
                 {{ tt('新增数据') }}<el-icon class="el-icon--right"><ArrowDown /></el-icon>
               </el-button>
               <template #dropdown>
@@ -1324,7 +1330,7 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <el-button v-else-if="detailEditable(b)" size="small" type="primary" :icon="Plus" @click="addInlineDetailRow(b)">{{ tt('新增数据') }}</el-button>
+            <el-button v-else-if="detailEditable(b)" size="small" type="primary" :icon="Plus" :class="{ 'btn-blink': isMissingHintTab(b) }" @click="addInlineDetailRow(b)">{{ tt('新增数据') }}</el-button>
             <span class="dt-ic" v-for="ic in b.isMain ? iconA : iconB" :key="ic" @click="onIcon(ic, b)">{{ tt(ic) }}</span>
           </span>
         </div>
@@ -1367,6 +1373,7 @@
               size="small"
               :show-summary="false"
               :row-class-name="(o) => rowCls(o, b)"
+              :cell-class-name="(o) => missingCellCls(o)"
               @selection-change="(r) => (delSel = r)"
               @row-contextmenu="(row, col, ev) => onCtx(ev, row, b)"
               @cell-dblclick="(row, col, cell, ev) => onDetailCellDblclick(row, col, cell, ev, b)"
@@ -1443,6 +1450,7 @@
           :summary-method="(p) => sumMethodFor(b, p)"
           :sum-text="tt('合计')"
           :row-class-name="(o) => rowCls(o, b)"
+          :cell-class-name="(o) => missingCellCls(o)"
           @selection-change="(r) => (delSel = r)"
           @row-contextmenu="(row, col, ev) => onCtx(ev, row, b)"
           @cell-dblclick="(row, col, cell, ev) => onDetailCellDblclick(row, col, ev, b)"
@@ -2386,13 +2394,14 @@
             <el-radio-button v-for="lv in gradeOptions" :key="lv" :value="lv">{{ tt(lv) }}</el-radio-button>
           </el-radio-group>
         </div>
+        <!-- 2026-11-17 用户口径（1117问题 #3）：「冯总审核后直接跳转到秀丽分发，**不要下拉选择二级审核人**」
+             ⇒ 对接人固定为陈秀丽，不再给下拉。后端 confirmRdApprove 仍会兜底默认，
+             老单/接口直连也不会漏分发。要换人仍可在「产品信息表→定级分发」等既有入口改。 -->
         <div class="dq-row" style="align-items:center">
           <span class="dq-label">{{ tt('对接人') }}</span>
-          <el-select v-model="apvLiaison" style="flex:1" filterable clearable :placeholder="tt('对接人（选填）')">
-            <el-option v-for="u in rdFlowUsers" :key="u.username" :label="`${u.realName}（${u.username}）`" :value="u.username" />
-          </el-select>
+          <span class="dq-fixed">{{ tt('陈秀丽') }}<span class="dq-fixed-hint">{{ tt('（审批后自动分发）') }}</span></span>
         </div>
-        <div class="dq-tip">{{ tt('在审批定级的同时选择对接人，一步完成分发；不选则审批后由侧栏「补发对接人」补上') }}</div>
+        <div class="dq-tip">{{ tt('审批通过即自动分发对接人（陈秀丽），无需选择；如需更换请审批后到「定级分发」修改') }}</div>
         <div class="dq-row" style="align-items:flex-start">
           <span class="dq-label">{{ tt('审批意见') }}</span>
           <el-input v-model="apvOpinion" type="textarea" :rows="3" :placeholder="tt('审批意见（选填）')" />
@@ -2523,6 +2532,18 @@
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
     <!-- 字段管理(动态字段/备用列池):绑定/停用自定义字段(入口按「自定义字段」权限显隐) -->
     <FieldManagerDialog v-model="fieldMgrVisible" :panel-code="panelCode" @done="cfgCache = null; load()" />
+    <!-- 立项申请 · 全屏单据预览(2026-11-17 用户口径):按申请立项人筛「我申请的」+ 返回 + 跳转。
+         组件内部 Teleport 到 body,故挂在根级任意位置都不影响布局。 -->
+    <ApprovalPreviewOverlay
+      :visible="approvalPreviewOpen"
+      :rows="list || []"
+      :me="myApplicantName"
+      :owner-key="previewOwnerKey"
+      :subject="previewSubject"
+      :panel-code="String(panelCode || '')"
+      @close="approvalPreviewOpen = false"
+      @jump="jumpToApprovalDoc"
+    />
     <!-- 检验项目/检验方案(2026-10-09 **合并口径**):三类工序检验单(成型/切炭/组装成品)工具栏**唯一**入口 ——
          同一个弹窗两用:上=方案表、下=该方案的项目表(可勾选);①勾选后「带入明细」把项目写进当前单据
          (表区=检验项目,再按现有模板填实测/判定);②表头的新增/编辑/停用就地维护标准本身
@@ -2782,7 +2803,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, onActivated, watch, nextTick, markRaw, toRaw, provide } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, onActivated, watch, nextTick, markRaw, shallowRef, toRaw, provide } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Filter, Plus, Search, WarningFilled, ArrowDown } from '@element-plus/icons-vue'
@@ -2849,6 +2870,8 @@ import NewVoucherDialog from './NewVoucherDialog.vue'
 import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
 import SelectVoucherDialog from './SelectVoucherDialog.vue'
 import DocSelectRail from './DocSelectRail.vue'
+/** 立项申请的全屏单据预览（2026-11-17）：按申请立项人筛选 + 返回 + 跳转 */
+import ApprovalPreviewOverlay from './ApprovalPreviewOverlay.vue'
 import DocSheet from './DocSheet.vue'
 import FileAttachCell from './FileAttachCell.vue'
 // 标注笔/橡皮擦:纸面(RecordSheetPanels 里的 AnnotatedText)通过 provide/inject 拿状态,
@@ -2948,7 +2971,7 @@ const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', '
   //   和外部单底部的新增样品一样，而不是表格类的面板」）⇒ 两张单都走 DocSheet；
   //   内部单的行源改成明细（见 docSheetConfigs.sampleIntSheetCfg 与
   //   tools/migrate-sample-int-paper-rows-20261106.sql）。上一版 archive 数据面板做法已撤销。
-  'RD_SAMPLE_EXT', 'RD_SAMPLE_INT',
+  'RD_SAMPLE_EXT', 'RD_SAMPLE_INT', 'RD_SAMPLE_ND',
   // 检验委托单(INSP_COMMISSION,2026-11-15 用户口径「检验委托单为主要实际单据,需要这个单据完成形式
   // 实现为图片中的」):纸面由 InspCommissionSheet 接管(委托检验合同 YJ-QP-701-1-01 (00)),
   // 「检验类别」从送样登记表的检测目录勾选带入。不列进来会退回「表头字段平铺 + 明细表格」的数据页。
@@ -2994,10 +3017,28 @@ const changeSigners = computed(() => String(cur.value?.['会签人'] ?? '')
 const iAmChangeSigner = computed(() => changeSigners.value.includes(String(user.account || user.userName || '')))
 const isChangeInitiator = computed(() => user.isAdmin === true
   || (!!user.realName && String(cur.value?.['申请人'] ?? '') === String(user.realName)))
+/** 内部样品单的月份标题前缀：`2026年11月内部`（优先单号里的年月，退回当前月） */
+const sampleMonthTitle = computed(() => {
+  const no = String(cur.value?.['单据编号'] || curDocNo.value || '')
+  const m = no.match(/(\d{4})-(\d{2})-/)
+  const now = new Date()
+  const y = m ? m[1] : String(now.getFullYear())
+  const mo = m ? String(Number(m[2])) : String(now.getMonth() + 1)
+  return `${y}年${mo}月内部`
+})
 const docSheetConfig = computed(() => {
   // 2026-11-06 样品二级目录两张单（各自版式，见 docSheetConfigs 的 sampleExt/IntSheetCfg）
-  if (panelCode.value === 'RD_SAMPLE_EXT') return sampleExtSheetCfg
-  if (panelCode.value === 'RD_SAMPLE_INT') return sampleIntSheetCfg
+  // 非开发样品申请单（2026-11-17 Excel #14）：用户口径「复制一份样品-外部开发样品单页面及入口」
+  //   ⇒ 纸面版式**逐字复用** sampleExtSheetCfg，不另写一套。
+  if (panelCode.value === 'RD_SAMPLE_EXT' || panelCode.value === 'RD_SAMPLE_ND') return sampleExtSheetCfg
+  // 2026-11-17 用户口径（Excel #4 第 3 条）：
+  //   「新增单据时默认填充 ****年**月 内部（开发样品申请单） 表名称」
+  //   ⇒ 标题前半段按**这张单所属月份**动态生成（A1 是每月一张单，所以标题也跟着月度走）。
+  //   月份优先从单号 SPN-YYYY-MM-NNNN 取（头表 单据日期 常为空，实测 SPN-2026-11-0004/0005 都是 null），
+  //   取不到再落到当前月 —— 新建未保存时就是当前月，符合"新增时默认填充"。
+  if (panelCode.value === 'RD_SAMPLE_INT') {
+    return { ...sampleIntSheetCfg, titlePart1: sampleMonthTitle.value }
+  }
   return qcSheetCfgs[panelCode.value] || (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg)
 })
 
@@ -4943,6 +4984,28 @@ const previewKw = ref('')
  */
 const PREVIEW_SIDE_PANELS = new Set(['RD_PROD_INFO', 'RD_APPROVAL'])
 const canPreviewSide = computed(() => PREVIEW_SIDE_PANELS.has(String(panelCode.value)))
+/**
+ * 走**全屏**单据预览的面板（2026-11-17 用户口径，目前只有立项申请）。
+ *
+ * <p>用户原话：「点击单据预览就根据申请立项人进行一个筛选全屏展示这些属于自己申请的单据的明细，
+ * 设计要好看，使用设计库进行设计，要留一个返回按钮，点击对应单据要有一个跳转按钮，
+ * 可以直接跳转到对应单据」。</p>
+ *
+ * <p>与右栏那个 176px 的窄预览是**两回事**：立项申请的字段多（背景/机型/规格/目标/等级…），
+ * 挤在侧栏里根本看不清，所以单独开全屏浮层（组件 ApprovalPreviewOverlay）。
+ * 其余面板（RD_PROD_INFO 等）继续走原来的右栏 DocSelectRail，行为逐字不变。</p>
+ */
+// 2026-11-17 用户口径：立项申请 + 产品信息表共用同一套「全屏单据预览」（左状态树 + 多条件查询栏）
+const FULL_PREVIEW_PANELS = new Set(['RD_APPROVAL', 'RD_PROD_INFO'])
+const canFullPreview = computed(() => FULL_PREVIEW_PANELS.has(String(panelCode.value)))
+/** 全屏预览浮层是否打开 */
+const approvalPreviewOpen = ref(false)
+/** 当前登录人姓名（用于「只看我申请的」判据） */
+const myApplicantName = computed(() => String(user.realName || '').trim())
+/** 全屏预览的「归属人」字段：立项申请看申请立项人；产品信息表没有该列，看编辑人（=制单人姓名） */
+const previewOwnerKey = computed(() => (String(panelCode.value) === 'RD_APPROVAL' ? '申请立项人' : '编辑人'))
+/** 全屏预览副标题里的面板名 */
+const previewSubject = computed(() => tt(String(panelName.value || '')))
 /** 右栏是否处于「单据预览」态 */
 const previewInSide = ref(false)
 /**
@@ -4950,6 +5013,8 @@ const previewInSide = ref(false)
  * 但**不走 previewMode** —— previewMode 是"把左栏/整页切走"的老预览态，这里只替换右栏内容。
  */
 async function openSidePreview() {
+  // 2026-11-17：立项申请走**全屏浮层**（按申请立项人筛选 + 可跳转），不进右栏窄预览。
+  if (canFullPreview.value) { await openApprovalPreview(); return }
   if (canPreviewSide.value && previewInSide.value) { closeSidePreview(); return }
   previewKw.value = ''
   previewInSide.value = true
@@ -4960,6 +5025,31 @@ async function openSidePreview() {
   curIdx.value = 0
   await load()
 }
+/**
+ * 打开立项申请的全屏单据预览（2026-11-17）。
+ * 取数：与右栏预览同一口径 —— pageSize 拉到 200 一次取全、客户端筛选（不额外造接口）。
+ */
+async function openApprovalPreview() {
+  if (previewPrevPageSize === null) previewPrevPageSize = query.pageSize
+  query.pageSize = 200
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+  approvalPreviewOpen.value = true
+}
+
+/**
+ * 浮层里点「跳转」= 回到本面板并定位到那张单（?focus=单号）。
+ * ⚠ 用 focus 而不是 docNo：本面板走列表式定位（applyDocNoQuery 那条是 RD_SPEC_DOC 的深链口径），
+ *   与 gotoDocNo / 派发后的跳转保持同一套写法。
+ */
+function jumpToApprovalDoc(row) {
+  const no = String(row?.['单据编号'] || '').trim()
+  approvalPreviewOpen.value = false
+  if (!no) return
+  router.push({ path: '/panelx/list/RD_APPROVAL', query: { focus: no } })
+}
+
 /** 返回：恢复右侧操作栏（操作按钮原样回来） */
 function closeSidePreview() {
   previewInSide.value = false
@@ -6345,7 +6435,11 @@ watch(
 // 只改**显示值与保存报文**(cur 是保存时回传的表头对象),不主动置脏:
 //   用户没有别的改动就不该弹「未保存」提醒。落库权威仍在服务端(ButtonService 每次保存按登录人回写),
 //   所以即使这一格没被前端改到,存下去也一定是当前登录人。
-const EDITOR_STAMP_FIELDS = { RD_PROD_INFO: '编辑人', RD_ASM_PROC: '表单管理人' }
+// 2026-11-17：RD_ASM_PROC 的「表单管理人」已改为**固定柴善银**（用户口径「是固定的」），
+//   故从这里移除 —— 否则每次打开/编辑草稿都会把纸面值改写成当前登录人（生产实测：
+//   库里已是柴善银，界面却被盖成「系统管理员」，就是这个监视器干的）。
+//   产品信息表的「编辑人」= 当前编辑人，属于另一件事，保留。
+const EDITOR_STAMP_FIELDS = { RD_PROD_INFO: '编辑人' }
 watch(
   () => [panelCode.value, draftEditable.value, cur.value?.['单据编号'], JSON.stringify(cur.value || {})],
   () => {
@@ -8001,6 +8095,9 @@ const isApproved = computed(() => cur.value && APPROVED_STATUS_VALUES.includes(c
 
 function rowCls({ row }, b) {
   if (row._placeholder) return 'ph-row'
+  // 缺必填的行整行描边(2026-11-17):用户口径「没高亮提示是那个数据行」——
+  // 单元格闪色之外再给整行一个红边,长表格里一眼能扫到是第几行
+  if (isMissingHintRow(row)) return 'row-missing-hint'
   if (b && b.id === 'A' && row['产品编码'] && row['产品编码'] === selectedProduct.value) return 'prod-selected'
   if (APPROVED_STATUS_VALUES.includes(row['审批状态'])) return 'row-approved'
   return ['产品编码', '材料编码', '存货编码', '存货名称', '产品名称', '材料名称'].some((k) => row[k] === '合计') ? 'sum-row' : ''
@@ -8252,6 +8349,8 @@ const apvLevel = ref('')
 const apvOpinion = ref('')
 const apvDocNo = ref('')
 /** 2026-10-28:审批定级时一并分发对接人(用户口径「后续也默认是这个对接人」) */
+/** 立项申请审批后自动分发的对接人（2026-11-17 1117问题 #3：冯总审核后直接到秀丽分发） */
+const RD_DEFAULT_LIAISON = 'chenxiuli'
 const apvLiaison = ref('')
 
 // ── 测试申请单:审批通过 + 分发测试负责人(2026-10-29) ──
@@ -8341,8 +8440,9 @@ async function openRdApprove(no) {
   apvLevel.value = String(current.value?.['项目等级'] || '')
   // 对接人下拉的候选来自账号清单(与「定级分发」同一份);不预取 ⇒ 打开弹窗时拉一次
   await ensureRdFlowUsers()
-  // 默认带出已有对接人("后续也默认是这个对接人");新单为空,由用户自行选或不选
-  apvLiaison.value = String(rdFlow.liaison || '')
+  // 2026-11-17（1117问题 #3）：对接人固定陈秀丽 —— 已分发过的沿用原值，新单直接默认 chenxiuli。
+  // 弹窗里已不再给下拉（见模板），这里仍赋值是为了把值提交给后端（后端另有一道兜底默认）。
+  apvLiaison.value = String(rdFlow.liaison || RD_DEFAULT_LIAISON)
   apvOpinion.value = ''
   apvVisible.value = true
 }
@@ -9450,6 +9550,13 @@ async function exportSheetExcel() {
     // 无合计、空白行全在），用户报的「炭棒配方管控清单-设计添加量导出错误」就是它。
     // 版式口径在 RecordSheetPanels.exportRecipeExcel + core/mold/recipeExport.js。
     RD_MOLD_PROC: 'exportRecipeExcel',
+    // 2026-11-17（Excel #10「工艺单-X烧结 · 配方计算导出异常」）：
+    // X烧结与烧结工艺清单**共用同一个配方表导出器**（RecordSheetPanels.exportRecipeExcel
+    // 按 dt.recipeCalc / filterVal='配方表' 找表，两个面板都配了 recipeCalc），
+    // 但映射表当初只登记了 RD_MOLD_PROC ⇒ X烧结一直在走「通用导出」，
+    // 于是用户看到的还是老毛病（小数位不对、空行全在、没有合计）。
+    // 这是"专属导出写好了却没接上"的典型漏接，补这一行即可。
+    RD_X_SINTER: 'exportRecipeExcel',
   }[panelCode.value]
   if (catalogExporter) {
     const sheet = approvalSheetRef.value
@@ -10856,23 +10963,130 @@ function emptyFieldValue(value) {
 function focusMissingField(key) {
   if (!key) return
   try { approvalSheetRef.value?.focusField?.(key) } catch { /* 定位失败不影响校验 */ }
+  // 无纸面 sheet 的布局(单据卡片/网格)自己点亮(2026-11-17)——
+  // 后端拒收时也会走到这里(ButtonService「X不能为空」),同样要能看出是哪一格
+  if (!approvalSheetRef.value) applyHintByFieldName(key)
+}
+
+/**
+ * 只拿得到一个**字段名**时(典型:后端报错文案里反解出来的键)尽量点亮:
+ * 表头字段直接亮那一栏;明细字段则把该列**空着的行**全亮出来。
+ * @returns {boolean} 是否点亮了任何东西
+ */
+function applyHintByFieldName(key) {
+  if (!key) return false
+  if ((headerFields.value || []).some((f) => headerFieldKey(f) === key)) {
+    applyMissingHint([{ key }])
+    return true
+  }
+  const hits = []
+  for (const tab of cfgCache.value?.detail?.tabs || []) {
+    if (!(tab.fields || []).some((f) => f.dataName === key)) continue
+    for (const row of cur.value?.detail?.[tab.key] || []) {
+      if (row && emptyFieldValue(row[key])) hits.push({ key, tabKey: tab.key, row })
+    }
+  }
+  if (!hits.length) return false
+  applyMissingHint(hits)
+  return true
 }
 
 /**
  * 一次高亮**多个**缺必填的格(2026-11-06 用户口径:「所有的必填项在保存提交审批的时候要有高亮
  * 提示哪一个还没有填写」)。原先只定位第一个缺失项 —— 用户补完一个又冒下一个,来回试好几轮。
  * 与 focusMissingField 同款:可选链 + try,定位失败绝不改变校验结果。
- * @param {string[]} keys 缺必填的数据键(顺序即提示顺序)
+ * @param {Array<{key:string,tabKey?:string,row?:object}>|string[]} items 缺必填项(顺序即提示顺序)
  */
-function focusMissingFields(keys) {
-  const list = (keys || []).filter(Boolean)
+function focusMissingFields(items) {
+  const list = (items || []).filter(Boolean)
   if (!list.length) return
+  const keys = list.map((it) => (typeof it === 'string' ? it : it.key)).filter(Boolean)
+  if (!keys.length) return
+  // ① 文书面板(RecordSheetPanels / DocSheet / 各纸面 sheet)自带 focusFields/focusField
   try {
     const sheet = approvalSheetRef.value
-    if (sheet?.focusFields) sheet.focusFields(list)
-    else sheet?.focusField?.(list[0])
+    if (sheet?.focusFields) sheet.focusFields(keys)
+    else sheet?.focusField?.(keys[0])
   } catch { /* 定位失败不影响校验 */ }
+  // ② 单据卡片 / 网格布局(工艺路线等基础资料与绝大多数单据)没有纸面 sheet 组件 ⇒ 本组件自己点亮。
+  //    2026-11-17 用户报障:「必填项没有体现为必填,且点击保存后并没高亮提示是那个数据行」——
+  //    弹窗里写着"已用高亮标出",而这套布局一条高亮都没有(高亮只实现在纸面组件里)。
+  applyMissingHint(list)
 }
+
+/* ═══ 缺必填的「本组件自绘高亮」(2026-11-17)═════════════════════════════════════
+   两处落点:
+     · 表头字段条 `.field`          → class `field-blink`(键 = 表头字段数据键)
+     · 明细表格单元格 / 整行         → `cell-blink` / `row-missing-hint`(键 = 行对象 + 字段数据键)
+   用**行对象身份**(WeakMap)而不是行号:表里还混着 `_placeholder` 空行(工艺路线末行恒有一个),
+   行号与 cur.detail 的下标并不一一对应;排序/筛选后行号更不可靠。
+   高亮是**持续**的(补齐前一直亮,配合弹窗「已用高亮标出,请补齐后再提交」的口径),
+   校验通过或换单据时清掉。 */
+const missingHintHead = shallowRef(null)   // Set<string> 表头缺必填的数据键
+// 明细行是 markRaw 过的对象 ⇒ 必须用 WeakMap 按**对象身份**记,且用 shallowRef 保持它是原生
+// WeakMap(ref 会把集合包成 Proxy,代理后的 get 用原始对象做键容易落空)
+const missingHintRows = shallowRef(null)   // WeakMap<明细行对象, Set<string>> 缺必填的格
+// 整表级「请至少添加一行」:键是页签键 —— 没有具体格子可亮,改成闪该页签的「新增数据」按钮
+const missingHintTabs = shallowRef(null)   // Set<string> 缺行的页签键
+
+function isMissingHintTab(b) {
+  const key = b ? activeTab(b).key : ''
+  return !!key && !!missingHintTabs.value && missingHintTabs.value.has(key)
+}
+
+function isMissingHintHead(key) {
+  return !!key && !!missingHintHead.value && missingHintHead.value.has(key)
+}
+
+function missingCellCls({ row, column }) {
+  const set = row ? missingHintRows.value?.get?.(row) : null
+  if (!set) return ''
+  const prop = column?.property
+  return prop && set.has(prop) ? 'cell-blink' : ''
+}
+
+function isMissingHintRow(row) {
+  return !!row && !!missingHintRows.value?.get?.(row)
+}
+
+function clearMissingHint() {
+  missingHintHead.value = null
+  missingHintRows.value = null
+  missingHintTabs.value = null
+}
+
+/** 把缺失清单落成高亮状态,并把第一个高亮点滚到视野中央(翻页后目标常在视野外)。 */
+function applyMissingHint(items) {
+  const head = new Set()
+  const tabs = new Set()
+  const rows = new WeakMap()
+  for (const it of items || []) {
+    if (!it || !it.key) continue
+    if (it.row) {
+      const set = rows.get(it.row) || new Set()
+      set.add(it.key)
+      rows.set(it.row, set)
+    } else if (it.tabKey) {
+      // 「请至少添加一行明细」:没有格子可亮,闪该页签的「新增数据」按钮
+      tabs.add(it.tabKey)
+    } else {
+      head.add(it.key)
+    }
+  }
+  missingHintHead.value = head.size ? head : null
+  missingHintTabs.value = tabs.size ? tabs : null
+  missingHintRows.value = rows
+  nextTick(() => {
+    try {
+      // 明细优先(表头字段条总在最上面,明细行才可能被翻页/滚动甩出视野)
+      const el = document.querySelector('.cell-blink') || document.querySelector('.field-blink')
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    } catch { /* 滚动失败不影响校验 */ }
+  })
+}
+
+// 换单据就清高亮:表头数据键(如「工艺路线名称」)各张单同名,不清会把高亮亮到另一张单上
+watch(curDocNo, () => clearMissingHint())
 
 /**
  * 唯一键查重(2026-10-16,起点需求:工序档案「相同工序编码不允许出现重复」)。
@@ -10952,9 +11166,11 @@ function promptMissingRequired(pre, fallbackText) {
 }
 
 function validateInlineDraft() {
-  /** 缺失项:{key(数据键), text(人话)} —— 明细页签整表必填时 key 是页签键 */
+  /** 缺失项:{key(数据键), text(人话), tabKey/row(明细行所在页签与行对象,供高亮定位)} */
   const missing = []
   lastMissingRequired = missing
+  // 每次校验先清旧高亮:补掉的格子要灭,换单据后不留上一条单据的残留高亮
+  clearMissingHint()
   for (const field of headerFields.value) {
     const key = headerFieldKey(field)
     if (field.isRequired && emptyFieldValue(cur.value[key])) {
@@ -10986,18 +11202,19 @@ function validateInlineDraft() {
       nonEmpty++
       for (const field of tab.fields || []) {
         if (field.isRequired && emptyFieldValue(row[field.dataName])) {
-          missing.push({ key: field.dataName, text: `${tabName}第 ${index + 1} 行${field.dataName}不能为空` })
+          // tabKey + row 让高亮能精确落到「第几行的哪一格」,而不是只报一个字段名
+          missing.push({ key: field.dataName, tabKey: tab.key, row, text: `${tabName}第 ${index + 1} 行${field.dataName}不能为空` })
           rowMissing = true
         }
       }
     }
     if (tab.isRequired && nonEmpty === 0 && !rowMissing) {
-      missing.push({ key: tab.key, text: `请至少添加一行${tabName}` })
+      missing.push({ key: tab.key, tabKey: tab.key, text: `请至少添加一行${tabName}` })
     }
   }
   if (!missing.length) return ''
   // 一次把**所有**缺失格点亮(翻到第一个缺失项所在页;其它页的格回到那页时仍在高亮期)
-  focusMissingFields(missing.map((m) => m.key))
+  focusMissingFields(missing)
   // 提示文案:一项直说;多项列前 5 条 + 总数 —— 弹窗窄,不铺整串
   if (missing.length === 1) return missing[0].text
   const shown = missing.slice(0, 5).map((m) => m.text).join('、')
@@ -14514,6 +14731,13 @@ onUnmounted(() => {
   color: #444;
   white-space: nowrap;
 }
+/* 必填标识(2026-11-17 用户报障「必填项在原来的工艺路线中没有体现为必填」)。
+   沿革:2026-11-06 给必填项打了红星 → 2026-11-13 用户口径「把必填项的红点标识去掉,保留必填项的
+   属性就行」把**全系统 7 处**红星一起清掉了 —— 但那条口径是针对**弹窗**(参照选择/客户名称那几个)
+   说的,连单据卡片表头与明细列头一起清,结果是用户看不出哪些格必填,只有点保存时被弹窗拦下。
+   ⇒ 现在只在**单据卡片表头 label + 明细列头**这两处恢复红星;各弹窗组件里没有下面这两条规则,
+     弹窗内的红星仍然保持去掉。
+   要再全部去掉:删掉下面两个 `::before` 块即可 —— `.req` 类名与 required 必填判据不受影响。 */
 .field label.req::before {
   content: '*';
   color: #ff0033;
@@ -14524,6 +14748,24 @@ onUnmounted(() => {
   color: #ff0033;
   margin-right: 2px;
   font-weight: bold;
+}
+/* 保存时缺必填的表头字段闪烁(2026-11-17):与 PanelxForm / DocSheet / RecordSheetPanels 的
+   .field-blink 同一观感(scoped 样式不跨组件继承,这里必须单独定义)。 */
+.field-blink {
+  animation: pxlFieldBlink 1.1s ease-in-out 2;
+  border-radius: 4px;
+}
+@keyframes pxlFieldBlink {
+  0%, 100% { background: transparent; }
+  50% { background: var(--el-color-warning-light-7, #fdf6ec); box-shadow: 0 0 0 2px var(--el-color-warning-light-5, #f5dab1); }
+}
+/* 「请至少添加一行明细」时闪该页签的「新增数据」按钮(没有格子可亮,给个明确的落点) */
+.btn-blink {
+  animation: pxlBtnBlink 1.1s ease-in-out 2;
+}
+@keyframes pxlBtnBlink {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 0 3px rgba(255, 0, 51, 0.45); }
 }
 .field :deep(.el-input),
 .field :deep(.el-select),
@@ -15259,6 +15501,22 @@ onUnmounted(() => {
   color: #c0c4cc;
 }
 :deep(.el-table .row-approved td) { background: #f0fdf4 !important; }
+/* 缺必填的明细行/格(2026-11-17 用户报障「点击保存后并没高亮提示是那个数据行」)。
+   整行淡红底 + 左起红边(扫一眼就知道是第几行),具体缺的那一格再闪烁两次。
+   ⚠ el-table 的 tr/td 由子组件渲染、拿不到本组件的 scoped 属性 ⇒ 必须走 :deep。 */
+:deep(.el-table .row-missing-hint > td.el-table__cell) {
+  background: #fff5f5 !important;
+}
+:deep(.el-table .row-missing-hint > td.el-table__cell:first-child) {
+  box-shadow: inset 3px 0 0 #ff0033;
+}
+:deep(.el-table .cell-blink) {
+  animation: pxlCellBlink 1.1s ease-in-out 2;
+}
+@keyframes pxlCellBlink {
+  0%, 100% { background: transparent; }
+  50% { background: #ffe9ec; box-shadow: inset 0 0 0 2px #ff0033; }
+}
 .main-grid { margin-bottom: 10px; }
 .main-grid .dt-head { margin-bottom: 4px; }
 .main-grid .dt-head .dt-tab.on { cursor: default; }

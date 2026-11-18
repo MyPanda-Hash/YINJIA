@@ -36,6 +36,12 @@ export const menuTree = [
         code: 'rdSample', title: '样品', icon: 'Box', children: [
           { code: 'rdSampleExt', title: '外部-开发样品', path: '/panelx/list/RD_SAMPLE_EXT', panelCode: 'RD_SAMPLE_EXT', icon: 'DocumentAdd', operationName: '申请样品' },
           { code: 'rdSampleInt', title: '内部-开发样品', path: '/panelx/list/RD_SAMPLE_INT', panelCode: 'RD_SAMPLE_INT', icon: 'Document', operationName: '申请样品' },
+          // 非开发样品申请单（2026-11-17 Excel #14）：
+          //   「复制一份样品-外部开发样品单页面及入口，将名称改为外部-非开发样品申请单。
+          //    1. 审批流程要求 销售有权限录单（刘磊或王光珍审核）
+          //    2. 其他人有查阅权限但不能修改内容」
+          //   版式复用外部开发样品单（见 PanelxList.docSheetConfig），只是面板码/表/前缀独立。
+          { code: 'rdSampleNonDev', title: '外部-非开发样品', path: '/panelx/list/RD_SAMPLE_ND', panelCode: 'RD_SAMPLE_ND', icon: 'DocumentAdd', operationName: '申请样品' },
         ],
       },
       {
@@ -50,6 +56,12 @@ export const menuTree = [
               { code: 'rdRoProtect', title: 'RO保护', path: '/panelx/list/RD_RO_PROTECT', panelCode: 'RD_RO_PROTECT', icon: 'Umbrella' },
               { code: 'rdSoak', title: '浸泡安全', path: '/panelx/list/RD_SOAK', panelCode: 'RD_SOAK', icon: 'Coffee' },
               { code: 'rdDropPrec', title: '压降、精度', path: '/panelx/list/RD_DROP_PREC', panelCode: 'RD_DROP_PREC', icon: 'Bottom' },
+              // 2026-11-17 用户口径:「在数据记录表列下边使用设计库新设计一个面板,可以上传一些比较特殊
+              //   的数据记录表进行保存,也可以点击预览这些文件,删除需要管理员审批…所有人只要能看这个面板
+              //   就可以查看这些上传的数据记录表」。⚠ 它是**页面级视图**(路径 /rd/extraRecFile),
+              //   不是 PanelxList 引擎面板 —— 上传/预览/删除审批都由专属页面 + /api/extra-rec-file 承担。
+              //   panelCode 仍登记 RD_EXTRA_REC_FILE:权限矩阵与后端 requirePanelView 同源(能看才进得来)。
+              { code: 'rdExtraRecFile', title: '特殊数据记录表', path: '/rd/extraRecFile', panelCode: 'RD_EXTRA_REC_FILE', icon: 'Files' },
             ],
           },
           {
@@ -724,6 +736,11 @@ export const menuTree = [
     children: [
       { code: 'qcSampleReg', title: '送样登记表', path: '/panelx/list/SAMPLE_REG', icon: 'Notebook', panelCode: 'SAMPLE_REG' },
       { code: 'qcInspCommission', title: '检验委托单', path: '/panelx/list/INSP_COMMISSION', icon: 'Document', panelCode: 'INSP_COMMISSION', operationName: '新增流程' },
+      // 样品检验汇总表(2026-11-17 用户口径:「为当前的样品检验增加汇总表,能够查看到一天或者一周,
+      //   送好多个样品,测试啥的总表。要按一个时间范围,去导出有多少人送了啥样品测试啥,安排检测工作。」)
+      // 页面级虚拟面板 INSP_SUMMARY(定义见后端 PagePanelRegistry)⇒ 专用路由 /qc/inspSummary,
+      // 数据由 /api/px/inspSummary/summary 现算(只读),导出 Excel 在前端生成。
+      { code: 'qcInspSummary', title: '样品检验汇总表', path: '/qc/inspSummary', icon: 'DataAnalysis', panelCode: 'INSP_SUMMARY' },
     ],
   },
   // 2026-10-18 用户口径:「写一个数据建模目录」——其下依次放 字段管理 / 数据字典。

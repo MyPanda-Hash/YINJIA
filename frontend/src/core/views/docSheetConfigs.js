@@ -25,6 +25,12 @@ export const FIXED_SHEET_W = {
   RD_PLAN: 1242,
   // 样品两张单（2026-11-06 表格式纸面）：纸宽 = 模板各列宽之和，否则外层 flex 会把列宽拉伸变形
   RD_SAMPLE_EXT: 1188,
+  // 2026-11-18 修（研发管理版面审计发现）：`RD_SAMPLE_ND`（外部-非开发样品）复用
+  //   **同一份 `sampleExtSheetCfg`**（PanelxList 里 EXT/ND 共用一个配置），
+  //   但这里只登记了 EXT ⇒ ND 的 fixedSheetWidth=0 落回默认纸宽 940，
+  //   而表体是 13 列共 1188 ⇒ 表格比纸宽出 249px（实测 paperW=940 / .sg-table=1189）。
+  //   同一份配置必须同一纸宽。
+  RD_SAMPLE_ND: 1188,
   // 内部单 = 13 列合计 1220（2026-11-11 修正：原写 1450，比列宽和多 230 ⇒ 纸右缘一条空档、
   // 表体只占左侧 1221px，标题「内部（开发样品申请单）」也被纸面滚动容器裁掉 67px）。
   // 钉死口径：FIXED_SHEET_W 与 grid.cols 的 w 之和必须相等，见 docSheetWidth.test.js。
@@ -63,6 +69,18 @@ export const approvalSheetCfg = {
   titlePart2: '二三四级项目',
   titlePart3: '',
   seq: 'cn',
+  // 2026-11-17 用户口径（1117问题 #2，对照《立项申请表》目标版式）：
+  //   右上角 = **受控文件编号 YJ-QR-155**（不再是"项目编号"参照格）；
+  //   信息表 4 行 = 文件管理人 / 密级 / 文件使用范围（**固定「公司项目组」，不再下拉**）/ 立项编号。
+  //   「立项编号」与原来的「项目编号」是**同一个东西**（用户确认选 A）——
+  //   数据键仍是 `文档编号`（ADR-0001：数据键不随显示名变），所以下游实施计划索引、流程管控对号零影响。
+  docnoStatic: 'YJ-QR-155',
+  info: [
+    { label: '文件管理人', key: '文件管理人' },
+    { label: '密级', key: '密级' },
+    { label: '文件使用范围', kind: 'static', text: '公司项目组' },
+    { label: '立项编号', key: '文档编号' },
+  ],
   // 设计右侧是可填的「备注」区(F5 标签 + F6:G15 合并填写区)⇒ 渲染成真的备注列,
   // 不再是 deco 装饰虚线(2026-09-22 对齐设计;rd_approval.备注 列本就存在,只是没登记字段)
   remark: { label: '备注', key: '备注', max: 1000 },
@@ -95,6 +113,15 @@ export const planSheetCfg = {
   titlePart2: '二三四级',
   titlePart3: '实施计划',
   seq: 'num',
+  // 2026-11-17 用户口径（1117问题 #2）：右上角 = **YJ-QR-156**；使用范围固定「公司项目组」。
+  //   「立项编号」= 直接索引立项申请表 —— 同一数据键 `文档编号`（下游按它关联，不动）。
+  docnoStatic: 'YJ-QR-156',
+  info: [
+    { label: '文件管理人', key: '文件管理人' },
+    { label: '密级', key: '密级' },
+    { label: '文件使用范围', kind: 'static', text: '公司项目组' },
+    { label: '立项编号', key: '文档编号' },
+  ],
   rows: [
     // 行高 = 设计磅值 × 4/3(96dpi),来源「项目实施计划.xlsx」行高
     // [20.15,27.75,27.75,27.75,33.75,33.75,32.1,77.1,60.95,39.95,39.95,39.95,68.25,30]
@@ -384,30 +411,46 @@ export const qcSheetCfgs = {
   QC_JJF: {
     docno: 'YJ-QR-92',
     titlePart1: '紧急放行通知单', titlePart2: '', titlePart3: '',
-    info: qcInfo(''),
+    // 右上信息表(2026-11-17 用户口径,截图绿字):
+    //   · 使用范围 = 印刷值「公司内部」;
+    //   · 责任部门 = **责任人所属部门**(由后端按建单/提交人所属部门写入 qc_jjf.责任部门,只读);
+    //   · 时间 = 单据日期(建单即当天,只读)。
+    info: [
+      { label: '使用范围', kind: 'static', text: '公司内部' },
+      { label: '责任部门', key: '责任部门' },
+      { label: '时间', key: '单据日期', kind: 'date' },
+    ],
     rows: [
       { kind: 'pairs', cells: [
         { label: '物料类型', key: '物料类型', kind: 'checks', options: ['外部来料', '自制物料'], flex: 3 },
       ] },
       { kind: 'pairs', cells: [
         { label: '物料名称', key: '物料名称', flex: 1 },
+        // 2026-11-17 用户口径(截图「点击选择→不用点击选择,责任人手动录入」):
+        //   物料编码由「参照 INV 存货编码」改为**纯文本手输**(yj_field.data_type=文本、ref 全清)。
         { label: '物料编码', key: '物料编码', flex: 1 },
       ] },
       { kind: 'pairs', cells: [
         { label: '申请放行数量', key: '申请放行数量', flex: 1 },
         { label: '批次号', key: '批次号', flex: 1 },
       ] },
-      { kind: 'section', label: '一．紧急放行原因', key: '紧急放行原因', h: 110, max: 2000, sign: '责任人', signKey: '责任人' },
+      // 一．紧急放行原因:责任人 + 日期(2026-11-17 用户口径「日期无法填写,新增要求自动生成时间以及
+      //   填写人员」)⇒ 责任人 = 建单/提交人(后端写,只读)、日期 = 单据日期(dateKey,只读),
+      //   两格都由系统生成,纸面照原样印「责任人: ＿ 日期: 年 月 日」。
+      { kind: 'section', label: '一．紧急放行原因', key: '紧急放行原因', h: 110, max: 2000,
+        sign: '责任人', signKey: '责任人', dateKey: '单据日期' },
       { kind: 'section', label: '二．相关部门处理意见', h: 34 },
       { kind: 'dept', label: '产品开发部意见', h: 130, subs: [
         { label: '性能', key: '产品开发部性能意见', checks: ['同意使用', '不同意使用'], max: 250 },
         { label: '工艺', key: '产品开发部工艺意见', checks: ['同意使用', '不同意使用'], max: 250 },
       ] },
       { kind: 'dept', label: '品质部意见', h: 80, subs: [{ key: '品质部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
-      { kind: 'section', label: '三．检测结果', key: '检测结果', h: 90, max: 1000 },
+      // 2026-11-17 用户口径(截图红框「三．检测结果 → 这一行删除」):该行整行下线;
+      //   qc_jjf.[检测结果] 物理列保留(历史值不丢),yj_field 登记已随迁移删除。
     ],
     signKind: 'plain',
-    signCells: qcSignStd('检测人'),
+    // 底部落款(截图绿字):编制 = 责任人、审核 = 一级审批通过人(冯敏)、批准 = 二级(冯总/超级管理员)。
+    signCells: qcSignStd('责任人'),
   },
 
   // YJ-QR-118 试产材料使用申请单

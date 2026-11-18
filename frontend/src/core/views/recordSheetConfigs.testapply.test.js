@@ -148,12 +148,21 @@ test('产品文件**六张单**的右上角都是固定表单编号（2026-11-06
   //   规格书:YJ-QR-153 组装工艺清单:YJ-QR-144 出货检验计划表:YJ-QR-145
   //   这些右上角固定的编号你也没有改全，这些又不影响流程就是显示而已」
   // ⇒ 六张单一个都不能漏（上一版只改了 4 张，组装/出货检验两张还在显示流水号 AP-…/IP-…）
+  // 2026-11-17 用户重新给了对照表（1117问题 #1）：
+  //   产品信息表 YJ-QR-152 / 烧结工艺管控清单 YJ-QR-146 / 烧结配方管控清单 YJ-QR-154 /
+  //   X烧结工艺清单 YJ-QR-157 / 规格书 YJ-QR-153 / 组装工艺清单 YJ-QR-144 / 出货检验计划表 YJ-QR-145
+  //   ⇒ 烧结去掉了 -1 后缀；X烧结由"与烧结同号"改为 157；配方管控清单补 154（页级覆盖）。
   assert.equal(recordSheetConfigs.RD_PROD_INFO.docNoStatic, 'YJ-QR-152', '产品信息表')
-  assert.equal(recordSheetConfigs.RD_MOLD_PROC.docNoStatic, 'YJ-QR-146-1', '烧结工艺清单')
-  assert.equal(recordSheetConfigs.RD_X_SINTER.docNoStatic, 'YJ-QR-146-1', 'X烧结工艺清单')
+  assert.equal(recordSheetConfigs.RD_MOLD_PROC.docNoStatic, 'YJ-QR-146', '烧结工艺管控清单')
+  assert.equal(recordSheetConfigs.RD_X_SINTER.docNoStatic, 'YJ-QR-157', 'X烧结工艺清单')
   assert.equal(recordSheetConfigs.RD_SPEC_DOC.docNoStatic, 'YJ-QR-153', '规格书')
   assert.equal(recordSheetConfigs.RD_ASM_PROC.docNoStatic, 'YJ-QR-144', '组装工艺清单')
   assert.equal(recordSheetConfigs.RD_INSP_PLAN.docNoStatic, 'YJ-QR-145', '出货检验计划表')
+  // 烧结配方管控清单 = RD_MOLD_PROC 的第 2 页（页级 docNoStatic 覆盖面板级）
+  const formulaPage = (recordSheetConfigs.RD_MOLD_PROC.pages || [])
+    .find((pg) => pg && pg.staticTitle === '炭棒配方管控清单')
+  assert.ok(formulaPage, '烧结配方页必须存在')
+  assert.equal(formulaPage.docNoStatic, 'YJ-QR-154', '烧结配方管控清单（页级编号）')
 })
 /**
  * 2026-11-06 用户报障：「把规格书的第一页的字体大小统一一下，应该是草稿状态显示的问题」。
@@ -181,4 +190,39 @@ test('封面输入框规则的 CSS 特异性高于通用 .rs-t 规则（否则�
   assert.ok(m, '封面输入框字号规则必须带 .rs-t 前缀（否则与通用规则同特异性、被后者压掉）')
   const classes = (m[1].match(/\.[a-zA-Z-]+/g) || []).length
   assert.ok(classes >= 3, '选择器只有 ' + classes + ' 个类，压不过 .rs-t :deep(.el-input__inner)')
+})
+
+/* ═══ 2026-11-17 用户口径:「这个的列宽有问题」(测试申请单·内部委托页·样品信息三列) ═══
+ *
+ * 截图与生产真实数据对出来的事实:
+ *   样品信息组 尺寸/配方/密度 = 88 / 88 / 74 px,而实际要装的是
+ *   尺寸最长 9 字(30*10*113)、配方最长 71 字(>>英克瑞斯酸洗炭(80-250) >>依品晟-400*15% …)、
+ *   密度最长 48 字且带换行(密度0.65-0.67 / 敲5% / 190℃ 65min / 一切一 …)。
+ *   88px 一列放 71 字 = 每行 4~5 个字,列表里直接被截成一条缝 —— 用户报的就是这个。
+ *
+ * 口径(总宽不变,只是把宽度从富余的列挪给要装字的列):
+ *   ① 配方 >=160px(71 字在 160px 下约 8~10 行,可读);
+ *   ② 密度 >=120px(带换行的 48 字);
+ *   ③ 尺寸保持紧凑(9 字,>=80 够);
+ *   ④ 16 列合计仍 = 1707(与设计纸宽一致,不许因为加宽而撑破纸张)。
+ */
+const INNER_PAGE = () => recordSheetConfigs.RD_DOM_TEST.pages.find((p) => p.title === '内部委托-测试申请单')
+
+const INNER_LABELS = ['序号', '日期', '申请人', '背景/目的', '尺寸', '配方', '密度', '方法', '标准', '目标', '组装方式', '样品处理', '紧急程度', '期望完成', '预计完成', '备注']
+
+test('⑯ 样品信息三列宽度与真实内容匹配(配方 71 字 / 密度 48 字 / 尺寸 9 字)', () => {
+  const g = INNER_PAGE().grid
+  assert.equal(g.length, 16, '内部委托页是 16 列(设计 B..Q)')
+  const w = {}
+  INNER_LABELS.forEach((l, i) => { w[l] = g[i] })
+  assert.ok(w['配方'] >= 160, '配方 ' + w['配方'] + 'px 太窄:最长 71 字要能读,至少 160')
+  assert.ok(w['密度'] >= 120, '密度 ' + w['密度'] + 'px 太窄:最长 48 字且带换行,至少 120')
+  assert.ok(w['尺寸'] >= 80, '尺寸 ' + w['尺寸'] + 'px 太窄:9 字的 30*10*113 会折行')
+  assert.ok(w['配方'] > w['密度'] && w['密度'] > w['尺寸'], '三者按内容长度递减:配方 > 密度 > 尺寸')
+})
+
+test('⑰ 加宽三列不得撑破纸面:16 列合计仍等于设计纸宽 1707', () => {
+  const g = INNER_PAGE().grid
+  assert.equal(g.reduce((a, b) => a + b, 0), 1707, '合计必须仍是 1707(宽度只在列之间挪,不改变纸宽)')
+  assert.deepEqual(recordSheetConfigs.RD_DOM_TEST.grid, g, '面板级 grid 要与内部委托页同步')
 })

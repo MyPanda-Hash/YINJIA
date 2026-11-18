@@ -4927,6 +4927,85 @@ migrate-pur-in-wh-group-20261117.sql
 #   (行表 bl_material_ret 无该列,该字段只落在单据头 bd_material_ret;口径同材料出库单)纯元数据,零改表零改代码。
 migrate-material-ret-wo-line-nodetail-20261117.sql
 
+# 2026-11-17 检验委托单第三次修订(用户新 .doc 标黄差异):单据编号可手工改号(editable=1)、
+#   委托单位/制造商/生产厂/样品型号规格/报告类型 五个字段转下拉框字典、headDefaults 去掉
+#   样品处理方式与检验报告有效期默认值、列注明同步(10 日/只读语义);幂等;两账套
+migrate-insp-commission-rev-20261117.sql
+
+# 2026-11-17 检验委托单必填项(用户截图:红色 * = 必填):联系人/样品名称/样品数量/样品型号规格/检验类别
+#   五格 yj_field.required 0→1;纸面按 isRequired 渲染红 *;两账套已执行;幂等
+migrate-insp-commission-required-20261117.sql
+
+# 2026-11-17 补登记(并行会话带入但未登记,本地已执行 2026-11-17):销售退货单/生产退料单 + 生产领料退料明细表 + 扫码混料与混料批号 + 打印任务缓存。
+#   依赖顺序:return-docs(建 4 表 + 6 面板) → return-fields-layout(补字段布局) → pick-two-docs(生产领料拆两单/退料授权)
+#   → prod-ret-list(领料改名明细表 + 新增退料明细表) → mix-scan(扫码混料面板+下架两个扫码入口) → mix-batch(混料批号/纸表)
+#   ⚠ print-task-cache 早已登记在本清单(11-16),此处不重复;幂等;需两账套
+migrate-return-docs-20261113.sql
+migrate-return-fields-layout-20261113.sql
+migrate-pick-two-docs-20261116.sql
+migrate-prod-ret-list-20261116.sql
+migrate-mix-scan-20261118.sql
+migrate-mix-batch-20261118.sql
+
+# 2026-11-17 检验委托单「联系人」= 送样人(用户截图「拉选填」):data_type→下拉框,字典=yj_user 有账号人员姓名;
+#   新建单据默认带入当前登录人姓名(ButtonService.putSenderDefault/…InHead);两账套已执行;幂等
+migrate-insp-commission-sender-20261117.sql
+
+# 2026-11-17 送样登记表(SAMPLE_REG)内部检测目录改版:整批换成「提供系统更新版2026.11.17.xls」(54 项 + 外送部分 = 55 行);
+#   「内部检出限」数据键改名为「标准方法检出限」(物理列沿用,同「收费」的 label≠col 先例);「检测误差」全表清空;
+#   「硬度」被「总硬度」取代(置作废);en 译名 1 条;两账套已执行;幂等(按 检测元素 逐行 upsert)
+migrate-sample-catalog-rev-20261117.sql
+
+# 2026-11-17 样品检验汇总表(页面级虚拟面板 INSP_SUMMARY;用户口径「按一个时间范围,去导出有多少人
+#   送了啥样品测试啥,安排检测工作」):授权给能看检验委托单/送样登记表的角色(view,query,export)+ 面板名
+#   10 语言译名;页面 /qc/inspSummary,取数 POST /api/px/inspSummary/summary(只读现算);两账套已执行;幂等
+migrate-insp-summary-20261117.sql
+
+# 2026-11-17 紧急放行申请单 QC_JJF(YJ-QR-92)版面改造 + 二级审批落地:
+#   ① qc_jjf 补 [责任部门](=责任人所属部门,后端自动写,纸面只读);② 物料编码 参照→文本(手动录入);
+#   ③ 责任人/单据日期 置只读(自动生成填写人员与时间);④ 「三、检测结果」字段注销(物理列保留);
+#   ⑤ 检测人 hidden(不再充当编制格,编制改绑[责任人]);两账套已执行;幂等
+migrate-jjf-twolevel-20261117.sql
+
+# 2026-11-17 出货检验计划表「检查频率」下拉过多(用户口径:改为 1%/一个生产批次、1PCS/一个生产批次、
+#   1PCS/一个工单、型式检验,内容可自行增加):另开**本面板专属**库 INSP_FREQ_OQC(6 条)并把
+#   RD_INSP_PLAN.检测频率 的 dict_sql 指过去;共用库 INSP_FREQ 原样保留(制程/首件/组装成品检验单照旧);
+#   两账套已执行;幂等
+migrate-insp-freq-oqc-20261117.sql
+
+# 2026-11-17 「特殊数据记录表」上传类面板(用户口径:数据记录表下新增,全员可传,删除走单独待审批列表)
+migrate-rd-extra-record-file-20261117.sql
+# 2026-11-17 Excel #14：新增「外部-非开发样品申请单」面板（复制外部开发样品单；销售录单、刘磊/王光珍审核、其他人只读）
+migrate-sample-nondev-20261117.sql
+# 2026-11-17 补漏(合并 origin/main 后 DbNormAudit 第 4 项 FAIL):上面那条用 SELECT INTO 复制建表,
+#   并不复制主键 ⇒ rd_sample_nondev_head/_detail 只有 identity 没有 PK;本脚本补 PK(id),
+#   不动列与数据(两表 0 行);幂等;两账套
+migrate-sample-nondev-pk-20261117.sql
+# 2026-11-17 Excel #7：生产模具表 PROD_MOLD 补齐角色权限行（实测缺 文件负责人 + 2 个自动化角色）
+migrate-prod-mold-perms-20261117.sql
+# 2026-11-17：补 RD_SAMPLE_INT / QC_FIRST_INSP / RD_SAMPLE_EXT 三个面板的角色权限行（全员可查阅+新增自己那行）
+migrate-role-perms-20261117.sql
+# 2026-11-17：恢复「规格书批准」按钮 —— 补 RD_SPEC_DOC 的 specapprove 词（冯敏所在角色；此前 0 个角色有该词）
+migrate-spec-approve-perm-20261117.sql
+# 2026-11-17 1117问题 #5：清掉数据记录表「历史草稿」上被自动预填的审核人（只清未审核/未归档的单）
+migrate-datarec-clear-prefilled-auditor-20261117.sql
+# 2026-11-17 1117问题 #6：组装工艺管控清单新增「审核人」格（label 审核人 → 列 备用3，只读，审批通过回填）
+migrate-asm-proc-auditor-20261117.sql
+# 2026-11-17 1117问题 #7：产品信息表「应用场景」改成标准库（含历史取值种入）
+migrate-prod-info-scene-stdlib-20261117.sql
+# 2026-11-17 1117问题 #6 追加：组装工艺 表单管理人固定柴善银 + 补历史单据审核人（按 shr，账号→姓名）
+migrate-asm-proc-fixed-manager-20261117.sql
+# 2026-11-17 数据记录表：把「表单审核人」纠正为真实审批人姓名（历史预填值/空白一并修）
+migrate-datarec-auditor-from-shr-20261117.sql
+# 2026-11-17 核验补漏（具体问题点 行10）：炭棒工艺管控清单加「审核人」格（备用3，审批后自动生成）
+migrate-mold-proc-auditor-20261117.sql
+# 2026-11-17 核验补漏（产品信息表 行22）：主要性能描述改标准库
+migrate-prod-info-perf-stdlib-20261117.sql
+# 2026-11-18 出货检验计划：表单管理人默认改崔晓云（存量按旧默认冯敏的改成崔晓云）
+migrate-insp-plan-manager-20261118.sql
+# 2026-11-18 X烧结配方表：存量小数位订正为 2 位 + 删除全空配方行（回填过滤已在代码侧修）
+migrate-xsinter-formula-fix-20261118.sql
+
 # 2026-11-19 检验报告(YJ-QR-96,QC_INSP_REC)「检测结果」由固定五格改为**可增删列**:
 #   qc_insp_rec_detail 补 结果6..结果20 nvarchar(200)(逐列中文注明)+ qc_insp_rec.结果列数 int(计数载体,隐藏);
 #   yj_field 登记 结果1..结果20(全部可见列,否则"清空"落不了库)、单项判定 seq 40→60、结果列数(header,隐藏);

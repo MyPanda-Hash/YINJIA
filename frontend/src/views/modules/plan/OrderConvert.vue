@@ -69,8 +69,11 @@
 
     <!-- 待结转表(分页渲染:一页最多 pageSize 行,数据再多也不卡) -->
     <div class="oc-table">
+      <!-- 点整行即勾选(2026-11-17 用户口径「不需要只选择一定要点那个小方框,而是可以点击这一行来选择」):
+           row-click 翻转勾选(判据在 business/rowSelect.js:复选框/交货日期选择器/本次转单数量输入框
+           这些格内控件点了不翻),前面那个复选框降级成状态显示 + 表头全选。 -->
       <el-table ref="tableRef" :data="pagedRows" size="small" border height="100%" row-key="rowKey" v-loading="loading"
-                @selection-change="onCheck">
+                @selection-change="onCheck" @row-click="onRowClick">
         <el-table-column type="selection" width="42" reserve-selection />
         <el-table-column :label="tt('订单资料')" width="240" fixed>
           <template #default="{ row }">
@@ -143,12 +146,19 @@
         </template>
       </el-table>
 
-    <!-- 工艺路线选择弹窗(2026-10-05 用户口径:路线多时下拉不现实 ⇒ 弹窗;支持编码/名称过滤,列出工序序列) -->
-    <el-dialog v-model="routeDialog" :title="tt('选择工艺路线')" width="660px" append-to-body>
+    <!-- 工艺路线选择弹窗(2026-10-05 用户口径:路线多时下拉不现实 ⇒ 弹窗;支持编码/名称过滤,列出工序序列)
+         2026-11-17 修复「上次选过的路线看起来还被选中、但确定点不了」:
+           ① destroy-on-close:弹窗关闭即卸载内容,el-table 内部的 currentRow(高亮)随之清空 ——
+              此前弹窗只是 v-show 隐藏,上次的 current-row 一直留着,重开时"看着选中、实际没选";
+           ② 选行除了 @current-change 还接 @row-click:Element Plus 的 setCurrentRow 只在**行变了**时
+              才发 current-change,点回同一条(已是 currentRow 的)行不会触发,routePick 停在上次的值
+              ⇒ 确定一直是灰的,必须先点别的路线再点回来。 -->
+    <el-dialog v-model="routeDialog" :title="tt('选择工艺路线')" width="660px" append-to-body destroy-on-close>
       <el-input v-model="routeKw" :placeholder="tt('编码 / 名称')" clearable style="width: 220px; margin-bottom: 8px" />
       <div class="oc-route-note">{{ tt('仅「已审核」的工艺路线可用于转工单（未审核的路线置灰，需先在「基础设置→工艺路线」完成审核）') }}</div>
       <el-table :data="routeFiltered" size="small" border height="330" highlight-current-row
-                @current-change="(r) => (routePick = r)" @row-dblclick="applyRoute" :row-class-name="routeRowCls">
+                @row-click="onRouteRowClick" @current-change="onRouteCurrentChange"
+                @row-dblclick="applyRoute" :row-class-name="routeRowCls">
         <el-table-column :label="tt('编码')" prop="编码" width="140" />
         <el-table-column :label="tt('名称')" prop="名称" width="170" show-overflow-tooltip />
         <el-table-column :label="tt('工序序列')" prop="工序序列" min-width="220" show-overflow-tooltip />
@@ -162,7 +172,7 @@
       <template #footer>
         <span class="oc-route-tip">{{ tt('将对勾选的') }} {{ checked.length }} {{ tt('行应用该路线(双击行亦可)') }}</span>
         <el-button @click="routeDialog = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" :disabled="!routePick || routePick.审核状态 !== '已审核'" @click="applyRoute">{{ tt('确定') }}</el-button>
+        <el-button type="primary" :disabled="!canApplyRoute" @click="applyRoute">{{ tt('确定') }}</el-button>
       </template>
     </el-dialog>
 
@@ -196,6 +206,7 @@ import { useReportColumns } from '@core/report/useReportColumns'
 import DateRangeQuery from '@core/ui/DateRangeQuery.vue'
 import ColumnSettingsDialog from '@core/views/ColumnSettingsDialog.vue'
 import { applyRouteDefaults } from '@/business/routeDefaults'
+import { toggleRowOnRowClick } from '@/business/rowSelect'
 
 /**
  * 页面级权限(2026-10-16):本页挂页面面板 ORDER_CONVERT
@@ -221,6 +232,19 @@ async function loadRoutes() {
   try { routeOptions.value = (await request.post('/px/processTask/routes', {})).data || [] } catch { routeOptions.value = [] }
 }
 function openRouteDialog() { routePick.value = null; routeKw.value = ''; routeDialog.value = true }
+/**
+ * 弹窗里"选中哪条路线"= routePick(确定按钮的判据)。
+ * 2026-11-17 修复:光靠 @current-change 不够 —— Element Plus 的 setCurrentRow 只在行**变了**时发
+ * current-change,点回同一条(已是 currentRow 的)行什么都不发,routePick 就停在上次的值(或 null),
+ * 表现是"行亮着、确定点不了,必须先点别的路线再点回来"。所以:
+ *   · @row-click 每次都落 routePick(重复点同一条也生效);
+ *   · @current-change 继续兜底:过滤把当前行滤掉时它会发 null,routePick 跟着清空,避免
+ *     "确定可点但选中行已不在列表里"。
+ */
+function onRouteRowClick(row) { routePick.value = row || null }
+function onRouteCurrentChange(row) { routePick.value = row || null }
+/** 确定按钮:必须选中且已审核(未审核路线置灰不可用,2026-10-16 口径) */
+const canApplyRoute = computed(() => !!routePick.value && routePick.value.审核状态 === '已审核')
 /** 行样式:未审核的工艺路线整行置灰(2026-10-16) */
 function routeRowCls({ row }) { return row.审核状态 === '已审核' ? '' : 'oc-row-warn' }
 /** 把弹窗里选中的路线应用到**勾选行**(批量;未勾选则不动) */
@@ -427,6 +451,17 @@ async function askJumpToLatest() {
   await loadAll()
 }
 function onCheck(r) { checked.value = r }
+
+/**
+ * 点整行 = 勾选/取消勾选(2026-11-17 用户口径)。
+ * <p>判据在 @/business/rowSelect.js:点复选框自己那一下、以及格内控件
+ * (交货日期选择器 / 本次转单数量输入框)都不翻勾选 —— 用户点它们是要改数,不是选行。
+ * 翻转走 el-table 自己的 toggleRowSelection(本表 reserve-selection 跨页保留勾选,
+ * 另存数组会跟表格内部状态打架)。</p>
+ */
+function onRowClick(row, column, event) {
+  toggleRowOnRowClick(tableRef.value, row, event)
+}
 
 /** 保存交期:把行内修正的预计交货日期回写销售订单行 */
 async function saveDates() {

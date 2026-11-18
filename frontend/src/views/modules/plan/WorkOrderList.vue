@@ -122,9 +122,13 @@
       <span class="wol-short-tip">{{ tt('标红格 = 当天已结束但报工未达原计划(汇总含未显示为列的日期)') }}</span>
     </div>
 
-    <!-- 明细大表(2026-11-09 用户口径 2.0:滚动加载 —— 首屏 50 行,向下滚动时再追加下一批) -->
+    <!-- 明细大表(2026-11-09 用户口径 2.0:滚动加载 —— 首屏 50 行,向下滚动时再追加下一批)
+         点整行即勾选(2026-11-17 用户口径「不需要只选择一定要点那个小方框,而是可以点击这一行来选择」):
+         row-click 翻转勾选;点工单号链接(.el-link)、行内日排产格(.dp-plan)、复选框这些
+         "点了另有用途"的地方不翻(判据 business/rowSelect.js)。 -->
     <el-table :data="visibleRows" border size="small" class="wol-table" height="100%"
               @selection-change="(r) => (checked = r)" @current-change="(r) => (currentRow = r)" ref="tableRef"
+              @row-click="onRowClick"
               highlight-current-row row-key="rowKey">
       <el-table-column type="selection" width="40" fixed="left" reserve-selection />
       <!-- 按量流转·逐道明细的展开行(2026-11-12 方案A)**已于 2026-11-14 删除**:
@@ -394,6 +398,7 @@ import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
 import ScheduleBoard from './ScheduleBoard.vue'
 import WorkOrderDraftBoxDialog from './WorkOrderDraftBoxDialog.vue'
 import { qtyText, dayColState, isToday, isPast, dayCellView, historyShortfalls, shortfallTotals, isOutOfPlanRange } from '@/business/dayPlan'
+import { toggleRowOnRowClick } from '@/business/rowSelect'
 import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
@@ -480,6 +485,17 @@ const checked = ref([])
 const currentRow = ref(null)
 /** 表格引用:刷新后清勾选用(2026-10-05 修「撤回切单后卡在请先勾选」的 bug) */
 const tableRef = ref(null)
+
+/**
+ * 点整行 = 勾选/取消勾选(2026-11-17 用户口径「不需要只选择一定要点那个小方框,而是可以点击这一行来选择」)。
+ * <p>判据在 @/business/rowSelect.js:点复选框自己那一下不重复处理,工单号链接(.el-link)、
+ * 行内日排产格(.dp-plan)这些"点了另有用途"的格子也不翻勾选。翻转走 el-table 的
+ * toggleRowSelection(本表 reserve-selection 跨页保留勾选,另存数组会打架)。</p>
+ */
+function onRowClick(row, column, event) {
+  toggleRowOnRowClick(tableRef.value, row, event, { extra: '.dp-plan' })
+}
+
 const lines = ref([])
 const lineFilter = ref('')
 const lineCode = ref('')

@@ -274,10 +274,27 @@ const input = computed(() => ({
 const calc = computed(() => computeXsinter(input.value))
 const probs = computed(() => problemsOf(input.value))
 
-const fmt = (v) => {
+/**
+ * 数值落库格式（2026-11-17 用户口径，Excel #10「各项数值的小数位数错误」）。
+ *
+ * <p>原来统一 `Math.round(n*1e6)/1e6` ⇒ 纸面上出现 `25.851768`、`109.414949`、
+ * `2.24798` 这种 6 位小数，用户截图里红字标了「小数位错误」。</p>
+ *
+ * <p>改按**列语义**给位数：
+ * · `ratio`（添加比例%）→ 2 位 —— 与配方表其他面板一致；
+ * · `piece`（单支含量 g）→ 2 位；
+ * · `weight`（炭棒重量 上下限/中间值 g）→ 2 位；
+ * · `length`（成型切炭/冷却长度 mm）→ 1 位（Excel 原表就是 179.5 / 180.5）；</p>
+ *
+ * <p>⚠ 不改计算精度：`calcEngine` 内部仍按 r6 算（多道工序连乘不能中途截断），
+ * 只在**落库/上纸**这一步按显示精度收敛。</p>
+ */
+const fmt = (v, kind = 'plain') => {
   if (v === null || v === undefined || v === '') return ''
   const n = Number(v)
   if (!Number.isFinite(n)) return ''
+  if (kind === 'length') return String(Math.round(n * 10) / 10)
+  if (kind === 'ratio' || kind === 'piece' || kind === 'weight') return String(Math.round(n * 100) / 100)
   return String(Math.round(n * 1e6) / 1e6)
 }
 
@@ -447,23 +464,34 @@ function apply() {
     [HEAD_MAP.lengthFix]: form.lengthFix,
     [HEAD_MAP.densLow]: form.densLow,
     [HEAD_MAP.densHigh]: form.densHigh,
-    '切炭长度下限mm': fmt(c.cut.low),
-    '切炭长度中间值mm': fmt(c.cut.mid),
-    '切炭长度上限mm': fmt(c.cut.high),
-    '冷却长度下限mm': fmt(c.cool.low),
-    '冷却长度中间值mm': fmt(c.cool.mid),
-    '冷却长度上限mm': fmt(c.cool.high),
-    '炭棒重量下限g': fmt(c.weight.low),
-    '炭棒重量中间值g': fmt(c.weight.mid),
-    '炭棒重量上限g': fmt(c.weight.high),
+    // 切炭/冷却长度：1 位小数（Excel 原表就是 179.5 / 180.5）
+    '切炭长度下限mm': fmt(c.cut.low, 'length'),
+    '切炭长度中间值mm': fmt(c.cut.mid, 'length'),
+    '切炭长度上限mm': fmt(c.cut.high, 'length'),
+    '冷却长度下限mm': fmt(c.cool.low, 'length'),
+    '冷却长度中间值mm': fmt(c.cool.mid, 'length'),
+    '冷却长度上限mm': fmt(c.cool.high, 'length'),
+    // 炭棒重量：2 位小数（原来是 109.414949 这种 6 位，用户截图标了「小数位错误」）
+    '炭棒重量下限g': fmt(c.weight.low, 'weight'),
+    '炭棒重量中间值g': fmt(c.weight.mid, 'weight'),
+    '炭棒重量上限g': fmt(c.weight.high, 'weight'),
     '密度要求下限': fmt(c.density.low),
     '密度要求中间值': fmt(c.density.mid),
     '密度要求上限': fmt(c.density.high),
   }
-  const detail = lines.value.map((r, i) => {
+  // 2026-11-18 用户口径（X烧结截图）：「写了在配方计算回填的时候没有数据的行自己去掉，怎么现在还有显示的」
+  //   ⇒ 回填只写**有物料**的行（物料编号或物料名称任一非空），其余（默认 10 行里的空行）不进单据。
+  //   注意两点：
+  //   ① 过滤前先带**原始下标** idx 去查 c.rows[idx]（计算结果是按行下标对齐的），过滤后再重排序号；
+  //   ② `blankRows:10` 的默认空行是"新建空表时铺一次"（本表区为空才铺），
+  //      回填写入 N 行后表区非空 ⇒ 不会再把 10 行空行铺回来。
+  const detail = lines.value
+    .map((r, idx) => ({ r, idx }))
+    .filter(({ r }) => String(r.code || '').trim() !== '' || String(r.name || '').trim() !== '')
+    .map(({ r, idx }, i) => {
     const gram = isGramRow(r.kind)
-    const design = c.rows[i]?.design
-    const actual = c.rows[i]?.actual
+    const design = c.rows[idx]?.design
+    const actual = c.rows[idx]?.actual
     return {
       序号: String(i + 1),
       物料种类: r.kind,
@@ -471,10 +499,10 @@ function apply() {
       物料名称: r.name || '',
       // 落**百分数**而不是比例：纸面「添加比例%」那列直接印数字（45 而不是 0.45），
       // 重新打开计算器读回来也还是同一个值（'45' → 0.45 的容错在 designUnits）。
-      设计添加量: fmt(gram ? design : percentOf(design)),
+      设计添加量: fmt(gram ? design : percentOf(design), 'ratio'),
       // 添加比例恒存百分数：颗粒料现在也有实际比例（克数 ÷ 总重），旧口径存的是 9 克本身
-      添加比例: fmt(percentOf(actual)),
-      '单支含量g': fmt(c.rows[i]?.perPiece),
+      添加比例: fmt(percentOf(actual), 'ratio'),
+      '单支含量g': fmt(c.rows[idx]?.perPiece, 'piece'),
     }
   })
   emit('applied', { head, detail })

@@ -414,6 +414,14 @@ public class PanelConfigService {
             if (!com.yinjia.mes.service.ButtonService.SELF_MAINTAINED_PANELS.contains(def.code())) {
                 buttonGroups.add(group("审批", List.of("审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审")));
             }
+            // 内部开发样品申请单（2026-11-17 用户口径，Excel #4）：
+            //   「每月进行点击归档按钮对该单据进行归档，归档后所有人不得修改（除管理员撤销归档）」
+            //   ⇒ 单列一组「归档」：主按钮=归档、下拉=撤销归档。
+            //   服务端：ButtonService.archiveSampleMonth / unarchiveSampleMonth
+            //   （撤销的服务端闸门是管理员，前端隐藏只是顺带）。
+            if ("RD_SAMPLE_INT".equals(def.code())) {
+                buttonGroups.add(group("归档", List.of("归档", "撤销归档")));
+            }
             // 自助维护型面板(物料清单):归档后靠它退回草稿 —— 后端 ButtonService.selfModify。
             if (com.yinjia.mes.service.ButtonService.SELF_MAINTAINED_PANELS.contains(def.code())) {
                 buttonGroups.add(group("修改", List.of("修改")));

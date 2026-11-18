@@ -112,7 +112,15 @@ public class QueryService {
      */
     private static boolean isTwoLevelSignPanel(String panelCode) {
         return panelCode != null && (ButtonService.ADMIN_L2_PANELS.contains(panelCode)
-                || ButtonService.SINGLE_LEVEL_INSP_PANELS.contains(panelCode));
+                || ButtonService.SINGLE_LEVEL_INSP_PANELS.contains(panelCode)
+                // 2026-11-17 组装工艺管控清单（1117问题 #6 追加）：新增的纸面「审核人」是**表内真值列**
+                //   （yj_field label 审核人 → 物理列 备用3，审批通过时由 ButtonService.writeFieldByLabel
+                //    写入**姓名**）。若走下面的默认覆盖，会被 yj_doc_status.shr 换成**账号**
+                //    （实测界面显示 "admin"），既丢了姓名也把账号当人名。
+                //   与质量单据同一处理：表内有值就用表内，为空才退回 shr 兜底。
+                || "RD_ASM_PROC".equals(panelCode)
+                // 2026-11-17 炭棒工艺管控清单同理（「具体问题点」行10 补的审核人格）
+                || "RD_MOLD_PROC".equals(panelCode));
     }
 
     private final PanelRegistry registry;
@@ -914,6 +922,43 @@ public class QueryService {
             docs.add(doc);
         }
         return docs;
+    }
+
+    /**
+     * 取一张「档案型」面板的虚拟单据（getFormDescriptor 用）。
+     *
+     * <p>背景（2026-11-17 生产实测）：`PROD_MOLD`（生产模具表，`mode='archive'`）点「新增/编辑」报
+     * HTTP 500 —— SQL 里出现 `t.[null] AS __no`。根因是 archive 面板在 yj_panel 里
+     * **`group_col = NULL`**（维护表本来就没有单据号、没有单据头，见
+     * tools/migrate-prod-mold-panel-20261030.sql 的注释），而 `loadOneDoc → loadDocs` 无条件
+     * 拼 `t.[group_col]`，NULL 就拼成了 `t.[null]`。</p>
+     *
+     * <p>archive 的**列表**走的是另一条路（{@link #queryArchive}：全量行平铺 + 一张虚拟单承载），
+     * 所以列表一直正常、只有表单描述符挂。这里补上同样口径的单表单路径：
+     * 虚拟单 = `{编号: 面板名, 状态: 启用, detail: {tabKey: [全部行]}}`，
+     * 与 queryArchive 返回的形状**逐字一致**，前端不需要为表单另写一套渲染。</p>
+     *
+     * @param docNo 档案面板无真实单号，调用方传什么都会被忽略（整份档案只有一张虚拟单）
+     */
+    public Map<String, Object> loadOneArchiveDoc(PanelRegistry.PanelDef def, String docNo) {
+        String cols = selectCols(def, def.fields(), derivedPanelNameLabel(def));
+        String sql = "SELECT t.id AS __id, " + cols + " FROM " + def.lineTable() + " t"
+                + " WHERE " + cancelFilter(def.lineTable())
+                + " ORDER BY t.id DESC OFFSET 0 ROWS FETCH NEXT " + ARCH_LOAD_CAP + " ROWS ONLY";
+        List<Map<String, Object>> rows = jdbc.queryForList(sql);
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (Map<String, Object> r : rows) items.add(rowToLabels(def, r, true));
+
+        String localeKey = TranslationService.localeKey(org.springframework.context.i18n.LocaleContextHolder.getLocale());
+        String docName = "zh".equals(localeKey) ? def.name()
+                : translations.scope(localeKey, "panel").getOrDefault(def.name(), def.name());
+
+        Map<String, Object> doc = new LinkedHashMap<>();
+        doc.put("编号", docName);
+        doc.put("状态", "启用");
+        doc.put("单据状态", "启用");
+        doc.put("detail", Map.of(def.tabKey(), items));
+        return doc;
     }
 
     /** 取一张单据(getFormDescriptor 用) */

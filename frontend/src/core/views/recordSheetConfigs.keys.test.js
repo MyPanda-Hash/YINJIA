@@ -268,7 +268,9 @@ test('组装工艺清单 3 页签:每页有 grid/showHead,每条表有唯一的�
 
   // ── ①页签数与页题(设计 3 个 sheet 一对一) ──
   const titles = (cfg.pages || []).map((p) => p.title)
-  assert.deepEqual(titles, ['修订记录', '组装BOM表', '组装工艺清单'], '页签应为设计 3 个 sheet')
+  // 2026-11-17 用户口径（1117问题 #6）：「修订记录放最右边」⇒ 原 修订记录/BOM/工艺 改为 BOM/工艺/修订记录。
+  //   页序变动后 sections/dataTables 的 page 号必须同步（本文件另有断言钉 page 越界）。
+  assert.deepEqual(titles, ['组装BOM表', '组装工艺清单', '修订记录'], '页签应为 3 个 sheet，修订记录在最右')
 
   // ── ②每页都要能算出非 0 的网格宽 ──
   for (const [i, pg] of (cfg.pages || []).entries()) {
@@ -378,15 +380,18 @@ test('成型工艺清单 3 页签:每页有 grid/showHead,且修订记录页与�
 })
 
 /**
- * 断言 ⑧(2026-09-20):出货检验项目控制计划「一张表 7 列」的版式与自动填充不变量。
+ * 断言 ⑧(2026-09-20;2026-11-17 改期):出货检验项目控制计划「一张表 6 列 + 表体最下层一整格」的版式与自动填充不变量。
  *
- * 设计源《出货检验项目控制计划.xlsx》单 sheet:报告头 + 三行三格表头 + 单张 7 列表 + 跨 7 列表尾注。
+ * 设计源《出货检验项目控制计划.xlsx》单 sheet:报告头 + 三行三格表头 + 单张 7 列表 + 跨全宽表尾注。
+ * 2026-11-17 用户口径:「不合格应对措施放置表格最下层,因为当前的不合格措施都是一样的」
+ *   ⇒ 该列退出表头(不再每行重复一段话),改为表体最下层一条满宽合并格(footerField);
+ *     其余 6 列重分列宽,合计仍 = 1187(表体右缘仍与纸宽齐平)。
  * 这里钉的是**三条同宽约束**(错一条整页竖线不齐、打印左右缘不齐平,且肉眼要拿尺子才看得出来):
- *   ① grid 7 格 = 设计 B..H 列宽,总宽 1187;
+ *   ① grid 7 格 = 设计 B..H 列宽,总宽 1187(报告头/表头块照旧按 7 格);
  *   ② head {title, infoLabel, infoValue} 合计 = grid 格数(报告头三段跨度),
  *      大标题跨 5 格 = 设计 B3:F4 的合并区,信息栏落 G/H;
- *   ③ sections 每行靠 lspan/vspan 拼满 7 格,且表体 cols 的可见列宽之和 = grid 之和。
- *      ⇒ 报告头 / 表头块 / 表体三处同宽,竖线才对得齐。
+ *   ③ sections 每行靠 lspan/vspan 拼满 7 格,且**表体 6 个可见列宽之和 = grid 之和**
+ *      (表体列线不再逐格落在 grid 列线上,这是少一列的必然结果,右缘仍齐平)。
  *
  * 另钉两条**会静默出错**的配置事实:
  *   ④ 本面板的**检验项目表**不得有 filterKey(**修订记录表除外**,它必须有,见下);
@@ -398,11 +403,11 @@ test('成型工艺清单 3 页签:每页有 grid/showHead,且修订记录页与�
  *        + 存量行回填 '检验项目'。补完后原担忧("按它过滤只会得到一张空表")不再成立 ——
  *        实测(admin 编辑态)检验项目页 21 行、修订记录页 18 行,两页互不干扰;
  *        保存后库:picture IP-2026-11-0002 下 18 行 表区='修订记录',值正确落 备用3。
- *        ⇒ 现在**必须**有两条 dataTable:一条无 filterKey(检验项目)、一条 filterKey='表区'(修订记录)。
+ *        ⇒ 现在**必须**有两条 dataTable:一条 filterKey='表区'(检验项目)、一条 filterKey='表区'(修订记录)。
  *   ⑤ autoFillSpec 的 from/to 必须都是真实存在的字段名 —— 它跨面板取 RD_SPEC_DOC 的列,
  *      那边改个 label,这边就静默填空白(与文件头讲的数据键漂移同一个坑)。
  */
-test('出货检验计划表:一张表 7 列的三处同宽 + 自动填充规格书的字段名溯源', () => {
+test('出货检验计划表:一张表 6 列 + 最下层合并格的三处同宽 + 自动填充规格书的字段名溯源', () => {
   const cfg = recordSheetConfigs.RD_INSP_PLAN
   assert.ok(cfg, 'RD_INSP_PLAN 配置缺失')
 
@@ -484,9 +489,27 @@ test('出货检验计划表:一张表 7 列的三处同宽 + 自动填充规格�
   assert.ok(dt, '缺检验项目表(filterVal=检验项目 的那张)')
   assert.equal(dt.filterKey, '表区', '检验项目表同样要用 [表区] 分块')
   const vis = (dt.cols || []).filter((c) => !c.hiddenCol)
-  assert.equal(vis.length, 7, '可见列应恰好 7 列(设计 B..H)')
+  assert.equal(vis.length, 6, '可见列应恰好 6 列(设计 B..H 去掉「不合格应对措施」)')
   const visSum = vis.reduce((a, c) => a + (c.w || 100), 0)
-  assert.equal(visSum, gridSum, `表体可见列宽之和 ${visSum} 应等于 grid 之和 ${gridSum}(否则表体与表头同宽不成立)`)
+  assert.equal(visSum, gridSum, `表体可见列宽之和 ${visSum} 应等于 grid 之和 ${gridSum}(否则表体与报告头同宽不成立)`)
+  // 「不合格应对措施」不再占列(2026-11-17 用户口径:那一列的每行内容完全一样)
+  assert.ok(!vis.some((c) => c.key === '不合格应对措施'), '「不合格应对措施」不该再是可见列')
+
+  // ── ④·补:表格最下层的整表共用一格(2026-11-17) ──
+  //     口径:「不合格应对措施放置表格最下层」。三条必须同时成立,否则那一格等于白画:
+  //     a) footerField.key 是**本面板真实明细字段**(不在 yj_field 里 ⇒ 写回行模型时是幻影键,保存丢值);
+  //     b) 该字段已从可见列撤出(留在 cols 里要 hiddenCol:true),否则同一字段一列一底两处出现;
+  //     c) 那一格存的仍是**逐行**的值 ⇒ autoFillSpec.defaults 继续逐行兜底,两者落点必须一致。
+  assert.ok(dt.footerField, '缺 footerField(表格最下层的整表共用一格)')
+  assert.equal(dt.footerField.key, '不合格应对措施', 'footerField 应绑「不合格应对措施」')
+  assert.ok(FIXTURE.RD_INSP_PLAN.labels.includes(dt.footerField.key),
+    `footerField.key '${dt.footerField.key}' 不是本面板的真实字段`)
+  assert.ok(
+    (dt.cols || []).some((c) => c.key === dt.footerField.key && c.hiddenCol),
+    '该字段必须留在 cols 里并标 hiddenCol:true(值要逐行往返,只是不上纸成列)',
+  )
+  assert.equal(cfg.autoFillSpec?.defaults?.[dt.footerField.key] !== undefined, true,
+    'autoFillSpec.defaults 必须继续逐行兜底同一字段(那一格显示/编辑的就是这些行的值)')
 
   // ── ⑤libGroupKey:单表形态的分组通道,列要藏起来,内置兜底库每行都要带分组值 ──
   assert.ok(dt.libGroupKey, '单表形态必须用 libGroupKey 承载 必测项/型式检验(否则勾选落明细时分组丢失)')

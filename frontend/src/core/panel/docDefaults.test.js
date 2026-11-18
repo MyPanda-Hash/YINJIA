@@ -265,11 +265,13 @@ test('成型工艺清单/成型配方:表单管理人=刘磊、密级=保密、�
  * ⇒ RD_ASM_PROC 的表单管理人不再写死刘磊,而是当前登录人姓名;其余三门(密级/使用范围/版本号)不动。
  * 这条测试必须能在「有人把 ASM 改回固定人名」时变红。
  */
-test('组装工艺清单:表单管理人=当前登录人姓名(不再是固定刘磊)', () => {
+test('组装工艺清单:表单管理人固定「柴善银」（2026-11-17 用户改口径）', () => {
+  // 2026-10-28 曾是「=当前登录人姓名」；2026-11-17（1117问题 #6）用户点名：
+  //   「表单管理人：柴善银 / 增加一个审核人：产品负责人审核后自动填充」
+  //   ⇒ 覆盖旧口径，改回**固定人名**。本条测试会在"有人又改回动态"时变红。
   const form = {}
   applyDocDefaults('RD_ASM_PROC', form, USER, { isNew: true, today: T })
-  assert.equal(form['表单管理人'], USER.realName, '表单管理人应带当前登录人姓名')
-  assert.notEqual(form['表单管理人'], '刘磊', '不得再回落成固定人名')
+  assert.equal(form['表单管理人'], '柴善银', '表单管理人应固定为柴善银')
   assert.equal(form['密级'], '保密', '密级仍默认保密')
   assert.equal(form['使用范围'], '银嘉内部', '使用范围仍默认银嘉内部')
   assert.equal(form['版本号'], 'V2026-09-11', '版本号仍按当天展开')
@@ -340,4 +342,16 @@ test('headDefaults:不传/为空串时行为与改造前一致（不给别的面
   applyDocDefaults('RD_DOM_TEST', b, USER, { isNew: true, today: T, headDefaults: { 密级: '', 文件使用范围: null } })
   assert.equal(b['密级'], '公开', '空串/null 默认值不得覆盖或写入')
   assert.ok(!('文件使用范围' in b), 'null 默认值不应写入空键')
+})
+
+test('出货检验计划的表单管理人默认崔晓云（2026-11-18 用户口径）', () => {
+  // 用户：「出货控制计划的表单管理员默认写崔晓云」——覆盖原默认「冯敏」，
+  // 与《流程》表行24「崔晓云制作 出货控制计划」一致。
+  const form = {}
+  applyDocDefaults('RD_INSP_PLAN', form, USER, { isNew: true, today: T })
+  assert.equal(form['表单管理人'], '崔晓云', '默认应为崔晓云')
+  assert.notEqual(form['表单管理人'], '冯敏', '不得再回落成旧默认冯敏')
+  // 其余默认值不受影响
+  assert.equal(form['标题'], '出货检验项目控制计划')
+  assert.equal(form['密级'], '保密')
 })

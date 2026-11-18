@@ -1,0 +1,76 @@
+{
+  "sheets": [
+    "送检信息汇总表"
+  ],
+  "dims": "A1:J2",
+  "header": [
+    "时间",
+    "送样人",
+    "委托单编号",
+    "样品名称",
+    "数量",
+    "测试项目",
+    "是否接收",
+    "是否检测",
+    "数据或报告输出",
+    "备注"
+  ],
+  "dataRows": 1,
+  "firstDataRow": [
+    "2026-11-15",
+    "1",
+    "14",
+    "1",
+    "1",
+    "钾",
+    "",
+    "",
+    "",
+    ""
+  ],
+  "validations": [
+    {
+      "sqref": "G2:G202",
+      "type": "list",
+      "formula1": "\"√\"",
+      "allowBlank": true,
+      "showDropDown": false,
+      "prompt": "下拉选 √",
+      "promptTitle": "是否接收"
+    },
+    {
+      "sqref": "H2:H202",
+      "type": "list",
+      "formula1": "\"√\"",
+      "allowBlank": true,
+      "showDropDown": false,
+      "prompt": "下拉选 √",
+      "promptTitle": "是否检测"
+    },
+    {
+      "sqref": "I2:I202",
+      "type": "list",
+      "formula1": "\"数据,报告,数据+报告\"",
+      "allowBlank": true,
+      "showDropDown": false,
+      "prompt": "下拉选:数据 / 报告 / 数据+报告",
+      "promptTitle": "数据或报告输出"
+    }
+  ],
+  "freeze": "A2",
+  "autoFilter": "A1:J2",
+  "colWidths": {
+    "A": 14.0,
+    "B": 12.0,
+    "C": 20.0,
+    "D": 22.0,
+    "E": 10.0,
+    "F": 42.0,
+    "G": 12.0,
+    "H": 12.0,
+    "I": 18.0,
+    "J": 26.0
+  },
+  "headFill": "Values must be of type <class 'str'>",
+  "headBold": true
+}

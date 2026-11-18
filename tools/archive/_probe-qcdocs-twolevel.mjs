@@ -38,7 +38,7 @@ const TABLE = {
 /** 面板 → 纸面底部落款第一格「编制」绑的列(须与 ButtonService.QC_DOC_PREPARER 一致) */
 const PREP = {
   QC_TC_IN: '编制人', QC_LYB: '编制人', QC_SCY: '编制人', QC_BHG: '填写人',
-  QC_BHC: '责任人', QC_BHZ: '责任人', QC_JJF: '检测人', QC_SCP: '责任人',
+  QC_BHC: '责任人', QC_BHZ: '责任人', QC_JJF: '责任人', QC_SCP: '责任人',
 }
 /**
  * 「编制」格是**预填型**(可手改)的面板 —— 与 ButtonService.PREPARER_EDITABLE_PANELS 一致。

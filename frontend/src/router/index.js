@@ -96,6 +96,9 @@ const routes = [
       { path: 'erp/integConfig', component: () => import('@/views/erp/ErpIntegConfig.vue'), meta: { title: 'ERP集成配置清单', code: 'erpIntegCfg', panelCode: 'ERP_INTEG' } },
       // 共享文件库(研发管理·全公司共享资料):panelCode=RD_SHARE_FILE 带权限,故不进 flatMenus 自动路由,显式注册
       { path: 'rd/shareFile', component: () => import('@/views/rd/ShareFileCenter.vue'), meta: { title: '共享文件库', code: 'rdShareFile' } },
+      // 特殊数据记录表(2026-11-17 用户口径):「数据记录表」下的上传类面板 —— 上传/预览/删除审批。
+      // 与共享文件库同一形态(页面级视图,非 PanelxList 引擎面板);权限走 panelCode RD_EXTRA_REC_FILE。
+      { path: 'rd/extraRecFile', component: () => import('@/views/rd/ExtraRecFileCenter.vue'), meta: { title: '特殊数据记录表', code: 'rdExtraRecFile', panelCode: 'RD_EXTRA_REC_FILE' } },
       // 项目流程管控(研发管理·项目管理,2026-10-20):按立项单号查流程走到哪一步。
       // 页面级虚拟面板 PROJECT_FLOW(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由,显式注册。
       { path: 'rd/projectFlow', component: () => import('@/views/rd/ProjectFlow.vue'), meta: { title: '项目流程管控', code: 'rdFlow', panelCode: 'PROJECT_FLOW' } },
@@ -129,6 +132,10 @@ const routes = [
       //   点节点跳对应面板并定位该单(没有该面板查看权时只提示不跳);数据由 QcFlowService 现算。
       //   页面级虚拟面板 QC_FLOW(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由。
       { path: 'qc/flowMonitor', component: () => import('@/views/modules/qc/QcFlowMonitor.vue'), meta: { title: '品质流程监控', code: 'qcFlowMonitor', panelCode: 'QC_FLOW' } },
+      // 样品检验汇总表(2026-11-17 用户口径:「……按一个时间范围,去导出有多少人送了啥样品测试啥,安排检测工作。」):
+      //   按送样人 / 按委托单两个视角 + 今日/本周/本月快捷区间 + 导出 Excel(前端 xlsx 现生成)。
+      //   页面级虚拟面板 INSP_SUMMARY(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由,显式注册。
+      { path: 'qc/inspSummary', component: () => import('@/views/modules/qc/InspSummary.vue'), meta: { title: '样品检验汇总表', code: 'qcInspSummary', panelCode: 'INSP_SUMMARY' } },
       // ══════════ 手机扫码(2026-10-30 新增一级目录)══════════
       // 用户口径:「把生产领料和工序报工这两个 app 的面版重新放在一个新的『手机扫码』(和生产计划平级)
       //   导航下。工序报工不变。生产领料重写。」

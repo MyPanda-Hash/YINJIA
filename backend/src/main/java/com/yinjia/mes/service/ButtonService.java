@@ -185,6 +185,13 @@ public class ButtonService {
             //   归档后**免申请、免再审批**的直接修改:进入修改态(留痕开始) → 保存修改(落库+再归档+diff收尾)。
             case "修改单据" -> openDirectModify(def, formData);
             case "保存修改" -> saveDirectModify(def, formData);
+            // 内部开发样品申请单「整单归档」(2026-11-17 Excel #4 用户口径):
+            //   「每月进行点击归档按钮对该单据进行归档，归档后所有人不得修改（除管理员撤销归档）」
+            //   归档 = markArchived（archived='Y'）⇒ 状态变「已归档」⇒ draftEditable 为假，
+            //   行级编辑（applySampleIntRowRules 只在草稿路径生效）随之全部关闭。
+            //   撤销 = 管理员专属，archived='N' 回到草稿，全月的人都能继续在自己行上补录。
+            case "归档" -> archiveSampleMonth(def, formData);
+            case "撤销归档" -> unarchiveSampleMonth(def, formData);
             // 产品变更申请单:会签子流程(发起人勾「需会签」+选会签人 → 全部通过才进审核,2026-09-21)
             case "提交会签" -> submitSignoff(def, formData);
             case "会签通过" -> signoffApprove(def, formData);
@@ -335,6 +342,10 @@ public class ButtonService {
         body.remove("更新时间");
         body.remove("审核人");
         body.remove("审核时间");
+        // 组装工艺管控清单：表单管理人**固定柴善银**（2026-11-17 用户口径
+        //   「这个表单管理员应该是柴善银，是固定的」）—— 覆盖 2026-10-28「=当前编辑人」那条，
+        //   服务端强制写死：前端无论是旧缓存、默认值还是绕过保存，落库都只可能是柴善银。
+        if ("RD_ASM_PROC".equals(def.code())) body.put("表单管理人", "柴善银");
         // 立项申请(2026-10-08 研发流程图③④):「对接人/项目责任人」是流程动作写下的只读格
         // (字段在 yj_field 已 editable=0,这里再剥一次 —— 前端题面能改的键,服务端一律不收),
         // 否则绕过按钮直接保存就能"自封责任人"。
@@ -579,6 +590,128 @@ public class ButtonService {
      * <p>为什么在落库前**改写 items** 而不是拒绝整单:一张单里有多人各自的行,一个人保存时如果用整单校验,
      * 别人的行会把整单打回;这里改成"只动自己的行,别人的行原样回写",既保住内容也保住行不被缺席软删。</p>
      */
+    /**
+     * 内部开发样品申请单「整单归档」（2026-11-17 用户口径，Excel #4）。
+     *
+     * <p>用户原话：「每月进行点击归档按钮对该单据进行归档，归档后所有人不得修改
+     * （除管理员撤销归档）」。</p>
+     *
+     * <p>为什么放在按钮层而不是保存时自动流转：这张单是**月内共享**的 ——
+     * 一个月一张总单，各人在下面加自己的行。若保存即归档，第一个保存的人就把全月锁死了。
+     * 故归档必须是**显式动作**，由文档管理员在月末点。</p>
+     *
+     * @return { 编号, 状态, 归档:true }
+     */
+    private Map<String, Object> archiveSampleMonth(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!"RD_SAMPLE_INT".equals(def.code()))
+            throw new IllegalArgumentException("该面板不支持归档操作：" + def.code());
+        String no = docNoOf(formData, def);
+        if (no == null || no.isBlank()) throw new IllegalArgumentException("缺少单据编号");
+        ensureSampleMonthDoc(def, no);
+        // 已归档再点 = 幂等返回，不报错（用户连点两次不该看到红字）
+        String cur = sampleArchivedFlag(def, no);
+        if (!"Y".equals(cur)) markArchived(def.code(), no, currentUserName());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("编号", no);
+        out.put("状态", "已归档");
+        out.put("归档", true);
+        return out;
+    }
+
+    /**
+     * 撤销归档（管理员专属）。
+     *
+     * <p>用户口径：「归档后所有人不得修改（**除管理员撤销归档**）」。
+     * 撤销后 archived='N'，状态回到「草稿」，全月的人又能各自补录自己的行。</p>
+     */
+    private Map<String, Object> unarchiveSampleMonth(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!"RD_SAMPLE_INT".equals(def.code()))
+            throw new IllegalArgumentException("该面板不支持撤销归档：" + def.code());
+        if (!isAdminUser(currentUserName()))
+            throw new org.springframework.security.access.AccessDeniedException("撤销归档仅管理员可操作");
+        String no = docNoOf(formData, def);
+        if (no == null || no.isBlank()) throw new IllegalArgumentException("缺少单据编号");
+        ensureSampleMonthDoc(def, no);
+        // ⚠ 必须**连 shr/shsj 一起清**：markArchived 归档时会写 shr（文控口径：归档即视为审核），
+        //   若只清 archived，状态会退到「已审核」—— 而"已审核"同样是锁定态（draftEditable=false），
+        //   用户撤销归档后仍然加不了行，等于没撤销（2026-11-17 实测踩到）。
+        //   本单的语义是「月内共享草稿 → 月末归档」，没有独立审核环节 ⇒ 撤销即回草稿。
+        jdbc.update("UPDATE yj_doc_status SET archived = 'N', archived_at = NULL, "
+                + "shr = NULL, shsj = NULL, update_at = GETDATE() "
+                + "WHERE panel_code = ? AND doc_no = ?", def.code(), no);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("编号", no);
+        out.put("状态", "草稿");
+        out.put("归档", false);
+        return out;
+    }
+
+    /** 从 formData 取单号（兼容 head / 顶层 / 编号 三种拿法） */
+    private String docNoOf(Map<String, Object> formData, PanelRegistry.PanelDef def) {
+        if (formData == null) return null;
+        Object v = formData.get(def.groupCol());
+        if (v == null || String.valueOf(v).isBlank()) v = formData.get("单据编号");
+        if (v == null || String.valueOf(v).isBlank()) v = formData.get("编号");
+        return v == null ? null : String.valueOf(v).trim();
+    }
+
+    /** 单据状态标签（复用归档位即可：已归档 / 已审核 / 草稿）——仅用于「新增」复用时的回显 */
+    private String sampleStatusLabelOf(PanelRegistry.PanelDef def, String no) {
+        try {
+            java.util.List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT ISNULL(archived,'N') AS a, shr FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
+                    def.code(), no);
+            if (rows.isEmpty()) return "草稿";
+            Map<String, Object> r = rows.get(0);
+            if ("Y".equals(blankSafe(r.get("a")))) return "已归档";
+            if (r.get("shr") != null && !blankSafe(r.get("shr")).isEmpty()) return "已审核";
+            return "草稿";
+        } catch (Exception e) {
+            return "草稿";
+        }
+    }
+
+    /** 该单是否已归档（yj_doc_status.archived） */
+    private String sampleArchivedFlag(PanelRegistry.PanelDef def, String no) {
+        java.util.List<String> rows = jdbc.queryForList(
+                "SELECT ISNULL(archived,'N') FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
+                String.class, def.code(), no);
+        return rows.isEmpty() ? "N" : rows.get(0);
+    }
+
+    /** 单号必须真实存在于头表，否则拒绝（防跨面板/伪造单号调用） */
+    private void ensureSampleMonthDoc(PanelRegistry.PanelDef def, String no) {
+        Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM " + def.headTable()
+                + " WHERE " + def.groupCol() + " = ? AND ISNULL(asp_cancel,'N') <> 'Y'", Integer.class, no);
+        if (n == null || n == 0) throw new IllegalArgumentException("单据不存在：" + no);
+    }
+
+    /**
+     * A1「每月一张单」：找当月那张内部样品单，找到就复用，不新建。
+     *
+     * <p>用户口径（2026-11-17 Excel #4）：「按每月1张申请单，每个人在下面进行新增」。</p>
+     *
+     * <p>判据用**单号里的年月**（`SPN-YYYY-MM-NNNN`）而不是「单据日期」：
+     * 实测头表 单据日期 常为 null（SPN-2026-11-0004/0005 都是空），拿它筛会漏。
+     * 单号由 formNoService 按 prefix+年月生成，所以它才是可靠的月份键。</p>
+     *
+     * <p>已归档的当月单也会被复用 —— 复用是为了让用户继续看到那张单，
+     * 而不是给他建第二张；归档态下他改不了内容，只能请管理员撤销归档。
+     * 这比"归档后又悄悄建一张"更符合"每月一张"的口径。</p>
+     *
+     * @return 当月单号；没有则 null
+     */
+    private String findSampleMonthDoc(PanelRegistry.PanelDef def) {
+        String ym = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM"));
+        String prefix = def.prefix() == null ? "" : def.prefix();
+        java.util.List<String> rows = jdbc.queryForList(
+                "SELECT TOP 1 " + def.groupCol() + " FROM " + def.headTable()
+                        + " WHERE " + def.groupCol() + " LIKE ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " ORDER BY id DESC",
+                String.class, prefix + "-" + ym + "-%");
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
     private java.util.Set<String> applySampleIntRowRules(PanelRegistry.PanelDef def, List<Map<String, Object>> items,
                                                     String no, String actor) {
         java.util.Set<String> none = java.util.Set.of();
@@ -728,9 +861,87 @@ public class ButtonService {
         return java.time.LocalDate.now();
     }
 
+    // ══════════════════════════════════════════════════════════════════════════════
+    // 单据编号可手工调整(2026-11-17 用户口径:新纸样「委托单编号 可调整」)
+    //   「可以改」不是「随便改」:
+    //     ① 只有 DOC_NO_EDITABLE_PANELS 里的面板受理(纸面把该字段渲染成输入框);
+    //     ② 已提交审批 / 已审核 / 已归档 / 已作废 / 已中止的单不受理(状态行 yj_doc_status 说了算);
+    //     ③ 目标号必须在**业务表**里查不到(号池 s_allno 里可能留着"建过又删掉的草稿"的号,
+    //        这种空占号允许复用 —— 否则用户改成一个池里有过、库里没有的号会被无故拦住);
+    //     ④ 改号时 头表 + 行表 + yj_doc_status 三者一起挪,挪完把号回登 s_allno 留痕
+    //        (不回登的话月内取号基准仍按 s_allno 单调递增,不至于重号,但号池会缺一段留痕)。
+    // ══════════════════════════════════════════════════════════════════════════════
+    private static final java.util.Set<String> DOC_NO_EDITABLE_PANELS = java.util.Set.of("INSP_COMMISSION");
+
+    /** 保存前把"用户手改的单据编号"接过来(改号成功则后续一律按新号落库) */
+    private String adoptEditedDocNo(PanelRegistry.PanelDef def, Map<String, Object> head, String no, String user) {
+        if (def == null || head == null || no == null || no.isBlank()) return no;
+        if (!DOC_NO_EDITABLE_PANELS.contains(def.code())) return no;
+        String col = def.groupCol() != null && !def.groupCol().isBlank() ? def.groupCol() : def.codeCol();
+        if (col == null || col.isBlank()) return no;
+        // 表头载荷的键是 yj_field.label(中文即数据键);本面板 label 与物理列同名,仍按元数据取一次
+        String key = col;
+        for (PanelRegistry.FieldDef fd : def.fields()) {
+            if (fd.col() != null && fd.col().equals(col)) {
+                key = fd.label();
+                break;
+            }
+        }
+        Object raw = head.get(key);
+        String wanted = raw == null ? "" : String.valueOf(raw).trim();
+        if (wanted.isEmpty() || wanted.equals(no.trim())) return no;
+        if (wanted.length() > 50) throw new IllegalArgumentException("单据编号最多 50 个字符");
+        ensureDocNoRenameAllowed(def, no);
+        ensureDocNoFree(def, col, wanted, no);
+        renameDocNo(def, col, no, wanted, user);
+        head.put(key, wanted);
+        log.info("[改号] {} 单据编号 {} → {}(操作人 {})", def.code(), no, wanted, user);
+        return wanted;
+    }
+
+    /** 状态门禁:已离草的单一律不许改号(审批/归档/作废/中止任一命中即拒) */
+    private void ensureDocNoRenameAllowed(PanelRegistry.PanelDef def, String no) {
+        List<Integer> hit = jdbc.query(
+                "SELECT TOP 1 1 FROM yj_doc_status WHERE panel_code = ? AND doc_no = ? AND ("
+                        + "ISNULL(pending,'N') = 'Y' OR shr IS NOT NULL OR ISNULL(archived,'N') = 'Y'"
+                        + " OR ISNULL(canceled,'N') = 'Y' OR ISNULL(stopped,'N') = 'Y')",
+                (rs, i) -> 1, def.code(), no);
+        if (!hit.isEmpty()) {
+            throw new IllegalArgumentException("该单据已提交审批/已审核/已归档/已作废,编号不能再改");
+        }
+    }
+
+    /** 查重:业务表里已有同号(排除自己)就拒 */
+    private void ensureDocNoFree(PanelRegistry.PanelDef def, String col, String wanted, String selfNo) {
+        String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
+        if (table == null || table.isBlank()) return;
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM [" + table + "] WHERE [" + col + "] = ? AND [" + col + "] <> ?",
+                Integer.class, wanted, selfNo);
+        if (n != null && n > 0) throw new IllegalArgumentException("单据编号「" + wanted + "」已存在,请换一个");
+    }
+
+    /** 挪号:头表 + 行表 + 状态行,并把新号回登号池 */
+    private void renameDocNo(PanelRegistry.PanelDef def, String col, String oldNo, String newNo, String user) {
+        String headTable = def.hasHeadTable() ? def.headTable() : def.lineTable();
+        if (headTable != null && !headTable.isBlank()) {
+            jdbc.update("UPDATE [" + headTable + "] SET [" + col + "] = ? WHERE [" + col + "] = ?", newNo, oldNo);
+        }
+        String lineTable = def.lineTable();
+        if (def.hasHeadTable() && lineTable != null && !lineTable.isBlank()
+                && tableCols(lineTable).contains(col)) {
+            jdbc.update("UPDATE [" + lineTable + "] SET [" + col + "] = ? WHERE [" + col + "] = ?", newNo, oldNo);
+        }
+        jdbc.update("UPDATE yj_doc_status SET doc_no = ?, update_at = GETDATE() WHERE panel_code = ? AND doc_no = ?",
+                newNo, def.code(), oldNo);
+        formNoService.registerNo(def.prefix(), newNo, user);
+    }
+
     private Map<String, Object> saveDoc(PanelRegistry.PanelDef def, Map<String, Object> head,
                                         List<Map<String, Object>> items, String no, String user,
                                         boolean markSaved, boolean systemDraft) {
+        // 纸样「委托单编号 可调整」⇒ 草稿阶段允许改号(见 adoptEditedDocNo)
+        no = adoptEditedDocNo(def, head, no, user);
         // 工序检验三单:检验人员默认当前电脑端登录人(2026-10-21;空值/历史 system 占位才填)
         defaultQcInspector(def, head, user);
         boolean split = def.hasHeadTable();
@@ -742,6 +953,20 @@ public class ButtonService {
         //   · 已存在且申请人是别人:整行按库里的原值回写(不改、也不软删——行级状态不互通);
         //   · 有 edit_others 词(组织架构里勾了「改他人行」)/管理员:以上限制全部放开。
         java.util.Set<String> protectRowIds = applySampleIntRowRules(def, items, no, user);
+        // ── A1「每月一张单」（2026-11-17 用户口径，Excel #4）─────────────────────
+        //   用户原话：「按每月1张申请单，每个人在下面进行新增」。
+        //   点「新增」时先看当月那张单在不在：
+        //     · 在  → **直接把它交给前端打开**（不新建、不写任何数据）；
+        //     · 不在 → 落下去走原来的建单分支（单号 SPN-YYYY-MM-NNNN）。
+        //   为什么复用而不是"每月自动建一张"：空单会出现在列表里、也会被人当草稿删掉；
+        //   按需复用既保证"一个月就一张"，又不会凭空多出一堆空单。
+        //   ⚠ 只在**空表单的新建**（items 为空且非 markSaved）时复用；带数据进来的是保存，不能拦。
+        if (no == null && items.isEmpty() && !markSaved && "RD_SAMPLE_INT".equals(def.code())) {
+            String month = findSampleMonthDoc(def);
+            if (month != null && !month.isBlank()) {
+                return result(month, sampleStatusLabelOf(def, month));
+            }
+        }
         if (no == null) {
             if (items.isEmpty()) {
                 // directAdd 语义:空表单 -> 建一张空白草稿单(头行式写头表,单表式写一行占位行)
@@ -786,6 +1011,8 @@ public class ButtonService {
                 // 新建默认值(2026-10-29 用户口径「密级/文件使用范围默认保密、银嘉内部,可以换」):
                 // 只补没有值的列 ⇒ 用户手改过的不会被抢回默认值。
                 putHeadDefaults(def, table, cols);
+                // 送样人默认(2026-11-17):检验委托单「联系人」= 送样人,新单直接带入当前登录人姓名
+                putSenderDefault(def, table, cols, user);
                 // 单表式单据的明细「行序」:空白草稿也占一行,写 1 而不是让列默认值 0 落地
                 // (2026-11-04,组装物料清单 ASM_BOM;见 assignNewLineSeq 注释)。
                 // 纯排序/展示口径:唯一索引只要求同单内不重复,先占 1 是为了让用户随后「新增数据」的
@@ -802,6 +1029,8 @@ public class ButtonService {
                 // 建单那一刻按创建人姓名补上(仅空值)—— 同段之上 putEditorCols 的理由:本分支直接
                 // return,走不到保存末尾那次调用。字段仍只读、save() 仍剥离入参,故不会变成可手改。
                 prefillPreparerName(def, no, user);
+                // 紧急放行申请单:建单即带出「责任人 / 责任部门」(仅空值;本分支直接 return,故在此补)
+                prefillJjfOwner(def, no, user);
                 // 产品变更申请单:建单即铺部门评审行(照 YJ-QR-130 纸面 7 个部门)
                 if (CHANGE_PANEL.equals(def.code())) ensureChangeDeptRows(def, no, user);
                 // 四个受控文件的编辑门禁在**空草稿分支也要过**(2026-09-21 全流程走查发现的门禁洞):
@@ -839,6 +1068,8 @@ public class ButtonService {
                     && (head.get(preCol2) == null || String.valueOf(head.get(preCol2)).isBlank())) {
                 head.put(preCol2, realNameOf(user));
             }
+            // 送样人默认(2026-11-17):同空白草稿分支 —— 检验委托单「联系人」带入当前登录人姓名
+            putSenderDefaultInHead(def, head, user);
         }
         // 规格书两级分发封锁(2026-09-12):①防绕过——载荷编号命中的是已下发产品(而非已有单据)
         // 时要求总负责人/admin(手动以产品码建单的唯一向量);②分配单仅 责任人∪总负责人∪管理员 可保存。
@@ -924,6 +1155,8 @@ public class ButtonService {
         ensureBatchNoByDate(def, head, items);
         // 明细「行序」自动补号(2026-11-04,组装物料清单 ASM_BOM 连加两行保存撞唯一索引):见方法注释
         assignNewLineSeq(def, items, no);
+        // 紧急放行申请单:保存时补「责任人 / 责任部门」(仅空值,覆盖"带数据一次保存建单"这条路)
+        putJjfOwner(def, head, user);
         if (split) {
             // 已生效/已归档的"部门填写"模式**只写明细**：表头字段（产品编号/变更事由/会签人…）
             // 一律不落库，否则会签人顺手就能把这张已生效单的实质内容改掉。
@@ -1050,8 +1283,10 @@ public class ButtonService {
         // 与上面编辑人同一套口径:前端只保证纸面显示与保存报文带上,落库一律以本次保存人为准 ——
         // 否则用户把这一格改回别人名字就能伪造"谁管的这张表"。
         if ("RD_ASM_PROC".equals(def.code())) {
+            // 2026-11-17：值改为**固定柴善银**（用户口径「是固定的」），不再按本次保存人回写。
+            //   保留这段 UPDATE 的作用是"防止前端旧缓存把它改回别人"—— 每次保存都钉一次固定值。
             jdbc.update("UPDATE rd_asm_proc_head SET 表单管理人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
-                    realNameOf(user), no);
+                    ASM_PROC_FORM_MANAGER, no);
         }
         // 纯落款「编制」格的创建人预填(2026-11-02):见 prefillPreparerName 注释。
         // 落库后执行 ⇒ 同一次保存即可在纸面上看到;只在为空时写,不覆盖已有/用户已确认的值。
@@ -1074,7 +1309,10 @@ public class ButtonService {
     private void putEditorCols(PanelRegistry.PanelDef def, String table, Map<String, Object> cols, String user) {
         String name = realNameOf(user);
         if ("RD_PROD_INFO".equals(def.code()) && tableCols(table).contains("编辑人")) cols.put("编辑人", name);
-        if ("RD_ASM_PROC".equals(def.code()) && tableCols(table).contains("表单管理人")) cols.put("表单管理人", name);
+        // 组装工艺：表单管理人**固定柴善银**（2026-11-17 用户口径），不再跟当前编辑人
+        if ("RD_ASM_PROC".equals(def.code()) && tableCols(table).contains("表单管理人")) {
+            cols.put("表单管理人", ASM_PROC_FORM_MANAGER);
+        }
     }
 
     /**
@@ -1104,6 +1342,54 @@ public class ButtonService {
             if (cur != null && !String.valueOf(cur).trim().isEmpty()) continue;  // 已有值不覆盖
             cols.put(col, val);
         }
+    }
+
+    /**
+     * 送样人默认值 = 当前登录人的**真实姓名**(2026-11-17 用户口径:
+     * 「送样人进行选择填入嘛,直接带入有账号的人的姓名」)。
+     *
+     * <p>检验委托单的「联系人」格就是**送样人** —— 纸面标黄「拉选填」,下拉里是所有有账号的人
+     * (字典取自 yj_user.real_name,见 migrate-insp-commission-sender-20261117.sql),新建单据时
+     * 默认就把当前登录人姓名填进去,不用手打。
+     *
+     * <p>口径与「责任人」预填一致:**只在新建时补空值**;已有值(用户改过/历史单)一律不覆盖;
+     * 后台线程(user=system)没有登录人,留空。
+     */
+    private static final java.util.Map<String, String> SENDER_DEFAULT_COL =
+            java.util.Map.of("INSP_COMMISSION", "联系人");
+
+    /** 新建草稿分支用:目标是**物理列名**键的 cols */
+    private void putSenderDefault(PanelRegistry.PanelDef def, String table, Map<String, Object> cols, String user) {
+        if (def == null || cols == null || !sendersPanel(def.code())) return;
+        String col = SENDER_DEFAULT_COL.get(def.code());
+        if (table != null && !tableCols(table).contains(col)) return;
+        Object cur = cols.get(col);
+        if (cur != null && !String.valueOf(cur).trim().isEmpty()) return;
+        String name = senderNameOf(user);
+        if (!name.isEmpty()) cols.put(col, name);
+    }
+
+    /** 正常保存(新单带明细)分支用:目标是**字段 label(数据键)** 键的 head */
+    private void putSenderDefaultInHead(PanelRegistry.PanelDef def, Map<String, Object> head, String user) {
+        if (def == null || head == null || !sendersPanel(def.code())) return;
+        String col = SENDER_DEFAULT_COL.get(def.code());
+        PanelRegistry.FieldDef f = def.byCol(col);
+        if (f == null) return;
+        Object cur = head.get(f.label());
+        if (cur != null && !String.valueOf(cur).trim().isEmpty()) return;
+        String name = senderNameOf(user);
+        if (!name.isEmpty()) head.put(f.label(), name);
+    }
+
+    private static boolean sendersPanel(String code) {
+        return code != null && SENDER_DEFAULT_COL.containsKey(code);
+    }
+
+    /** 当前登录人的姓名(后台线程/空用户 → 空串,表示"不填") */
+    private String senderNameOf(String user) {
+        if (user == null || user.isBlank() || "system".equals(user)) return "";
+        String name = realNameOf(user);
+        return name == null ? "" : name.trim();
     }
 
     /**
@@ -3589,6 +3875,9 @@ public class ButtonService {
                 writeBackSignCell(def, no, prep, null, operator);
             }
         }
+        // 紧急放行申请单:右上「责任部门」= 责任人所属部门 ⇒ 与上面「责任人=提交人」同一步刷新,
+        // 否则提交后会出现「责任人=张三(生产部) 但 责任部门=李四的技术部」的错位。
+        if (JJF_PANEL.equals(def.code())) syncJjfDeptToSubmitter(def.headTable(), no, operator);
         // 规格书(RD_SPEC_DOC):「制订」格 = **提交审批的人**（2026-11-06 用户口径
         // 「规格书的底部的首先制定是填写提交审批的账号名字和日期」）。
         // 与质量单据同一时机（提交这一刻），但落的是单列合写「姓名/yyyy.M.d」。
@@ -3703,6 +3992,15 @@ public class ButtonService {
         if (SINGLE_LEVEL_INSP_PANELS.contains(def.code())) {
             writeBackSignCell(def, no, "审核人", "审核时间", operator);
         }
+        // 数据记录表(实验室 8 张)：审核人**审核后生成**（1117问题 #5）
+        writeDataRecAuditor(def, no, operator);
+        // 组装工艺管控清单：新增的「审核人」格 = 审批通过人（1117问题 #6「产品负责人审核后自动填充」）
+        // 组装工艺 / 炭棒工艺管控清单：新增的「审核人」格 = 审批通过人
+        //   （1117问题 #6「产品负责人审核后自动填充」+「具体问题点」行10「炭棒工艺管控起单…
+        //    右上角加多一行审核人，审核完成后自动生成」）
+        if ("RD_ASM_PROC".equals(def.code()) || "RD_MOLD_PROC".equals(def.code())) {
+            writeFieldByLabel(def, no, "审核人", signNameOf(operator));
+        }
         // 规格书(RD_SPEC_DOC):「审核」格 = **审批通过的人**（2026-11-06 用户口径
         // 「审核的是在审批人审批之后，把对应的审批人的账号和日期回填进去」）。
         // 规格书不走两级审批（「一级审批就回填」）⇒ 落点就在这条单节点通过路径上。
@@ -3726,8 +4024,12 @@ public class ButtonService {
             if (!level.isEmpty()) applyGrade(def.code(), no, level, operator);
             // 2026-10-28 用户口径:「立项申请可以由管理员在审批定级的时候确定一个对接人进行分发，
             //   后续也默认是这个对接人，除非进行修改」⇒ 审批弹窗里一并选对接人,与定级同一动作完成分发。
-            // 载荷不带对接人则跳过(兼容旧前端/老单:仍可用侧栏「定级分发」补发)。
+            // 2026-11-17 用户口径(1117问题 #3):「冯总审核后直接跳转到秀丽分发，**不要下拉选择二级审核人**」
+            //   ⇒ 载荷没带对接人时**默认分发给陈秀丽**（chenxiuli），不再留空等人工补发；
+            //     已分发给别人的（旧单/改过）由前端把原值带上，不会被这里覆盖。
+            //   ⚠ 默认写在服务端而不只写前端：接口直连/旧前端/其他入口调审批也不会漏分发。
             String liaison = pickOf(formData, "对接人");
+            if (liaison.isEmpty()) liaison = RD_DEFAULT_LIAISON_ACCOUNT;
             if (!liaison.isEmpty()) assignLiaison(def.code(), no, liaison, operator);
         }
         // 测试申请单:审批时可以**一并分发测试负责人**(2026-10-29 用户口径
@@ -4186,7 +4488,7 @@ public class ButtonService {
             Map.entry("QC_BHG", "填写人"),        // YJ-QR-11  不合格报告(制程)
             Map.entry("QC_BHC", "责任人"),        // YJ-QR-59  不合格品处理单(制程)
             Map.entry("QC_BHZ", "责任人"),        // YJ-QR-64  不合格品处理单(自制物料)
-            Map.entry("QC_JJF", "检测人"),        // YJ-QR-92  紧急放行申请单
+            Map.entry("QC_JJF", "责任人"),        // YJ-QR-92  紧急放行申请单(2026-11-17:纸面「编制」= 责任人)
             Map.entry("QC_SCP", "责任人"),        // YJ-QR-118 试产材料使用申请单
             Map.entry("QC_OQC_REPORT", "检验员")); // YJ-QR-05/A1 出厂检验报告(2026-11-04:纸面第一格=检验员=编制)
 
@@ -4238,8 +4540,28 @@ public class ButtonService {
      *       (「批准」格不再写,历史值保留)。</li>
      * </ul>
      */
+    /**
+     * 「数据记录表」一族（实验室 8 张：碱性/矿物质/抗菌/阻垢/RO保护/浸泡/滴落/功能性滤效）。
+     *
+     * <p>2026-11-17 用户口径（1117问题 #5）：「审核人需审核后生成，不能自动填充」。
+     * 这些表纸面表尾/头部有一格「审核人」（物理列 `表单审核人`），原先前端 docDefaults 建单就
+     * 预填「秀丽」⇒ 草稿态就已经"签了名"。现在：**审批通过时由本类回填、弃审/驳回时清空**，
+     * 前端不再预填（docDefaults 里那 8 条已删）。</p>
+     *
+     * <p>⚠ 物理列名是「表单审核人」—— 叫「审核人」的那一列会被 {@code save()} 的
+     * {@code body.remove("审核人")} 静默丢弃（那是 yj_doc_status.shr 的虚拟字段）。</p>
+     */
+    public static final java.util.Set<String> DATA_REC_AUDITOR_PANELS = java.util.Set.of(
+            "RD_ALKALINE", "RD_MINERAL", "RD_ANTIBACT", "RD_SCALE",
+            "RD_RO_PROTECT", "RD_SOAK", "RD_DROP_PREC", "RD_FILTER_EFF");
+
     public static final java.util.Set<String> SINGLE_LEVEL_INSP_PANELS =
-            java.util.Set.of("QC_FIRST_INSP", "QC_PROC_INSP", "QC_ASM_INSP");
+            // QC_LINE_PATROL（成型车间巡线记录表）2026-11-17 追加：用户口径（Excel #13）
+            //   「无审批流（要求程志/李光从账户写报表提交 → 刘磊账户审核）」
+            //   该表此前纸头「审核人」只读、注释写"本期不做审批流" ⇒ 现在按单级审批接上：
+            //   提交审批 → 审批通过(一次) → 已审核 → 弃审 → 草稿。
+            //   编制格 = 巡线人员（业务值，可手填；提交审批时为空才兜底写提交人）。
+            java.util.Set.of("QC_FIRST_INSP", "QC_PROC_INSP", "QC_ASM_INSP", "QC_LINE_PATROL");
 
     /** 单级审批面板的「编制」格列名(检验人业务值,可手填) */
     private static final Map<String, String> SINGLE_LEVEL_PREPARER = Map.of(
@@ -4247,7 +4569,9 @@ public class ButtonService {
             // 2026-11-13 用户口径「为当前的出货检验表观增加审批流程」:出货检验表观(原组装成品检验单)
             // 与出货检验功能同形 —— 提交审批 → 审批通过(一次) → 已审核 → 弃审 → 草稿;
             // 表尾「检验人」= 编制(业务值,可手填,提交审批时为空才兜底写提交人)。
-            "QC_ASM_INSP", "检验员");
+            "QC_ASM_INSP", "检验员",
+            // 巡线记录表的「编制」= 巡线人员（纸面最后一列，业务值）
+            "QC_LINE_PATROL", "巡线人员");
 
     /** 该面板的「编制」格是否可手改(= 预填型);非此类返回空串 */
     private String preparerEditableColOf(String panelCode) {
@@ -4273,7 +4597,7 @@ public class ButtonService {
      * <p>与 {@link #PREPARER_EDITABLE_PANELS} 的区别:那边是"预填且用户可改",
      * 这边是"预填但用户不可改"。要扩大范围只改本集合。
      */
-    private static final java.util.Set<String> PREPARER_CREATOR_PREFILL = java.util.Set.of("QC_BHG");
+    private static final java.util.Set<String> PREPARER_CREATOR_PREFILL = java.util.Set.of("QC_BHG", "QC_JJF");
 
     /**
      * 纯落款「编制」格的**创建人预填**(只在为空时写,绝不覆盖已有值)。
@@ -4292,6 +4616,84 @@ public class ButtonService {
                     realNameOf(user), currentUserName(), no);
         } catch (Exception e) {
             log.warn("[编制格] 预填 {} 失败 no={}: {}", def.code(), no, e.getMessage());
+        }
+    }
+
+    // ══════════ 紧急放行申请单(QC_JJF)表头自动生成:责任人 / 责任部门 ══════════
+    // 2026-11-17 用户口径(截图:一．紧急放行原因「责任人: 冯敏 日期: 年 月 日」红框 +
+    //   「无法填写,新增要求自动生成时间以及填写人员」;右上信息表「责任部门: 责任人所属部门」):
+    //   · 责任人   = 建单/提交审批的人(纯落款,见 QC_DOC_PREPARER + PREPARER_CREATOR_PREFILL);
+    //   · 责任部门 = **责任人所属部门** —— 建单时按建单人所属部门写入,提交审批时按提交人刷新
+    //                (提交审批会把「责任人」刷成提交人,两格必须同一个人身上取,否则会错位);
+    //   · 日期     = 单据日期(建单即当天,由单据引擎默认值写;yj_field.editable=0 ⇒ 纸面只读)。
+    // 只补/只刷新这两列,不动其它字段;非本面板调用直接返回。
+
+    /** 紧急放行申请单面板码 */
+    private static final String JJF_PANEL = "QC_JJF";
+    /** 紧急放行申请单「责任部门」列(标签=物理列) */
+    private static final String JJF_DEPT_COL = "责任部门";
+
+    /** 账号所属部门名(取 yj_user.dept_id → yj_dept.dept_name;查不到/系统线程返回空串) */
+    private String deptNameOf(String user) {
+        if (user == null || user.isBlank() || "system".equals(user)) return "";
+        try {
+            List<String> v = jdbc.queryForList(
+                    "SELECT TOP 1 ISNULL(d.dept_name, N'') FROM yj_user u LEFT JOIN yj_dept d ON d.id = u.dept_id"
+                            + " WHERE u.username = ?", String.class, user);
+            return v.isEmpty() ? "" : String.valueOf(v.get(0)).trim();
+        } catch (Exception e) {
+            log.warn("[责任部门] 取部门失败 user={}: {}", user, e.getMessage());
+            return "";
+        }
+    }
+
+    /** 紧急放行申请单:表头对象里补「责任人 / 责任部门」(只补空值,不覆盖已有值) */
+    private void putJjfOwner(PanelRegistry.PanelDef def, Map<String, Object> head, String user) {
+        if (def == null || head == null || !JJF_PANEL.equals(def.code())) return;
+        if (user == null || user.isBlank() || "system".equals(user)) return;
+        if (blankSafe(head.get("责任人")).isEmpty() && tableCols(def.headTable()).contains("责任人"))
+            head.put("责任人", realNameOf(user));
+        if (blankSafe(head.get(JJF_DEPT_COL)).isEmpty() && tableCols(def.headTable()).contains(JJF_DEPT_COL)) {
+            String dept = deptNameOf(user);
+            if (!dept.isEmpty()) head.put(JJF_DEPT_COL, dept);
+        }
+    }
+
+    /**
+     * 紧急放行申请单:落库后补「责任人 / 责任部门」(只补空值)。
+     * 空白草稿分支在建单后直接 return,走不到保存末尾那次 {@link #putJjfOwner},故两处各调一次。
+     */
+    private void prefillJjfOwner(PanelRegistry.PanelDef def, String no, String user) {
+        if (def == null || no == null || !JJF_PANEL.equals(def.code())) return;
+        if (user == null || user.isBlank() || "system".equals(user)) return;
+        try {
+            Set<String> cols = tableCols(def.headTable());
+            if (cols.contains("责任人"))
+                jdbc.update("UPDATE " + def.headTable() + " SET [责任人] = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                                + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                                + " AND ([责任人] IS NULL OR LTRIM(RTRIM([责任人])) = '')",
+                        realNameOf(user), currentUserName(), no);
+            String dept = deptNameOf(user);
+            if (!dept.isEmpty() && cols.contains(JJF_DEPT_COL))
+                jdbc.update("UPDATE " + def.headTable() + " SET [" + JJF_DEPT_COL + "] = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                                + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                                + " AND ([" + JJF_DEPT_COL + "] IS NULL OR LTRIM(RTRIM([" + JJF_DEPT_COL + "])) = '')",
+                        dept, currentUserName(), no);
+        } catch (Exception e) {
+            log.warn("[责任部门] 预填失败 no={}: {}", no, e.getMessage());
+        }
+    }
+
+    /** 紧急放行申请单:提交审批时「责任部门」跟着提交人走(与「责任人」刷成提交人同口径) */
+    private void syncJjfDeptToSubmitter(String table, String no, String operator) {
+        try {
+            if (table == null || table.isBlank() || !tableCols(table).contains(JJF_DEPT_COL)) return;
+            String dept = deptNameOf(operator);
+            if (dept.isEmpty()) return;
+            jdbc.update("UPDATE " + table + " SET [" + JJF_DEPT_COL + "] = ?"
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", dept, no);
+        } catch (Exception e) {
+            log.warn("[责任部门] 提交刷新失败 no={}: {}", no, e.getMessage());
         }
     }
 
@@ -4320,6 +4722,25 @@ public class ButtonService {
      *   审核=一级审批通过的人、批准=超级管理员(出厂检验报告、首件/制程检验单纸面第一格印
      *   「检验员」/「检验人」,语义同为编制)。
      */
+    /**
+     * 立项申请审批通过后**自动分发**的对接人账号（2026-11-17 用户口径，1117问题 #3）：
+     * 「冯总审核后直接跳转到秀丽分发，不要下拉选择二级审核人」。
+     *
+     * <p>陈秀丽 = `chenxiuli`（研发审核角色；同时也是产品信息表的一级审核人）。</p>
+     */
+    private static final String RD_DEFAULT_LIAISON_ACCOUNT = "chenxiuli";
+
+    /**
+     * 组装工艺管控清单（RD_ASM_PROC）纸面「表单管理人」的**固定值**（2026-11-17 用户口径）：
+     * 「这个表单管理员应该是柴善银，是**固定的**」—— 覆盖 2026-10-28「=当前编辑人」那条。
+     *
+     * <p>⚠ 三处写入点必须同时固定，漏一处就会被"当前编辑人"覆盖回去：
+     * ① 前端 PanelxList 的 EDITOR_STAMP_FIELDS（纸面显示）；
+     * ② putEditorCols（空白草稿分支落库）；
+     * ③ saveDoc 末尾那段 UPDATE（正常保存落库）。</p>
+     */
+    private static final String ASM_PROC_FORM_MANAGER = "柴善银";
+
     private static final java.util.Set<String> TWO_LEVEL_PANELS = twoLevelPanels();
 
     /** 两级面板集合 = RD_PROD_INFO / RD_SAMPLE_EXT(一级选人)+ 质量单据一族(二级固定超级管理员) */
@@ -4502,10 +4923,81 @@ public class ButtonService {
     }
 
     /**
+     * 数据记录表：审批通过 → 回填纸面「表单审核人」= 审批通过人（2026-11-17 用户口径，1117问题 #5）。
+     *
+     * <p>用户原话：「审核人需审核后生成，不能自动填充」。原来前端建单即预填「秀丽」，
+     * 草稿态就有签名；现在只有**真正审批通过**这一步才写。</p>
+     */
+    private void writeDataRecAuditor(PanelRegistry.PanelDef def, String no, String account) {
+        String col = dataRecAuditorCol(def);
+        if (col == null || no == null || no.isBlank()) return;
+        try {
+            jdbc.update("UPDATE " + def.headTable()
+                    + " SET [" + col + "] = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    signNameOf(account), currentUserName(), no);
+        } catch (Exception e) {
+            log.warn("[数据记录表] 回填表单审核人失败 {} {}: {}", def.code(), no, e.toString());
+        }
+    }
+
+    /**
+     * 「表单审核人」这一格在**该面板**的物理列名。
+     *
+     * <p>⚠ 必须走 yj_field 元数据取 col_name，**不能直接写 `[表单审核人]`**：
+     * 实测这 8 张表的 label「表单审核人」映射到物理列 **`备用1`**
+     * （见 tools/migrate-rd-datarec-reviewer-2026-09-30.sql 把审核人落进备用列池）。
+     * 直接按 label 拼列名会报「列名无效」，而本方法外层是 try/catch ⇒ 会被静默吞掉，
+     * 表现为「审批通过了但纸面审核人还是空」——比报错更难查（2026-11-17 首次上线即踩到）。</p>
+     *
+     * @return 物理列名；面板不在集合内或该格未登记则 null
+     */
+    private String dataRecAuditorCol(PanelRegistry.PanelDef def) {
+        if (def == null || !DATA_REC_AUDITOR_PANELS.contains(def.code())) return null;
+        PanelRegistry.FieldDef f = def.byLabel("表单审核人");
+        if (f == null || f.col() == null || f.col().isBlank()) return null;
+        return f.col();
+    }
+
+    /**
+     * 按**字段 label** 写单格值（列名从 yj_field 元数据取，绝不拼 label）。
+     *
+     * <p>为什么要这个通用方法：本系统的纸面 label 与物理列常年不同名
+     * （数据记录表 表单审核人→备用1、组装工艺 审核人→备用3）。
+     * 直接按 label 拼列名会「列名无效」，而调用方多包 try/catch ⇒ 静默失败，极难查。</p>
+     */
+    private void writeFieldByLabel(PanelRegistry.PanelDef def, String no, String label, String value) {
+        if (def == null || no == null || no.isBlank() || def.headTable() == null) return;
+        PanelRegistry.FieldDef f = def.byLabel(label);
+        if (f == null || f.col() == null || f.col().isBlank()) return;
+        try {
+            jdbc.update("UPDATE " + def.headTable() + " SET [" + f.col() + "] = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", value, currentUserName(), no);
+        } catch (Exception e) {
+            log.warn("[签核格] 写 {} 失败 {} {}: {}", label, def.code(), no, e.toString());
+        }
+    }
+
+    /** 数据记录表：弃审/驳回 → 清空「表单审核人」（签名随审批作废，与 writeDataRecAuditor 成对） */
+    private void clearDataRecAuditor(PanelRegistry.PanelDef def, String no) {
+        String col = dataRecAuditorCol(def);
+        if (col == null || no == null || no.isBlank()) return;
+        try {
+            jdbc.update("UPDATE " + def.headTable() + " SET [" + col + "] = NULL"
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        } catch (Exception e) {
+            log.warn("[数据记录表] 清空表单审核人失败 {} {}: {}", def.code(), no, e.toString());
+        }
+    }
+
+    /**
      * 清「审核 / 批准」两格(驳回或弃审 → 回草稿:签名随审批作废)。
      * **编制格不清** —— 谁编的单没变;重新提交时会按新的提交人刷新。
      */
     private void clearAuditSignCells(PanelRegistry.PanelDef def, String no) {
+        // 数据记录表：签名随审批作废（1117问题 #5）。挂在**这个入口**而不是 4 个调用点，
+        // 是因为弃审/驳回/撤回共 4 条路都汇到这里，逐处挂必漏。
+        clearDataRecAuditor(def, no);
         if (def == null || (!QC_DOC_PREPARER.containsKey(def.code()) && !SINGLE_LEVEL_INSP_PANELS.contains(def.code()))) return;
         try {
             // ⚠ 2026-11-13:不能盲写「审批人/审批时间」—— 出货检验表观(qc_asm_insp_head)当年没有两级审批,
@@ -7389,6 +7881,43 @@ public class ButtonService {
         return result(no, "会签中");
     }
 
+    /**
+     * 会签通过 → 在该会签人所属部门的纸面行上盖「签字 + 日期」（2026-11-17 用户口径 A）。
+     *
+     * <p>用户原话：「会签人员直接会签人签名后直接显示对应部门以及签名信息到表格」+
+     * 追问确认「点通过即在该部门行写"签字+日期"，内容留空（或写"/"）」。</p>
+     *
+     * <p>映射口径与填写门禁**同一套**（{@link #changeDeptsOf}：
+     * `yj_user.dept_id → yj_change_dept.部门`），不另造规则：
+     * · 一个账号可能映射到多个部门（如 9/12 都是品质部）⇒ 这些部门行**都盖**；
+     * · 映射里查不到部门（账号没配 dept_id）⇒ **静默跳过**，不影响会签本身
+     *   —— 会签是流程动作，盖章只是纸面留痕，不能因缺映射把人卡住；
+     * · 只写 签字/日期 两列，「变更后内容」保持原样（没给意见就是空）。</p>
+     *
+     * <p>幂等：只更新 `签字` 为空或就是本人的行，重复签不会刷掉别人的签名。
+     * 一票否决（驳回）不走这里 —— 驳回本来就不该留签名。</p>
+     */
+    private void stampSignoffDeptRow(PanelRegistry.PanelDef def, String no, String user) {
+        try {
+            java.util.Set<String> depts = changeDeptsOf(user);
+            if (depts.isEmpty()) return;
+            String signer = realNameOf(user);
+            String today = LocalDate.now().toString();
+            for (String dept : depts) {
+                if (dept == null || dept.isBlank()) continue;
+                jdbc.update("UPDATE " + def.lineTable() + " SET 签字 = ?, 日期 = ? "
+                                + " WHERE " + def.groupCol() + " = ? AND 部门 = ? "
+                                + "   AND ISNULL(表区, N'') = ? AND ISNULL(asp_cancel,'N') <> 'Y' "
+                                + "   AND (ISNULL(签字, N'') = N'' OR 签字 = ?)",
+                        signer, today, no, dept, CHANGE_DEPT_SECTION, signer);
+            }
+        } catch (Exception e) {
+            // 盖章失败不得拖垮会签（会签已落库）；只在日志里留痕
+            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
+                    .warn("会签部门行盖章失败 panel={} no={} user={}: {}", def.code(), no, user, e.toString());
+        }
+    }
+
     /** 会签通过(仅本单会签人):全部签完 → **自动**转审批中(用户口径:会签通过才进审核) */
     private Map<String, Object> signoffApprove(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String no = requireNo(formData);
@@ -7400,6 +7929,14 @@ public class ButtonService {
                         + "WHERE panel_code = ? AND form_no = ? AND action = 'SIGNOFF' AND result = 'PENDING' AND operator = ?",
                 opinion.isEmpty() ? null : opinion, CHANGE_PANEL, no, user);
         if (n == 0) throw new IllegalStateException("会签已处理，请刷新后查看");
+        // 🔴 会签即盖章（2026-11-17 用户口径 A）：
+        //   「点通过即在该部门行写"签字+日期",内容留空(或写"/")」
+        //   此前只有 stampSignature 那条路（**填了「变更后内容」并保存**才盖章）——
+        //   会签人只点「会签通过」不填内容时，纸面「三、部门评审意见」里他那一行
+        //   永远停在「/ /」（用户截图即此状）。这里补上"签了就算"的通道。
+        //   ⚠ 只写 签字/日期 两列：不动「变更后内容」（用户没给意见就让它空着，
+        //     尊重实际输入，也让 stampSignature 的"内容变了才盖章"口径不被污染）。
+        stampSignoffDeptRow(def, no, user);
         if (signoffPending(no).isEmpty()) {
             // 全部通过:转审批中(走提交内核——刻意跳过发起人校验,最后一位会签人通常不是发起人)
             doSubmitApproval(def, no, opinion);

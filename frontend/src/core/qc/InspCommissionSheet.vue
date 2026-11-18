@@ -57,7 +57,17 @@
       </div>
       <div class="ic-meta-no">
         <span class="ic-meta-no-label">{{ tt('委托单编号：') }}</span>
-        <span class="ic-meta-no-val">{{ headVal('单据编号') }}</span>
+        <!-- 2026-11-17 纸样标黄「可调整」⇒ 编号可手工改(保存时查重、提交审批后锁定) -->
+        <el-input
+          v-if="canEdit('单据编号')"
+          :model-value="headVal('单据编号')"
+          size="small"
+          class="ic-input ic-meta-no-input"
+          maxlength="50"
+          :placeholder="tt('自动生成')"
+          @update:model-value="(v) => setHead('单据编号', v)"
+        />
+        <span v-else class="ic-meta-no-val">{{ headVal('单据编号') }}</span>
       </div>
     </div>
 
@@ -72,26 +82,59 @@
         <col class="ic-col-6" />
       </colgroup>
       <tbody>
-        <!-- ── 委托方/制造方/生产方:每行「名称/地址」合并成一格(纸样三行,值跨后 5 列) ── -->
+        <!-- ── 委托方/制造方/生产方:每行「名称/地址」合并成一格(纸样三行,值跨后 5 列) ──
+             2026-11-17 纸样:名称格改成「□销售 □品质 □研发 □其他____」这类勾选(值写进原字段),
+             地址仍单独填;勾选值 = 该字段的中文值,「其他」时后面的横线可手填。 -->
         <tr v-for="row in PARTY_ROWS" :key="row.label">
           <th class="ic-lbl">{{ tt(row.label) }}</th>
           <td class="ic-cell" colspan="5">
             <div class="ic-party-line">
-              <template v-for="(key, ki) in row.keys" :key="key">
-                <el-input
-                  v-if="canEdit(key)"
-                  :model-value="headVal(key)"
-                  size="small"
-                  :class="['ic-input', ki === 0 ? 'ic-party-name' : 'ic-party-addr']"
-                  maxlength="200"
-                  :placeholder="tt(key)"
-                  @update:model-value="(v) => setHead(key, v)"
-                />
+              <template v-if="row.choices">
                 <span
-                  v-else
-                  :class="['ic-text', 'ic-party-text', ki === 0 ? 'ic-party-name' : 'ic-party-addr']"
-                >{{ headVal(key) }}</span>
+                  v-for="opt in row.choices"
+                  :key="opt"
+                  class="ic-opt ic-opt-inline"
+                  :class="{ 'is-clickable': canEdit(row.keys[0]) }"
+                  @click="pickChoice(row.keys[0], opt)"
+                >
+                  <span class="ic-box">{{ choiceBox(row.keys[0], opt) }}</span>
+                  <span class="ic-opt-text">{{ tt(opt) }}</span>
+                </span>
+                <span class="ic-fill ic-fill-party">
+                  <el-input
+                    v-if="canEdit(row.keys[0]) && isOtherActive(row.keys[0])"
+                    :model-value="headVal(row.keys[0])"
+                    size="small"
+                    class="ic-input ic-input-fill"
+                    maxlength="120"
+                    :placeholder="tt('请填写名称')"
+                    @update:model-value="(v) => setHead(row.keys[0], v)"
+                  />
+                  <span v-else-if="isCustomValue(row.keys[0])" class="ic-fill-text">{{ headVal(row.keys[0]) }}</span>
+                </span>
               </template>
+              <template v-else>
+                <el-input
+                  v-if="canEdit(row.keys[0])"
+                  :model-value="headVal(row.keys[0])"
+                  size="small"
+                  :class="['ic-input', 'ic-party-name']"
+                  maxlength="200"
+                  :placeholder="tt(row.keys[0])"
+                  @update:model-value="(v) => setHead(row.keys[0], v)"
+                />
+                <span v-else :class="['ic-text', 'ic-party-text', 'ic-party-name']">{{ headVal(row.keys[0]) }}</span>
+              </template>
+              <el-input
+                v-if="canEdit(row.keys[1])"
+                :model-value="headVal(row.keys[1])"
+                size="small"
+                :class="['ic-input', 'ic-party-addr']"
+                maxlength="300"
+                :placeholder="tt(row.keys[1])"
+                @update:model-value="(v) => setHead(row.keys[1], v)"
+              />
+              <span v-else :class="['ic-text', 'ic-party-text', 'ic-party-addr']">{{ headVal(row.keys[1]) }}</span>
             </div>
           </td>
         </tr>
@@ -99,10 +142,40 @@
         <!-- ── 联系人 / 联系电话（手机）/ E-mail(纸面列头印 E-mail,数据键仍是「邮箱」) ── -->
         <tr v-for="(rowDef, ri) in SIX_CELL_ROWS" :key="'ic-six-' + ri">
           <template v-for="c in rowDef" :key="c.key">
-            <th class="ic-lbl">{{ tt(c.title || c.key) }}</th>
+            <th class="ic-lbl">
+              {{ tt(c.title || c.key) }}<span v-if="isRequired(c.key)" class="ic-req">*</span>
+            </th>
             <td class="ic-cell">
+              <!-- 联系人(=送样人):纸样「拉选填」⇒ 有账号的人名下拉,可搜索;老姓名仍可手输 -->
+              <el-select
+                v-if="canEdit(c.key) && c.select && !contactDialogMode"
+                :model-value="headVal(c.key)"
+                size="small"
+                filterable
+                allow-create
+                default-first-option
+                clearable
+                class="ic-input ic-select-inline"
+                :placeholder="tt(c.title || c.key)"
+                @update:model-value="(v) => setHead(c.key, v)"
+              >
+                <el-option v-for="o in optionsOf(c.key)" :key="o" :label="o" :value="o" />
+              </el-select>
+              <!-- 人数超过阈值(2026-11-17 用户口径:>15 个账号)⇒ 改成弹窗查找,纸面只显示已选姓名 -->
+              <div v-else-if="canEdit(c.key) && c.select" class="ic-cat-line">
+                <span class="ic-text">{{ headVal(c.key) }}</span>
+                <el-button
+                  size="small"
+                  type="primary"
+                  plain
+                  class="ic-pick-btn no-print"
+                  @click="openContactPick"
+                >
+                  {{ tt('选择') }}
+                </el-button>
+              </div>
               <el-input
-                v-if="canEdit(c.key)"
+                v-else-if="canEdit(c.key)"
                 :model-value="headVal(c.key)"
                 size="small"
                 class="ic-input"
@@ -114,21 +187,30 @@
           </template>
         </tr>
 
-        <!-- ── 样品型号/规格 | 检验类别(值区 = 已选目录项目摘要 + 选择按钮) ── -->
+        <!-- ── 样品型号/规格(2026-11-17 纸样:改成单选类别 □滤芯 □水样 □电气类) | 检验类别(值区 = 已选目录项目摘要 + 选择按钮) ── -->
         <tr>
-          <th class="ic-lbl">{{ tt('样品型号/规格') }}</th>
+          <th class="ic-lbl">
+            {{ tt('样品型号/规格') }}<span v-if="isRequired('样品型号/规格')" class="ic-req">*</span>
+          </th>
           <td class="ic-cell" colspan="2">
-            <el-input
-              v-if="canEdit('样品型号/规格')"
-              :model-value="headVal('样品型号/规格')"
-              size="small"
-              class="ic-input"
-              maxlength="120"
-              @update:model-value="(v) => setHead('样品型号/规格', v)"
-            />
-            <span v-else class="ic-text">{{ headVal('样品型号/规格') }}</span>
+            <div class="ic-party-line">
+              <span
+                v-for="opt in SAMPLE_KINDS"
+                :key="opt"
+                class="ic-opt ic-opt-inline"
+                :class="{ 'is-clickable': canEdit('样品型号/规格') }"
+                @click="pickOne('样品型号/规格', opt)"
+              >
+                <span class="ic-box">{{ isPicked('样品型号/规格', opt) ? '■' : '□' }}</span>
+                <span class="ic-opt-text">{{ tt(opt) }}</span>
+              </span>
+              <!-- 老数据里的自由文本(具体型号/规格)原样显示:改单选不等于把历史值抹掉 -->
+              <span v-if="isCustomValue('样品型号/规格')" class="ic-fill-text">{{ headVal('样品型号/规格') }}</span>
+            </div>
           </td>
-          <th class="ic-lbl">{{ tt('检验类别') }}</th>
+          <th class="ic-lbl">
+            {{ tt('检验类别') }}<span v-if="isRequired('检验类别')" class="ic-req">*</span>
+          </th>
           <td class="ic-cell ic-cat-cell" colspan="2">
             <div class="ic-cat-line">
               <span class="ic-text">{{ headVal('检验类别') }}</span>
@@ -198,7 +280,7 @@
                 <tr>
                   <th>{{ tt('序号') }}</th>
                   <th>{{ tt('检测元素') }}</th>
-                  <th>{{ tt('内部检出限') }}</th>
+                  <th>{{ tt(limitKey) }}</th>
                   <th>{{ tt('检测误差') }}</th>
                   <th>{{ tt('测试方法') }}</th>
                   <th>{{ tt('测试周期') }}</th>
@@ -211,7 +293,7 @@
                 <tr v-for="(row, ri) in items" :key="rowKeyOf(row, ri)">
                   <td class="ic-items-no">{{ cell(row, '行号') || ri + 1 }}</td>
                   <td>{{ cell(row, '检测元素') }}</td>
-                  <td>{{ cell(row, '内部检出限') }}</td>
+                  <td>{{ limitOf(row) }}</td>
                   <td>{{ cell(row, '检测误差') }}</td>
                   <td>{{ cell(row, '测试方法') }}</td>
                   <td>{{ cell(row, '测试周期') }}</td>
@@ -226,7 +308,7 @@
             <div v-else class="ic-items-empty">{{ tt('尚未从送样登记表带入检验项目') }}</div>
 
             <div v-if="items.length" class="ic-items-total">
-              {{ tt('合计收费：') }}<span class="ic-items-total-val">{{ feeTotalText }}</span>
+              {{ tt('总金额（含增值税6%）RMB：') }}<span class="ic-items-total-val">{{ feeTotalText }}</span>
             </div>
           </td>
         </tr>
@@ -306,7 +388,7 @@
           </td>
         </tr>
 
-        <!-- ── 报告类型(2 选 1) ── -->
+        <!-- ── 报告类型(2026-11-17 纸样加「只要数据」⇒ 3 选 1) ── -->
         <tr>
           <th class="ic-lbl">{{ tt('报告类型') }}</th>
           <td class="ic-cell" colspan="5">
@@ -318,7 +400,7 @@
               @click="pickOne('报告类型', opt)"
             >
               <span class="ic-box">{{ isPicked('报告类型', opt) ? '■' : '□' }}</span>
-              <span class="ic-opt-text">{{ tt(oi === 0 ? '普通报告；' : 'CNAS 报告') }}</span>
+              <span class="ic-opt-text">{{ tt(opt) }}{{ oi < REPORT_OPTIONS.length - 1 ? '；' : '' }}</span>
             </span>
           </td>
         </tr>
@@ -433,7 +515,33 @@
     </div>
     <div class="ic-docno">{{ tt('YJ-QP-701-1-01 (00)') }}</div>
 
-    <!-- ⑤ 送样登记表目录弹窗(档案面板 SAMPLE_REG 的 44 行检测目录;确认后带入行表) -->
+    <!-- ⑤ 送样人(联系人)弹窗选择:人数超过阈值时用它替代下拉(2026-11-17 用户口径) -->
+    <el-dialog
+      v-model="contactPickOpen"
+      :title="tt('选择送样人')"
+      width="420px"
+      append-to-body
+      :close-on-click-modal="false"
+      class="ic-contact-dialog"
+    >
+      <el-input v-model="contactKeyword" :placeholder="tt('输入姓名搜索')" clearable />
+      <div class="ic-contact-list">
+        <div
+          v-for="o in contactPickOptions"
+          :key="o.value"
+          class="ic-contact-item"
+          :class="{ 'is-active': o.value === headVal('联系人') }"
+          @click="pickContact(o.value)"
+        >{{ o.label }}</div>
+        <el-empty v-if="!contactPickOptions.length" :description="tt('暂无匹配的人员')" :image-size="50" />
+      </div>
+      <template #footer>
+        <el-button @click="clearContact">{{ tt('清空') }}</el-button>
+        <el-button type="primary" @click="contactPickOpen = false">{{ tt('取消') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ⑥ 送样登记表目录弹窗(档案面板 SAMPLE_REG 的 44 行检测目录;确认后带入行表) -->
     <SampleCatalogPickDialog v-model="catalogOpen" @confirm="onCatalogConfirm" />
   </div>
 </template>
@@ -442,6 +550,7 @@
 import { computed, ref, watch } from 'vue'
 import { tt } from '@/i18n'
 import SampleCatalogPickDialog from './SampleCatalogPickDialog.vue'
+import { vatTotalText } from './inspCommissionVat'
 
 const props = defineProps({
   /** 当前单据(与首件/巡线/出厂检验同一口径:表头字段平铺 + detail.items 明细行) */
@@ -464,21 +573,32 @@ const bump = ref(0)
  *   制造商/地址      | 值(制造商 + 制造商地址)
  *   生产厂/地址      | 值(生产厂 + 生产厂地址)
  * 显示标签是合并文案(照 .doc 纸样),数据键仍是两个独立字段 —— 没有合并 SQL 列、没改 yj_field。
+ *
+ * 2026-11-17 新纸样:名称格变成「勾选框 + 其他可填」(用户口径:勾选值**写进原字段**):
+ *   委托单位 = □销售 □品质 □研发 □其他____ ;制造商/生产厂 = □银嘉 □其他____。
+ * 「其他」勾上后,后面的横线改成可输入的框,填的值直接落回同一列(不改数据键、不新增列)。
  */
 const PARTY_ROWS = [
-  { label: '委托单位/单位地址', keys: ['委托单位', '委托单位地址'] },
-  { label: '制造商/地址', keys: ['制造商', '制造商地址'] },
-  { label: '生产厂/地址', keys: ['生产厂', '生产厂地址'] },
+  { label: '委托单位/单位地址', keys: ['委托单位', '委托单位地址'], choices: ['销售', '品质', '研发', '其他'] },
+  { label: '制造商/地址', keys: ['制造商', '制造商地址'], choices: ['银嘉', '其他'] },
+  { label: '生产厂/地址', keys: ['生产厂', '生产厂地址'], choices: ['银嘉', '其他'] },
 ]
+
+/** 样品型号/规格 → 单选类别(2026-11-17 用户口径「替换型号/规格为单选类别」) */
+const SAMPLE_KINDS = ['滤芯', '水样', '电气类']
 
 /**
  * 纸面上的 6 格行(标签|值|标签|值|标签|值):
  *   联系人      | 值 | 联系电话（手机） | 值 | E-mail | 值
  *   样品名称    | 值 | 商标            | 值 | 样品数量 | 值
  * ⚠ E-mail 那格纸面列头印「E-mail」,但数据键仍是 yj_field.label「邮箱」(§3.3)。
+ *
+ * 2026-11-17 用户口径:「送样人进行选择填入嘛,直接带入有账号的人的姓名」
+ *   ⇒ 联系人 = **送样人**,纸面「拉选填」= 可搜索的人员下拉(选项 = 有账号的人名,由后端下发
+ *   field.options);`select: true` 表示该格用下拉渲染,其余格仍是无边框输入。
  */
 const SIX_CELL_ROWS = [
-  [{ key: '联系人' }, { key: '联系电话（手机）' }, { key: '邮箱', title: 'E-mail' }],
+  [{ key: '联系人', select: true }, { key: '联系电话（手机）' }, { key: '邮箱', title: 'E-mail' }],
   [{ key: '样品名称' }, { key: '商标' }, { key: '样品数量' }],
 ]
 
@@ -492,7 +612,8 @@ const HANDLE_OPTIONS = [
   {
     value: '委托单位自愿放弃',
     text: '2、委托单位自愿放弃；',
-    note: '（自发出检验报告之日起 45 日内不取样品，又未做任何说明的，视为委托单位自愿放弃样品，由检验机构对其进行处置）；',
+    // 2026-11-17 新纸样:45 日 → 10 日
+    note: '（自发出检验报告之日起 10 日内不取样品，又未做任何说明的，视为委托单位自愿放弃样品，由检验机构对其进行处置）；',
   },
   {
     value: '委托单位委托检验机构代办样品托运手续',
@@ -503,7 +624,8 @@ const HANDLE_OPTIONS = [
 
 /** 判定规则 / 报告类型 / 检验报告有效期(纸面单选;值 = 选中项中文文案) */
 const RULE_OPTIONS = ['按标准限值判定', '其他判定规则', '无需判定']
-const REPORT_OPTIONS = ['普通报告', 'CNAS 报告']
+/** 2026-11-17 新纸样:报告类型加「只要数据」 */
+const REPORT_OPTIONS = ['只要数据', '普通报告', 'CNAS报告']
 const VALIDITY_OPTIONS = ['长期有效', '规定有效期']
 /** 单选组清单(按数据键索引) —— 判当前选中项与「点谁写谁」都看这一份 */
 const PICK_GROUPS = {
@@ -511,14 +633,15 @@ const PICK_GROUPS = {
   判定规则: RULE_OPTIONS,
   报告类型: REPORT_OPTIONS,
   检验报告有效期: VALIDITY_OPTIONS,
+  '样品型号/规格': SAMPLE_KINDS,
 }
 
-/** 新建空单默认值(契约 §4.1;报告类型故意留空,由用户自己勾) */
-const DEFAULT_PICKS = [
-  ['样品处理方式', '委托单位自行取走'],
-  ['判定规则', '无需判定'],
-  ['检验报告有效期', '长期有效'],
-]
+/**
+ * 新建空单默认值(契约 §4.1;报告类型故意留空,由用户自己勾)。
+ * 2026-11-17:纸面不再预勾「样品处理方式」与「检验报告有效期」⇒ 只留判定规则
+ * (与 yj_panel.config 的 headDefaults 同口径,两边一起看)。
+ */
+const DEFAULT_PICKS = [['判定规则', '无需判定']]
 
 /* ───────────────────────── 明细行(从送样登记表带入的检验项目) ───────────────────────── */
 
@@ -526,6 +649,9 @@ const DEFAULT_PICKS = [
 const DETAIL_LABELS = [
   '行号',
   '检测元素',
+  '标准方法检出限',
+  // 并行任务(2026-11-17)把 SAMPLE_REG/行表的「内部检出限」改名为「标准方法检出限」:
+  // 两个键都认(带入时都带、显示时优先取有值的那一个),改名前后建的单都不会丢这一列。
   '内部检出限',
   '检测误差',
   '测试方法',
@@ -535,6 +661,31 @@ const DETAIL_LABELS = [
   '检测标准备注',
 ]
 /** 「收费」两个可能的键:label 是 收费（一个样/元）,物理列是 收费 —— 读两边都认 */
+/**
+ * 「检出限」的两个可能键(2026-11-17 并行任务把目录/行表的「内部检出限」改名为「标准方法检出限」):
+ * 显示时优先取行里真正有值的那个,表头文字跟着走 —— 改名前后建的单都不会出现空列。
+ */
+const LIMIT_KEYS = ['标准方法检出限', '内部检出限']
+
+/** 表头文字:先看行表里哪些行真有值,再退回 yj_field 里登记的名字 */
+const limitKey = computed(() => {
+  bump.value
+  const rows = items.value
+  for (const k of LIMIT_KEYS) {
+    if (rows.some((r) => String(r?.[k] ?? '').trim() !== '')) return k
+  }
+  return LIMIT_KEYS[0]
+})
+
+/** 一行里「检出限」的值(两个键都认) */
+function limitOf(row) {
+  for (const k of LIMIT_KEYS) {
+    const v = String(row?.[k] ?? '').trim()
+    if (v) return v
+  }
+  return ''
+}
+
 const FEE_KEYS = ['收费（一个样/元）', '收费']
 
 /** 明细行(只读取,不创建) */
@@ -592,12 +743,22 @@ function feeTextOf(row) {
   return ''
 }
 
-/** 合计收费 = 行表「收费」求和(两位小数) */
+/** 行表收费合计(净额;含税换算在 inspCommissionVat.js,金额口径有单测) */
 const feeTotal = computed(() => {
   bump.value
   return items.value.reduce((sum, row) => sum + feeOf(row), 0)
 })
-const feeTotalText = computed(() => feeTotal.value.toFixed(2))
+
+/** 一行行表 → 含税总金额文本(2026-11-16 用户口径:原基础上 +6%) */
+function vatTotalTextOf(rows) {
+  return vatTotalText(rows.reduce((sum, row) => sum + feeOf(row), 0))
+}
+
+/** 纸面显示值 = 含税总金额(不是净额) */
+const feeTotalText = computed(() => {
+  bump.value
+  return vatTotalTextOf(items.value)
+})
 
 /** 取某一列去重后的非空值(保持行表顺序) */
 function uniqueOf(rows, key) {
@@ -621,14 +782,15 @@ function renumber() {
 
 /**
  * 整份行表重算三处汇总(契约 §4.2 第 2~4 条,带入与删行后都要重算):
- *   检验类别 = 检测元素去重后「、」拼接;检验依据 = 检测标准去重后「；」拼接;合计收费 = 收费求和。
+ *   检验类别 = 检测元素去重后「、」拼接;检验依据 = 检测标准去重后「；」拼接;
+ *   合计收费 = 行表「收费」求和 × (1+6%)(2026-11-16 用户口径:总金额含增值税 6%)。
  * 只写这三格,用户手填的其它表头字段一律不动。
  */
 function recomputeSummary() {
   const arr = ensureItems()
   props.head['检验类别'] = uniqueOf(arr, '检测元素').join('、')
   props.head['检验依据'] = uniqueOf(arr, '检测标准').join('；')
-  props.head['合计收费'] = arr.reduce((sum, row) => sum + feeOf(row), 0).toFixed(2)
+  props.head['合计收费'] = vatTotalTextOf(arr)
 }
 
 /** 删除一行(纸样小表可编辑时每行末「×」) */
@@ -646,7 +808,7 @@ function removeItem(index) {
 /**
  * 带入:送样登记表目录弹窗确认后的行 → 追加进本单行表(契约 §4.2)。
  *   1. 按「检测元素」去重追加(已存在的不重复),行号重排 1..n;
- *   2. 检验类别 / 检验依据 / 合计收费 按整份行表重算;
+ *   2. 检验类别 / 检验依据 / 合计收费(含 6% 增值税) 按整份行表重算;
  *   3. emit('dirty') + bump++(行对象可能 markRaw)。
  */
 function applyCarry(rows) {
@@ -686,6 +848,67 @@ function isLocked(key) {
 /** 这一格能不能填:纸面可编辑 且 该字段没被登记成只读 */
 function canEdit(key) {
   return props.editable && !isLocked(key)
+}
+
+/**
+ * 必填标记(2026-11-17 用户口径:纸样上带**红色 *** 的即必填,截图 = 联系人/样品名称/
+ * 样品数量/样品型号/规格/检验类别)。
+ * 数据真源仍是 `yj_field.required`(后端 dataSchema 里叫 isRequired)—— 这里只做显示,
+ * 不写死清单:以后在字段管理里勾掉必填,纸面的 * 会一起消失(保存校验同源)。
+ */
+function isRequired(key) {
+  const f = (props.fields || []).find((x) => (x.dataName || x.name || x.code) === key)
+  if (!f) return false
+  return f.isRequired === true || f.required === true || Number(f.required) === 1
+}
+
+/**
+ * 该字段的下拉候选(2026-11-17:联系人=送样人,候选 = 有账号的人名)。
+ * 选项由后端按 `yj_field.dict_sql` 下发(dataSchema.fields[].options,可能带 label/value 包装);
+ * 取不到就返回空数组 —— 下拉仍可手输(allow-create),不会因为字典挂了填不了字。
+ */
+function optionsOf(key) {
+  const f = (props.fields || []).find((x) => (x.dataName || x.name || x.code) === key)
+  const raw = Array.isArray(f?.options) ? f.options : []
+  return raw.map((o) => (o && typeof o === 'object' ? (o.value ?? o.label ?? '') : o))
+    .filter((v) => v !== '' && v != null)
+}
+
+/**
+ * 送样人(联系人)选择控件双模(2026-11-17 用户口径:
+ * 「当前这个页面的检验人下拉框当账号超过 15 个后就变为弹窗查找的形式选择」):
+ *   · 账号 ≤ 15 ⇒ 纸面内联下拉(可搜索、可手输);
+ *   · 账号 > 15 ⇒ 纸面只显示已选姓名 + 「选择」按钮,点开**弹窗查找**(搜索框 + 名单),
+ *     弹窗里仍允许手输清单外的姓名(搜索词不在名单时列表头插一条「使用「xxx」」)。
+ * 阈值只影响这张纸面;通用表单页仍走全局面板阈值 `REF_DROPDOWN_THRESHOLD`(20)。
+ */
+const CONTACT_PICK_DIALOG_THRESHOLD = 15
+const contactDialogMode = computed(() => optionsOf('联系人').length > CONTACT_PICK_DIALOG_THRESHOLD)
+
+const contactPickOpen = ref(false)
+const contactKeyword = ref('')
+const contactPickOptions = computed(() => {
+  const base = optionsOf('联系人').map((v) => ({ value: v, label: v }))
+  const kw = contactKeyword.value.trim()
+  if (!kw) return base
+  const lower = kw.toLowerCase()
+  const hit = base.filter((o) => o.label.toLowerCase().includes(lower))
+  // 手输兜底:清单里没有就补一条「使用「xxx」」,历史姓名/新同事照样能填
+  if (!base.some((o) => o.label === kw)) hit.unshift({ value: kw, label: `${tt('使用')}「${kw}」` })
+  return hit
+})
+function openContactPick() {
+  if (!canEdit('联系人')) return
+  contactKeyword.value = ''
+  contactPickOpen.value = true
+}
+function pickContact(value) {
+  setHead('联系人', value)
+  contactPickOpen.value = false
+}
+function clearContact() {
+  setHead('联系人', '')
+  contactPickOpen.value = false
 }
 
 /** 表头取值 */
@@ -745,6 +968,56 @@ function pickOne(key, value) {
   setHead(key, value)
 }
 
+/* ───────── 勾选 + 「其他」手填(2026-11-17 纸样:委托单位/制造商/生产厂) ───────── */
+
+/** 空白差异不该让勾选框错位(老数据「CNAS 报告」vs 字典「CNAS报告」) */
+function squashText(s) {
+  return String(s ?? '').replace(/\s+/g, '')
+}
+
+/** 该字段的勾选清单(委托方三行的人文选项 + 单选组的通用清单) */
+function choicesOf(key) {
+  const row = PARTY_ROWS.find((r) => r.choices && r.keys[0] === key)
+  return row ? row.choices : (PICK_GROUPS[key] || [])
+}
+
+/** 当前值是不是「清单之外的自定义值」(老数据/手填名称) */
+function isCustomValue(key) {
+  const cur = headVal(key).trim()
+  if (!cur) return false
+  return !choicesOf(key).some((o) => squashText(o) === squashText(cur))
+}
+
+/** 本次刚点了「其他」(还没输入)—— 与「已有自定义值」合并判断 */
+const otherOn = ref({})
+function isOtherActive(key) {
+  if (otherOn.value[key] === true) return true
+  return choicesOf(key).includes('其他') && isCustomValue(key)
+}
+
+/** 勾选框 ■/□:「其他」看 isOtherActive,其余按值精确比 */
+function choiceBox(key, opt) {
+  if (opt === '其他') return isOtherActive(key) ? '■' : '□'
+  return squashText(headVal(key)) === squashText(opt) ? '■' : '□'
+}
+
+/** 点勾选:选具体项 ⇒ 值=该项;选「其他」⇒ 打开横线输入框并清掉原具体项 */
+function pickChoice(key, opt) {
+  if (!canEdit(key)) return
+  if (opt === '其他') {
+    otherOn.value[key] = true
+    if (!isCustomValue(key)) setHead(key, '')
+    return
+  }
+  otherOn.value[key] = false
+  setHead(key, opt)
+}
+
+/** 换单(编号变了)⇒「其他」的临时态归零,免得上一张单的输入框跟到下一张 */
+watch(() => String(props.head?.['单据编号'] || ''), () => {
+  otherOn.value = {}
+})
+
 /* ───────────────────────── 送样登记表目录弹窗 ───────────────────────── */
 
 const catalogOpen = ref(false)
@@ -797,6 +1070,21 @@ watch(
   () => props.editable + '|' + docKeyOf(),
   () => {
     seedDefaultsOnce()
+  },
+  { immediate: true },
+)
+
+/**
+ * 含税总金额回写表头(2026-11-16 用户口径:合计收费 = 行表收费合计 × (1+6%))。
+ * 纸面显示本来就按行表实时算,但库里的「合计收费」可能是旧口径(净额)⇒ 打开单据时按现行口径
+ * 静默重算一次,保证后续保存/打印/审批取到的是**含税总金额**;只写这一格,不改其它字段、不标脏。
+ */
+watch(
+  () => docKeyOf() + '|' + items.value.length,
+  () => {
+    if (!props.head || !items.value.length) return
+    const next = vatTotalTextOf(items.value)
+    if (String(props.head['合计收费'] ?? '') !== next) props.head['合计收费'] = next
   },
   { immediate: true },
 )
@@ -900,16 +1188,40 @@ watch(
   background: transparent;
   padding: 0 2px;
 }
+/* 联系人(送样人)下拉:与纸面其它输入框同观感 —— 透明底 + 一条下划线,别长成网页控件 */
+.ic-select-inline {
+  width: 100%;
+}
+.ic-select-inline :deep(.el-select__wrapper) {
+  box-shadow: none !important;
+  border-bottom: 1px solid #8a8a8a;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 2px;
+  min-height: 22px;
+}
 .ic-meta-no {
   flex: 1 1 auto;
   padding-left: 15.9%;
   white-space: nowrap;
-}
-.ic-meta-no-label {
+}.ic-meta-no-label {
   font-weight: 700;
 }
 .ic-meta-no-val {
   padding-left: 2px;
+}
+/* 必填标记:纸样红 *(2026-11-17 用户口径「用这个红色*即可」) */
+.ic-req {
+  color: #e60012;
+  font-weight: 700;
+  margin-left: 2px;
+  line-height: 1;
+}
+/* 编号可改(2026-11-17):只读态还是纸面的裸号,编辑态给一个下划线输入框 */
+.ic-meta-no-input {
+  width: 190px;
+  margin-left: 2px;
+  vertical-align: middle;
 }
 
 /* ── ③ 主表:6 列基准栅格(列宽 = 纸样实测 / 1054px) ──
@@ -1033,6 +1345,18 @@ watch(
 }
 .ic-party-text {
   width: auto;
+}
+/* 勾选「其他」后的横线:占剩余宽度,纸面上仍是下划线输入(2026-11-17) */
+.ic-fill-party {
+  flex: 0 1 26%;
+  min-width: 96px;
+}
+/* 三行名称格的勾选项不许被压成竖排(实测窄窗下「销售」会拆成「销 / 售」) */
+.ic-party-line .ic-opt {
+  flex: 0 0 auto;
+}
+.ic-party-line .ic-opt-text {
+  white-space: nowrap;
 }
 
 /* ── 检验类别格:摘要 + 「选择检验项目」按钮 ── */
@@ -1457,6 +1781,11 @@ watch(
   .ic-sheet .ic-items td {
     line-height: 1.45 !important;
   }
+  /* 送样人弹窗同理:打印时一律不印 */
+  .ic-contact-dialog,
+  .el-overlay:has(.ic-contact-dialog) {
+    display: none !important;
+  }
   /* 弹窗(append-to-body,不在 .portal 里)不跟着隐藏 ⇒ 开着弹窗按打印会印上去 */
   body.approval-printing .el-overlay,
   body.approval-printing .el-message-box__wrapper,
@@ -1472,4 +1801,30 @@ watch(
   @page {
     margin: 8mm;
   }
-}</style>
+}
+/* 送样人弹窗(2026-11-17:账号 >15 时用弹窗查找替代纸面下拉;append-to-body ⇒ 只能写全局) */
+.ic-contact-list {
+  margin-top: 10px;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+}
+.ic-contact-item {
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  border-bottom: 1px solid #f2f3f5;
+}
+.ic-contact-item:last-child {
+  border-bottom: none;
+}
+.ic-contact-item:hover {
+  background: #f5f7fa;
+}
+.ic-contact-item.is-active {
+  color: #2f6fed;
+  font-weight: 600;
+  background: #eef3ff;
+}
+</style>

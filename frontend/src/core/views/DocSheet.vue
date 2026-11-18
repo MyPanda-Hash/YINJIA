@@ -32,7 +32,11 @@
       <div class="as-company">惠州市银嘉环保科技有限公司</div>
       <!-- 表格式纸面(样品申请单 layout:'grid'):编号在信息条里(模板 row2 第一格),顶栏不再重复一格 -->
       <div v-if="!isGrid" class="as-docno">
-        <div v-if="editable && isRefKey('文档编号')" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
+        <!-- 2026-11-17 用户口径（1117问题 #2）：右上角那格改印**受控文件编号**（YJ-QR-155/156），
+             与产品文件那批同款；原本挂在这一格的「项目编号」参照控件下移到信息表
+             「立项编号」行（两处同一个数据键『文档编号』，ADR-0001 不动数据键 ⇒ 下游零影响）。 -->
+        <template v-if="docnoStatic"><span class="as-docno-static">{{ tt('文件编号') }}：{{ docnoStatic }}</span></template>
+        <div v-else-if="editable && isRefKey('文档编号')" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
           <span class="as-ref-text" :class="{ 'is-empty': !head['文档编号'] }">{{ head['文档编号'] || tt(docnoLabelText) }}</span>
           <el-icon class="as-ref-ico"><Search /></el-icon>
         </div>
@@ -174,7 +178,9 @@
               />
               <el-select
                 v-else-if="editable && c.kind === 'select'" v-model="row[c.key]" size="small"
-                class="as-cell-input sg-cell-input" :clearable="false" @change="emit('dirty')"
+                class="as-cell-input sg-cell-input"
+                :class="c.key === '样品状态' ? ('st-' + stateTone(row[c.key])) : ''"
+                :clearable="false" @change="emit('dirty')"
               >
                 <el-option v-for="o in (c.options || [])" :key="o" :label="tt(o)" :value="o" />
               </el-select>
@@ -198,6 +204,10 @@
                 :maxlength="c.max || 500" :rows="gridTextRows" resize="none"
                 class="as-fill-input sg-cell-area" :placeholder="c.hint ? tt(c.hint) : ''" @input="emit('dirty')"
               />
+              <!-- 样品状态底色（2026-11-17 用户口径，Excel #4）：
+                   「状态下拉描述：待确认（填充红色）/ 已确认（黄色）/ 已安排（黄色）/ 已完成（绿色）」。
+                   只读态给带底色的胶囊；编辑态仍是 el-select（下拉里给色块会干扰选择）。 -->
+              <span v-else-if="c.key === '样品状态' && row[c.key]" class="sg-state" :class="'st-' + stateTone(row[c.key])">{{ tt(row[c.key]) }}</span>
               <span v-else class="sg-ro">{{ row[c.key] || '' }}</span>
             </td>
           </tr>
@@ -440,7 +450,24 @@
                 />
                 <span v-else>{{ head[row.signKey || '填写人'] || '' }}</span>
               </span>
-              <span class="q-sign-date">{{ tt('日期') }}：　　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</span>
+              <!-- 章节行签名日期:2026-11-17 补 dateKey 支持(紧急放行申请单「一．紧急放行原因」的
+                   「责任人 / 日期」两格要求**系统自动生成**)。与 dept 行同一套渲染:
+                   配了 dateKey 且可编辑 = 三格手填;配了 dateKey 但字段只读(yj_field.editable=0)
+                   = 只显示值(自动生成的值不给改);没配 dateKey = 纸面空白「年 月 日」。 -->
+              <span class="q-sign-date">
+                <template v-if="row.dateKey && editable && !dateKeyLocked(row)">
+                  {{ tt('日期') }}：<el-input class="as-cell-input q-date-in q-dy" size="small" :model-value="datePart(row.dateKey, 'y')" @update:model-value="v => setDatePart(row.dateKey, 'y', v)" />
+                  {{ tt('年') }}
+                  <el-input class="as-cell-input q-date-in q-dm" size="small" :model-value="datePart(row.dateKey, 'm')" @update:model-value="v => setDatePart(row.dateKey, 'm', v)" />
+                  {{ tt('月') }}
+                  <el-input class="as-cell-input q-date-in q-dm" size="small" :model-value="datePart(row.dateKey, 'd')" @update:model-value="v => setDatePart(row.dateKey, 'd', v)" />
+                  {{ tt('日') }}
+                </template>
+                <template v-else-if="row.dateKey && head[row.dateKey]">
+                  {{ tt('日期') }}：{{ datePart(row.dateKey, 'y') }} {{ tt('年') }} {{ datePart(row.dateKey, 'm') }} {{ tt('月') }} {{ datePart(row.dateKey, 'd') }} {{ tt('日') }}
+                </template>
+                <template v-else>{{ tt('日期') }}：　　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</template>
+              </span>
             </div>
           </div>
         </div>
@@ -622,7 +649,7 @@
           <div class="as-fill">
             <template v-for="(ph, pi) in row.phases" :key="ph.key">
               <div
-                v-if="!phaseHidden[pi]"
+                v-if="phaseVisible(pi, ph.num)"
                 class="as-phase"
                 :class="{ 'as-phase-done': head[ph.key + '_实际完成'] }"
                 :data-filled="hasPhaseContent(head, ph.num) ? '1' : '0'"
@@ -698,8 +725,13 @@
                     </div>
                   </div>
                 </div>
-                <!-- 完成按钮:五行最下边;附「申请终止」(阶段处终止,二级审批;无在途/已落实终止时可用) -->
-                <div v-if="canStageComplete && head[ph.key + '_计划内容']" class="as-phase-footer">
+                <!-- 完成按钮:五行最下边;附「申请终止」(阶段处终止,二级审批;无在途/已落实终止时可用)
+                     ⚠ 判据必须用 hasPhaseContent(5 字段任一非空)，不能只认「计划内容」（2026-11-17 用户报障
+                     「有人反应说找不到终止按钮这些了」）。原写法 `head[ph.key + '_计划内容']` 要求**恰好这一格**
+                     非空：生产实测 LXB-2026-11-0001 的阶段 2/3 填了「计划开始/计划完成」但「计划内容」留空
+                     ⇒ 完成 + 申请终止 两颗按钮**整条消失**，而且界面上没有任何提示，用户只能报"按钮不见了"。
+                     同文件第 634 行的 data-filled 早就在用 hasPhaseContent —— 两处口径本就该一致。 -->
+                <div v-if="canStageComplete && hasPhaseContent(head, ph.num)" class="as-phase-footer">
                   <el-button v-if="!head[ph.key + '_实际完成']" type="success" size="small" :loading="stageLoading === ph.num" @click.stop="doStageComplete(ph.num)">
                     {{ tt('完成') }}
                   </el-button>
@@ -709,7 +741,7 @@
                 </div>
               </div>
             </template>
-            <div v-if="Object.values(phaseHidden).filter(Boolean).length" class="as-phase-restore" @click.stop="phaseHidden = {}">
+            <div v-if="hiddenPhaseCount" class="as-phase-restore" @click.stop="phaseHidden = {}; showAllPhases = true">
               {{ tt('显示全部') }}（{{ row.phases.length }}）
             </div>
           </div>
@@ -975,6 +1007,23 @@ const canStageComplete = computed(() => !props.editable && props.audited && prop
 const isGrid = computed(() => props.config?.layout === 'grid')
 const gridCfg = computed(() => props.config?.grid || {})
 const gridInfo = computed(() => props.config?.info || [])
+/**
+ * 样品状态 → 底色档位（2026-11-17 用户口径，Excel #4）。
+ *
+ * <p>用户原话：「状态下拉描述：样品状态选择后对样品状态的底色填充要求：
+ *   一待确认（填充红色）/ 二已确认（黄色）/ 三已安排（黄色）/ 四已完成（绿色）」。</p>
+ *
+ * <p>三档而不是四档：已确认与已安排**同为黄色**（用户就是这么给的）；
+ * 未知/空值落到 none（灰），不猜颜色。</p>
+ */
+function stateTone(v) {
+  const t = String(v ?? '').trim()
+  if (t === '待确认') return 'red'
+  if (t === '已确认' || t === '已安排') return 'yellow'
+  if (t === '已完成') return 'green'
+  return 'none'
+}
+
 const gridCols = computed(() => gridCfg.value.cols || [])
 const gridW = computed(() => gridCols.value.reduce((s, c) => s + (c.w || 0), 0))
 const gridInfoH = computed(() => gridCfg.value.infoH || 48)
@@ -1088,6 +1137,8 @@ function removeGridRow(idx) {
  * 判定表在 docSheetConfigs.docnoLabel(可单测);未登记的面板回空串 ⇒ 仍显示「文档编号：」。
  * 已带冒号,模板里直接 `tt(docnoLabelText)` 取译名。
  */
+/** 纸面右上角固定文件编号（config.docnoStatic）；空 = 仍走原来的「项目编号/文档编号」参照格 */
+const docnoStatic = computed(() => String(props.config?.docnoStatic || ''))
 const docnoLabelText = computed(() => {
   const lb = docnoLabel(props.panelCode)
   return lb ? lb + '：' : '文档编号：'
@@ -1264,6 +1315,33 @@ async function doTermAction(buttonName) {
 
 // 阶段框显示状态(本地视图;导出/打印按当前实际显示渲染)
 const phaseHidden = reactive({})
+/**
+ * 「显示全部」临时开关（2026-11-17 用户报障：「阶段隐藏后保存，审核人打开还是可以看到多个阶段」）。
+ *
+ * 根因：`phaseHidden` 只是组件内的 reactive，**从不落库**，审核人/重新打开时自然回到"全显示"。
+ *
+ * 改法不引入新库字段，改为**按数据推导**：
+ *   · 可编辑态（填单/草稿）→ 10 个阶段框全显示（否则没法填空白阶段）；
+ *   · 只读态（已审核/已归档，审批人看到的就是这一态）→ **只显示填过内容的阶段**，
+ *     与纸面 hasPhaseContent 同口径（计划内容/计划开始/计划完成/责任人/实际完成 任一非空）。
+ *   这样"隐藏未使用阶段"这件事变成数据事实，谁打开都一致，保存/刷新不会丢。
+ *   仍保留手动「隐藏」按钮（本地临时收起）与「显示全部」复原。
+ */
+const showAllPhases = ref(false)
+/** 某阶段框是否显示：手动隐藏 > 显示全部 > 只读态按是否有内容 > 可编辑态全显示 */
+function phaseVisible(pi, num) {
+  if (phaseHidden[pi]) return false
+  if (showAllPhases.value) return true
+  if (props.editable) return true
+  return hasPhaseContent(props.head || {}, num)
+}
+/** 当前被收起的阶段数（用于底部「显示全部（n）」提示） */
+const hiddenPhaseCount = computed(() => {
+  const rows = (props.config?.rows || []).filter((r) => r && r.kind === 'phases')
+  if (!rows.length) return 0
+  const phases = rows[0].phases || []
+  return phases.filter((ph, pi) => !phaseVisible(pi, ph.num)).length
+})
 
 const fieldMap = computed(() => new Map(props.fields.map((f) => [f.dataName || f.code, f])))
 /** 字段级只读(元数据 editable=0 → readonly):文书锁定字段(申请立项人/负责人)按纯文本显示,不可改 */
@@ -1296,6 +1374,21 @@ function autoRowsOf(row) {
 function signKeyLocked(c) {
   const key = (c && c.signKey) || '填写人'
   return !!(fieldMap.value.get(key) || {}).readonly
+}
+
+/**
+ * 签名行「日期」格的字段级只读(2026-11-17)。
+ *
+ * 与 {@link signKeyLocked} 同一口径:签名日期绑的字段(yj_field)元数据只读 ⇒ 只显示值、不给编辑。
+ * 起因:紧急放行申请单「一．紧急放行原因」的责任人/日期要求**系统自动生成**(建单人 + 建单日),
+ * 那两个字段已置 editable=0;若这里仍按 sheet 级 editable 渲染输入框,用户会以为能手填而实际存不进去。
+ * 未登记 dateKey 的签名行不受影响(照旧走纸面空白「年 月 日」)。
+ */
+function dateKeyLocked(c) {
+  const key = c && c.dateKey
+  if (!key) return false
+  const f = fieldMap.value.get(key)
+  return !!(f && f.readonly)
 }
 
 /**
@@ -1389,6 +1482,40 @@ function applyApprovalDocNo(source) {
   for (const k of CODE_KEYS) {
     const v = source?.[k]
     if (v !== undefined && v !== null && String(v).trim() !== '') { code = String(v).trim(); break }
+  }
+  // 2026-11-17 修（用户口径「这个项目编号在选择客户的时候自己根据规则带入」）：
+  //   上一步在**正式环境永远取不到值** —— 客户参照（RD_APPROVAL.客户名）的 ref_field 是 `mc`，
+  //   回填的是**客户名**本身，既没有「客户编码」列也没有 dm 列 ⇒ code 恒为空 ⇒ 立项编号一直空白。
+  //   而用户口径明确：**客户名里已含编码**（如「B-85-06 青岛伊可普」）⇒ 从名字开头把编码抠出来。
+  //   只认 ASCII 开头的编码段（字母/数字/连字符/下划线/点）；纯中文客户名抠不出编码就**不填**，
+  //   绝不拿中文当编码拼接。
+  if (!code) {
+    const NAME_KEYS = ['客户名', '客户名称', 'mc']
+    // ⚠ 编码位置**不固定**，必须全串扫，不能只看开头：
+    //   用户给的例子是「B-85-06 青岛伊可普」（编码在前），
+    //   而生产实测（2026-11-17 ego 选客户）是「浙江德凌电器有限公司 A-60 跟单客户 18658439031 …」
+    //   —— 编码在**中文名之后**。只看开头永远抠不到 ⇒ 立项编号仍旧空白。
+    // 规则：字母段(1-4) + 连字符 + 数字开头，后面可继续接字母/数字/连字符。
+    //   这样 B-85-06 / A-60 / C-112 都能命中；纯数字手机号 18658439031、中文都不会误命中。
+    const CODE_IN_NAME = /[A-Za-z]{1,4}-[0-9][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*/
+    for (const k of NAME_KEYS) {
+      const name = source?.[k]
+      if (name === undefined || name === null) continue
+      const m = String(name).match(CODE_IN_NAME)
+      if (m && m[0]) { code = m[0]; break }
+    }
+    // 最后兜底：**扫这一行的所有字段值**。
+    //   客户参照行的键名不可靠 —— 实测弹窗里明明有一列值是 `A-60`，
+    //   但按「客户编码 / dm / 客户名称…」逐个取名都落空（行对象键名与列标题不一定同名），
+    //   于是 app 侧永远算不出编码 ⇒ 立项编号空白。扫值则与键名无关，命中率最高。
+    //   只认「字母段+连字符+数字」形态，手机号/纯中文不会误命中。
+    if (!code) {
+      for (const v of Object.values(source || {})) {
+        if (v === null || v === undefined) continue
+        const m = String(v).match(CODE_IN_NAME)
+        if (m && m[0]) { code = m[0]; break }
+      }
+    }
   }
   if (!code) return
   const d = new Date()
@@ -1539,6 +1666,27 @@ defineExpose({ focusField })
   padding: 0 2px;
 }
 .sg-table .sg-cell-date { width: 100%; }
+/* 样品状态底色（2026-11-17，Excel #4）：待确认红 / 已确认·已安排黄 / 已完成绿。
+   取设计库语义色：error-1 #fff1f0·error-6 #cf1322 / warning-1 #fffbe6·warning-6 #d48806 /
+   success-1 #f6ffed·success-6 #389e0d；只读态给胶囊，编辑态给输入框描边+浅底。 */
+.sg-state {
+  display: inline-block;
+  min-width: 52px;
+  padding: 0 8px;
+  line-height: 20px;
+  border-radius: 10px;
+  font-size: 12px;
+  text-align: center;
+  border: 1px solid transparent;
+}
+.sg-state.st-red { color: #cf1322; background: #fff1f0; border-color: #ffa39e; }
+.sg-state.st-yellow { color: #d48806; background: #fffbe6; border-color: #ffe58f; }
+.sg-state.st-green { color: #389e0d; background: #f6ffed; border-color: #b7eb8f; }
+.sg-state.st-none { color: rgba(0, 0, 0, 0.45); background: #fafafa; border-color: #f0f0f0; }
+/* 编辑态：给 el-select 套同样的浅底（描边由组件自己画，只染底色避免打架） */
+.sg-cell-input.st-red { background: #fff1f0; border-radius: 4px; }
+.sg-cell-input.st-yellow { background: #fffbe6; border-radius: 4px; }
+.sg-cell-input.st-green { background: #f6ffed; border-radius: 4px; }
 .sg-ro {
   display: block;
   font-size: 13px;
@@ -1730,6 +1878,15 @@ defineExpose({ focusField })
 }
 .as-docno-input {
   width: 130px;
+}
+/* 右上角固定文件编号（YJ-QR-155/156）：斜体、右对齐、不可点（不是输入框，也不弹参照）。
+   2026-11-17 用户口径：「立项申请和项目实施计划的文件编号是红色的，改为黑色」——
+   原设 #b00（照产品文件那批受控编号的红字观感），改回纸面正文色 #333。
+   只改这两张文书（.as-docno 系列只存在于 DocSheet），不影响产品文件的红色编号。 */
+.as-docno-static {
+  white-space: nowrap;
+  color: #333;
+  font-weight: 600;
 }
 /* 参照单元格(文档编号 -> 立项申请右上角编号):拟态输入框,点击弹参照 */
 .as-ref-ctl {
@@ -2067,9 +2224,16 @@ defineExpose({ focusField })
 .as-fill-multi {
   padding: 0 6px;
 }
+/* ⚠ 2026-11-18 修「项目实施计划·测试方案 三子区文字重叠」（用户报障截图：
+   测试方法的长文本压住了「测试标准：150字」那一行）。
+   原写法 `flex:1; min-height:0` ⇒ 三块**等分**行高（h:160 ⇒ 每块 ~53px），
+   而只读文本 `.as-ro-text` 没有溢出约束 ⇒ 长文本直接溢出格子、盖住下一块。
+   改为**按内容自然高度**（flex:0 0 auto）+ 与等分时相当的最小高度：
+   · 内容短 ⇒ 三块仍各占 ~52px，版式与设计一致（行内 min-height 160 兜住）；
+   · 内容长 ⇒ 该块自己长高，把整行撑开（.as-row 是 min-height，不会被裁切、也不再重叠）。 */
 .as-sub {
-  flex: 1;
-  min-height: 0;
+  flex: 0 0 auto;
+  min-height: 52px;
   display: flex;
   flex-direction: column;
   padding: 2px 4px;

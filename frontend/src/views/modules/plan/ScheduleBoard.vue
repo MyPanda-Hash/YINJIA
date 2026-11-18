@@ -48,8 +48,10 @@
           ? tt('已按生产工单页勾选收敛为本批（可多选后点「批量排产」）')
           : tt('勾选一张工单 → 点「排产」→ 按工艺路线逐道选线(双击行同效)') }}</span>
       </div>
+      <!-- 点整行即勾选(2026-11-17 用户口径「不需要只选择一定要点那个小方框,而是可以点击这一行来选择」):
+           row-click 翻转勾选(判据 business/rowSelect.js);双击行 = 直接排产(原有快捷键保留)。 -->
       <el-table ref="poolTable" :data="pool" size="small" border height="300" empty-text="" row-key="rowKey"
-                @selection-change="onCheck" @row-dblclick="planOne">
+                @selection-change="onCheck" @row-click="onPoolRowClick" @row-dblclick="planOne">
         <el-table-column type="selection" width="42" reserve-selection />
         <el-table-column :label="tt('客户')" prop="客户" min-width="150" fixed show-overflow-tooltip />
         <el-table-column :label="tt('客户订单号')" prop="客户订单号" width="140" show-overflow-tooltip />
@@ -104,8 +106,9 @@
         <el-button v-if="todayFiltering" size="small" link type="primary" @click="clearTodayFilter">{{ tt('清空筛选') }}</el-button>
       </div>
       <!-- row-key 必须**唯一到行**(2026-10-07 修:此前用 加工单号 ⇒ 同一工单多行时勾一条会全勾) -->
+      <!-- 点整行即勾选(2026-11-17,同①):撤销排产/预排线都按勾选行执行,不必先点小方框 -->
       <el-table ref="todayTable" :data="filteredToday" size="small" border height="240" empty-text="" row-key="rowKey"
-                @selection-change="onCheckToday">
+                @selection-change="onCheckToday" @row-click="onTodayRowClick">
         <el-table-column type="selection" width="42" />
         <el-table-column :label="tt('生产线')" prop="生产线" width="110" fixed />
         <el-table-column :label="tt('排产班组')" prop="排产班组" width="100" fixed />
@@ -162,6 +165,7 @@ import { canDo, canDoAny } from '@core/auth/panelAccess'
 import ProcessRoutePlanDialog from './ProcessRoutePlanDialog.vue'
 import ScheduleBatchDialog from './ScheduleBatchDialog.vue'
 import { filterScheduled, isFiltering } from '@/business/scheduleFilter'
+import { toggleRowOnRowClick } from '@/business/rowSelect'
 
 /**
  * 页面级权限(2026-10-16):本组件**两处挂载** —— 快速排产页(/prod/plan/scheduleBoard)与其
@@ -203,6 +207,9 @@ const loading = ref(false)
 const pool = ref([])
 const checked = ref([])
 const poolTable = ref(null)
+/** ② 已排产表的 ref(2026-11-17 补声明:onTodayFilter 里早就在用它 clearSelection,
+ *  但一直是"未声明标识符" ⇒ 改筛选/清空筛选一走就 ReferenceError;顺带给行点击翻勾选用) */
+const todayTable = ref(null)
 const todayRows = ref([])
 const checkedToday = ref([])
 const allMode = ref(false)
@@ -315,6 +322,19 @@ async function loadToday() {
 function loadAll() { loadPool(); loadStats(); loadToday() }
 function onCheck(r) { checked.value = r }
 function onCheckToday(r) { checkedToday.value = r }
+
+/**
+ * 点整行 = 勾选/取消勾选(2026-11-17 用户口径「不需要只选择一定要点那个小方框,而是可以点击这一行来选择」)。
+ * <p>① 待排产池与 ② 已排产两张表同口径,判据在 @/business/rowSelect.js(点复选框自己那一下不重复处理)。
+ * 翻转走 el-table 的 toggleRowSelection —— ① 开了 reserve-selection 跨页保留勾选,另存数组会打架。</p>
+ * <p>① 还留着「双击行 = 排产」:双击是两次 row-click ⇒ 只会翻回原状(净效果不变),随后照常开排线弹窗。</p>
+ */
+function onPoolRowClick(row, column, event) {
+  toggleRowOnRowClick(poolTable.value, row, event)
+}
+function onTodayRowClick(row, column, event) {
+  toggleRowOnRowClick(todayTable.value, row, event)
+}
 
 // ───────── ② 已排产 的本地筛选(2026-10-28) ─────────
 // 用户口径:「除去「全部」这个筛选外,还需要增加其他筛选实现 —— 增加模糊搜索查看当前的已排产内容」。

@@ -45,7 +45,10 @@ test('审批通过弹窗同时承担定级与分发对接人（唯一入口）',
   const dlg = panelx.slice(start, end)
   assert.ok(dlg.length > 200, '找不到审批通过弹窗')
   assert.match(dlg, /apvLevel/, '弹窗里要有项目等级')
-  assert.match(dlg, /apvLiaison/, '弹窗里要有对接人')
+  // 2026-11-17（1117问题 #3）：对接人改为**固定文本**（陈秀丽），弹窗里不再有 apvLiaison 下拉控件；
+  //   值仍由 script 的 apvLiaison 提交，故下面继续校验载荷。
+  assert.match(dlg, /dq-fixed/, '弹窗里要有对接人（固定展示）')
+  assert.match(dlg, /陈秀丽/, '固定对接人是陈秀丽')
   // 提交时的载荷在 script 里（不在弹窗模板里）
   assert.match(panelx, /对接人: apvLiaison\.value/, '对接人要随 formData 发出去')
 })

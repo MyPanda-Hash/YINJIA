@@ -42,7 +42,12 @@ export function flowStepsOf(row) {
     docNo: String(row['单据编号'] || ''),
     // 处理人（2026-11-11 用户口径）：产品信息表 = **填写并提交审批的人**；
     // 规格书 = 产品信息表的二级负责人；成型/组装/出货 = 签核后分发给该文件的负责人。
+    // ⚠ 2026-11-17 用户口径「去掉处理人，只留单号 + 状态 + 日期」⇒ 界面不再显示 owner。
+    //   字段保留：后端仍在算（别的视图/导出会用到），只是本页不渲染。
     owner: String(row['填写人'] || ''),
+    // 最后操作时间（2026-11-17 用户口径「每个都显示处理的日期」）：后端 yyyy-MM-dd HH:mm，
+    // 取不到就是空串 ⇒ 界面显示「—」，不编造。
+    at: String(row.at || ''),
     state: String(row.state || ''),
     tone: String(row.state || '') === '已归档' ? STEP_STATE.done
       : (String(row.state || '').trim() && String(row.state) !== '草稿' ? STEP_STATE.doing : STEP_STATE.none),
@@ -53,6 +58,7 @@ export function flowStepsOf(row) {
     label: String(n.label || n.panel || ''),
     docNo: String(n.docNo || ''),
     owner: String(n.owner || ''),
+    at: String(n.at || ''),
     state: String(n.state || ''),
     tone: stepStateOf(n),
     reaudited: !!n.reaudited,
@@ -93,7 +99,10 @@ export function flowStatusOf(row) {
 }
 
 export function flowKpisOf(rows) {
-  const list = (Array.isArray(rows) ? rows : []).filter((r) => String(r?.['产品编号'] || '').trim() !== '')
+  // ⚠ 2026-11-17:「产品数」的口径必须与列表**同一份行**——两者都只要求"单据编号或产品编号有一个"
+  //   (新建的产品信息表还没填产品编号)。此前这里单看产品编号 ⇒ 列表 3 行、KPI 写 2 的产品数矛盾。
+  const list = (Array.isArray(rows) ? rows : []).filter((r) => String(r?.['产品编号'] || '').trim() !== ''
+    || String(r?.['单据编号'] || '').trim() !== '')
   let done = 0
   let doing = 0
   let none = 0
@@ -116,5 +125,73 @@ export function filterFlowRows(rows, keyword, onlyOpen = false) {
     if (!kw) return true
     const hay = `${r?.['产品编号'] ?? ''} ${r?.['产品名称'] ?? ''} ${r?.['立项文档编号'] ?? ''}`.toLowerCase()
     return hay.includes(kw)
+  })
+}
+
+/* ═════════ 与「项目流程管控」(ProjectFlow.vue)对齐的展示口径 · 2026-11-17 ═════════
+ * 用户口径:「产品文件流程管控的格式可以按照项目流程管控的格式进行参考设计」。
+ * 参考实现把「状态标签/当前环节/展开行信息区」的口径都放在纯函数里,页面只负责画 ——
+ * 这里照做,避免两页各写一套判定(判定一漂,同一张单在两条流程里说法就不一样)。
+ */
+
+const STEP_LABEL = {
+  done: '已完成',
+  doing: '进行中',
+  none: '未开始',
+}
+
+/**
+ * 步骤的**状态文案**(el-tag 里显示的那三个字)。
+ *
+ * <p>归一成三档、不直接显示单据状态原文:ProductFlow 原先 `st.state` 会原样吐出「草稿」,
+ * 而 ProjectFlow 那一列一直是「已完成/进行中/未开始」。两页并排看就露馅,故统一走这里。</p>
+ *
+ * @param {{tone?: string}} step flowStepsOf() 产出的步骤
+ * @returns {'已完成'|'进行中'|'未开始'}
+ */
+export function stateLabelOf(step) {
+  const tone = String(step?.tone || STEP_STATE.none)
+  return STEP_LABEL[tone] || STEP_LABEL.none
+}
+
+/**
+ * 「当前环节」= 第一个没完成的步骤(与 nextStepOf 同一个判定,但多给一个**第几步**)。
+ *
+ * <p>ProjectFlow 的「当前环节」列显示成 `3/10 环节名`,这边是 `2/5 成型工艺清单`。
+ * 全部完成返回 null(界面显示「已完成」)。</p>
+ *
+ * @param {Array} steps flowStepsOf() 的结果
+ * @returns {{index: number, step: object, text: string}|null} index 是 1 起的序号
+ */
+export function currentStepOf(steps) {
+  const list = Array.isArray(steps) ? steps : []
+  const i = list.findIndex((s) => s.tone !== STEP_STATE.done)
+  if (i < 0) return null
+  return { index: i + 1, step: list[i], text: `${i + 1}/${list.length}` }
+}
+
+/** 展开行底部的「单据信息」项(与 ProjectFlow 的 pf-meta 同构:label + value 成对) */
+const DOC_META_FIELDS = [
+  { label: '产品编号', pick: (r) => r?.['产品编号'] },
+  { label: '产品名称', pick: (r) => r?.['产品名称'] },
+  { label: '立项文档编号', pick: (r) => r?.['立项文档编号'] },
+  // 「产品信息表单号」= 这张开发包对应产品信息表的**单据编号**(PI-…),
+  // 与第一列表头那个「产品编号」(A-54-08 这种业务编号)是两回事,别混。
+  { label: '产品信息表单号', pick: (r) => r?.['单据编号'] },
+  { label: '最后动作', pick: (r) => r?.at },
+]
+
+/**
+ * 展开行信息区:与 ProjectFlow 的 `dl.pf-meta` 同一形态(5 项 label/value)。
+ * 空值统一给「-」(参考实现是 `|| '-'`,不显示 undefined/空串)。
+ *
+ * @param {Record<string, any>|null} row /px/rdDevOverview 的一行
+ * @returns {Array<{label: string, value: string}>}
+ */
+export function docMetaOf(row) {
+  return DOC_META_FIELDS.map((f) => {
+    const v = f.pick(row)
+    const s = v === undefined || v === null ? '' : String(v).trim()
+    return { label: f.label, value: s || '-' }
   })
 }

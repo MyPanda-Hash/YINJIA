@@ -71,6 +71,22 @@ public final class PagePanelRegistry {
      */
     public static final String QC_FLOW = "QC_FLOW";
     /**
+     * 样品检验汇总表(2026-11-17,用户口径:「为当前的样品检验增加汇总表,能够查看到一天或者一周,
+     *   送好多个样品,测试啥的总表。要按一个时间范围,去导出有多少人送了啥样品测试啥,安排检测工作。」)。
+     *
+     * <p>一行/一个视角回答三个问题:① 时间范围内**谁送了几单**(按送样人);
+     * ② 每单**送了什么样品、要测哪些项目**(按委托单);③ 导出 Excel 拿去做检测排班。
+     * 数据 = 检验委托单头 {@code qc_insp_commission_head} × 行 {@code qc_insp_commission_detail}
+     * 现算(状态真源 {@code yj_doc_status},与 QC_FLOW/列表页同一口径),见 {@link InspSummaryService}。
+     *
+     * <p>页面 = {@code views/modules/qc/InspSummary.vue},**不是** yj_panel 单据面板
+     * (它是"查询/汇总/导出"页,不承载单据)⇒ 页面级虚拟面板,授权落 {@code yj_role_panel};
+     * 动作 = 可见 / 查询 / 导出(导出由后端 POI 生成「送检信息汇总表」,含 Excel 下拉数据验证;
+     * 见 {@link InspSummaryService#export(java.util.Map)})。
+     * 迁移:{@code tools/migrate-insp-summary-20261117.sql}(授权 + 面板名译名)。
+     */
+    public static final String INSP_SUMMARY = "INSP_SUMMARY";
+    /**
      * ERP 集成配置清单(2026-10-18):导入 / 转出两向 × 分类的接口、设备、字段映射统一配置页。
      * 数据源是三张配置表(erp_integ_api / _field / _device),**不是** yj_panel 单据面板,
      * 故同样按页面级虚拟面板登记 —— 授权落 yj_role_panel,页面菜单按 panelCode 显隐。
@@ -335,6 +351,19 @@ public final class PagePanelRegistry {
     };
 
     /**
+     * 样品检验汇总表(2026-11-17):**只读**汇总页 —— 按时间范围看「谁送了什么样品、要测什么」,
+     * 并导出 Excel 安排检测工作。
+     *
+     * <p>动作只有三个:可见 / 查询 / 导出。本页不写任何业务数据(要改单回检验委托单面板),
+     * 导出的 Excel 由前端 xlsx 现生成,后端接口仍是只读统计。
+     */
+    private static final String[][] INSP_SUMMARY_ACTIONS = {
+            {"view",   "可见"},
+            {"query",  "查询"},
+            {"export", "导出"},
+    };
+
+    /**
      * ERP 集成配置清单:只有「可见」一个授权词。
      *
      * <p>2026-10-18 用户口径「保证这个面板除管理员只可看不可编辑」——
@@ -559,7 +588,10 @@ public final class PagePanelRegistry {
             new PagePanelDef(SUPPLIER_PRINT, "供应商采购打印", "智能供应链", SUPPLIER_PRINT_ACTIONS),
             new PagePanelDef(SUPPLIER_ACCOUNT, "供应商权限配置", "智能供应链", SUPPLIER_ACCOUNT_ACTIONS),
             // 2026-11-12 品质流程监控:一条来料批次 × 送料/检验/入库三张单的状态与跳转,归「品质管理」组
-            new PagePanelDef(QC_FLOW, "品质流程监控", "品质管理", QC_FLOW_ACTIONS));
+            new PagePanelDef(QC_FLOW, "品质流程监控", "品质管理", QC_FLOW_ACTIONS),
+            // 2026-11-17 样品检验汇总表:按时间范围汇总「谁送了什么样品、要测什么」并可导出,
+            //   归「样品检验」组(与两张单据同一一级模块;ReportService.NAV_GROUP_ORDER 已有该组)
+            new PagePanelDef(INSP_SUMMARY, "样品检验汇总表", "样品检验", INSP_SUMMARY_ACTIONS));
 
     private static final Map<String, PagePanelDef> BY_CODE = buildIndex();
 

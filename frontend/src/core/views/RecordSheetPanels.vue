@@ -314,7 +314,7 @@
                 </td>
               </template>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(pair.key) }" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
-                <div v-if="editable && isRefKey(pair.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(pair.key)">
+                <div v-if="editable && isRefKey(pair.key)" class="rs-ref-ctl" :class="{ 'has-dev': devStatus && devKey === pair.key }" :title="tt('点击选择')" @click="openProdRef(pair.key)">
                   <span class="rs-ref-text">{{ head[pair.key] || tt('点击选择') }}</span>
                   <span v-if="devStatus && devKey === pair.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
                   <el-icon class="rs-ref-ico"><Search /></el-icon>
@@ -589,14 +589,26 @@
                且克隆块仍排在所有 sections 之后 ⇒ 表格照样落在末尾。 -->
     <div v-for="(dt, di) in cfg.dataTables" v-show="pageOf(dt) === activePage" :key="'dt' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
       <div class="rsp-dt-table">
-        <table class="rs-t rs-dt" :class="{ 'rsp-design-t': dt.design }" :style="{ width: (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : effPlain ? plainW(dt) : gridW) + 'px' }">
+        <!-- ⚠ 表格宽度必须与下面 colgroup **同一个口径**（dtTableW = 含 span 的列宽和 × design/dtFillK）。
+             2026-11-17 生产缺陷：这里原写 dtW(dt)（不乘 dtFillK），而 colgroup 乘了
+             ⇒ 一旦「字段管理」给该表加过列（碱性实测 +2 列 width=120），
+             colgroup 缩到纸宽 1183、table 的 width 仍是 1540，下方「3.测试数据」整条比纸宽出去
+             （用户口径「下面的那些填写数据的列比上边的超出来」）。改后两条口径同源，加列不再撑破纸面。 -->
+        <table class="rs-t rs-dt" :class="{ 'rsp-design-t': dt.design }" :style="{ width: (dtOwnsWidth(dt) ? dtTableW(dt) : effPlain ? plainW(dt) : gridW) + 'px' }">
           <colgroup>
             <template v-if="effPlain || dtOwnsWidth(dt)">
               <!-- ⚠ span 必须写进 <col>：`样品信息` 这类 span:3 的列，若只生成一个不带 span 的 <col>，
                    浏览器就把它当 1 列宽 + 把另外两列当"无宽度列" ⇒ 表头 colspan=3 与下面的格子对不上，
                    整表宽度也会小于纸宽（2026-11-11 用户报「新增一个列字段之后」版面被压窄的根因）。 -->
+              <!-- ⚠ 2026-11-18 修「炭棒配方管控清单 配方表整表比纸宽出一倍」：
+                   `<col span=N style="width:W">` 按 HTML 语义是**每一列都 W**（总宽 = W×N），
+                   而配置里的 `w` 一直是"该列**总**宽"（所有可见列 w 之和 = 纸宽 780，
+                   wideSheetNarrow.test 也是这么钉的）⇒ 一旦某列既有 span 又有 w，就会被放大 N 倍：
+                   实测 炭棒配方表 物料种类 127×2=254、物料编号 181×4=724、物料名称 164×3=492，
+                   整表 780 → **1779px**，纸面横向溢出。
+                   修法：宽度先按 span 均分再乘缩放系数 ⇒ 该列总宽恒等于 w×K。 -->
               <col v-for="(c, i) in visCols(dt)" :key="'dc' + i" :span="(c.span || 1) > 1 ? c.span : undefined"
-                   :style="{ width: ((c.w || 100) * (dt.design ? designK(dt) : dtFillK(dt))).toFixed(1) + 'px' }" />
+                   :style="{ width: (((c.w || 100) * (dt.design ? designK(dt) : dtFillK(dt))) / (c.span || 1)).toFixed(1) + 'px' }" />
             </template>
             <template v-else>
               <col v-for="(w, i) in effGrid" :key="'dc' + i" :style="{ width: w + 'px' }" />
@@ -923,7 +935,7 @@
                   @input="emit('dirty')"
                   @change="onDetailTextCommit(row, c.key)"
                 />
-                <span v-else class="rs-txt rsp-cell" :title="isLockedCell(dt, row, c) ? tt('非本部门栏目（只读）') : ''">{{ cellText(cellKind(c), row[c.key]) || ' / ' }}</span>
+                <span v-else class="rs-txt rsp-cell" :title="isLockedCell(dt, row, c) ? tt('非本部门栏目（只读）') : ''">{{ readCellText(c, row[c.key]) || ' / ' }}</span>
               </td>
               <td v-if="editable && !dt.fixedRows" class="rs-td-op"><span class="rs-op-add" :title="tt('在本行下方插入一行')" @click="addRow(dt, row)">＋</span><span class="rs-op-del" @click="removeRow(row)">×</span></td>
             </tr>
@@ -936,6 +948,26 @@
               <td class="rs-td rsp-total" :colspan="visCols(dt)[0]?.span || 1">{{ tt('合计') }}</td>
               <td v-for="(c, ci) in visCols(dt).slice(1)" :key="'tt' + ci" class="rs-td rsp-total" :colspan="(c.span || 1) > 1 ? c.span : undefined">
                 {{ totalOf(dt, c.key) || '' }}
+              </td>
+              <td v-if="editable" class="rsp-op-pad"></td>
+            </tr>
+            <!-- 表格最下层的「整表共用一格」(2026-11-17 用户口径:出货检验计划表的
+                 「不合格应对措施放置表格最下层,因为当前的不合格措施都是一样的」)。
+                 数据仍逐行存(带入检验单/保存链路都按行取),这一格只做"显示合并、编辑同步":
+                 取第一行非空值显示,改一次写回本表全部行(见 footerFieldValue/setFooterFieldValue)。 -->
+            <tr v-if="dt.footerField">
+              <td :colspan="totalSpan(dt)" class="rsp-footer-field">
+                <div class="rff-label">{{ tt(dt.footerField.label) }}</div>
+                <el-input
+                  v-if="editable"
+                  :model-value="footerFieldValue(dt)"
+                  type="textarea"
+                  :autosize="{ minRows: dt.footerField.rows || 2, maxRows: 12 }"
+                  size="small"
+                  class="rs-t-in rs-wrap-in rff-in"
+                  @update:model-value="(v) => setFooterFieldValue(dt, v)"
+                />
+                <div v-else class="rs-txt rsp-cell rsp-pre">{{ footerFieldValue(dt) || ' / ' }}</div>
               </td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
@@ -1929,7 +1961,9 @@ import { OPTION_CAP, invSearchOptions } from '@/core/mold/recipeRows'
 
 /** 标准库型下拉列(2026-10-19:出货检验计划表的「检查频率」)——options 来自 yj_std_lib,可在弹窗里维护 */
 const stdLibOpts = ref({})   // { libCode: [content, ...] }(复用下方既有 stdLibVisible/stdLibCode)
-const STD_LIB_CODES = ['INSP_FREQ']
+// INSP_FREQ      = 四张检验单共用(制程/首件/组装成品)的检查频率库
+// INSP_FREQ_OQC  = 出货检验计划表专属(2026-11-17 用户口径「下拉框的数据过多」,出货口径 6 条)
+const STD_LIB_CODES = ['INSP_FREQ', 'INSP_FREQ_OQC']
 
 function colOptions(c) {
   if (c && c.stdLib && stdLibOpts.value[c.stdLib]) return stdLibOpts.value[c.stdLib]
@@ -1952,8 +1986,13 @@ async function loadStdLibs() {
     try {
       const res = await request.get('/stdlib/list', { params: { lib, all: 1 } })
       const rows = (res?.data ?? res ?? []).filter((r) => r.enabled !== 0 && r.enabled !== false)
+      // 按 seq 重排(2026-11-17):接口是 ORDER BY item_code(字母/拼音序),与维护界面排好的
+      // seq(10/20/30…) 不是一回事 —— 入库顺序才是业务想要的下拉顺序(如出货口径:
+      // 1%/一个生产批次 → 1PCS/一个生产批次 → 1PCS/一个工单 → 型式检验…)。
+      // 后端 StdLibController.list 的注释也写明「调用方要用 seq 自行重排」。
+      const ordered = [...rows].sort((a, b) => (Number(a.seq) || 0) - (Number(b.seq) || 0))
       const opts = []
-      for (const r of rows) {
+      for (const r of ordered) {
         const v = typeof r.content === 'string' ? r.content.trim() : ''
         if (v && !opts.includes(v)) opts.push(v)
       }
@@ -2103,6 +2142,34 @@ function stdLibOf(key) {
 function cellKind(c) {
   const f = (props.fields || []).find((x) => (x.dataName || x.code) === c?.key)
   return cellKindOf(f?.dataType)
+}
+
+/**
+ * 只读态要不要给这一格补 `%`（2026-11-17 用户口径，Excel #10「没有百分比号」）。
+ *
+ * <p>用户截图里 X烧结配方表的「添加比例%」列印出来是 `23` / `30` / `45`，
+ * 红字标了「没有百分比号」—— 列名带 % 但**值不带**，看起来像普通数字。</p>
+ *
+ * <p>为什么按列名判而不按 dataType：这三个字段在 yj_field 里都是 `文本`
+ * （`设计添加量` / `添加比例` / `单支含量g`，实测），拿不到数值/百分比语义；
+ * 而列名本身已经把单位写进去了（「添加比例%」），跟着列名走最稳、也不用改库。</p>
+ *
+ * <p>只在**只读态**补：编辑态是输入框，塞个 % 进去会污染用户输入。</p>
+ */
+function needsPercentSuffix(c) {
+  const label = String(c?.label ?? '')
+  if (!label.includes('%')) return false
+  const v = String(c?.key ?? '')
+  // 排除「单支含量g」这类虽然同表但单位是克的列（列名里没有 %，上面已挡）
+  return v === '添加比例' || label.endsWith('%')
+}
+
+/** 只读态的格文本：数值列补单位（目前只有百分比） */
+function readCellText(c, v) {
+  const text = cellText(cellKind(c), v)
+  if (!text) return ''
+  if (!needsPercentSuffix(c)) return text
+  return String(text).trim().endsWith('%') ? String(text) : String(text).trim() + '%'
 }
 
 /** 日期/时间控件回值 → 写回行(区间合成文本),并置脏交给父级保存 */
@@ -3773,7 +3840,10 @@ function dtW(dt) {
  * 结果就是表格 898px、下面那根「新增数据记录行」只有 720px（用户截图）。</p>
  */
 function dtColSum(dt) {
-  return visCols(dt).reduce((sum, c) => sum + (c.span || 1) * (c.w || 100), 0)
+  // 2026-11-18：与 colgroup 同口径 —— `w` 就是**该列总宽**（不再 × span）。
+  //   这两处必须同时改，否则「表格 width」与「colgroup 总宽」不一致，
+  //   浏览器会把列二次拉伸（本文件 2026-11-17 那段注释记的就是这类事故）。
+  return visCols(dt).reduce((sum, c) => sum + (c.w || 100), 0)
 }
 function dtTableW(dt) {
   return dtColSum(dt) * (dt.design ? designK(dt) : dtFillK(dt))
@@ -3793,7 +3863,7 @@ function dtTableW(dt) {
 function dtFillK(dt) {
   const merged = extMerged.value.get(dt)
   if (!merged || !merged.addedCount) return 1
-  const want = visCols(dt).reduce((sum, c) => sum + (c.span || 1) * (c.w || 100), 0)
+  const want = visCols(dt).reduce((sum, c) => sum + (c.w || 100), 0) // 同 dtColSum 口径
   return want ? gridW.value / want : 1
 }
 function designK(dt) {
@@ -4524,6 +4594,43 @@ function rowsOf(dt) {
   return list
 }
 /**
+ * 整表共用一格(dt.footerField,2026-11-17 出货检验计划表的「不合格应对措施」)。
+ *
+ * <p>契约:**显示合并、存储逐行**。值仍在每一行的同名数据键上(带入检验单、标准库勾选、
+ * 规格书自动填充、保存 upsert 四条链路都按行取/写这一格),这一整格只做两件事:</p>
+ * <ul>
+ *   <li>显示 —— 取本表**第一行非空值**(存量单据 55 行的措施完全相同,取哪行都一样);</li>
+ *   <li>编辑 —— 写回本表**全部行**,让"改一次全表一致"成立,也保证新行/旧行不会出现两套文本。</li>
+ * </ul>
+ * <p>⚠ 不要改成"只写第一行":那样其余行保存的是旧文本,带入检验单时会带出旧措施。</p>
+ */
+function footerFieldRowsOf(dt) {
+  return dt?.footerField?.key ? rowsOf(dt) : []
+}
+function footerFieldValue(dt) {
+  const key = dt?.footerField?.key
+  if (!key) return ''
+  for (const r of rowsOf(dt)) {
+    const v = r ? r[key] : ''
+    if (v !== undefined && v !== null && String(v).trim()) return String(v)
+  }
+  return ''
+}
+function setFooterFieldValue(dt, v) {
+  const key = dt?.footerField?.key
+  if (!key) return
+  const rows = footerFieldRowsOf(dt)
+  // 本表一行都没有时无处可写(表格空着)⇒ 不 silently 丢输入:先补一行再写。
+  if (!rows.length) {
+    addRow(dt)
+    for (const r of footerFieldRowsOf(dt)) r[key] = v
+    emit('dirty')
+    return
+  }
+  for (const r of rows) r[key] = v
+  emit('dirty')
+}
+/**
  * 加一行。
  * @param {object} dt 数据表配置
  * @param {object} [afterRow] 行内「＋」带上来的**本行** —— 有值就插在它正下方(2026-10-29 用户口径
@@ -4538,6 +4645,9 @@ function addRow(dt, afterRow) {
   // 新行必须带上当前下拉值:否则它会飘在"空组"里,切到别组就看不见、重开也可能归错组
   const g = groupBy.value
   if (g?.detailKey) stampGroup(row, g.detailKey, currentGroupValue())
+  // 整表共用一格(dt.footerField,如 不合格应对措施):新行必须带上同一份文本 ——
+  // 否则这一行保存时是空的,带入检验单/导出时该行就没有应对措施(见 footerFieldValue 注释)。
+  if (dt.footerField?.key) row[dt.footerField.key] = footerFieldValue(dt)
   // 序号自动编:dataTables 里声明 autoSeqBar 的表(成型配方表)按**本表区**已有行数续编。
   // 原来只认面板级 cfg.autoSeq 且用全表 touch().length 计数——多表区共用一张明细表时
   // 会串号(配方行数被工序/BOM 行数带偏),故改为按表区过滤后计数。
@@ -6842,6 +6952,33 @@ body.approval-printing .rs-mold-pick { display: none !important; }
   line-height: 1.8;
   padding: 8px 12px;
   background: #fff;
+}
+/**
+ * 表格最下层的「整表共用一格」(2026-11-17 用户口径:出货检验计划表「不合格应对措施放置表格最下层」)。
+ *
+ * <p>版式:紧贴明细行下方的一条满宽合并行 —— 小标题(不合格应对措施)一行 + 内容一段。
+ * 边框与 .rs-td / .rsp-footnote 同一套 1px #7f7f7f,所以下接的表尾注仍用 border-top:none 与之合成一条线。</p>
+ * <p>⚠ 内容字级/行距照纸面口径(12.5px/1.7),编辑态与只读态同高:编辑时看到的行数与间距就是打印出来的样子。</p>
+ */
+.rsp-footer-field {
+  border: 1px solid #7f7f7f;
+  background: #fff;
+  text-align: left;
+  vertical-align: top;
+  padding: 6px 12px 8px;
+}
+.rff-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #333;
+  line-height: 1.5;
+  margin-bottom: 2px;
+}
+.rff-in :deep(.el-textarea__inner) {
+  font-size: 12.5px;
+  line-height: 1.7;
+  font-family: inherit;
+  padding: 2px 4px;
 }
 
 /* ═══ 矿化:表+图并排(复刻 Excel 表格在左、散点图在右) ═══ */

@@ -295,8 +295,14 @@ function isSpecColumn(c) {
 function canApprove(c) {
   if (!isSpecColumn(c)) return false
   if (user?.isAdmin) return true
-  const p = user?.pagePerms || {}
-  const csv = p.RD_SPEC_DOC || ''
+  // 2026-11-17 修「批准按钮不见了」：原先只读 user.pagePerms.RD_SPEC_DOC，
+  // 而 pagePerms **只含页面级虚拟面板**（我的桌面/订单结转/流程管控…），真实单据面板
+  // （RD_SPEC_DOC）从不在里面 ⇒ 该键恒 undefined ⇒ 非管理员永远看不到按钮，
+  // 与数据库里勾没勾 specapprove 无关（只改库不改这里，等于没修）。
+  // 现在优先读登录下发的 panelPerms（角色全部已授权面板 panel_code → perms），
+  // 再退回 pagePerms（兼容旧会话/旧后端）。
+  const pp = user?.panelPerms || {}
+  const csv = pp.RD_SPEC_DOC ?? (user?.pagePerms || {}).RD_SPEC_DOC ?? ''
   return String(csv).split(',').map((s) => s.trim()).includes('specapprove')
 }
 
