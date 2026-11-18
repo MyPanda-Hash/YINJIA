@@ -636,48 +636,46 @@ public class ScheduleBoardService {
     }
 
     /**
-     * **区间外那天填了日排产 ⇒ 把本行的排产区间扩到包含那一天**(2026-11-18 用户口径)。
+     * **区间外那天填了日排产 ⇒ 把这块行对应的计划区间扩到包含那一天**(2026-11-18 用户口径,同日修第二轮)。
      *
-     * <p>背景(用户 2026-11-18,附「工单排产」截图):日期列里落在本行排产区间
-     * ({@code plang.st_date} ~ {@code plang.cp_date})之外的格子原来是「/」不可填;用户要求
-     * **这些列也可以填**,填完保存后该工单行的「预计完工时间」({@code plang.cp_date},
-     * 也即计划完工日期)要改到**填写的那一天**。{@link WorkOrderDayPlanService#save} 在保存循环后
-     * 按行取本次填数格子的**最早/最晚日期**调本方法(见那里的注释)。
+     * <p>背景(用户 2026-11-18,附「工单排产」截图):日期列里落在排产区间之外的格子原来是「/」不可填;
+     * 用户要求**这些列也可以填**,填完保存后那块行的「预计完工时间」要改到**填写的那一天**。
      *
-     * <p><b>口径:只扩不缩</b> ——
-     * <ul>
-     *   <li>{@code from} 非空且(计划开工为空 或 from **早于** 计划开工)⇒ {@code st_date = from}
-     *       (往前填的格子把开工日前移到那一天);</li>
-     *   <li>{@code to} 非空且(预定完成为空 或 to **晚于** 预定完成)⇒ {@code cp_date = to}
-     *       (往后填的格子把预计完工时间改到那一天);</li>
-     *   <li>已经在区间内的日期 ⇒ 一个字段都不动(不会因为补填格子反而把交期提前)。</li>
-     * </ul>
+     * <p>🔴 <b>2026-11-18 用户复测报障「修改当前的日期后第二行的计划完工日并不会改变」的根因</b>:
+     * 工单排产页的「本线工序」行(例:装箱2(新厂) 上的 装箱)显示的是 {@code wo_process_line} 那道工序的
+     * 计划区间,而日排产里的工序键是**产线工序**({@code processOfLine},可能是 组装),与台账工序(装箱)
+     * 不是同一个名字 ⇒ 原实现只改 {@code plang}(当前工序=成型)和**当前工序台账**,装箱那道的台账纹丝不动,
+     * 用户填完刷新看到的还是 11-17。现改为:
+     * <ol>
+     *   <li>先按 {@code (工单行id, 工序)} 找台账行;找不到(工序名与台账不同)再按**产线**找
+     *       ({@code 实际生产线=line} 或 计划生产线=line)—— 这才是看板上那一行真正显示的区间;</li>
+     *   <li><b>只扩不缩</b>地改那道台账的 计划开工/计划完工;</li>
+     *   <li>只有当这块格子对应的就是**当前工序**(或行上没有台账)时才同步 {@code plang.st_date/cp_date}
+     *       + {@code plang_pc} 镜像 —— 否则会给别的工序行凭空改交期
+     *       (实测:在 装箱2(新厂) 填 11-23,原实现把 成型(当前工序) 的计划完工从 11-13 推成了 11-23)。</li>
+     * </ol>
      *
      * <p><b>已结案跳过</b>:按本类唯一口径 {@link #CLOSED} 判定,已结案直接返回空 Map
      * —— **不抛错**:这是日排产保存的附带动作,不能因为某行已结案就把整笔保存打回滚。
      *
-     * <p>写三处(同事务,与 {@link #updateRowDates} 同一套写法):
-     * <ol>
-     *   <li>{@code plang.st_date / cp_date}(唯一真源,asp_user2/asp_time2 留痕);</li>
-     *   <li>{@code plang_pc} —— 走 {@link WorkOrderScheduleRecord#sync} 镜像(看板读的是它);</li>
-     *   <li>{@code wo_process_line} **当前工序**那道 —— 复用 {@link #syncProcessRanges}
-     *       (日期列窗口有一部分就来自这些区间,不跟着改的话扩了交期也看不到新列)。</li>
-     * </ol>
-     *
      * @param rowId 工单行id({@code plang.id})
-     * @param from  本次保存在该行填数格子里的**最早**计划日期(可以为 null)
-     * @param to    本次保存在该行填数格子里的**最晚**计划日期(可以为 null)
+     * @param op    这块格子保存时带的工序(日排产的工序键;可空)
+     * @param line  这块格子保存时带的产线(工单排产页 = 当前选中的线;生产工单页可空)
+     * @param from  本次填数格子里的**最早**计划日期(可以为 null)
+     * @param to    本次填数格子里的**最晚**计划日期(可以为 null)
      * @param user  当前登录账号
-     * @return 有变化时 {@code {行id, 计划开工日期, 预定完成日期}}(日期为 yyyy-MM-dd 字符串);
-     *         行不存在/已作废/已结案/区间没变化 ⇒ **空 Map**(调用方据此跳过,不当作失败)
+     * @return 有变化时 {@code {行id, 工序?, 计划开工日期, 预定完成日期}}(日期为 yyyy-MM-dd 字符串;
+     *         前者 = 那块行实际显示的区间);行不存在/已作废/已结案/区间没变化 ⇒ **空 Map**
      */
     @Transactional
-    public Map<String, Object> extendRowDates(long rowId, java.time.LocalDate from, java.time.LocalDate to, String user) {
+    public Map<String, Object> extendRowDates(long rowId, String op, String line,
+                                              java.time.LocalDate from, java.time.LocalDate to, String user) {
         if (rowId <= 0 || (from == null && to == null)) return java.util.Map.of();
         Map<String, Object> row;
         try {
             row = jdbc.queryForMap(
-                    "SELECT p.id, CONVERT(varchar(10), p.st_date, 120) AS st,"
+                    "SELECT p.id, ISNULL(p.[当前工序],N'') AS 当前工序,"
+                            + " CONVERT(varchar(10), p.st_date, 120) AS st,"
                             + " CONVERT(varchar(10), p.cp_date, 120) AS cp,"
                             + " CASE WHEN " + CLOSED + " THEN 1 ELSE 0 END AS 已结案标志"
                             + " FROM dbo.plang p WHERE p.id=? AND ISNULL(p.asp_cancel,'N')<>'Y'", rowId);
@@ -685,19 +683,82 @@ public class ScheduleBoardService {
             return java.util.Map.of();                       // 行不存在/已作废:静默跳过
         }
         if (Integer.valueOf(1).equals(row.get("已结案标志"))) return java.util.Map.of();   // 已结案跳过(不抛错)
-        java.time.LocalDate st = toDate(row.get("st"));
-        java.time.LocalDate cp = toDate(row.get("cp"));
-        java.time.LocalDate nst = (from != null && (st == null || from.isBefore(st))) ? from : st;
-        java.time.LocalDate ncp = (to != null && (cp == null || to.isAfter(cp))) ? to : cp;
-        if (java.util.Objects.equals(nst, st) && java.util.Objects.equals(ncp, cp)) return java.util.Map.of();
-        jdbc.update("UPDATE dbo.plang SET st_date=?, cp_date=?, asp_user2=?, asp_time2=GETDATE() WHERE id=?",
-                nst, ncp, user, rowId);
-        WorkOrderScheduleRecord.sync(jdbc, rowId, user);     // 镜像 plang_pc(看板读它)
-        syncProcessRanges(rowId, nst, ncp, user);            // 只同步当前工序那道台账
+        String op0 = op == null ? "" : op.trim();
+        String ln = line == null ? "" : line.trim();
+        // ① 这次填的格子对应哪道台账:先 (工单行id+工序),命中不了再按产线回落(见方法头 ①)
+        Map<String, Object> led = null;
+        if (!op0.isEmpty()) {
+            List<Map<String, Object>> l = jdbc.queryForList(
+                    "SELECT TOP 1 id, ISNULL(工序,N'') AS 工序,"
+                            + " CONVERT(varchar(10), 计划开工日期, 120) AS st,"
+                            + " CONVERT(varchar(10), 计划完工日期, 120) AS cp"
+                            + " FROM dbo.wo_process_line WHERE 工单行id=? AND 工序=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                            + " ORDER BY CASE WHEN ISNULL(实际生产线,N'')<>N'' THEN 0 ELSE 1 END, ISNULL(工序序,999), id",
+                    rowId, op0);
+            led = l.isEmpty() ? null : l.get(0);
+        }
+        if (led == null && !ln.isEmpty()) {
+            List<Map<String, Object>> l = jdbc.queryForList(
+                    "SELECT TOP 1 id, ISNULL(工序,N'') AS 工序,"
+                            + " CONVERT(varchar(10), 计划开工日期, 120) AS st,"
+                            + " CONVERT(varchar(10), 计划完工日期, 120) AS cp"
+                            + " FROM dbo.wo_process_line WHERE 工单行id=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                            + "   AND (ISNULL(实际生产线,N'')=? OR (ISNULL(实际生产线,N'')=N'' AND ISNULL(计划生产线,N'')=?))"
+                            + " ORDER BY ISNULL(工序序,999), id", rowId, ln, ln);
+            led = l.isEmpty() ? null : l.get(0);
+        }
+        // ② 只扩不缩地改那道台账(看板「本线工序」行显示的就是它)
+        boolean ledChanged = false;
+        String ledOp = op0;
+        java.time.LocalDate ledSt = null;
+        java.time.LocalDate ledCp = null;
+        if (led != null) {
+            ledOp = str(led.get("工序")) == null ? "" : str(led.get("工序")).trim();
+            java.time.LocalDate ws = toDate(led.get("st"));
+            java.time.LocalDate we = toDate(led.get("cp"));
+            java.time.LocalDate ns = (from != null && (ws == null || from.isBefore(ws))) ? from : ws;
+            java.time.LocalDate ne = (to != null && (we == null || to.isAfter(we))) ? to : we;
+            ledSt = ns;
+            ledCp = ne;
+            if (!java.util.Objects.equals(ns, ws) || !java.util.Objects.equals(ne, we)) {
+                jdbc.update("UPDATE dbo.wo_process_line SET 计划开工日期=?, 计划完工日期=?,"
+                                + " asp_user2=?, asp_time2=GETDATE() WHERE id=?",
+                        ns, ne, user, ((Number) led.get("id")).longValue());
+                ledChanged = true;
+            }
+        }
+        // ③ 只有「填的就是当前工序」(或行上没有台账)才动 plang 真源 + plang_pc 镜像
+        String curOp = str(row.get("当前工序"));
+        if (curOp == null || curOp.isBlank()) {
+            curOp = WorkOrderDayPlanService.ledgerCurrentOp(jdbc, java.util.List.of(rowId)).getOrDefault(rowId, "");
+        }
+        boolean isCurrent = ledOp != null && !ledOp.isBlank()
+                && ledOp.trim().equals(curOp == null ? "" : curOp.trim());
+        java.time.LocalDate pst = toDate(row.get("st"));
+        java.time.LocalDate pcp = toDate(row.get("cp"));
+        java.time.LocalDate nst = pst;
+        java.time.LocalDate ncp = pcp;
+        boolean plangChanged = false;
+        if (led == null || isCurrent) {
+            nst = (from != null && (pst == null || from.isBefore(pst))) ? from : pst;
+            ncp = (to != null && (pcp == null || to.isAfter(pcp))) ? to : pcp;
+            if (!java.util.Objects.equals(nst, pst) || !java.util.Objects.equals(ncp, pcp)) {
+                jdbc.update("UPDATE dbo.plang SET st_date=?, cp_date=?, asp_user2=?, asp_time2=GETDATE() WHERE id=?",
+                        nst, ncp, user, rowId);
+                WorkOrderScheduleRecord.sync(jdbc, rowId, user);     // 镜像 plang_pc(看板当前线行读它)
+                plangChanged = true;
+            }
+            if (led == null) syncProcessRanges(rowId, nst, ncp, user);  // 没台账:沿用老口径同步当前工序
+        }
+        if (!ledChanged && !plangChanged) return java.util.Map.of();
+        boolean showPlang = led == null || isCurrent;
+        java.time.LocalDate outSt = showPlang ? nst : ledSt;
+        java.time.LocalDate outCp = showPlang ? ncp : ledCp;
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("行id", rowId);
-        out.put("计划开工日期", nst == null ? "" : nst.toString());
-        out.put("预定完成日期", ncp == null ? "" : ncp.toString());
+        if (ledOp != null && !ledOp.isBlank()) out.put("工序", ledOp);
+        out.put("计划开工日期", outSt == null ? "" : outSt.toString());
+        out.put("预定完成日期", outCp == null ? "" : outCp.toString());
         return out;
     }
 

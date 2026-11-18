@@ -289,10 +289,9 @@ public class WorkOrderDayPlanService {
         int saved = 0, cleared = 0;
         // 本次动过的 (工单行id|工序) —— 保存完逐个做「Σ计划 ≤ 排产数量」的守卫(2026-10-30)
         Map<String, double[]> touched = new LinkedHashMap<>();
-        // 2026-11-18:每行本次**填了数**格子的最早/最晚计划日期(同一行多格取 min/max;
-        // 清空/0 的格子不参与)。循环后据此把该行的排产区间扩到包含这一天。
-        Map<Long, LocalDate> minDateByRow = new LinkedHashMap<>();
-        Map<Long, LocalDate> maxDateByRow = new LinkedHashMap<>();
+        // 2026-11-18:本次**填了数**的格子按 (工单行id|工序) 归堆,记最早/最晚计划日期 + 当时的产线;
+        // 清空/0 的格子不参与。循环后交给 extendRowDates 把**看板显示的那道工序**的区间扩到包含这一天。
+        Map<String, Map<String, Object>> spans = new LinkedHashMap<>();
         for (Map<String, Object> cell : cells) {
             long rowId = longOf(cell.get("工单行id"));
             if (rowId <= 0) throw new IllegalArgumentException("缺少工单行id");
@@ -320,9 +319,25 @@ public class WorkOrderDayPlanService {
                         user, rowId, op, date);
                 continue;
             }
-            // 2026-11-18:此刻起该格算「填了数」⇒ 记进本行本次的最早/最晚日期(供循环后扩展区间)
-            minDateByRow.merge(rowId, date, (a, b) -> b.isBefore(a) ? b : a);
-            maxDateByRow.merge(rowId, date, (a, b) -> b.isAfter(a) ? b : a);
+            // 2026-11-18:此刻起该格算「填了数」⇒ 按 (行id|工序) 记本组的最早/最晚日期与产线
+            String spanKey = rowId + "|" + (op == null ? "" : op);
+            Map<String, Object> span = spans.get(spanKey);
+            if (span == null) {
+                span = new LinkedHashMap<>();
+                span.put("行id", rowId);
+                span.put("工序", op == null ? "" : op);
+                span.put("生产线", line == null ? "" : line);
+                span.put("min", date);
+                span.put("max", date);
+                spans.put(spanKey, span);
+            } else {
+                if (date.isBefore((LocalDate) span.get("min"))) span.put("min", date);
+                if (date.isAfter((LocalDate) span.get("max"))) span.put("max", date);
+                String oldLine = String.valueOf(span.get("生产线"));
+                if ((oldLine == null || oldLine.isBlank()) && line != null && !line.isBlank()) {
+                    span.put("生产线", line);
+                }
+            }
             int n = jdbc.update(
                     "UPDATE dbo.wo_day_plan SET 计划数量=?, 生产线=?, asp_user2=?, asp_time2=SYSDATETIME()"
                             + " WHERE 工单行id=? AND 工序=? AND 计划日期=? AND asp_cancel='N'",
@@ -365,17 +380,25 @@ public class WorkOrderDayPlanService {
             }
         }
         // ═══ 2026-11-18 用户口径:「区间外那天填了数 ⇒ 把预计完工时间改到这一天」 ═══
-        // 日期列里落在本行排产区间(plang.st_date ~ plang.cp_date)之外的格子原来是「/」不可填;
-        // 用户要求这些列也能填。但只写 wo_day_plan 是不够的 —— 区间不跟着扩,看板/列表读回来那天
-        // 仍在区间外,下次刷新格子又变回「/」、数据看不见。故按行把本次填数格子的最早/最晚日期
-        // 交给 ScheduleBoardService#extendRowDates 去扩 plang(真源)+ plang_pc(镜像)+ 当前工序区间。
+        // 日期列里落在本行排产区间之外的格子原来是「/」不可填;用户要求这些列也能填。但只写
+        // wo_day_plan 是不够的 —— 区间不跟着扩,看板/列表读回来那天仍在区间外,下次刷新格子又变回「/」。
+        // 故按 **(工单行id, 工序)** 把本次填数格子的最早/最晚日期 + 当时的产线交给
+        // ScheduleBoardService#extendRowDates:
+        //   · 工单排产页「本线工序」行(如 装箱2(新厂) 上的 装箱)显示的是台账那道工序的区间,
+        //     日排产的工序键可能是产线工序(组装)⇒ 服务端会按工序、再按产线回落找到**看板真正显示的那道**;
+        //   · 只有填的是当前工序时才同步 plang(真源)+ plang_pc(镜像),避免改别的工序行却把当前工序交期推后。
         // 口径「只扩不缩」:往早处填 ⇒ 开工日前移;往晚处填 ⇒ 预计完工改到那天(已在区间内不动)。
         // 该方法在 已结案 / 行不存在 / 区间无变化 时返回空 Map ⇒ 这里直接跳过,不抛错、不影响本次保存;
         // 既有「超分配」软校验与事务语义一概不变(同一事务,异常照旧向上抛)。
         List<Map<String, Object>> dateAdjust = new ArrayList<>();
-        for (Map.Entry<Long, LocalDate> e : minDateByRow.entrySet()) {
+        for (Map<String, Object> span : spans.values()) {
             Map<String, Object> adj = board.extendRowDates(
-                    e.getKey(), e.getValue(), maxDateByRow.get(e.getKey()), user);
+                    ((Number) span.get("行id")).longValue(),
+                    String.valueOf(span.get("工序")),
+                    String.valueOf(span.get("生产线")),
+                    (LocalDate) span.get("min"),
+                    (LocalDate) span.get("max"),
+                    user);
             if (adj != null && !adj.isEmpty()) dateAdjust.add(adj);
         }
         Map<String, Object> out = new LinkedHashMap<>();
