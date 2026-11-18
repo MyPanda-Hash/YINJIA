@@ -458,6 +458,14 @@ public class QueryService {
             return counted;
         }
 
+        // 报表「数量列」的**整段合计**(2026-11-18 用户口径「报工数量下面要有一个合计数量」)。
+        // 为什么必须在服务端算:报表列表是后端分页(50 行/页),前端 el-table 的 show-summary
+        //   只拿到**当前页**的行 ⇒ 按日期段汇总时页脚只有第 1 页的 50 行,数字是错的。
+        // 口径:只合计 dataType=「数值」的列(报工数量 / 完成数量 —— 报工、完工明细两张报表的数量列),
+        //   其它 小数/整数 列维持原来的本页合计不动:范围最小,也不给 20+ 张报表都加一条 SUM
+        //   (库存台账/收发存/状况三张是整表重算视图,pageCap=50,绝不能在这里再扫一遍)。
+        Map<String, Object> reportSums = reportQuantitySums(def, where, args, l2c);
+
         // 列表默认排序(2026-10-14 用户口径「应该最新的单据日期在最上面」):
         //   有日期列且该列确实存在 ⇒ 「日期 DESC, id DESC」(同一天按录入先后倒排);
         //   否则退回 id DESC(原行为);台账(ledger)保持 id ASC。
@@ -520,7 +528,58 @@ public class QueryService {
         Map<String, Object> out = new HashMap<>();
         out.put("totalSize", totalOut);
         out.put("list", list);
+        // 整段合计(见上方 reportQuantitySums):没有数量列的面板为 null ⇒ 前端落回本页合计老口径
+        out.put("sums", reportSums);
         return out;
+    }
+
+    /**
+     * 报表「数量列」的整段合计(2026-11-18,报工记录「报工数量下面要有一个合计数量」)。
+     *
+     * <p>口径与触发面:
+     * <ul>
+     *   <li>只合计 {@code yj_field.data_type='数值'} 的列 —— 全库仅 6 个数值字段,落在报表里的
+     *       就是报工记录「报工数量」与完工明细「完成数量」;小数/整数列不在此列(维持本页合计);</li>
+     *   <li>WHERE 与列表**同一条**(日期段/关键字/高级筛选/状态闸门都一样)⇒ 分页、翻页、导出
+     *       看到的合计是同一个数,不是"每页各算各的";</li>
+     *   <li>{@code TRY_CAST(... AS decimal(38,6))}:脏值变 NULL(不把整张列表打成 500),
+     *       decimal 收口顺带抹掉 float 累加的二进制尾差;</li>
+     *   <li>任何异常(列不存在/类型不对)只记 WARN 并返回 null —— 合计是附加信息,
+     *       **绝不能因为它让报表打不开**(与 {@code appendAdvFilters} 的防呆口径一致)。</li>
+     * </ul>
+     *
+     * @return 列 label → 合计值;面板没有可解析的数值列 ⇒ {@code null}(前端落回本页合计)
+     */
+    private Map<String, Object> reportQuantitySums(PanelRegistry.PanelDef def, StringBuilder where,
+                                                   List<Object> args, Map<String, String> l2c) {
+        List<String> labels = new ArrayList<>();
+        List<String> cols = new ArrayList<>();
+        for (PanelRegistry.FieldDef f : def.fields()) {
+            if (!"数值".equals(f.dataType())) continue;
+            // label ≠ 物理列名(2026-11-18 的日期段 bug 同源):必须走 l2c 映射,解析不到就不算
+            String col = l2c.get(f.label());
+            if (col == null || col.isBlank()) continue;
+            labels.add(f.label());
+            cols.add(col);
+        }
+        if (labels.isEmpty()) return null;
+        StringBuilder sql = new StringBuilder("SELECT ");
+        for (int i = 0; i < cols.size(); i++) {
+            if (i > 0) sql.append(", ");
+            sql.append("SUM(TRY_CAST(t.[").append(cols.get(i)).append("] AS decimal(38,6))) AS v").append(i);
+        }
+        sql.append(" FROM ").append(def.lineTable()).append(" t ").append(where);
+        try {
+            Map<String, Object> row = jdbc.queryForMap(sql.toString(), args.toArray());
+            Map<String, Object> sums = new LinkedHashMap<>();
+            for (int i = 0; i < labels.size(); i++) sums.put(labels.get(i), row.get("v" + i));
+            return sums;
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(QueryService.class)
+                    .warn("[reportSums] 面板 {} 数量合计计算失败(本次返回 null,页脚落回本页合计):{}",
+                            def.code(), e.getMessage());
+            return null;
+        }
     }
 
     /** 台账合成行用的匹配值(编码优先;没编码才用名称位) */
@@ -1474,22 +1533,36 @@ public class QueryService {
             // 兜底再判一次空(null = 没有名称条件),不要再出现"靠上层保证非 null"的写法(2026-10-20 NPE)
             boolean byWh = strOf(whCode).length() > 0 || (whName != null && !whName.isEmpty());
             boolean byItem = strOf(itemCode).length() > 0 || (itemName != null && !itemName.isEmpty());
-            // 报表日期段(查询弹窗):开始/结束日期 → 区间过滤。
-            // 有 期次 列(收发存汇总)按月(yyyy-MM)闭区间;否则有 单据日期 列(库存台账)按全日期闭区间。
-            // 这两个键不进通用 LIKE,下方的 l2c 兜底也会因无列名而跳过。
-            String rangeCol = l2c.containsKey("期次") ? "期次" : (l2c.containsKey("单据日期") ? "单据日期" : null);
-            boolean byMonth = "期次".equals(rangeCol);
+            // 报表日期段(查询弹窗/内联查询区):开始/结束日期 → 区间过滤。
+            // 有「期次」列(收发存汇总)按月(yyyy-MM)闭区间;否则有「单据日期」列按全日期半开区间。
+            //
+            // 🔴 2026-11-18 修正(报工记录「要可以选择某个日期段的」暴露,改动前两条都是错的):
+            //   ① rangeCol 必须是 l2c 映射后的**物理列名**。旧写法拿的是 label「单据日期」直接拼列,
+            //      只有库存台账/收发存汇总这类视图(列名恰好是中文)碰巧能用;报工记录(sc_date)、
+            //      出入库明细表等一律 500 `Invalid column name '单据日期'` —— 日期段从未真正通用过。
+            //   ② 结束日改成**半开区间** `< 次日`:日期列带时分秒时(实测 scjl.sc_date 1314 行中
+            //      1275 行时间非 0:00),旧写法 `<= 'yyyy-MM-dd'` 会把结束日当天 00:00 之后的记录全漏掉。
+            String rangeCol = l2c.get("期次");
+            boolean byMonth = rangeCol != null;
+            if (rangeCol == null) rangeCol = l2c.get("单据日期");
             Object qs = condition.get("开始日期");
             if (rangeCol != null && qs != null && !String.valueOf(qs).isBlank()) {
                 String v = String.valueOf(qs).trim();
-                where.append(" AND ").append(alias).append(".[").append(rangeCol).append("] >= ?");
+                where.append(" AND ").append(alias).append(".[").append(rangeCol).append("] >= ")
+                        .append(byMonth ? "?" : "CAST(? AS date)");
                 args.add(byMonth && v.length() > 7 ? v.substring(0, 7) : v);
             }
             Object qe = condition.get("结束日期");
             if (rangeCol != null && qe != null && !String.valueOf(qe).isBlank()) {
                 String v = String.valueOf(qe).trim();
-                where.append(" AND ").append(alias).append(".[").append(rangeCol).append("] <= ?");
-                args.add(byMonth && v.length() > 7 ? v.substring(0, 7) : v);
+                if (byMonth) {
+                    where.append(" AND ").append(alias).append(".[").append(rangeCol).append("] <= ?");
+                    args.add(v.length() > 7 ? v.substring(0, 7) : v);
+                } else {
+                    where.append(" AND ").append(alias).append(".[").append(rangeCol)
+                            .append("] < DATEADD(day, 1, CAST(? AS date))");
+                    args.add(v);
+                }
             }
             for (Map.Entry<String, Object> e : condition.entrySet()) {
                 String key = e.getKey();
@@ -1502,7 +1575,7 @@ public class QueryService {
                 // (非集合值返回 null),参照分支据此拼 IN(...);非参照字段收到数组则按调用方异常忽略。
                 List<String> codes = refCodesOf(v);
                 if (codes == null && String.valueOf(v).isBlank()) continue;
-                if ("开始日期".equals(key) || "结束日期".equals(key)) continue; // 已按期次区间处理
+                if ("开始日期".equals(key) || "结束日期".equals(key)) continue; // 已在上方「日期段」处理
                 // 仓库/存货已由 appendWhItemFilter 按「编码优先、退化名称」处理完毕(前端仍回显名称,不重复叠加)
                 if ("仓库".equals(key) && byWh) continue;
                 if ("存货".equals(key) && byItem) continue;

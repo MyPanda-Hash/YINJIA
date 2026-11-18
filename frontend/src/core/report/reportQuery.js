@@ -1,9 +1,13 @@
 /**
- * reportQuery.js — 库存报表「查询弹窗」(reportQueryDialog)的**纯逻辑层**。
+ * reportQuery.js — 报表面板的**纯逻辑层**(查询弹窗门 + 内联查询区日期段)。
  *
  * 适用面板:`yj_panel` 里 STOCK_LEDGER(库存台账)/ STOCK_SUMMARY(收发存汇总表)
  *   —— 服务端 PanelConfigService 给它们 metadata.reportQueryDialog = true,T+ 同款:
  *   **进入面板先弹条件弹窗**(单据日期区间必填 [+ 台账的仓库/存货必填]),关闭弹窗即退出页面。
+ *
+ * 2026-11-18 追加:报表**内联查询区**的日期段(报工记录 WO_REPORT_LIST 起用,见文件末尾
+ *   `dateRangeToCondition` / `dateRangeFromCondition`)。两者共用同一套「开始日期/结束日期」
+ *   控制键与后端 `QueryService.queryFlat` 的日期段过滤,只是控件从弹窗搬到了查询条。
  *
  * 为什么单独抽一个文件(2026-10-20 用户报障「库存台账和收发存汇总表出现重复弹窗和查询问题」):
  *   弹窗门原先散落在 PanelxList.vue 的 `load()` 里,判据是 `reportQueryDialog && !rqdDone`;
@@ -111,4 +115,66 @@ export function cleanCondition(draft = {}) {
     out[k] = v
   }
   return out
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 报表「内联查询区」的日期段(2026-11-18)
+ *
+ * 用户口径:「报工记录，要可以选择某个日期段的」—— 查询区的「单据日期」原来只有单日选择,
+ * 报表(尤其报工/完工明细)要按一段日期汇总。
+ *
+ * 契约(与后端 `QueryService.queryFlat` 的日期段过滤同源):
+ *   · 区间写在 condition 的两个控制键上,**不是**把「单据日期」字段改成区间值:
+ *       condition.开始日期 = 'YYYY-MM-DD',condition.结束日期 = 'YYYY-MM-DD'
+ *     后端把它落成 `单据日期 >= 开始 AND 单据日期 < 结束次日`(半开区间,含结束日一整天);
+ *   · 只认 `YYYY-MM-DD`;任一端缺失/非法 ⇒ 返回 `{}`(不加条件 = 查全量),
+ *     绝不做「只有开始日」那种半截过滤 —— 用户要的是"一段",不是"某天以后";
+ *   · 反序(Element 的 unlink-panels 允许先点结束日、再点开始日)⇒ **交换**后返回,
+ *     与 DateRangeQuery 文件头「反序由调用页自行处理」的分工一致。
+ *
+ * 为什么抽成纯函数:日期段会同时被内联控件、切面板/reset 回显、弹窗应用三处读写,
+ * 口径放在组件里就会各写一遍(2026-10-20 台账重复弹窗就是判据散落的教训)。
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** condition 里日期段的开始键(数据键永远中文,ADR-0001;后端 QueryService 认这两个键) */
+export const DATE_RANGE_START_KEY = '开始日期'
+/** condition 里日期段的结束键 */
+export const DATE_RANGE_END_KEY = '结束日期'
+
+/** `YYYY-MM-DD`(只认补零的完整日期;`2026-1-1` 这类非标准写法一律当非法) */
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * 把任意输入规整成 `[开始, 结束]`。
+ * @param {Array|string|null|undefined} range 形如 ['2026-10-01','2026-10-31'] 或单值
+ * @returns {string[]} 合法 ⇒ 两端非空、升序;非法/不完整 ⇒ `[]`(从不返回 null)
+ */
+export function normalizeDateRange(range) {
+  const arr = Array.isArray(range) ? range : (range === null || range === undefined ? [] : [range])
+  let [from, to] = arr.slice(0, 2).map((v) => String(v ?? '').trim().slice(0, 10))
+  if (!DAY_RE.test(from) || !DAY_RE.test(to)) return []
+  if (from > to) [from, to] = [to, from]
+  return [from, to]
+}
+
+/**
+ * 区间 → condition 增量(直接 Object.assign 到 condition 即可)。
+ * @param {Array|string|null|undefined} range
+ * @returns {{}} 合法 ⇒ `{开始日期, 结束日期}`;非法/不完整 ⇒ `{}`(调用方据此删键)
+ */
+export function dateRangeToCondition(range) {
+  const [from, to] = normalizeDateRange(range)
+  return from ? { [DATE_RANGE_START_KEY]: from, [DATE_RANGE_END_KEY]: to } : {}
+}
+
+/**
+ * condition → 区间(供切面板/reset/弹窗应用后把控件回显到当前条件)。
+ * @param {object|null|undefined} condition
+ * @returns {string[]} 见 {@link normalizeDateRange};没有日期段 ⇒ `[]`
+ */
+export function dateRangeFromCondition(condition) {
+  return normalizeDateRange([
+    condition ? condition[DATE_RANGE_START_KEY] : undefined,
+    condition ? condition[DATE_RANGE_END_KEY] : undefined,
+  ])
 }

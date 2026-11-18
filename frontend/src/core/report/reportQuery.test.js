@@ -3,7 +3,10 @@ import assert from 'node:assert/strict'
 import {
   REPORT_QUERY_DIALOG_PANELS,
   cleanCondition,
+  dateRangeFromCondition,
+  dateRangeToCondition,
   defaultReportRange,
+  normalizeDateRange,
   reportQueryDialogOn,
   shouldAutoOpenReportQuery,
   validateReportQuery,
@@ -89,4 +92,41 @@ test('condition 整理:只去空值;`_` 控制键必须原样保留(台账按编
     cleanCondition({ 仓库: '正品仓', 存货: '', 开始日期: '2026-10-01', 结束日期: '2026-10-20', _whCode: 'CK00001', 空: undefined, 无: null }),
     { 仓库: '正品仓', 开始日期: '2026-10-01', 结束日期: '2026-10-20', _whCode: 'CK00001' })
   assert.deepEqual(cleanCondition(), {})
+})
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * 报工记录「日期段」(2026-11-18 用户口径「要可以选择某个日期段的」)
+ * 契约:开始日期/结束日期两个控制键;只认 YYYY-MM-DD;不完整 ⇒ 不加条件。
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+test('日期段 → condition:合法区间写成两个控制键,不碰「单据日期」字段本身', () => {
+  assert.deepEqual(dateRangeToCondition(['2026-10-01', '2026-10-31']), { 开始日期: '2026-10-01', 结束日期: '2026-10-31' })
+  // 带时分秒的输入也收(元素控件在某些时区会回 '2026-10-01 00:00:00')
+  assert.deepEqual(dateRangeToCondition(['2026-10-01 00:00:00', '2026-10-31 23:59:59']), { 开始日期: '2026-10-01', 结束日期: '2026-10-31' })
+  // 同一个日期选两次 = 只查这一天(仍是完整区间)
+  assert.deepEqual(dateRangeToCondition(['2026-10-21', '2026-10-21']), { 开始日期: '2026-10-21', 结束日期: '2026-10-21' })
+})
+
+test('日期段反序自动交换(unlink-panels 允许先点结束日)', () => {
+  assert.deepEqual(normalizeDateRange(['2026-10-31', '2026-10-01']), ['2026-10-01', '2026-10-31'])
+  assert.deepEqual(dateRangeToCondition(['2026-10-31', '2026-10-01']), { 开始日期: '2026-10-01', 结束日期: '2026-10-31' })
+})
+
+test('日期段不完整/非法 ⇒ 空对象(绝不能只按一端过滤)', () => {
+  // 只有一端 = 用户还没选完(Element 中途会给 [start, null])⇒ 不加条件
+  for (const bad of [[], null, undefined, ['2026-10-01'], ['2026-10-01', null], [null, '2026-10-31'],
+    ['2026-1-1', '2026-10-31'], ['2026/10/01', '2026-10-31'], ['abc', 'def'], '2026-10-01']) {
+    assert.deepEqual(dateRangeToCondition(bad), {}, `非法输入 ${JSON.stringify(bad)} 必须返回空对象`)
+    assert.deepEqual(normalizeDateRange(bad), [])
+  }
+})
+
+test('condition → 日期段回显:切面板/reset 后控件跟着当前条件走', () => {
+  assert.deepEqual(dateRangeFromCondition({ 开始日期: '2026-10-01', 结束日期: '2026-10-31' }), ['2026-10-01', '2026-10-31'])
+  // 反序的历史 condition 也能回显成升序(后端按 >=/<= 比,顺序无关)
+  assert.deepEqual(dateRangeFromCondition({ 开始日期: '2026-10-31', 结束日期: '2026-10-01' }), ['2026-10-01', '2026-10-31'])
+  // 没有日期段 / 只有一半 / 空条件 ⇒ []
+  assert.deepEqual(dateRangeFromCondition({}), [])
+  assert.deepEqual(dateRangeFromCondition({ 开始日期: '2026-10-01' }), [])
+  assert.deepEqual(dateRangeFromCondition(null), [])
 })

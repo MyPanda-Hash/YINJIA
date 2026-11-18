@@ -143,6 +143,21 @@
         >
           <el-option v-for="o in qOptions(qr)" :key="o.value" :label="o.label ?? o.value" :value="o.value" />
         </el-select>
+        <!-- 报表内联查询区「单据日期」= 日期段(2026-11-18 用户口径「报工记录，要可以选择某个日期段的」)。
+             只放开 INLINE_DATE_RANGE_PANELS 里的面板(当前=报工记录;其它报表面板仍是原来的单日查询,
+             口径不动)。值走 condition 的 开始日期/结束日期 两个控制键 —— 与后端 queryFlat 的
+             日期段过滤同一契约(见 @core/report/reportQuery 的 dateRangeToCondition)。
+             ⚠ 宽度必须显式给:`.field :deep(.el-date-editor)` 是 160px,两段日期会挤成一团;
+               这里 250px 由 DateRangeQuery 的 width prop 以内联 style 下发(优先级高于上面的 :deep)。 -->
+        <DateRangeQuery
+          v-else-if="qType(qr) === 'date' && qr.dataName === '单据日期' && inlineDateRangePanel"
+          class="query-date-range"
+          :model-value="pageDateRange"
+          clearable
+          width="250px"
+          @update:model-value="onPageDateRangeInput"
+          @change="onPageDateRange"
+        />
         <el-date-picker
           v-else-if="qType(qr) === 'date'"
           v-model="condition[qr.dataName]"
@@ -2845,11 +2860,18 @@ import QcProcInspWoPicker from '@core/qc/QcProcInspWoPicker.vue'
 import ZonePickDialog from './ZonePickDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
+// 通用「日期范围查询」控件(2026-11-09 从订单结转抽出的共用实现,带今日/本周/本月快捷档)。
+// 2026-11-18:报工记录的内联查询区「单据日期」也用它(用户口径「要可以选择某个日期段的」)——
+// 与订单结转/生产工单同一份控件、同一套快捷档,不另写一套 date-range。
+import DateRangeQuery from '@core/ui/DateRangeQuery.vue'
 // 库存报表「查询弹窗」门(台账/收发存汇总):要不要弹 / 开之前重置什么 / 必填校验,全部是纯函数
 // (2026-10-20 修「重复弹窗 + 查询异常」—— 弹窗门此前只按"查过没有"判,弹窗开着时后台再调 load 会重开一次)
 import {
   cleanCondition as cleanReportCondition,
+  dateRangeFromCondition,
+  dateRangeToCondition,
   defaultReportRange,
+  normalizeDateRange,
   reportQueryDialogOn,
   shouldAutoOpenReportQuery,
   validateReportQuery,
@@ -4198,7 +4220,51 @@ function changedArchiveRows() {
 function archiveSaveParam() {
   return { 只提交改动行: true }
 }
+/**
+ * 报表内联查询区「单据日期」的**日期段**(2026-11-18 用户口径:
+ * 「报工记录，要可以选择某个日期段的」)。
+ *
+ * 范围只放开报工记录(与 2026-11-13「输入即查」同一条口径:只改报工记录,其它面板不动)。
+ * 其它报表面板仍是原来的单日选择;要开同款,把面板码加进本常量即可(控件/条件契约都已通用)。
+ *
+ * 条件口径(唯一真源 = @core/report/reportQuery 的 dateRangeToCondition):
+ *   condition.开始日期 / condition.结束日期 —— 后端 QueryService.queryFlat 据此拼
+ *   `单据日期 >= 开始 AND 单据日期 < 结束次日`(半开区间,结束日整天都算)。
+ * 控件状态与 condition 分开维护:Element 选择过程中会给「只有一端」的中间值,
+ * 直接绑 condition 会让后端按半截条件查一次(等于"某天以后"),所以只在 change(选完/清空)时落条件。
+ */
+const INLINE_DATE_RANGE_PANELS = ['WO_REPORT_LIST']
+const inlineDateRangePanel = computed(() => INLINE_DATE_RANGE_PANELS.includes(String(panelCode.value || '')))
+/** 日期段控件的显示值(YYYY-MM-DD × 2;空数组 = 没选,查全量) */
+const pageDateRange = ref([])
+/** 控件 update(选择过程中的中间值,可能只有一端):只更新显示,不落条件、不查 */
+function onPageDateRangeInput(range) {
+  pageDateRange.value = Array.isArray(range) ? range : []
+}
+/** 控件 change(选完两端或清空):规整(反序交换、两端齐全)后写入/删除 condition 的两个控制键 */
+function onPageDateRange(range) {
+  const next = normalizeDateRange(range)
+  pageDateRange.value = next
+  delete condition['开始日期']
+  delete condition['结束日期']
+  Object.assign(condition, dateRangeToCondition(next))
+  search()
+}
+/** 按当前 condition 回显控件(切面板/reset/弹窗应用后调用,避免控件显示的区间与生效条件不一致) */
+function syncPageDateRange() {
+  pageDateRange.value = dateRangeFromCondition(condition)
+}
+
 const reportPageCount = computed(() => Math.max(1, Math.ceil(total.value / query.pageSize)))
+/**
+ * 报表脚「整段合计」(2026-11-18 用户口径「报工数量下面要有一个合计数量」)。
+ *
+ * 服务端在平表查询响应里返回 `sums`(列 label → 合计值),按**同一条 WHERE** 算 ——
+ * 覆盖整个日期段/筛选结果,而不是 el-table 页脚天然能拿到的"当前页 50 行"。
+ * 只有面板含 dataType=数值 的数量列(报工数量/完成数量)时才有这个键;其余面板为 null,
+ * 页脚继续走 sumMethod 的本页合计老口径(行为零变化)。
+ */
+const reportSums = ref(null)
 const reportPeriod = computed(() => {
   const start = condition['开始日期']
   const end = condition['结束日期']
@@ -8066,9 +8132,22 @@ function sumMethod({ columns, data }) {
       sums[i] = tt('合计')
       return
     }
-    // 只对「小数/整数」类型的字段求和：纯数字文本（身份证号/手机号/编码）不参与合计
+    // 服务端「整段合计」优先(2026-11-18,见 reportSums 注释):报工数量/完成数量这类数值列,
+    // 合计覆盖**整个查询段**(日期段/筛选后全部行),不是当前页 50 行 —— 这是用户要的"日期段合计"。
+    // 服务端没返回该列(其它面板/没有数量列)⇒ 继续下面的本页合计老口径。
+    const serverSum = reportSums.value && Object.prototype.hasOwnProperty.call(reportSums.value, col.property)
+      ? reportSums.value[col.property]
+      : undefined
+    if (serverSum !== undefined && serverSum !== null) {
+      sums[i] = sumKeepScale([serverSum])
+      return
+    }
+    // 只对「小数/整数/数值」类型的字段求和：纯数字文本（身份证号/手机号/编码）不参与合计。
+    // 「数值」口径(2026-11-18 用户口径「报工数量下面要有一个合计数量」):yj_field 里
+    // 报工记录/完工明细的数量列登记的就是「数值」(不是小数/整数),旧判据把它当文本 ⇒
+    // 合计行在报工数量格永远是空的。数值型列参与求和(本方法只服务报表页脚,不动单据明细)。
     const f = fieldDefOf(col.property)
-    const isNumeric = f && (f.dataType === '小数' || f.dataType === '整数')
+    const isNumeric = f && ['小数', '整数', '数值'].includes(f.dataType)
     // NaN 过滤:三段式台账的期初/期末合成行大量缺键(Number(undefined)=NaN),
     // 旧行为 every(isFinite) 会因一行的缺失清空整列合计(合计消失的根因)
     const vals = real.map((r) => Number(r[col.property])).filter((v) => Number.isFinite(v))
@@ -11566,6 +11645,8 @@ function applyHeaderQuery() {
   for (const [key, value] of Object.entries(cleanReportCondition(queryDraft))) condition[key] = value
   // 「输入即查」现场(2026-11-13):条件被整套替换(应用查询方案/弹窗查询)⇒ 输入框按新条件重新回显
   syncQueryInputText()
+  // 内联查询区日期段跟着新条件回显(2026-11-18;非日期段面板/无区间时 = 清空)
+  syncPageDateRange()
   // 高级筛选定格为「生效中」:报表/单据面板随本次查询 POST 给后端全表过滤(分页/导出口径一致;
   // 单据面板 2026-09-24 起同样服务端化);档案面板仍是前端过滤。
   // 日期范围(起/止)在此并入(ge/le 两条),不占可见条件行。
@@ -11680,6 +11761,7 @@ function resetHeaderQuery() {
   Object.keys(queryDraft).forEach((key) => delete queryDraft[key])
   Object.keys(condition).forEach((key) => delete condition[key])
   syncQueryInputText() // 「输入即查」输入框草稿一并清空(condition 已空 ⇒ 回显为空)
+  syncPageDateRange() // 内联查询区日期段跟着清空(2026-11-18)
   rqdRange.value = [] // 弹窗面板:单据日期区间一并重置
   advFilters.value = []
   dateFrom.value = ''
@@ -13516,6 +13598,8 @@ async function load(clamping = false) {
     }
     const res = await engine.queryFormDataList(params)
     markArchListRaw(res.list) // 档案:进入响应式系统前 markRaw 明细行(赋值后打在代理上无效)
+    // 整段合计(见 reportSums 注释):只对报表取,非对象/空 = 没有服务端合计 ⇒ 页脚落回本页合计
+    reportSums.value = reportMode.value && res && res.sums && typeof res.sums === 'object' ? res.sums : null
     list.value = res.list || []
     total.value = res.totalSize || 0
     // 档案「改动行提交」基线:载入即快照,保存只发改动行(见 archiveBaseline 注释)
@@ -13572,6 +13656,7 @@ function search() {
 function reset() {
   Object.keys(condition).forEach((k) => delete condition[k])
   syncQueryInputText() // 「输入即查」输入框随条件一起清空(否则框里还留着上一轮的片段)
+  syncPageDateRange() // 内联查询区日期段一并清空(2026-11-18)
   query.keyword = ''
   if (isStockStatus.value) stockWh.value = ''
   search()
@@ -13707,6 +13792,7 @@ watch(
     // el-table 每删一列都会对全部行重渲染一次(O(列×行),宽表拆除的主长帧来源之一)。
     list.value = []
     total.value = 0
+    reportSums.value = null // 整段合计属于上一个面板的查询条件,切面板先清掉(防串味)
     cfgCache.value = null
     // 弹窗门随面板重置(2026-10-20):台账/汇总「进入即弹条件弹窗」的口径是**每个面板各一次**。
     // 见下方「查询弹窗面板(收发存/台账):切换面板重置」那条 watch —— 两处必须同步
@@ -13729,6 +13815,7 @@ watch(
     Object.keys(condition).forEach((key) => delete condition[key])
     Object.keys(queryDraft).forEach((key) => delete queryDraft[key])
     syncQueryInputText() // 「输入即查」输入框草稿属于上一个面板(同名字段也不能把片段带过去)
+    syncPageDateRange() // 内联查询区日期段随面板条件清空(2026-11-18)
     query.keyword = ''
     queryFields.value = []
     gridTabs.value = []
