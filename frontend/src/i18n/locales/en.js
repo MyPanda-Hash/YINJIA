@@ -697,8 +697,8 @@ export default {
     // 2026-11-18 日排产:区间外(斜杠)格可填,填完把预计完工日期改到那一天
     '不在本行排产区间(开工日~计划完工日)内;点此填写当天数量,保存后会把预计完工日期改到这一天': 'Outside this line\'s schedule range (start ~ planned finish). Click to enter the quantity for that day; on save the planned finish date moves to that day',
     '已把预计完工日期改到': 'Planned finish date moved to',
-    // 2026-11-18 工序路线排线:上一道已实际完工时,下一道开工取实际完工日
-    '上一道已实际完工的，下一道计划开工日期自动取该实际完工日，计划完工按本道原时长顺延': 'If the previous step is actually finished, the next step starts on that actual finish date and keeps its own duration',
+    // 2026-11-18 第二轮:开工按实际报工推导,完工仍是排产时选的日期
+    '预计开工日期：本道已报工取本道最早报工日，上一道已报工取上一道的实际开工日，都没报工才按上一道的计划完工日；预计完工日期仍按排产时选择的日期（只有开工晚于完工时才后延）': 'Expected start: this step\'s earliest report date if it has one, otherwise the previous step\'s actual start date once it reports, otherwise the previous step\'s planned finish; the planned finish stays as the date chosen when scheduling (and only moves later if the start passes it)',
     '日排产日期列': 'Daily plan dates',
     // 当天没数据 → 弹窗询问是否跳到最近有数据的一天(2026-10-06 用户口径:不静默跳转)
     '没有数据': 'No data',

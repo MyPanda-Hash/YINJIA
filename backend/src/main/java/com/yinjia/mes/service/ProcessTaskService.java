@@ -1018,6 +1018,8 @@ public class ProcessTaskService {
             if (due != null) s.put("计划完工日期", due);
             prevDue = due == null ? start : due;
             s.put("实际完工", doneTimeText(no, rowId, str(s.get("工序"))));
+            // 2026-11-18 第二轮:每道也带「实际开工」(首次报工时间),前端据此推导下一道的预计开工
+            s.put("实际开工", startTimeText(no, rowId, str(s.get("工序"))));
         }
         // 已有台账(未作废):改线时回填
         // 「实际开工」= **该道已审核报工的最早时间**(2026-10-30 用户口径「只有真报工才显示」),
@@ -1166,15 +1168,17 @@ public class ProcessTaskService {
             double stepRate = num(rt.get("换算率"));
             if (stepRate <= 0) stepRate = 1;
             p.put("计划数量", round(qty * stepRate));
-            // 计划开工/完工(2026-10-29):**上一道的计划完工日 = 下一道的计划开工日**(计划链,服务端强制);
-            //   下一道完工日早于这个开工日的,按它原来的计划时长(完工-开工)整体顺延,不报错
-            //   (历史台账日期各排各的,不能把计划链打断)。
+            // 计划开工/完工(2026-11-18 第二轮用户口径;口径定义见 frontend/src/business/planChain.js 文件头):
+            //   ① 计划开工 = **客户端给的开工日**(前端已按「本道实际开工 > 上一道实际开工 > 上一道计划完工」推导);
+            //      没给才回落到上一道计划完工(老调用方兼容),再没有就是今天;
+            //   ② 计划完工 = 客户端给的完工日(排产时**原来选择的日期**),不按上道完工/本道时长顺延;
+            //   ③ 跨道不再要求「后道开工 ≥ 上道计划完工」—— 前道提前开工、量已流入时,后道开工本来就可以更早
+            //      (2026-11-11 那条「下方的工序不能比上方的工序小」已由本轮事实推导取代);
+            //      只保留「本道开工 ≤ 本道完工」这一条硬约束。
             String givenStart = str(given.get("计划开工日期"));
             String givenDue = str(given.get("计划完工日期"));
             // 🔴 2026-11-09 用户口径「计划开工日期不得大于计划完工日期」:客户端**明确给了**两个日期却倒挂 ⇒
             //   直接拒,不再静默纠正(前端两个排线弹窗已自动调平,这里只兜绕过前端的调用方)。
-            //   ⚠ 只判「两个都给且倒挂」这一种:客户端没给日期时 due 会回落到**交期**(可能早于计划链开工,
-            //     逾期工单就是这种),那是**派生**出来的不一致,按下面原口径顺延,不能拒(否则逾期单排不进去)。
             if (givenStart != null && givenDue != null) {
                 java.time.LocalDate gs;
                 java.time.LocalDate gd;
@@ -1189,39 +1193,13 @@ public class ProcessTaskService {
                     throw new IllegalArgumentException("工序「" + op + "」计划开工日期不能晚于计划完工日期("
                             + givenStart + " → " + givenDue + ")");
             }
-            String due = givenDue != null ? givenDue : str(rt.get("计划完工日期"));
             String prevDue = plan.isEmpty() ? null : str(plan.get(plan.size() - 1).get("计划完工日期"));
-            // 🔴 2026-11-11 用户口径「校验需要增加实现下方的工序页不能比上方的工序小的实现」:
-            //   后道工序的日期**不得早于上道工序**(后道开工 ≥ 上道完工,后道完工也随之 ≥ 上道完工)。
-            //   只拒「客户端明确给了、且比上道完工还早」的日期 —— 派生出来的不一致仍按下面原口径顺延,
-            //   不误拦(与 2026-11-09 的倒挂守卫同一条取舍)。
-            if (prevDue != null) {
-                try {
-                    java.time.LocalDate pd = java.time.LocalDate.parse(prevDue);
-                    if (givenStart != null && java.time.LocalDate.parse(givenStart).isBefore(pd))
-                        throw new IllegalArgumentException("工序「" + op + "」计划开工日期不能早于上道工序的计划完工日期("
-                                + prevDue + " → " + givenStart + ")");
-                    if (givenDue != null && java.time.LocalDate.parse(givenDue).isBefore(pd))
-                        throw new IllegalArgumentException("工序「" + op + "」计划完工日期不能早于上道工序的计划完工日期("
-                                + prevDue + " → " + givenDue + ")");
-                } catch (java.time.format.DateTimeParseException e) {
-                    throw new IllegalArgumentException("工序「" + op + "」计划开工/完工日期格式应为 yyyy-MM-dd("
-                            + givenStart + " / " + givenDue + ")");
-                }
-            }
-            String start = prevDue != null ? prevDue : givenStart;
+            String start = givenStart != null ? givenStart : prevDue;
             if (start == null) start = java.time.LocalDate.now().toString();
+            String due = givenDue != null ? givenDue : str(rt.get("计划完工日期"));
             if (due == null) due = start;
-            if (java.time.LocalDate.parse(due).isBefore(java.time.LocalDate.parse(start))) {
-                long dur = 0;
-                if (givenStart != null && givenDue != null) {
-                    try {
-                        dur = java.time.temporal.ChronoUnit.DAYS.between(
-                                java.time.LocalDate.parse(givenStart), java.time.LocalDate.parse(givenDue));
-                    } catch (RuntimeException ignore) { dur = 0; }
-                }
-                due = java.time.LocalDate.parse(start).plusDays(Math.max(0, dur)).toString();
-            }
+            // 派生的完工早于开工(逾期单 / 老调用方没给完工)⇒ 拉到开工日;不再按原时长顺延(2026-11-18)
+            if (java.time.LocalDate.parse(due).isBefore(java.time.LocalDate.parse(start))) due = start;
             p.put("计划开工日期", start);
             p.put("计划完工日期", due);
             plan.add(p);
@@ -1593,6 +1571,33 @@ public class ProcessTaskService {
     /** 实际完工时间(展示文本 yyyy-MM-dd HH:mm;没有则 null) */
     private String doneTimeText(String plNo, Long rowId, String op) {
         java.sql.Timestamp t = reportedDoneTime(plNo, rowId, op);
+        return t == null ? null
+                : t.toLocalDateTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+    }
+
+    /**
+     * 该道工序**已审报工的最早时间**(= 实际开工;没有报工 ⇒ null)。
+     *
+     * <p>2026-11-18 第二轮用户口径「按照前一个的实际开工后存在的报工数给到这一个流程里的
+     * 预计开工日期」——下一道的预计开工取**上一道首次报工**的日期,所以这里取 MIN
+     * (报工的开始时间,老数据退到完工时间/单据日期),锚定规则与 {@link #reportedDoneTime} 完全一致。
+     */
+    private java.sql.Timestamp reportedStartTime(String plNo, Long rowId, String op) {
+        if (!notBlank(plNo) || !notBlank(op) || rowId == null) return null;
+        List<java.sql.Timestamp> ts = jdbc.queryForList(
+                "SELECT MIN(COALESCE(s.kssj, s.wgsj, s.sc_date)) AS t FROM dbo.scjl s"
+                        + " WHERE s.gldh=? AND ISNULL(s.gxdm,N'')=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
+                        + "   AND ISNULL(s.wgzt,'N')='Y'"
+                        + "   AND (EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id=s.gd_id AND pc.plang_id=?)"
+                        + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'')="
+                        + "            (SELECT ISNULL([批次号],N'') FROM dbo.plang WHERE id=?)))",
+                java.sql.Timestamp.class, plNo.trim(), op.trim(), rowId, rowId);
+        return ts.isEmpty() ? null : ts.get(0);
+    }
+
+    /** 实际开工时间(展示文本 yyyy-MM-dd HH:mm;没有报工则 null) */
+    private String startTimeText(String plNo, Long rowId, String op) {
+        java.sql.Timestamp t = reportedStartTime(plNo, rowId, op);
         return t == null ? null
                 : t.toLocalDateTime().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
     }
