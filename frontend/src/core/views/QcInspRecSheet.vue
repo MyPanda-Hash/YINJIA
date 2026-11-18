@@ -144,14 +144,16 @@
               <span class="c-result-label">{{ tt('检测结果') }}</span>
               <!-- 2026-11-19 第二轮:加列入口**放进表头**(用户报「怎么还是这样」——
                    分区条那个 16px 的「＋」太不起眼/不好点)。表头这个按钮大、就在红框位置旁边,
-                   点一下加一列;列数仍存头字段「结果列数」。 -->
+                   点一下加一列;列数仍存头字段「结果列数」。
+                   第三轮补:1~2 格时整段只有 58~116px,文字按钮会盖住「检测结果」⇒ 自动收成
+                   只有 ＋ 的图标按钮(格子同时放宽到 96px,见 resultColW)。 -->
               <span
                 v-if="editable"
                 class="qr-addcol no-print"
-                :class="{ dim: resultColCount >= MAX_RESULT_COLS }"
+                :class="{ compact: headerAddCompact, dim: resultColCount >= MAX_RESULT_COLS }"
                 :title="tt('新增检测结果列（抽几件就加几列）')"
                 @click="addResultColumn()"
-              >＋ {{ tt('新增列') }}</span>
+              ><template v-if="headerAddCompact">＋</template><template v-else>＋ {{ tt('新增列') }}</template></span>
               <span v-if="editable" class="c-result-count no-print">{{ resultColCount }}</span>
             </th>
             <!-- 单项判定必填(2026-11-11 用户口径) -->
@@ -167,7 +169,7 @@
               v-for="(k, gi) in resultKeys"
               :key="'rh' + k"
               class="c-res"
-              :style="{ width: RESULT_COL_W + 'px' }"
+              :style="{ width: resultColW + 'px' }"
             >
               <span class="c-res-no">{{ gi + 1 }}</span>
               <span
@@ -464,22 +466,28 @@ const resultColCount = computed(() => clampResultColCount(props.head?.[RESULT_CO
 /** 实际渲染的结果列键(纸面 1..n 格) */
 const resultKeys = computed(() => RESULT_KEYS.slice(0, resultColCount.value))
 /**
- * 检测结果每格的宽度(px) —— 与列数无关,固定 58px(5 列时纸面宽度与旧版几乎一致)。
+ * 检测结果每格的宽度(px) —— 默认 58px(5 列时纸面宽度与旧版几乎一致)。
  * 结果区**不按百分比**算:按百分比时列数一多,表宽要按 34% 反算,整张纸会被拉成两三屏
  * (实测 20 列 = 2706px,「检验项/检测标准」各占 380px 却没内容,结果列全被推到屏幕外)。
- * 改成「基础列固定 px + 结果格固定 58px」后:20 列 = 766 + 1160 = 1926px,
+ * 改成「基础列固定 px + 结果格固定 px」后:20 列 = 766 + 1160 = 1926px,
  * 基础列不再跟着膨胀,结果列尽量留在视口内。
+ * ⚠ 1~2 格时放宽到 96px:表头那句话「检测结果 + 列数 + ＋」在 58px 里放不下,
+ *   文字按钮会盖住标题(2026-11-19 第三轮实测,默认 1 格时最明显)。
  */
 const RESULT_COL_W = 58
+const RESULT_COL_W_WIDE = 96
+const resultColW = computed(() => (resultColCount.value <= 2 ? RESULT_COL_W_WIDE : RESULT_COL_W))
+/** 表头那个「＋ 新增列」按钮要不要收成只有 ＋ 的图标(1~2 格时窄到放不下文字) */
+const headerAddCompact = computed(() => resultColCount.value <= 2)
 /** 结果区之外的定宽列合计(检验项 150 + 检测标准 230 + 检验方法 230 + 单项判定 110 + 行操作 46) */
 const STD_COLS_W = 766
 /** 当前的结果区宽度(= 列数 × 每格宽度) */
-const resultBandWidth = computed(() => `${RESULT_COL_W * resultColCount.value}px`)
+const resultBandWidth = computed(() => `${resultColW.value * resultColCount.value}px`)
 /**
  * 纸面表的最小宽度(px) = 基础列 + 结果列;比容器宽就由外层 .qr-table-scroll 横向滚动,
  * 不再把基础列挤成一条缝(打印口径见下面的 print* 三个值)。
  */
-const tableMinWidth = computed(() => `${STD_COLS_W + RESULT_COL_W * resultColCount.value}px`)
+const tableMinWidth = computed(() => `${STD_COLS_W + resultColW.value * resultColCount.value}px`)
 
 /* ── 打印口径(2026-11-19)──
    屏幕上是「定宽 + 横向滚动」,纸面必须反过来:**整张压进一页**。
@@ -1135,7 +1143,7 @@ watch(
 }
 /* 2026-11-19 检测结果改可增删列后,列宽改成**定宽模型**(合计不再是 100%):
    检验项 150 / 检测标准 230 / 检验方法 230 / 单项判定 110 / 行操作 46 = 766px 固定,
-   检测结果 = 列数 × 58px(见组件 RESULT_COL_W / resultBandWidth,内联到 th 上);
+   检测结果 = 列数 × 每格宽(5 列以上 58px、1~2 列 96px,见组件 resultColW / resultBandWidth,内联到 th 上);
    整表 min-width = 766 + 60×n,超出纸面就横向滚动,基础列不再被挤压。
    (2026-11-11 五格版的 14%/21%/21%/34%/10% 百分比模型已废。) */
 .c-item { width: 150px; }
@@ -1179,6 +1187,14 @@ watch(
   cursor: pointer;
 }
 .qr-addcol:hover { background: #d7e9ff; }
+/* 1~2 格时整段表头只有 96~192px:文字按钮会盖住「检测结果」⇒ 收成只有 ＋ 的方按钮 */
+.qr-addcol.compact {
+  width: 17px;
+  padding: 0;
+  text-align: center;
+  font-size: 12px;
+  line-height: 15px;
+}
 .qr-addcol.dim { color: #9aa7b6; border-color: #c8d3df; background: #f4f7fb; cursor: not-allowed; }
 /* 每列表头的 ×:平时淡、悬停整格才明显(格子只有 58px,常显会挤掉列号) */
 .c-res { position: relative; }
