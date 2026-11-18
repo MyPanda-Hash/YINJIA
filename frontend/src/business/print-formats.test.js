@@ -53,7 +53,7 @@ globalThis.requestAnimationFrame = (cb) => { cb(); return 1 }
 globalThis.alert = () => { throw new Error('不应触发打印失败告警') }
 
 const { printProductCards, productCardQrText, printPuOrder, printPuOrderNoAmount, printLocationCards, locationCardQrText,
-  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows, planSheetShop, planSheetTitle, planSheetDatesFromRows, planSheetWindow, ymdAddDays, MAX_SHEET_DAYS, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS, PLAN_SHEET_MAX_PRINT_DAYS, pickSlipHtml, mixSheetHtml, printWoQr, moldPlanQty } = await import('./print-formats.js')
+  schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows, planSheetShop, planSheetTitle, planSheetDatesFromRows, planSheetWindow, ymdAddDays, MAX_SHEET_DAYS, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS, PLAN_SHEET_MAX_PRINT_DAYS, planSheetUnreportedQty, pickSlipHtml, mixSheetHtml, printWoQr, moldPlanQty } = await import('./print-formats.js')
 
 test('单据行(带可选键):订单编号/供应商/数量/批次/生产日期填充进卡面', async () => {
   const before = captured.printed
@@ -224,7 +224,7 @@ test('打印采购订单/无金额版:返回 true = 已交给页面内打印层(
 
 // ── 成型车间排单计划(2026-10-31) ────────────────────────────────────────────
 // 用户口径「需要能打出这样的报表形式,就在当前工单排产处实现,不需要根据产线处理」⇒
-//   版式照纸表:客户等级/客户名称/产品编号/型号/成型车间/未完成总数/生产计划数量/实际完成数量/
+//   版式照纸表:客户等级/客户名称/产品编号/型号/成型车间/工序未报工量/订单数量/生产计划数量/实际完成数量/
 //   成型交期/成型交期紧迫度/7天/15天/大于15/日期列(=日计划)。纯函数 schedPlanSheetHtml 可直接断言。
 
 test('planSheetDates:从今天起取 5 天(纸表也就 3~5 天);今天以后没有就退化取最后几天', () => {
@@ -290,17 +290,17 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
   const html = await schedPlanSheetHtml(rows, ['2026-10-31', '2026-11-01', '2026-11-05'], { today: '2026-10-31', shop: '成型' })
   // 2026-11-05 版式重排:长表头用**显式换行**(断点固定,不再出现「生产计划数/量」掉单字);
   //   表头 HTML 里就是 <br>,这里按最终表头逐字断言。
-  for (const h of ['客户名称', '产品编号', '型号', '成型车间', '未完成<br>总数',
+  for (const h of ['客户名称', '产品编号', '型号', '成型车间', '工序<br>未报工量',
     '生产计划<br>数量', '实际完成<br>数量', '成型交期', '成型交期<br>紧迫度', '7天', '15天', '大于15']) {
     assert.ok(html.includes('>' + h + '</th>'), '表头应含 ' + h)
   }
   // 2026-11-13 用户口径「所有生产工单排单计划增加订单数量这个字段」:
-  //   列头单行(订单数量),位置在「未完成总数」之后、「生产计划数量」之前;值取 订单数量 ?? 需求数量。
+  //   列头单行(订单数量),位置在「工序未报工量」之后、「生产计划数量」之前;值取 订单数量 ?? 需求数量。
   assert.ok(html.includes('>订单数量</th>'), '表头应含 订单数量')
-  const iDone = html.indexOf('>未完成<br>总数</th>')
+  const iDone = html.indexOf('>工序<br>未报工量</th>')
   const iOrder = html.indexOf('>订单数量</th>')
   const iPlan = html.indexOf('>生产计划<br>数量</th>')
-  assert.ok(iDone >= 0 && iDone < iOrder && iOrder < iPlan, '列顺序:未完成总数 → 订单数量 → 生产计划数量')
+  assert.ok(iDone >= 0 && iDone < iOrder && iOrder < iPlan, '列顺序:工序未报工量 → 订单数量 → 生产计划数量')
   assert.ok(html.includes('<td class="r">200</td>'), '订单数量为空时退回 需求数量(200)照印,不是空列')
   // 2026-11-04 用户口径「客户等级这个列下不存在数据就默认隐藏了」:该行客户等级为空 ⇒ 不印这一列
   assert.ok(!html.includes('>客户等级</th>'), '客户等级全空 ⇒ 默认隐藏该列')
@@ -311,7 +311,7 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
   assert.ok(/>甲</.test(html2), '等级值要印出来')
   assert.ok(html.includes('10月31日') && html.includes('11月5日'), '日期列头用 月日 写法')
   assert.ok(html.includes('张莉') && html.includes('S031-3') && html.includes('28*12*178') && html.includes('1号机'))
-  assert.ok(/>10</.test(html), '未完成总数/排产数量应出现')
+  assert.ok(/>10</.test(html), '工序未报工量/排产数量应出现')
   assert.ok(html.includes('@page{size:A4 landscape'), '横向 A4')
   assert.ok(html.includes('成型车间排单计划'), '标题')
   // 2026-11-01 用户口径「不是两张纸,当前同一行融合起来」:单据编号 + 二维码都在同一行里
@@ -459,9 +459,14 @@ test('schedPlanSheetHtml:2026-11-05 版式 — 日期先占 6%/天,固定列拿�
   const rows = [mk(1), mk(2), mk(3)]
   const h3d = await schedPlanSheetHtml(rows, [], { dates: ['2026-10-29', '2026-10-30', '2026-10-31'] })
   assert.ok(h3d.includes('<col style="width:6.00%"/>'), '3 天 ⇒ 每天 6%(≈65px,4 位数字 + 横排表头都放得下)')
-  // 固定列按剩余宽度分:客户名称/单据编号 各 9.84%(旧的压窄算法只有 9%/10%;
-  //   2026-11-13 加「订单数量」列后固定列总基准宽度变大 ⇒ 10.49% → 9.84%)
-  assert.ok(h3d.includes('<col style="width:9.84%"/>'), '客户名称/单据编号 各 9.84%')
+  // 固定列按剩余宽度分:客户名称/单据编号 各取剩余宽度的 10.5/85.8(2026-11-13 加「订单数量」列
+  //   10.49% → 9.84%;2026-11-18「未完成总数」改「工序未报工量」基准 5 → 5.6 ⇒ ≈9.36%)。
+  //   ⚠ 这里只断档位(9%~11%)与两列同宽,不再钉死到两位小数 —— 每加/宽一列都会触发重算,
+  //     钉死数字的断言只会变成"每次改版式都要改测试"的噪音。
+  const fixedW3 = [...h3d.matchAll(/<col style="width:([\d.]+)%"\/>/g)].map((m) => Number(m[1]))
+  // 这一组数据「客户等级」全空 ⇒ 该列已被 hideIfEmpty 隐藏,固定列第 0/1 位就是 客户名称/单据编号
+  assert.ok(fixedW3[0] > 9 && fixedW3[0] < 11, '客户名称列 ≈9.8%(宽档,不是旧的 5%~7% 挤窄档)')
+  assert.equal(fixedW3[0], fixedW3[1], '客户名称/单据编号 同一基准宽度,两列等宽')
   assert.ok(h3d.includes('padding:3px 3px;font-size:10.5px'), '正文 10.5px(≈7.9pt)、内边距 3px')
   assert.ok(h3d.includes('font-weight:600;text-align:center;font-size:9.5px'), '表头 9.5px')
   assert.ok(h3d.includes('@page{size:A4 landscape;margin:8mm 6mm}'), 'A4 横向,上下 8mm / 左右 6mm')
@@ -497,7 +502,7 @@ test('schedPlanSheetHtml:日期表头始终横排;超过 10 列只印前 10 列'
   const d31 = planSheetWindow('2026-10-01', 31)
   const h31 = await schedPlanSheetHtml(rows, [], { dates: d31 })
   assert.equal((h31.match(/<th class="dt"/g) || []).length, 10, '31 天入参也只印前 10 列')
-  // 每行日期格 10 个 + 数字列 8 个(未完成总数/订单数量/生产计划/实际完成/紧迫度/7天/15天/大于15)都带 class="r"
+  // 每行日期格 10 个 + 数字列 8 个(工序未报工量/订单数量/生产计划/实际完成/紧迫度/7天/15天/大于15)都带 class="r"
   assert.equal((h31.match(/<td class="r">/g) || []).length, 3 * (10 + 8), '每行 10 个日期格 + 8 个数字列')
   assert.ok(!h31.includes('td.d{font-size:7px'), '不再需要「极窄格降字号」那套补丁')
 })
@@ -592,13 +597,14 @@ test('moldPlanQty:排产 × 成型换算率(detail 的 成型计划量 ÷ 计划
   assert.equal(moldPlanQty({ 排产数量: 50 }, { 计划合计: 50, 工序步骤: [{ 工序: '切炭', 计划量: 50 }] }), 50)
 })
 
-test('schedPlanSheetHtml:生产计划数量印**工序计划量**(成型 0.5:排产 50 → 印 25)', async () => {
+test('schedPlanSheetHtml:生产计划数量走当前工序口径(成型 0.5:排产 50 → 印 25)', async () => {
   const rows = [{
     客户等级: '', 客户: '内部', 加工单号: 'GD-2026-11-0028', 工单行号: 1, 公司代码: '0',
     物料编码: 'T410', 规格型号: '63*40*193', 生产线: '4号车间',
     未交量: 50, 需求数量: 50, 订单数量: 50,
     排产数量: 50,        // 成品口径
-    工序计划量: 25,      // 工序口径(planSheet 接口合并进来的)
+    工序计划量: 25,      // 工序口径(planSheet 接口合并进来的,与当前工序同一道)
+    当前工序计划量: 25,   // 台账当前工序(成型,换算率 0.5)= 25
     当前工序完工量: 0,
     交期: '2026-11-15', 交期紧迫度: 7, '7天已排': 25, '15天已排': 25, '大于15天已排': 0,
     日计划: { '2026-11-15': 25 },
@@ -612,7 +618,64 @@ test('schedPlanSheetHtml:生产计划数量印**工序计划量**(成型 0.5:排
   const cells = [...firstTr.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((m) => m[1].replace(/\s+/g, ''))
   const iP = heads.findIndex((h) => h.includes('生产计划数量'))
   assert.ok(iP >= 0, '纸面应有「生产计划数量」列')
-  assert.equal(cells[iP], '25', '生产计划数量 = 工序计划量 25(不是排产数量 50)')
+  assert.equal(cells[iP], '25', '生产计划数量 = 当前工序计划量 25(不是排产数量 50)')
+})
+
+// ── 2026-11-18 用户口径:「未完成总数」改名「工序未报工量」,值 = 当前工序计划量 − 当前工序报工数量 ──
+//   用户截图(第一轮):订单 480 / 生产计划 480 / 实际完成 240 ⇒ 印 480 − 240 = 240;
+//   第二轮更正:「图一的应该是当前工序计划量-当前工序的报工数量」——
+//   GD-2026-11-0032 在 4号车间 的当前工序是「组装装箱」(换算率 1,计划 480),已报 280 ⇒ 印 200,
+//   与追溯弹窗的「未完成合计 200」同数;此时 planSheet 合并的「工序计划量」= 成型 240(plang 当前工序漂移),
+//   只能当老接口的兜底。
+test('planSheetUnreportedQty:当前工序计划量 − 报工量;做够记 0;工序计划量只做兜底', () => {
+  assert.equal(planSheetUnreportedQty({ 当前工序计划量: 480, 当前工序完工量: 280 }), 200, '480 − 280 = 200')
+  assert.equal(planSheetUnreportedQty({ 当前工序计划量: 480, 当前工序完工量: 240 }), 240, '480 − 240 = 240')
+  assert.equal(planSheetUnreportedQty({ 当前工序计划量: 25, 当前工序完工量: 0 }), 25, '还没报工 ⇒ 全缺')
+  assert.equal(planSheetUnreportedQty({ 当前工序计划量: 25, 当前工序完工量: 25 }), 0, '做够了 ⇒ 0')
+  assert.equal(planSheetUnreportedQty({ 当前工序计划量: 25, 当前工序完工量: 30 }), 0, '做超了 ⇒ 0(纸面不印负数)')
+  // 报工量在老接口里可能叫 报工量 / 已报工 —— 逐级回退
+  assert.equal(planSheetUnreportedQty({ 当前工序计划量: 10, 报工量: 4 }), 6)
+  assert.equal(planSheetUnreportedQty({ 当前工序计划量: 10, 已报工: 3 }), 7)
+  // 老接口没有 当前工序计划量 ⇒ 回退 planSheet 的 工序计划量(没有键才对,别拿它去盖当前工序)
+  assert.equal(planSheetUnreportedQty({ 工序计划量: 480, 当前工序完工量: 240 }), 240, '兜底:工序计划量 − 报工')
+  // 两个都在 ⇒ 当前工序优先(实测行:工序计划量 240(成型)/当前工序计划量 480(装箱)/已报 280)
+  assert.equal(planSheetUnreportedQty({ 工序计划量: 240, 当前工序计划量: 480, 当前工序完工量: 280 }), 200,
+    '当前工序计划量优先 ⇒ 480 − 280 = 200,不是 240 − 280 → 0')
+  // 本线工序行同理:用行上的当前工序那一对(台账计划已按换算率折过)
+  assert.equal(planSheetUnreportedQty({ 行来源: '本线工序', 本线排产数量: 480, 当前工序计划量: 480, 当前工序完工量: 280 }), 200)
+  // 缺键/脏值不印 NaN/undefined
+  assert.equal(planSheetUnreportedQty({}), 0)
+  assert.equal(planSheetUnreportedQty(null), 0)
+  assert.equal(planSheetUnreportedQty({ 当前工序计划量: 'x', 当前工序完工量: 'y' }), 0)
+})
+
+test('schedPlanSheetHtml:工序未报工量/生产计划数量都走当前工序口径(480/280/200)', async () => {
+  const rows = [{
+    客户: '宁波市碧纯科技有限公司', 加工单号: 'GD-2026-11-0032', 工单行号: 1, 公司代码: '0',
+    物料编码: 'C-78-11', 规格型号: "35*10*121/品名:Z001/料号:T031", 生产线: '4号车间',
+    订单数量: 480, 需求数量: 480, 排产数量: 480,
+    当前工序: '组装装箱',
+    工序计划量: 240,        // planSheet 合并值(按 plang 当前工序 = 成型 算出来的,跨了道)
+    当前工序计划量: 480,     // 台账当前工序 = 组装装箱(换算率 1)= 480
+    当前工序完工量: 280,
+    交期: '2026-11-26', 交期紧迫度: 8, '7天已排': 89, '15天已排': 100, '大于15天已排': 0,
+    日计划: { '2026-11-26': 200 },
+  }]
+  const html = await schedPlanSheetHtml(rows, ['2026-11-26'], { today: '2026-11-26', shop: '成型' })
+  assert.ok(html.includes('>工序<br>未报工量</th>'), '列头改名:工序未报工量(断行:工序 / 未报工量)')
+  assert.ok(!html.includes('未完成'), '旧列头「未完成总数」不再出现')
+  const heads = [...html.matchAll(/<th[^>]*>([\s\S]*?)<\/th>/g)]
+    .map((m) => m[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ''))
+  const trBody = (/<tbody>([\s\S]*?)<\/tbody>/.exec(html) || [])[1] || ''
+  const firstTr = (/<tr>([\s\S]*?)<\/tr>/.exec(trBody) || [])[1] || ''
+  const cells = [...firstTr.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((m) => m[1].replace(/\s+/g, ''))
+  const iU = heads.findIndex((h) => h === '工序未报工量')
+  const iPlan = heads.findIndex((h) => h === '生产计划数量')
+  const iDone = heads.findIndex((h) => h === '实际完成数量')
+  assert.ok(iU >= 0, '纸面应有「工序未报工量」列')
+  assert.equal(cells[iU], '200', '工序未报工量 = 当前工序计划量 480 − 报工 280 = 200')
+  assert.equal(cells[iPlan], '480', '生产计划数量 = 当前工序计划量 480(不是 成型 240)')
+  assert.equal(cells[iDone], '280', '实际完成数量 = 当前工序完工量 280')
 })
 
 // 2026-11-16 用户口径「打印的这两个填写需要可以删除数据的」:
