@@ -16,13 +16,16 @@ import { readFileSync } from 'node:fs'
 const dlg = readFileSync(new URL('./XsinterCalcDialog.vue', import.meta.url), 'utf8')
 const sheet = readFileSync(new URL('../views/RecordSheetPanels.vue', import.meta.url), 'utf8')
 
-test('落库格式按列语义分精度（ratio/piece/weight 2 位、length 1 位）', () => {
+test('落库格式按列语义分精度（长度/重量 2 位、密度 3 位、比例与单支 2 位去尾零）', () => {
   const at = dlg.indexOf('const fmt = (v, kind')
   assert.ok(at > 0, 'fmt 必须接收 kind 参数')
-  const seg = dlg.slice(at, at + 900)
-  assert.match(seg, /kind === 'length'.*Math\.round\(n \* 10\)/, '长度类 1 位小数')
-  assert.match(seg, /kind === 'ratio' \|\| kind === 'piece' \|\| kind === 'weight'.*Math\.round\(n \* 100\)/,
-    '比例/单支含量/重量 2 位小数')
+  const seg = dlg.slice(at, at + 1200)
+  // 2026-11-18 用户打印截图红字：「2位小数」标在长度/重量上、「3位小数」标在密度上
+  assert.match(seg, /kind === 'len2'\) return n\.toFixed\(2\)/, '长度 2 位且补零')
+  assert.match(seg, /kind === 'density'\) return n\.toFixed\(3\)/, '密度 3 位')
+  assert.match(seg, /kind === 'weight'\) return n\.toFixed\(2\)/, '重量 2 位且补零')
+  assert.match(seg, /kind === 'ratio' \|\| kind === 'piece'\) return String\(Math\.round\(n \* 100\) \/ 100\)/,
+    '比例/单支含量 2 位去尾零')
 })
 
 test('关键列必须真的用上新精度', () => {
@@ -31,7 +34,13 @@ test('关键列必须真的用上新精度', () => {
   //   过滤后原始下标改名 idx ⇒ 取值用 c.rows[idx]，精度口径不变。
   assert.match(dlg, /'单支含量g': fmt\(c\.rows\[(i|idx)\]\?\.perPiece, 'piece'\)/, '单支含量要 2 位')
   assert.match(dlg, /'炭棒重量下限g': fmt\(c\.weight\.low, 'weight'\)/, '炭棒重量要 2 位')
-  assert.match(dlg, /'切炭长度中间值mm': fmt\(c\.cut\.mid, 'length'\)/, '切炭长度 1 位')
+  // 2026-11-18 用户口径改为 **2 位小数**（180.50），原来 1 位
+  assert.match(dlg, /'切炭长度中间值mm': fmt\(c\.cut\.mid, 'len2'\)/, '切炭长度 2 位')
+  // 密度要求 3 位（0.550）；重量 2 位且补零（112.40）
+  assert.match(dlg, /'密度要求下限': fmt\(c\.density\.low, 'density'\)/, '密度 3 位')
+  assert.match(dlg, /kind === 'density'\) return n\.toFixed\(3\)/, '密度用 toFixed(3)')
+  assert.match(dlg, /kind === 'weight'\) return n\.toFixed\(2\)/, '重量用 toFixed(2) 补零')
+  assert.match(dlg, /kind === 'len2'\) return n\.toFixed\(2\)/, '长度用 toFixed(2) 补零')
 })
 
 test('只读态给「%」列补百分号，编辑态不补', () => {
@@ -50,4 +59,15 @@ test('回填必须过滤掉没有物料的行（用户 2026-11-18 口径）', ()
     '要按 物料编号/物料名称 过滤')
   assert.match(dlg, /序号: String\(i \+ 1\)/, '过滤后序号按输出顺序重排')
   assert.match(dlg, /c\.rows\[idx\]/, '取计算结果要用**过滤前**的原始下标')
+})
+
+test('回填替换按引用判定，不再依赖行对象上的「表区」', () => {
+  // 2026-11-18 用户截图：回填后每行出现两次（1,1,2,2,3,3,4,4）——
+  // 原实现按 r[filterKey] 比对，而行对象不一定带该键 ⇒ 旧行被留下再追加 = 翻倍。
+  const sheet = readFileSync(new URL('../views/RecordSheetPanels.vue', import.meta.url), 'utf8')
+  const at = sheet.indexOf('function onXSinterApplied')
+  assert.ok(at > 0, '缺 onXSinterApplied')
+  const seg = sheet.slice(at, at + 1400)
+  assert.match(seg, /const mine = new Set\(rowsOf\(dt\)\)/, '要用 rowsOf(dt) 的引用集合判定本表行')
+  assert.match(seg, /arr\.filter\(\(r\) => !mine\.has\(r\)\)/, '按引用剔除旧行')
 })
