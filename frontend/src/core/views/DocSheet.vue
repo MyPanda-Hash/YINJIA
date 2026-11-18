@@ -1232,10 +1232,31 @@ function addGridRow() {
   emit('dirty')
 }
 /** 删除明细行(仅 detail 模式;留最后一行时不允许删空 —— 一张单至少一个样品) */
-function removeGridRow(idx) {
+/**
+ * 删除一行样品（2026-11-18 用户口径，Excel #11）：
+ *   「样品-内部开发 / 样品-开发外部 两个面板的删除行要二次确认」。
+ *
+ * <p>为什么做成**配置开关**而不是所有面板一刀切：其它单据（数据记录表/工艺清单）的行删除
+ * 是高频编辑动作，逐个弹窗会打断录入；这两个样品单一行 = 一个样品、删掉要重填，才值得拦一下。
+ * 开关名 `confirmDeleteRow`，只在 sampleExtSheetCfg / sampleIntSheetCfg 打开。</p>
+ *
+ * <p>取消（点"取消"或按 ESC）时不删、也不报错 —— ElMessageBox 的 reject 用 catch 吞掉即可。</p>
+ */
+async function removeGridRow(idx) {
   if (!props.editable || !gridAddable.value) return
   const items = props.head?.detail?.items
   if (!Array.isArray(items) || items.length <= 1) return
+  if (props.config && props.config.confirmDeleteRow) {
+    try {
+      await ElMessageBox.confirm(
+        tt('确定删除这一行吗？删除后需要重新填写。'),
+        tt('删除确认'),
+        { type: 'warning', confirmButtonText: tt('删除'), cancelButtonText: tt('取消') },
+      )
+    } catch (e) {
+      return // 用户取消
+    }
+  }
   items.splice(idx, 1)
   emit('dirty')
 }

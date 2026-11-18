@@ -5415,6 +5415,8 @@ export default {
     '请选择一个供应商': 'Please select a supplier',
     '加载供应商档案失败': 'Failed to load supplier master',
     /* ── 研发管理·样品 → 手填客户（建档打标记）2026-11-18 ── */
+    '删除后需要重新填写。': 'It will need to be filled in again.',
+
     '新客户': 'New customer',
     '客户档案里没有？手动填一个新客户': 'Not in the customer master? Enter a new customer manually',
     '客户编号': 'Customer code',

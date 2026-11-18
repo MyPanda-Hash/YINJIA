@@ -601,6 +601,8 @@ export const sampleExtSheetCfg = {
   // 落地方式：信息条（样品单编号/客户名称/费用/下单日期/期望交期）**下面新增一整行**，
   //   左侧标签「附件」+ FileAttachCell（复用产品信息表「客户图纸或规格书」同一套 yj_attachment 机制，
   //   支持多个文件、原文件名、点开预览/下载）。数据落头表 `附件` 列（文件名串）。
+  // 删除行二次确认（2026-11-18 用户口径，Excel #11）：一行 = 一个样品，删掉要重填，值得拦一下。
+  confirmDeleteRow: true,
   attach: { label: '附件', key: '附件' },
   signCells: [
     { label: '申请', key: '申请', span: 1, type: 'text' },
@@ -627,6 +629,8 @@ export const sampleNdSheetCfg = {
   // 2026-11-18：附件行**只给外部-开发样品单**（用户明确「只加在外部-开发样品单」），
   //   非开发样品单是展开继承来的，这里显式关掉，否则会跟着长出一行附件。
   attach: null,
+  // 删除确认同理：用户只点了「内部开发 + 开发外部」两张单，非开发单不开。
+  confirmDeleteRow: false,
   titlePart2: '非开发样品申请单',
   signCells: [
     { label: '申请', key: '申请', span: 2, type: 'text' },
@@ -644,6 +648,8 @@ export const sampleNdSheetCfg = {
  * 给最小可写宽（≥100px），列序与列名一字不改。
  */
 export const sampleIntSheetCfg = {
+  // 2026-11-18 用户口径（Excel #11）：内部开发样品单也要删除行二次确认。
+  confirmDeleteRow: true,
   layout: 'grid',
   titlePart1: '内部',
   titlePart2: '开发样品申请单',
