@@ -59,8 +59,10 @@ if (-not $javaHome -or -not (Test-Path (Join-Path $javaHome 'bin\javac.exe'))) {
 }
 if (-not $javaHome) { throw '找不到 JDK 25(设 JAVA_HOME)' }
 
-$version = '1.0.22'
+$version = '1.0.23'
 # ── 版本 —— versionName / versionCode 的**唯一真源**(Manifest 里不写,见 README §0)──
+# 1.0.23 = 本版(2026-11-18:整站前端重打 —— 生产退料提交只生成【草稿】(不再自动审批),
+#           确认框改成「生成生产退料单(草稿),等仓管审核后库存才增加」)。
 # 1.0.22 = 本版(2026-11-18:整站前端重打,原生壳未改 —— 修「生产退料扫组装/混料二维码都跳混料明细」:
 #           明细页的单据标识从 ref 一次性取值改成 computed 跟随路由 + watch 重取(query 变了但
 #           keep-alive 复用实例时不再停在上一张单);其他领料/退料明细页同样补了切单 watch)。
@@ -82,7 +84,7 @@ $version = '1.0.22'
 # 1.0.12 = 13 / 1.0.11 = 12 / 1.0.10 = 11 / 1.0.9 = 10 / 1.0.8 = 9 / 1.0.7 = 8(更早)。
 # versionCode 必须**单调递增**:安卓只在它变大时才允许「覆盖安装」;签名还必须与上一版同一把钥匙
 # (debug.keystore 随仓库保留,丢了就只能卸载重装)。
-$versionCode = 23
+$versionCode = 24
 $zxing = Join-Path $proj 'libs\zxing-core-3.5.3.jar'
 if (-not (Test-Path $zxing)) { throw "缺少 ZXing:$zxing(可从 Maven Central 下 core-3.5.3.jar)" }
 
