@@ -151,8 +151,10 @@ test('组件源码里取表体列值必须走 K 常量或 RESULT_KEYS', () => {
 /**
  * 源码级回归:检测结果是**可增删列**(2026-11-19),不再是固定五格:
  *   · 表头 colspan 与渲染循环都必须跟着 resultColCount / resultKeys 走;
- *   · 分区条必须有「检测结果列 － n ＋」步进器(列数存头字段「结果列数」);
- *   · 减列要清空被减列(否则库里留着看不见的旧值,下次加列"自己长回来")。
+ *   · 加列/减列入口必须有**看得见**的按钮(表头「＋ 新增列」+ 增行条「＋ 新增检测结果列」),
+ *     2026-11-19 第二轮用户报「怎么还是这样」—— 只有分区条里 16px 的 ＋ 时他找不到入口;
+ *   · 每列表头要能 × 掉**指定那一列**(只留 －/＋ 删不了中间列);
+ *   · 减列/删列都要清空被减列(否则库里留着看不见的旧值,下次加列"自己长回来")。
  */
 test('组件按 结果列数 渲染 1..n 个格子(可增删列),不再是固定五格', () => {
   const src = readFileSync(new URL('../views/QcInspRecSheet.vue', import.meta.url), 'utf8')
@@ -163,10 +165,17 @@ test('组件按 结果列数 渲染 1..n 个格子(可增删列),不再是固定
   assert.match(src, /:colspan="resultColCount"/, '表头「检测结果」必须跨 n 列')
   assert.ok(!/colspan="5"/.test(src), '固定五格的 colspan="5" 必须已去掉')
   // 步进器(加列/减列)
-  assert.match(src, /setResultColCount\(resultColCount \+ 1\)/, '要有「增加列」入口')
-  assert.match(src, /setResultColCount\(resultColCount - 1\)/, '要有「减少列」入口')
+  assert.match(src, /setResultColCount\(resultColCount \+ 1\)/, '分区条要有「增加列」入口')
+  assert.match(src, /setResultColCount\(resultColCount - 1\)/, '分区条要有「减少列」入口')
   assert.match(src, /props\.head\[RESULT_COUNT_KEY\] = n/, '列数要写进头字段(否则保存后丢失)')
   assert.match(src, /clearResultColumn\(props\.head, cur, n\)/, '减列要清空被减列已填的值')
+  // 2026-11-19 第二轮:看得见的加列入口(表头 + 增行条)与每列 × 删除
+  assert.match(src, /class="qr-addcol no-print"/, '表头「检测结果」里要有加列按钮')
+  assert.match(src, /tt\('新增检测结果列'\)/, '增行条要有「＋ 新增检测结果列」大按钮')
+  assert.match(src, /function addResultColumn\(\)/, '加列要收敛到 addResultColumn(到上限只提示)')
+  assert.match(src, /removeResultColumnAt\(gi\)/, '每列表头的 × 要能删掉指定那一列')
+  assert.match(src, /function removeResultColumnAt/, '删列逻辑要在(右侧各列左移 + 末列清空)')
+  assert.match(src, /row\[RESULT_KEYS\[i\]\] = row\[RESULT_KEYS\[i \+ 1\]\]/, '删中间列要把右侧各列左移')
   // 原来那一格是 type="textarea" + maxlength="500" 的自由文本域;格子是单值输入
   assert.ok(!/type="textarea"[\s\S]{0,200}maxlength="500"/.test(src),
     '检测结果的自由文本域应已换成 1..n 个单值格子')

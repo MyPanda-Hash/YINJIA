@@ -1631,6 +1631,17 @@ export default {
     '减少检测结果列将清空该列已填数据，确定减少吗？':
       'Removing result columns clears the data already filled in those columns. Continue?',
     '减少检测结果列': 'Remove result columns',
+    // 2026-11-19 第二轮:加列入口挪到「检测结果」表头 + 增行条(用户报「怎么还是这样」——
+    // 分区条里那个 16px 的 ＋ 太小、找不到);每列表头另有 × 删掉指定那一列
+    '新增列': 'Add column',
+    '新增检测结果列': 'Add result column',
+    '给「检测结果」加一列（抽几件就几列,最多 20 列）':
+      'Add one column to the inspection results (one per sampled piece, up to 20)',
+    '新增检测结果列（抽几件就加几列）': 'Add a result column (one per sampled piece)',
+    '删除该检测结果列（右侧各列左移）': 'Delete this result column (columns to the right shift left)',
+    '该列有已填的检测结果，删除后右侧各列左移、这一列的数据会清空，确定删除吗？':
+      'This column already has inspection results. Deleting it shifts the following columns left and clears its data. Continue?',
+    '删除检测结果列': 'Delete result column',
     '单项判定': 'Item Judgement',
     '物料批次': 'Material Batch',
     '来料日期': 'Arrival Date',

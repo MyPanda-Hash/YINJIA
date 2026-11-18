@@ -139,7 +139,20 @@
             <!-- 检验方法(2026-11-11 用户口径):来料检验要求「父目录+两个子目录」带入时,
                  一个子目录进 检测标准、另一个进 检验方法 —— 报告表体必须有这一列 -->
             <th class="c-method" rowspan="2">{{ tt('检验方法') }}</th>
-            <th class="c-result" :colspan="resultColCount" :style="{ width: resultBandWidth }">{{ tt('检测结果') }}</th>
+            <th class="c-result" :colspan="resultColCount" :style="{ width: resultBandWidth }">
+              <span class="c-result-label">{{ tt('检测结果') }}</span>
+              <!-- 2026-11-19 第二轮:加列入口**放进表头**(用户报「怎么还是这样」——
+                   分区条那个 16px 的「＋」太不起眼/不好点)。表头这个按钮大、就在红框位置旁边,
+                   点一下加一列;列数仍存头字段「结果列数」。 -->
+              <span
+                v-if="editable"
+                class="qr-addcol no-print"
+                :class="{ dim: resultColCount >= MAX_RESULT_COLS }"
+                :title="tt('新增检测结果列（抽几件就加几列）')"
+                @click="addResultColumn()"
+              >＋ {{ tt('新增列') }}</span>
+              <span v-if="editable" class="c-result-count no-print">{{ resultColCount }}</span>
+            </th>
             <!-- 单项判定必填(2026-11-11 用户口径) -->
             <th class="c-judge" rowspan="2">
               {{ tt('单项判定') }}<span v-if="isRequired(K.JUDGE)" class="qr-req" :title="tt('必填')">*</span>
@@ -147,12 +160,22 @@
             <th v-if="editable" class="c-op" rowspan="2"></th>
           </tr>
           <tr>
+            <!-- 每列右上角一个 ×:删掉**这一列**(右侧各列左移;该列有值时先确认)。
+                 只留 －/＋ 的话,想删中间那一列就没辙了(用户口径:要"能增能减")。 -->
             <th
               v-for="(k, gi) in resultKeys"
               :key="'rh' + k"
               class="c-res"
               :style="{ width: RESULT_COL_W + 'px' }"
-            >{{ gi + 1 }}</th>
+            >
+              <span class="c-res-no">{{ gi + 1 }}</span>
+              <span
+                v-if="editable && resultColCount > MIN_RESULT_COLS"
+                class="c-res-del no-print"
+                :title="tt('删除该检测结果列（右侧各列左移）')"
+                @click.stop="removeResultColumnAt(gi)"
+              >×</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -258,8 +281,16 @@
         </tbody>
       </table>
     </div>
+    <!-- 增行/增列条:两个入口都是"看得见的大按钮"(2026-11-19 第二轮 —— 光靠分区条里那个
+         16px 的 ＋ 用户找不到,才报「怎么还是这样」) -->
     <div v-if="editable" class="qr-addbar">
       <div class="qr-add" @click="addItem">＋ {{ tt('新增检验项') }}</div>
+      <div
+        class="qr-add qr-addcol-bar"
+        :class="{ dim: resultColCount >= MAX_RESULT_COLS }"
+        :title="tt('给「检测结果」加一列（抽几件就几列,最多 20 列）')"
+        @click="addResultColumn()"
+      >＋ {{ tt('新增检测结果列') }}<span class="qr-addcol-num">{{ resultColCount }}</span></div>
     </div>
 
     <!-- ⑤ 表尾(2026-11-11 用户口径:按模板排成**两行两对** ——
@@ -474,7 +505,7 @@ function clearResultColumn(head, count, to) {
   }
 }
 
-/** 调整结果列数(步进器):加列即时生效;减列先确认,并清空被减列已填的值 */
+/** 调整结果列数:加列即时生效;减列(从末尾减)先确认,并清空被减列已填的值 */
 async function setResultColCount(n) {
   if (!props.editable) return
   const cur = resultColCount.value
@@ -489,6 +520,37 @@ async function setResultColCount(n) {
     clearResultColumn(props.head, cur, n)
   }
   props.head[RESULT_COUNT_KEY] = n
+  emit('dirty')
+}
+
+/** 「＋ 新增列」(表头 / 增行条两个入口共用):到上限只提示、不改列数 */
+function addResultColumn() {
+  if (!props.editable) return
+  if (resultColCount.value >= MAX_RESULT_COLS) return ElMessage.warning(tt('已是最大列数'))
+  void setResultColCount(resultColCount.value + 1)
+}
+
+/** 删掉**指定那一列**(表头每格的 ×):右侧各列左移一格,末列清空。
+ *  与「－」的区别:「－」只从末尾减,想删中间那一列就得靠这里。
+ *  该列有已填值时先确认(数据要丢,必须问一句)。 */
+async function removeResultColumnAt(idx) {
+  if (!props.editable) return
+  const n = resultColCount.value
+  if (n <= MIN_RESULT_COLS) return ElMessage.warning(tt('已是最少列数'))
+  const hasVal = items.value.some((r) => String(r[RESULT_KEYS[idx]] ?? '').trim() !== '')
+  if (hasVal) {
+    try {
+      await ElMessageBox.confirm(
+        tt('该列有已填的检测结果，删除后右侧各列左移、这一列的数据会清空，确定删除吗？'),
+        tt('删除检测结果列'),
+        { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') })
+    } catch { return /* 取消 */ }
+  }
+  for (const row of items.value) {
+    for (let i = idx; i < n - 1; i++) row[RESULT_KEYS[i]] = row[RESULT_KEYS[i + 1]] ?? ''
+    row[RESULT_KEYS[n - 1]] = ''
+  }
+  props.head[RESULT_COUNT_KEY] = n - 1
   emit('dirty')
 }
 
@@ -1011,14 +1073,15 @@ watch(
 }
 .qr-colstep-btn {
   display: inline-block;
-  width: 16px;
-  height: 16px;
-  line-height: 14px;
+  width: 18px;
+  height: 18px;
+  line-height: 16px;
   text-align: center;
   border: 1px solid #8fb4e0;
   border-radius: 3px;
   background: #f4f9ff;
   color: #1c4f8a;
+  font-size: 13px;
   cursor: pointer;
 }
 .qr-colstep-btn:hover { background: #e2efff; border-color: #5b93d6; }
@@ -1073,6 +1136,73 @@ watch(
 /* 结果列是窄格:缩一缩左右内边距,数字/短文本不会被挤掉 */
 .qr-table th.c-res,
 .qr-table td.c-res { padding-left: 2px; padding-right: 2px; }
+/* 「检测结果」表头里的加列按钮(2026-11-19 第二轮:分区条那个 16px 的＋用户找不到,
+   这里做成表头内的可见按钮 —— 就在用户圈的那块表头上) */
+.c-result {
+  position: relative;
+}
+.c-result-label { display: inline-block; }
+.c-result-count {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 7px;
+  background: rgba(31, 95, 168, 0.12);
+  color: #1f5fa8;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 15px;
+}
+.qr-addcol {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 1px 6px;
+  border: 1px solid #4d8ed0;
+  border-radius: 3px;
+  background: #eaf3ff;
+  color: #1c4f8a;
+  font-size: 11.5px;
+  font-weight: 400;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.qr-addcol:hover { background: #d7e9ff; }
+.qr-addcol.dim { color: #9aa7b6; border-color: #c8d3df; background: #f4f7fb; cursor: not-allowed; }
+/* 每列表头的 ×:平时淡、悬停整格才明显(格子只有 58px,常显会挤掉列号) */
+.c-res { position: relative; }
+.c-res-no { display: inline-block; }
+.c-res-del {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 13px;
+  height: 13px;
+  line-height: 11px;
+  text-align: center;
+  font-size: 12px;
+  color: #c0392b;
+  background: #fff;
+  border-radius: 0 0 0 3px;
+  opacity: 0;
+  cursor: pointer;
+}
+.qr-table th.c-res:hover .c-res-del { opacity: 1; }
+.c-res-del:hover { background: #ffeceb; }
+/* 增行条里的「＋ 新增检测结果列」(与「＋ 新增检验项」并排,同样大小的按钮) */
+.qr-addbar .qr-addcol-bar { display: inline-flex; align-items: center; gap: 4px; }
+.qr-addcol-num {
+  min-width: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: rgba(31, 95, 168, 0.12);
+  color: #1f5fa8;
+  font-size: 11px;
+  line-height: 15px;
+  text-align: center;
+}
+.qr-add.dim { color: #9aa7b6; border-color: #c8d3df; background: #f4f7fb; cursor: not-allowed; }
 .qr-lib-btn {
   margin-left: 6px;
   font-size: 11px;
