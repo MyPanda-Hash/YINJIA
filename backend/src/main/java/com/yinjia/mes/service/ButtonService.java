@@ -40,7 +40,15 @@ public class ButtonService {
      *   明细行是保存前从库里查出来的、带着旧表头值,保存时行内旧值又把新值盖回去。
      * 只放行用户明确要求的面板(当前 ROUTE、ASM_BOM),其余单表式面板行为保持不变。
      */
-    private static final java.util.Set<String> SINGLE_HEAD_WINS_PANELS = java.util.Set.of("ROUTE", "ASM_BOM");
+    private static final java.util.Set<String> SINGLE_HEAD_WINS_PANELS =
+            java.util.Set.of("ROUTE", "ASM_BOM", "MIX_BOM");
+
+    /**
+     * 「空明细拒绝保存」护栏覆盖的面板(2026-11-18):单表式 BOM 类基础数据。
+     * 依据 2026-11-18 15:56 实测事故 —— 界面没加载出明细时点「提交」,6 行子件被整批软删、
+     * 整张清单从列表消失(见 saveDoc 里的护栏注释)。只列 BOM 面板,其它单表式面板行为不变。
+     */
+    private static final java.util.Set<String> BOM_LINE_GUARD_PANELS = java.util.Set.of("ASM_BOM", "MIX_BOM");
 
     private static final Logger log = LoggerFactory.getLogger(ButtonService.class);
 
@@ -68,6 +76,11 @@ public class ButtonService {
     private final StockMonthCloseService monthCloseService;
     /** 工序检验单的数据驱动出单(报工量达计划量即出单;报工审核与手机端吸收共用同一份判定) */
     private final QcInspAutoService qcInspAuto;
+    /**
+     * 工艺清单归档 → 基础数据清单的同步(2026-11-18):组装工艺清单 → 组装物料清单、
+     * 烧结/X烧结工艺清单 → 混料物料清单。见 {@link ProcBomArchiveSyncService} 头注。
+     */
+    private final ProcBomArchiveSyncService procBomSync;
 
     /**
      * 数量按计量单位精度规整(2026-11-09 用户口径:WMS 单据/库存/供应链单据统一按单位精度)。
@@ -84,7 +97,8 @@ public class ButtonService {
                          InvCostService invCost, QcCatalogService qcCatalog,
                          ManuWritebackService manuWriteback, CalcRuleService calcRuleService,
                          ProcessTaskService processTask, StockMonthCloseService monthCloseService,
-                         QcInspAutoService qcInspAuto, UnitQtyNormalizer unitQty) {
+                         QcInspAutoService qcInspAuto, UnitQtyNormalizer unitQty,
+                         ProcBomArchiveSyncService procBomSync) {
         this.registry = registry;
         this.queryService = queryService;
         this.formNoService = formNoService;
@@ -104,6 +118,7 @@ public class ButtonService {
         this.monthCloseService = monthCloseService;
         this.qcInspAuto = qcInspAuto;
         this.unitQty = unitQty;
+        this.procBomSync = procBomSync;
     }
 
     /** 发送业务事件消息(失败不影响业务操作) */
@@ -1155,6 +1170,22 @@ public class ButtonService {
         ensureBatchNoByDate(def, head, items);
         // 明细「行序」自动补号(2026-11-04,组装物料清单 ASM_BOM 连加两行保存撞唯一索引):见方法注释
         assignNewLineSeq(def, items, no);
+        // 误删护栏(2026-11-18,依据实测事故):单表式 BOM 面板(组装/混料物料清单)已有有效子件行,
+        // 而本次提交的**明细是空的** ⇒ 拒绝保存。
+        // 事故:2026-11-18 15:56 用户在一张组装物料清单上点「提交」,载荷里明细是空的(界面没加载出行),
+        //   upsertLineRows 的「缺席行=已删除」语义把 6 行全部软删(asp_cancel='Y')⇒ 整张单从列表里消失、
+        //   用户看到"这个产品的数据不见了"。这类清空是**不可逆的界面误操作**,不是业务意图。
+        // 需要清空整张清单请用「删除单据」;需要删个别行请逐行删(只剩最后一行时也会被本护栏拦住)。
+        if (BOM_LINE_GUARD_PANELS.contains(def.code()) && no != null && !no.isBlank() && items.isEmpty()) {
+            Integer existing = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM [" + def.lineTable() + "] WHERE [" + def.groupCol() + "] = ?"
+                            + " AND ISNULL(asp_cancel,'N') <> 'Y'", Integer.class, no);
+            if (existing != null && existing > 0) {
+                throw new IllegalArgumentException("明细为空,已拒绝保存:" + def.name() + " " + no
+                        + " 现有 " + existing + " 行子件,空明细会把这些行全部删掉。"
+                        + "如确需清空整张清单,请用「删除单据」;要删个别行请逐行删除。");
+            }
+        }
         // 紧急放行申请单:保存时补「责任人 / 责任部门」(仅空值,覆盖"带数据一次保存建单"这条路)
         putRespDept(def, head, user);
         if (split) {
@@ -1502,14 +1533,7 @@ public class ButtonService {
      */
     private void ensureRequiredFilled(PanelRegistry.PanelDef def, Map<String, Object> head, String no) {
         List<PanelRegistry.FieldDef> required = def.fieldsAt("header").stream()
-                .filter(PanelRegistry.FieldDef::required)
-                .filter(f -> !REQUIRED_SYS_FIELDS.contains(f.col()))
-                .filter(f -> !REQUIRED_SYS_FIELDS.contains(f.label()))
-                // 隐藏字段不校验:前端 headerFields = dataSchema.fields.filter(f => !f.hidden)
-                // (PanelxList.vue:2436 起,validateInlineDraft 只遍历它) —— 后端若强校验,
-                // 会出现"要求的字段界面上根本没渲染",用户无路可走。现存:RDDOM_TEST.文档编号、
-                // RD_PROD_INFO.产品类型(hidden=1/visible=1)。
-                .filter(f -> !f.hidden())
+                .filter(ButtonService::requiredEnforced)
                 .toList();
         if (required.isEmpty()) return;
         // ⚠ labelsToCols 会把**空串归一化成 null 并跳过**,所以这里取不到"提交了空值"这件事;
@@ -1545,6 +1569,26 @@ public class ButtonService {
             java.util.Set.of("单据编号", "单据日期", "创建时间", "更新时间", "编辑人", "编辑日期", "规格书种类", "编号");
 
     /**
+     * 该字段是否**真的要拦必填** —— 所有必填闸门(保存两道 + 状态推进那道)共用的唯一口径。
+     *
+     * <p><b>隐藏字段一律不校验(2026-11-18 用户口径:「隐藏字段得修改为不校验的形式才可以」)</b>:
+     * 前端只渲染 `dataSchema.fields.filter(f => !f.hidden)`(PanelxForm.vue / PanelxList.vue),
+     * 隐藏列在界面上**根本没有输入口**;后端若还按 `required=1` 强校验,用户永远补不上 ⇒
+     * 单据卡死在提交审批/审核/审批通过,只能改库。
+     * 实测踩坑:RD_PROD_INFO.产品类型(hidden=1,required=1,纸面 2026-10-29 改版已不画此格)⇒
+     * 「审批通过」必报「『产品类型』不能为空」;同类 SALE_OUT.售价(detail,visible=0,hidden=1)。
+     * 改版时把字段从纸面撤下,只置 hidden 即可,不需再记着去改 required。</p>
+     *
+     * <p>与前端 {@code validateInlineDraft} 逐条对齐:系统自动字段见 {@link #REQUIRED_SYS_FIELDS},
+     * 隐藏字段见本条。命中任一即不拦。</p>
+     */
+    private static boolean requiredEnforced(PanelRegistry.FieldDef f) {
+        return f != null && f.required() && !f.hidden()
+                && !REQUIRED_SYS_FIELDS.contains(f.col())
+                && !REQUIRED_SYS_FIELDS.contains(f.label());
+    }
+
+    /**
      * 明细行必填校验(2026-09-20 补):与前端 validateInlineDraft 的**逐行**口径一致
      * (PanelxList.vue「明细第 N 行X不能为空」),只取第一条违规,便于前端定位。
      *
@@ -1561,9 +1605,9 @@ public class ButtonService {
      */
     private void ensureDetailRequiredFilled(PanelRegistry.PanelDef def, List<Map<String, Object>> items) {
         if (items == null || items.isEmpty()) return;
+        // 隐藏列不校验(口径见 {@link #requiredEnforced}):界面没有输入口,拦了就是死结
         List<PanelRegistry.FieldDef> required = def.fieldsAt("detail").stream()
-                .filter(PanelRegistry.FieldDef::required)
-                .filter(f -> !REQUIRED_SYS_FIELDS.contains(f.col()))
+                .filter(ButtonService::requiredEnforced)
                 .toList();
         if (required.isEmpty()) return;
         for (int i = 0; i < items.size(); i++) {
@@ -1820,6 +1864,11 @@ public class ButtonService {
      * 载荷里常常只有单号，等于没校验。这里改成**拿库里的单据**说话:表头 + 明细逐字段核
      * `yj_field.required=1` 的列(系统自动填的字段除外，见 {@link #REQUIRED_SYS_FIELDS})。</p>
      *
+     * <p><b>隐藏列不核(2026-11-18)</b>:与保存那两道同口径,统一走 {@link #requiredEnforced} ——
+     * 2026-11-17 首版这里只排了系统字段、漏了 hidden,导致 RD_PROD_INFO.产品类型(hidden=1/
+     * required=1、纸面 2026-10-29 改版已撤格)让「审批通过」永远报「『产品类型』不能为空」,
+     * 用户界面上却找不到这一格。凡界面上没渲染的字段,后端一律不许拿它拦状态推进。</p>
+     *
      * <p>只拦状态推进:草稿保存/保存为草稿仍按用户口径不做必填限制(允许存一半)。</p>
      *
      * @param phase 提示语里的动作名(提交审批 / 审核 / 审批通过),让用户知道是哪一步被拦
@@ -1836,7 +1885,8 @@ public class ButtonService {
             Map<String, Object> head = heads.isEmpty() ? null : heads.get(0);
             if (head != null) {
                 for (PanelRegistry.FieldDef f : def.fieldsAt("header")) {
-                    if (!f.required() || REQUIRED_SYS_FIELDS.contains(f.col()) || REQUIRED_SYS_FIELDS.contains(f.label())) continue;
+                    // 隐藏字段 / 系统自动字段不拦 —— 口径见 {@link #requiredEnforced}
+                    if (!requiredEnforced(f)) continue;
                     Object v = head.get(f.col());
                     if (v == null || String.valueOf(v).isBlank()) {
                         throw new IllegalStateException("「" + f.displayName() + "」不能为空，请先补全再" + act);
@@ -1846,9 +1896,7 @@ public class ButtonService {
         }
         // ---- 2) 明细:逐行核(只报第一条违规,便于前端定位;软删行不算) ----
         List<PanelRegistry.FieldDef> required = def.fieldsAt("detail").stream()
-                .filter(PanelRegistry.FieldDef::required)
-                .filter(f -> !REQUIRED_SYS_FIELDS.contains(f.col()))
-                .filter(f -> !REQUIRED_SYS_FIELDS.contains(f.label()))
+                .filter(ButtonService::requiredEnforced)
                 .toList();
         if (required.isEmpty() || def.lineTable() == null || def.lineTable().isBlank()) return;
         boolean softDelete = hasSoftDeleteCol(def.lineTable());
@@ -2116,6 +2164,18 @@ public class ButtonService {
             // 2026-10-30 用户口径:「产品信息表处于审批的时候,物料清单是草稿状态;
             //   审批通过归档的时候物料清单也同时归档」⇒ 同步行数据时按 archived=true 写状态。
             syncProdBomToMaterialList(no, user, true);
+        }
+        // 工艺清单归档 ⇒ 基础数据清单(2026-11-18 用户口径「只要已归档状态的内容即可」):
+        //   · 组装工艺清单  → 组装物料清单(ASM_BOM / bs_asm_bom)
+        //   · 烧结工艺清单 / X烧结工艺清单 → 混料物料清单(MIX_BOM / bs_mix_bom)
+        // 挂在这里的理由同上面产品信息表那条:markArchived 是**唯一的归档入口**
+        // (保存即归档 / 审批通过 / 二级审批通过 / 再归档 四条路最后都汇到本方法 —— 挂别处必漏)。
+        // 同步内部自吞异常并记 warning:归档是业务主流程,不能因基础数据没写进去而卡住单据。
+        if (ProcBomArchiveSyncService.PANEL_ASM_PROC.equals(panelCode)) {
+            procBomSync.syncAsmProc(no, user);
+        } else if (ProcBomArchiveSyncService.PANEL_MOLD_PROC.equals(panelCode)
+                || ProcBomArchiveSyncService.PANEL_X_SINTER.equals(panelCode)) {
+            procBomSync.syncSinterProc(panelCode, no, user);
         }
     }
 
