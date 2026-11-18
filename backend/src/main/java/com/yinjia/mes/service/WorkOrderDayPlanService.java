@@ -74,7 +74,8 @@ public class WorkOrderDayPlanService {
      * @param ids        生产工单页:当前表格里的行 id(空 = 走产线模式)
      * @param line       工单排产页:选中产线
      * @param scope      未完工/已完工/全部(产线模式,与排产明细页签同口径)
-     * @param futureDays 未来最少列数(默认 14);实际窗口会按各行「计划完工日期」自动延长到最晚那天
+     * @param futureDays 未来最少列数(默认 14):今天一定出列,并把「今天→最早计划日」的空档补齐
+     *                   (最多这么天);实际窗口仍按各行「计划完工日期」自动延长到最晚那天
      *                   (用户口径「28 号往后的表格显示不全」⇒ 不再按固定天数截断)
      * @param workshop   登录账号车间(可空)
      */
@@ -107,7 +108,7 @@ public class WorkOrderDayPlanService {
         // 日期列**按数据生成**(2026-10-29 用户口径「不存在当前日期的时候不显示这些数据列」):
         //   = 这些行的自动日计划/日报工出现过的日期 ∪ 各工序「计划开工~计划完工」区间;
         //   不再给「今天-14 ~ 今天+14」的固定窗口(那样会满屏空列)。
-        List<String> dates = buildDates(refs, plans, actuals, today);
+        List<String> dates = buildDates(refs, plans, actuals, today, futureDays == null ? 14 : futureDays);
         out.put("日期", dates);
         // 产能可见(2026-10-31 用户口径「产能只显示、不拦截」):
         //   · 产线产能 = bs_prod_line.日产能(0/空 = 未配 ⇒ 不判超载,沿用列注明「0=不判超载」);
@@ -738,7 +739,8 @@ public class WorkOrderDayPlanService {
     private List<String> buildDates(List<RowRef> refs,
                                     Map<String, Map<String, Double>> plans,
                                     Map<String, Map<String, Double>> actuals,
-                                    LocalDate today) {
+                                    LocalDate today,
+                                    int futureDays) {
         TreeSet<LocalDate> set = new TreeSet<>();
         LocalDate min = today.minusDays(180);
         LocalDate max = today.plusDays(365);
@@ -777,6 +779,21 @@ public class WorkOrderDayPlanService {
                 }
             }
         }
+        // 🔴 2026-11-18 用户报障「这个怎么不显示今日的了」(组装1(老厂) 截图:各道计划整体落在 11-22 之后,
+        //   日期列就从 11-22 才开始,今天 11-18 那一列直接消失 ⇒ 看不到、也补不了今天的量)。
+        //   收口:**今天这一列一定在**,并把「今天 → 最早存在的未来日期」这段**空档**补齐
+        //   (最多 futureDays 天,防脏数据把列撑爆)。只补空档,不做「今天±N 天」的固定窗口
+        //   —— 那会满屏空列,2026-10-31 用户已否。
+        LocalDate firstOnOrAfter = null;
+        for (LocalDate d : set) {
+            if (!d.isBefore(today)) { firstOnOrAfter = d; break; }
+        }
+        int fd = futureDays < 1 ? 14 : futureDays;
+        LocalDate cap = today.plusDays(Math.max(0, fd - 1L));
+        LocalDate fillEnd = firstOnOrAfter == null ? today
+                : (firstOnOrAfter.isBefore(cap) ? firstOnOrAfter : cap);
+        for (LocalDate d = today; !d.isAfter(fillEnd); d = d.plusDays(1)) set.add(d);
+        set.add(today);
         List<String> out = new ArrayList<>();
         for (LocalDate d : set) {
             // 过去的日期:当天有计划或有已审报工才出列(2026-10-31:只认报工会把过去的计划吞掉,
