@@ -5119,27 +5119,44 @@ public class ButtonService {
     // ==================== 来料检验单审核 → 自动生成采购入库单(2026-09-15) ====================
 
     /**
-     * 「上游审核自动生成下游草稿」的**知情**收件角色(2026-11-17 用户口径:
-     * 「从来料检验单审批自动生成采购入库单和暂收退料单能不能消息通知到生产销售和仓库审核两个角色。
-     * 都是只要知情」)。
+     * 「上游审核自动生成下游草稿」的两类收件角色(2026-11-17 用户口径,第二轮修订)。
      *
-     * <p>角色编码取 {@code yj_role.role_code}:**scxs = 生产销售**、**cksh = 仓库审核**。
+     * <p>用户原话:「1. 生产销售**只用收到暂收退料**就行。2. 生成单据的时候就要有消息,
+     * **这个草稿单是需要他们去补充的**,不是待审批的消息。」
      *
-     * <p>⚠ 刻意**不用**审批权解析({@code MessageService.approversOf}):生产销售在这两张单上
-     * 没有 audit 权限(perms 只有 view/query/export/print/warn)⇒ 按审批权找人它永远收不到;
+     * <ul>
+     *   <li><b>fill</b>(草稿要去补充的人)= **仓库审核 `cksh`**:两张单一视同仁。文案说"请补充完善后再审核",
+     *       不说"待审批"——草稿不是审批节点;</li>
+     *   <li><b>fyi</b>(只需知情)= **生产销售 `scxs`**,且**只对暂收退料单**发;
+     *       ⚠ 采购入库单**不发**给生产销售(用户第二轮明确「只用收到暂收退料」)。</li>
+     * </ul>
+     *
+     * <p>角色编码取 {@code yj_role.role_code}。⚠ 刻意**不用**审批权解析
+     * ({@code MessageService.approversOf}):生产销售在这两张单上没有 audit 权限
+     * (perms 只有 view/query/export/print/warn)⇒ 按审批权找人它永远收不到;
      * 而且自动生成的是**草稿**,草稿不进门户「待办」(待办只认 {@code pending='Y'})。
-     * 面板级要改收件人不必改代码:{@code yj_panel.config} 的 {@code auditNotifyRoles}(角色)
-     * / {@code auditNotify}(点名账号),见 {@link MessageService#draftAuditNotifyTargets}。
+     * 面板级要改收件人不必改代码:{@code yj_panel.config} 的
+     * {@code fillNotify}/{@code fillNotifyRoles}/{@code fyiNotify}/{@code fyiNotifyRoles},
+     * 见 {@link MessageService#draftNotifyTargets}。
      */
-    private static final java.util.List<String> DRAFT_AUDIT_NOTIFY_ROLES =
-            java.util.List.of("scxs", "cksh");
+    private static final java.util.List<String> DRAFT_FILL_ROLES = java.util.List.of("cksh");
+
+    /** 只**知情**的角色(按下游面板区分;采购入库单 = 空 ⇒ 生产销售收不到它) */
+    private static final java.util.Map<String, java.util.List<String>> DRAFT_FYI_ROLES = java.util.Map.of(
+            "PURCHASE_IN", java.util.List.of(),
+            "QC_RETURN", java.util.List.of("scxs"));
 
     /**
-     * 上游单据审核**自动生成了下游草稿** → 发一条「已生成、请知悉」消息(2026-11-17)。
+     * 上游单据审核**自动生成了下游草稿** → 两条消息(2026-11-17 第二轮口径)。
      *
-     * <p>消息挂在**下游单据**上({@code panelCode}=目标面板、{@code docNo}=新单号),
-     * 前端「消息」里点「去处理」直接跳到那张草稿单(见 NoticeCenter 的 {@code ?docNo=} 跳转)。
-     * 操作者本人不收自己的动作消息;发送失败不影响生单({@link #notify} 内部吞异常)。
+     * <p>时机 = **生单那一刻**(来料检验单审核时),不是审批节点:草稿是"要人补"的纸,不是"要人批"的单。
+     * <ul>
+     *   <li>{@link MessageService#AUTO_DRAFT_TO_FILL} → 仓库审核:请补充完善后再审核;</li>
+     *   <li>{@link MessageService#AUTO_DRAFT_FYI} → 生产销售:只在暂收退料单上发一条纯知会。</li>
+     * </ul>
+     * 消息挂在**下游草稿单**上({@code panelCode}=目标面板、{@code docNo}=新单号),
+     * 前端「消息」里点「去处理」直接跳到那张草稿。操作者本人不收自己的动作消息;
+     * 发送失败不影响生单({@link #notify} 内部吞异常)。
      *
      * @param targetPanel 下游面板编码(PURCHASE_IN / QC_RETURN)
      * @param targetNo    自动生成的下游单号
@@ -5147,11 +5164,21 @@ public class ButtonService {
      * @param actor       触发人(审核来料检验单的人)
      */
     private void notifyAutoDraft(String targetPanel, String targetNo, String inspNo, String actor) {
+        java.util.Map<String, Object> params = java.util.Map.of(
+                "docNo", targetNo, "actor", actor, "sourceNo", inspNo);
         notify(() -> {
-            java.util.List<String> to = messageService.draftAuditNotifyTargets(targetPanel, DRAFT_AUDIT_NOTIFY_ROLES)
+            java.util.List<String> fill = messageService
+                    .draftNotifyTargets(targetPanel, "fill", DRAFT_FILL_ROLES)
                     .stream().filter((u) -> !u.equals(actor)).toList();
-            return messageService.send(to, MessageService.AUTO_DRAFT_FOR_AUDIT, targetPanel, targetNo,
-                    java.util.Map.of("docNo", targetNo, "actor", actor, "sourceNo", inspNo), actor);
+            return messageService.send(fill, MessageService.AUTO_DRAFT_TO_FILL, targetPanel, targetNo, params, actor);
+        });
+        java.util.List<String> fyiRoles = DRAFT_FYI_ROLES.getOrDefault(targetPanel, java.util.List.of());
+        if (fyiRoles.isEmpty()) return;   // 采购入库单:生产销售不收(用户口径「只用收到暂收退料」)
+        notify(() -> {
+            java.util.List<String> fyi = messageService
+                    .draftNotifyTargets(targetPanel, "fyi", fyiRoles)
+                    .stream().filter((u) -> !u.equals(actor)).toList();
+            return messageService.send(fyi, MessageService.AUTO_DRAFT_FYI, targetPanel, targetNo, params, actor);
         });
     }
 
@@ -5281,8 +5308,9 @@ public class ButtonService {
             jdbc.update("UPDATE qc_insp_detail SET 入库单号 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
                     piNo, user, r.get("id"));
         }
-        // 消息(2026-11-17 用户口径「能不能消息通知到生产销售和仓库审核两个角色,都是只要知情」):
-        // 自动生成的**草稿**入库单 → 生产销售 + 仓库审核 各一条「已生成、请知悉」。
+        // 消息(2026-11-17 第二轮口径「生成单据的时候就要有消息,草稿是要他们去补充的,不是待审批」):
+        // 自动生成的**草稿**入库单 → 仓库审核一条「请补充完善后再审核」;
+        // ⚠ 生产销售**不发**(用户口径「只用收到暂收退料」)。
         // 草稿不进门户「待办」(只认 pending='Y'),所以这条消息是目前唯一的提醒入口。
         notifyAutoDraft("PURCHASE_IN", piNo, no, user);
     }
@@ -5419,7 +5447,8 @@ public class ButtonService {
                     no, no + "#" + r.get("id"), thNo, thNo + "#" + tgtIds.get(i), r.get("物料编码"),
                     r.get("送检数量"), r.get("不合格数量"), h.get("批次号"), h.get("批次键"), user);
         }
-        // 消息(2026-11-17 同口径):自动生成的**草稿**暂收退料单 → 生产销售 + 仓库审核 各一条「已生成、请知悉」
+        // 消息(2026-11-17 第二轮同口径):自动生成的**草稿**暂收退料单 →
+        // 仓库审核「请补充完善后再审核」+ 生产销售「知会」两条(生产销售只对这张单知情)
         notifyAutoDraft("QC_RETURN", thNo, no, user);
     }
 

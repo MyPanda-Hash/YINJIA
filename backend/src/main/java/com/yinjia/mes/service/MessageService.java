@@ -94,18 +94,24 @@ public class MessageService {
     /** 消息码:变更单审批被驳回 → 发起人与已填写部门(2026-09-21 变更线上流程⑤) */
     public static final String CHANGE_REJECTED = "CHANGE_REJECTED";
     /**
-     * 消息码:上游单据审核**自动生成了下游草稿** → 该下游的受理角色(知情,不需审批权)。
+     * 消息码:上游单据审核**自动生成了下游草稿** → **该去补充的人**(默认 = 仓库审核 `cksh`)。
      *
-     * <p>2026-11-17 用户口径:「从来料检验单审批自动生成采购入库单和暂收退料单,
-     * 能不能消息通知到**生产销售**和**仓库审核**两个角色。都是只要**知情**」。
+     * <p>2026-11-17 用户口径(第二轮):「生成单据的时候就要有消息,**这个草稿单是需要他们去补充的**,
+     * 不是待审批的消息。」⇒ 文案不能说"待审批/等待审核",要说"草稿已生成、请补充完善后再审核";
+     * 触发时机就是**生单那一刻**(审核来料检验单时),不能等别的动作。
      *
-     * <p>为什么不能用 {@link #APPROVAL_SUBMITTED}:那条路的收件人按**审批权**
-     * ({@code yj_role_panel.can_approve})解析,而「生产销售」在这两张单上没有审批权
-     * (只有 查看/查询/导出/打印/预警)⇒ 永远收不到;且自动生成的是**草稿**,
-     * 草稿不进「待办」(待办只认 {@code pending='Y'})。⇒ 必须单独发一条「已生成、请知悉」的消息。
-     * 收件人见 {@link #draftAuditNotifyTargets}。
+     * <p>为什么不能用 {@link #APPROVAL_SUBMITTED}:那条路按**审批权**找人,而草稿本来就没有
+     * `pending='Y'`,也不进「待办」——它要的是"有人来补",不是"有人来批"。
+     * 收件人见 {@link #draftNotifyTargets}。
      */
-    public static final String AUTO_DRAFT_FOR_AUDIT = "AUTO_DRAFT_FOR_AUDIT";
+    public static final String AUTO_DRAFT_TO_FILL = "AUTO_DRAFT_TO_FILL";
+    /**
+     * 消息码:上游审核自动生成了下游草稿 → **只需知情**的角色(默认 = 生产销售 `scxs`)。
+     *
+     * <p>2026-11-17 用户口径(第二轮):「生产销售**只用收到暂收退料**就行。」
+     * ⇒ 采购入库单**不发**给生产销售;暂收退料单发一条纯知会(不提"请补充",因为他没有编辑权)。
+     */
+    public static final String AUTO_DRAFT_FYI = "AUTO_DRAFT_FYI";
 
     private final JdbcTemplate jdbc;
     private final PanelRegistry registry;
@@ -251,8 +257,9 @@ public class MessageService {
      * 面板级配置里取一个**字符串数组**键({@code yj_panel.config} 是 JSON)。
      *
      * <p>未配置 / 不是数组 / 解析失败 ⇒ 返回空列表(调用方据此走各自兜底口径)。
-     * 目前两个键走这里:{@code approvalNotify}(待审批提醒)与
-     * {@code auditNotify} / {@code auditNotifyRoles}(自动生单知情,见 {@link #draftAuditNotifyTargets})。
+     * 目前走的键:{@code approvalNotify}(待审批提醒)与
+     * {@code fillNotify}/{@code fillNotifyRoles}/{@code fyiNotify}/{@code fyiNotifyRoles}
+     * (自动生单草稿:要补充的 / 只需知会的,见 {@link #draftNotifyTargets})。
      */
     private List<String> configStringArray(String panelCode, String key) {
         try {
@@ -298,26 +305,28 @@ public class MessageService {
     }
 
     /**
-     * 「自动生成了下游草稿」的收件人(2026-11-17 用户口径,收件人只**知情**、不需审批权)。
+     * 「自动生成了下游草稿」的收件人(2026-11-17 口径第二版:分「要补充的」与「只需知会的」)。
      *
      * <p>三层口径,后者按需覆盖:
      * <ol>
-     *   <li>代码默认:{@code defaultRoleCodes}(调用方按链路指定,来料检验链 = 生产销售 + 仓库审核);</li>
-     *   <li>面板配置 {@code yj_panel.config.auditNotifyRoles} = 角色编码数组 ⇒ **替换**默认角色;</li>
-     *   <li>面板配置 {@code yj_panel.config.auditNotify} = 账号数组 ⇒ 与上面取并集(点名加人)。</li>
+     *   <li>代码默认:{@code defaultRoleCodes}(调用方按链路与 kind 指定,如 fill=仓库审核、fyi=生产销售);</li>
+     *   <li>面板配置 {@code yj_panel.config.<kind>NotifyRoles} = 角色编码数组 ⇒ **替换**默认角色;…</li>
+     *   <li>面板配置 {@code yj_panel.config.<kind>Notify} = 账号数组 ⇒ 与上面取并集(点名加人)。</li>
      * </ol>
-     * <p>例(来料检验链只想通知仓库审核和某个具体人):
-     * <pre>UPDATE yj_panel SET config = JSON_MODIFY(config,'$.auditNotify',JSON_QUERY(N'["jxg","Smm"]')) WHERE panel_code=N'PURCHASE_IN';</pre>
+     * <p>{@code kind}:{@code fill}=草稿要去补充的人 / {@code fyi}=只需知情的人。例(只把"请补充"发给某个具体人):
+     * <pre>UPDATE yj_panel SET config = JSON_MODIFY(config,'$.fillNotify',JSON_QUERY(N'["jxg","Smm"]')) WHERE panel_code=N'PURCHASE_IN';</pre>
      *
      * @param panelCode        目标(下游)面板编码,报错与配置都按它
-     * @param defaultRoleCodes 代码默认角色编码(配置了 auditNotifyRoles 时被替换)
+     * @param kind             {@code fill} 或 {@code fyi}(决定配置键名)
+     * @param defaultRoleCodes 代码默认角色编码(配置了对应 *NotifyRoles 时被替换)
      * @return 去重后的账号列表;解析不到人返回空列表(调用方不必再判)
      */
-    public List<String> draftAuditNotifyTargets(String panelCode, List<String> defaultRoleCodes) {
-        List<String> roles = configStringArray(panelCode, "auditNotifyRoles");
+    public List<String> draftNotifyTargets(String panelCode, String kind, List<String> defaultRoleCodes) {
+        String k = (kind == null || kind.isBlank()) ? "fill" : kind.trim();
+        List<String> roles = configStringArray(panelCode, k + "NotifyRoles");
         if (roles.isEmpty()) roles = defaultRoleCodes == null ? List.of() : defaultRoleCodes;
         Set<String> out = new LinkedHashSet<>(accountsOfRoles(roles));
-        out.addAll(configStringArray(panelCode, "auditNotify"));
+        out.addAll(configStringArray(panelCode, k + "Notify"));
         return new ArrayList<>(out);
     }
 
