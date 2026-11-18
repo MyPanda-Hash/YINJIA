@@ -635,6 +635,7 @@ test('系统管理平台(base)= 系统功能入口 + 设备维护(2026-10-20 从
  * 烧结公差 RD_SINTER_TOL 与明细面板 ERPLG_ROW 本就没有菜单项),
  * 故 28 = 字段管理 + 数据字典 + 迁来的 25 张 + 组装物料清单(2026-10-30 新增,挂「生产」组)。
  * ⚠ 「ERP导入日志 ERPLG」已按 2026-10-18 后续口径迁到一级目录「ERP系统集成」,不再计入数据建模。
+ * 2026-11-18:混料物料清单 MIX_BOM 挂「物料及价格」组(烧结侧基础数据)⇒ 28 → **29**。
  */
 test('数据建模(dm)接住系统管理平台迁来的四组面板(整树里每张只挂一次)', () => {
   const dm = menuTree.find((n) => n.code === 'dm')
@@ -646,13 +647,13 @@ test('数据建模(dm)接住系统管理平台迁来的四组面板(整树里每
   }
   const dmCodes = codesOf(dm)
   const moved = ['DEPT', 'EMP', 'WH', 'WHLOC', 'KHDA', 'GFDA', 'REGION', 'PROJ', 'UOM',
-    'INV', 'WLBOM', 'INV_PRICE', 'EQUIP', 'TEAM', 'WC', 'PROD_LINE', 'OP', 'ROUTE', 'OP_TIME',
+    'INV', 'WLBOM', 'INV_PRICE', 'MIX_BOM', 'EQUIP', 'TEAM', 'WC', 'PROD_LINE', 'OP', 'ROUTE', 'OP_TIME',
     'REJECT', 'FIN_TAX', 'SETTLE', 'CUR', 'FIN_EXP', 'FIN_ACC']
   for (const code of moved) {
     assert.ok(dmCodes.includes(code), `系统管理平台迁来的面板 ${code} 应在数据建模下`)
   }
-  assert.equal(dmCodes.length, 28, `数据建模应有 28 张面板入口,实际 ${dmCodes.length}`)
-  assert.equal(new Set(dmCodes).size, 28, '数据建模内不应有重复面板')
+  assert.equal(dmCodes.length, 29, `数据建模应有 29 张面板入口,实际 ${dmCodes.length}`)
+  assert.equal(new Set(dmCodes).size, 29, '数据建模内不应有重复面板')
   // 2026-10-20:设备维护整组搬进系统管理平台 ⇒ base 下允许 EQUIP_CHECK / MAINT_PLAN 两张,
   //   基础资料那 32 张仍不许回来
   const baseCodes = codesOf(menuTree.find((n) => n.code === 'base'))
@@ -682,6 +683,35 @@ test('组装物料清单 ASM_BOM 挂在「数据建模 → 生产」且全树只
   }
   walk(menuTree)
   assert.equal(acc.filter((c) => c === 'ASM_BOM').length, 1, 'ASM_BOM 在菜单树里只应挂一次')
+})
+
+/**
+ * 2026-11-18 用户口径(截图圈的是「数据建模 → 物料及价格 → 存货价格本」下面那一格):
+ * 「烧结工艺也要实现一个混料物料清单能被这里两种烧结工艺清单中的bom表填入进去」。
+ * 落点 = 数据建模(dm) → 物料及价格(bmat) 组,面板码 MIX_BOM,地址 /panelx/list/MIX_BOM;
+ * 全树只挂一次(与组装物料清单 ASM_BOM 同一套规矩)。
+ */
+test('混料物料清单 MIX_BOM 挂在「数据建模 → 物料及价格」且全树只挂一次', () => {
+  const dm = menuTree.find((n) => n.code === 'dm')
+  const bmat = (dm.children || []).find((n) => n.code === 'bmat')
+  assert.ok(bmat, '数据建模下应有「物料及价格」分组')
+  const leaf = (bmat.children || []).find((c) => c.panelCode === 'MIX_BOM')
+  assert.ok(leaf, '「物料及价格」组下应有混料物料清单 MIX_BOM')
+  assert.equal(leaf.path, '/panelx/list/MIX_BOM')
+  assert.equal(leaf.title, '混料物料清单')
+  // 顺序:紧跟 存货价格本(用户截图圈的就是那一格)
+  const codes = (bmat.children || []).map((c) => c.panelCode)
+  assert.equal(codes.indexOf('MIX_BOM'), codes.indexOf('INV_PRICE') + 1,
+    '混料物料清单应紧跟在 存货价格本 之后')
+  const acc = []
+  const walk = (n) => {
+    if (Array.isArray(n)) return n.forEach(walk)
+    if (!n || typeof n !== 'object') return
+    if (n.panelCode) acc.push(n.panelCode)
+    ;(n.children || []).forEach(walk)
+  }
+  walk(menuTree)
+  assert.equal(acc.filter((c) => c === 'MIX_BOM').length, 1, 'MIX_BOM 在菜单树里只应挂一次')
 })
 
 /**

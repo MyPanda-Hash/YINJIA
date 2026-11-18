@@ -1,0 +1,1 @@
+SELECT TABLE_NAME, COLUMN_NAME, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME IN ('rd_x_sinter_detail','rd_x_sinter_head') AND COLUMN_NAME IN ('单据编号','产品编号','产品名称','版本号','序号','表区','物料种类','物料编号','物料名称','添加比例','单支含量g','设计添加量') ORDER BY TABLE_NAME, ORDINAL_POSITION

@@ -1,0 +1,2 @@
+SELECT panel_code, label, col_name, place FROM yj_field WHERE panel_code IN ('RD_MOLD_PROC','RD_X_SINTER') AND label IN (N'产品编号',N'产品名称',N'版本号',N'表区',N'序号',N'物料种类',N'物料编号',N'物料名称',N'实际添加比例',N'单支物料含量',N'设计添加量',N'添加比例',N'单支含量g') ORDER BY panel_code, seq
+SELECT panel_code, label, col_name, place FROM yj_field WHERE panel_code='RD_ASM_PROC' AND label IN (N'产品编号',N'产品名称',N'版本号',N'表区',N'序号',N'物料编号',N'物料名',N'物料规格',N'用量') ORDER BY seq

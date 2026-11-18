@@ -2459,7 +2459,14 @@ public class PanelConfigService {
      * 不替代明细行删除。
      */
     private static final java.util.Set<String> DELETE_DOC_PANELS = java.util.Set.of(
-            "QC_ASM_INSP", "QC_PROC_INSP", "QC_FIRST_INSP", "ROUTE");
+            "QC_ASM_INSP", "QC_PROC_INSP", "QC_FIRST_INSP", "ROUTE",
+            // 2026-11-18 用户口径:「怎么样能让这个单能真正被删除,在删除中增加删除单据的按钮可以实现吗」
+            //   ⇒ 组装/混料物料清单(基础数据、单表式 doc)也下发「删除单据」。语义与上面同:仅**草稿**可删
+            //   (这两张没有审批流,所以恒为草稿),删的是**整张清单**(yj_doc_status.canceled='Y',
+            //   列表不再显示、领料/报工取 BOM 也随之排除),行数据留档不物理删除。
+            //   ⚠ 删掉的是同步出来的那张清单时,下次归档会按「忽略已作废清单」重新生成一张新号单
+            //   (见 ProcBomArchiveSyncService 的 target 查询),不会往废单里写。
+            "ASM_BOM", "MIX_BOM");
 
     /**
      * 「取出货检验计划」(RD_INSP_PLAN)入口下发的面板集 —— **不含首件检验单**:

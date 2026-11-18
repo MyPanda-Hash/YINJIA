@@ -5023,3 +5023,15 @@ migrate-qc-insp-rec-resultcols-20261119.sql
 #   存量每张单的 qc_insp_rec.结果列数 按"实际用到的格数"重算(最少 1,有值的格子一列都不藏);
 #   列说明改成「默认 1」口径;零业务数据改动(结果1..结果20 一个字节不改);幂等;两账套。
 migrate-qc-insp-rec-resultcols-default1-20261119.sql
+
+# 2026-11-18 烧结侧基础数据「混料物料清单」:新建 bs_mix_bom(单表 doc 模式,16 个业务列 + 5 个审计列 + 备用列池 20 + 备注)
+#   + 面板 MIX_BOM(数据建模→物料及价格,紧跟存货价格本)+ 16 个字段 + 面板/字段九语言译名
+#   + 全角色 view,query 授权。数据来源 = **已归档**的烧结工艺清单(RD_MOLD_PROC)/X烧结工艺清单
+#   (RD_X_SINTER) 的配方表,归档入口 ButtonService.markArchived → ProcBomArchiveSyncService 写入
+#   (与「产品信息表归档→物料清单」同一模式);组装工艺清单→组装物料清单同批改造,零 DDL。
+#   幂等;两账套(HSDZ_MES / HSDZ_MES_TEST)均已执行。
+migrate-mix-bom-20261118.sql
+# 2026-11-18 混料物料清单(MIX_BOM)产品编号去掉末尾 -tb 后缀(用户口径「混料产品编码需要把末尾的-tb过滤了」):
+#   存量数据归一化(bs_mix_bom.产品编号 → 原始产品编码;幂等,只剥结尾一层、大小写不敏感);
+#   代码侧同批:ProcBomArchiveSyncService.syncSinterProc 写库前用 DevTaskService.baseProductCode 归一化。
+migrate-mix-bom-strip-tb-20261118.sql

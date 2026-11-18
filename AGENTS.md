@@ -365,5 +365,6 @@ YINJIA-MES = light-mes 面板引擎(Vue3) + Spring Boot + SQL Server `HSDZ_MES`,
 | 金蝶订单同步**行 id 契约**(明细行 identity id 是 `form_flow_link.source_line_key` 与 `bl_pu_label.采购订单行id` 的唯一锚点 ⇒ 同步只许按「单据编号+行号」UPDATE 保 id,**禁止整单删插**;回归脚本 `deploy/_test-lineupsert-20261116.mjs`、存量回填 `tools/migrate-erp-linekey-repair-20261116.sql`) | `docs/development/金蝶订单同步-行id稳定与下游占用.md` |
 | 采购链四单字段基线 | `docs/development/采购链四单字段与显示字段.md` |
 | 工单排产看板数量口径(三处同源;台账唯一权威键 = 工单行 id) | `docs/development/工单排产看板-本线任务量口径.md` |
+| 工艺清单归档 → 基础数据清单(组装工艺清单→组装物料清单;烧结/X烧结工艺清单→混料物料清单;唯一归档入口 `markArchived`,表 `bs_mix_bom`/面板 `MIX_BOM`) | `docs/development/工艺清单归档同步基础数据清单-20261118.md` |
 | 开发与质量踩坑台账(§5.5 前端导出/探针:jsPDF px、html2canvas、`$el` fragment、离屏克隆全宽截图、CJK 键、`char(2)` 尾空格) | `docs/development/开发与质量.md`(**涉 PDF/截图导出/CDP 探针/PS 工具/定长列比较,先读该节**) |
 | 通用设计资产库(供其它项目参考) | `https://github.com/MyPanda-Hash/CHENGXIAO` |

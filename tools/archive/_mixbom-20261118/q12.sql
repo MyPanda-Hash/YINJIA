@@ -1,0 +1,1 @@
+SELECT TABLE_NAME, COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME IN ('rd_mold_proc_detail','rd_x_sinter_detail','rd_asm_proc_detail','rd_asm_proc_head','rd_mold_proc_head','rd_x_sinter_head') ORDER BY TABLE_NAME, ORDINAL_POSITION

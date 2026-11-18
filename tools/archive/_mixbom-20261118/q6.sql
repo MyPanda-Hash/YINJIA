@@ -1,0 +1,2 @@
+SELECT panel_code, seq, place, col_name, label, data_type, required, editable, hidden, visible, ref_panel, ref_field, display_field FROM yj_field WHERE panel_code='RD_MOLD_PROC' AND place LIKE '%detail%' ORDER BY seq, id;
+SELECT panel_code, seq, place, col_name, label, data_type, required, editable, hidden, visible, ref_panel, ref_field, display_field FROM yj_field WHERE panel_code='RD_X_SINTER' ORDER BY seq, id

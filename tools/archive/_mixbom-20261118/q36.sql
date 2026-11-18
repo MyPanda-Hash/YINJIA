@@ -1,0 +1,1 @@
+SELECT TOP 30 user_name, real_name, event_type, panel_name, action_name, doc_no, created_at FROM yj_usage_log WHERE (panel_name LIKE N'%组装物料%' OR panel_name='ASM_BOM' OR doc_no='C-23-11_V0001' OR panel_name LIKE N'%组装工艺%') AND created_at >= '2026-11-18' ORDER BY id DESC;

@@ -1,0 +1,10 @@
+SELECT COUNT(*) n, COUNT(DISTINCT 单据编号) docs FROM rd_asm_proc_head;
+SELECT TOP 10 单据编号, 产品编号, 产品名称, 版本号, 单据日期 FROM rd_asm_proc_head ORDER BY 单据编号 DESC;
+SELECT COUNT(*) asm_bom_rows, COUNT(DISTINCT 单据编号) asm_bom_docs, COUNT(DISTINCT 产品编码) prods FROM bs_asm_bom WHERE 来源 LIKE N'金蝶%';
+SELECT COUNT(*) bom_rows_material FROM rd_asm_proc_detail WHERE 表区=N'物料清单';
+SELECT TOP 8 h.单据编号, h.产品编号, COUNT(d.id) bom_rows FROM rd_asm_proc_head h LEFT JOIN rd_asm_proc_detail d ON d.单据编号=h.单据编号 AND d.表区=N'物料清单' GROUP BY h.单据编号, h.产品编号 ORDER BY h.单据编号 DESC;
+SELECT TOP 5 s.doc_no, s.archived, s.pending, s.shr FROM yj_doc_status s WHERE s.panel_code='RD_ASM_PROC' ORDER BY s.id DESC;
+SELECT COUNT(*) archived_asmproc FROM yj_doc_status WHERE panel_code='RD_ASM_PROC' AND ISNULL(archived,'N')='Y';
+SELECT COUNT(*) prod_info FROM rd_prod_info_head;
+SELECT TOP 5 产品编号 FROM rd_prod_info_head;
+SELECT TOP 5 产品编号 FROM rd_prod_info_head WHERE 产品编号 IN (SELECT 产品编码 FROM bs_asm_bom);

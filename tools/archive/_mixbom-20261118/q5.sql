@@ -1,0 +1,2 @@
+SELECT panel_code, seq, place, col_name, label, data_type, required, editable, hidden, visible, ref_panel, ref_field, display_field FROM yj_field WHERE panel_code='RD_ASM_PROC' ORDER BY seq, id;
+SELECT panel_code, panel_name, mode, line_table, head_table, group_col, pk_col, code_col, prefix, detail_key, module_group, config FROM yj_panel WHERE panel_code IN ('RD_ASM_PROC','RD_MOLD_PROC','RD_X_SINTER','ASM_BOM','WLBOM','RD_PROD_INFO')

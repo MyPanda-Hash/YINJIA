@@ -67,6 +67,12 @@ public class PxController {
     private final com.yinjia.mes.service.PanelFieldViewService fieldView;
     /** 采购入库单「一行拆多个仓库」(2026-11-17 客户口径):只在草稿、未转ERP 时可用 */
     private final com.yinjia.mes.service.PurInSplitService purInSplit;
+    /**
+     * 工艺清单归档 → 基础数据清单的同步(2026-11-18):组装工艺清单→组装物料清单、
+     * 烧结/X烧结工艺清单→混料物料清单。同步主体挂在归档入口(ButtonService.markArchived),
+     * 这里只为**存量回填**暴露一个管理员端点(见 {@link #resyncProcBom()})。
+     */
+    private final com.yinjia.mes.service.ProcBomArchiveSyncService procBomSync;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PxController.class);
 
@@ -86,7 +92,8 @@ public class PxController {
                         com.yinjia.mes.service.RdProjectFlowService rdFlow,
                         com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate,
                         com.yinjia.mes.service.PanelFieldViewService fieldView,
-                        com.yinjia.mes.service.PurInSplitService purInSplit) {
+                        com.yinjia.mes.service.PurInSplitService purInSplit,
+                        com.yinjia.mes.service.ProcBomArchiveSyncService procBomSync) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -107,6 +114,7 @@ public class PxController {
         this.qcRecvGenerate = qcRecvGenerate;
         this.fieldView = fieldView;
         this.purInSplit = purInSplit;
+        this.procBomSync = procBomSync;
     }
 
     // 2026-11-18:原「工单扫码领料」的四个端点(/woPick/lines|bom|scanLog|attachDoc|scanLogs)已随页面下架，
@@ -839,6 +847,30 @@ public class PxController {
     public ApiResult<Map<String, Object>> specByProductForXSinter(@RequestParam String code) {
         perm.requirePanelView("RD_X_SINTER");
         return ApiResult.ok(devTaskService.specByProduct(code, DevTaskService.SPEC_SHEET_AREA_INSPECT));
+    }
+
+    /**
+     * **存量回填**:把当前**已归档**的工艺清单各同步一次到基础数据清单(2026-11-18)。
+     *
+     * <p>用户口径(2026-11-18):「只要已归档状态的内容即可。参照产品信息表和物料清单的实现模式。」
+     * 同步主体挂在唯一归档入口({@code ButtonService.markArchived} → {@link
+     * com.yinjia.mes.service.ProcBomArchiveSyncService}):
+     * <pre>
+     *   组装工艺清单 RD_ASM_PROC 归档 → 组装物料清单 ASM_BOM(bs_asm_bom)
+     *   烧结工艺清单 RD_MOLD_PROC / X烧结工艺清单 RD_X_SINTER 归档 → 混料物料清单 MIX_BOM(bs_mix_bom)
+     * </pre>
+     * 但**功能上线前已经归档**的单据不会自动补 —— 那些单的归档发生在代码上线之前,归档入口没跑过
+     * 新逻辑。本端点就是给它们补一次;也可在怀疑数据不一致时重跑。
+     *
+     * <p>幂等:组装按 产品编号、混料按 产品编号 + 烧结类型 覆盖同一张清单,重复调用不会增生单据。
+     * 权限 = 管理员(写的是**基础数据**,不是调用者自己的单据;普通用户重放会改别人的取料口径)。
+     */
+    @PostMapping("/procBom/resync")
+    public ApiResult<Map<String, Object>> resyncProcBom() {
+        perm.requireAdmin();
+        String user = SecurityContextHolder.getContext().getAuthentication() == null ? null
+                : SecurityContextHolder.getContext().getAuthentication().getName();
+        return ApiResult.ok(procBomSync.backfillArchived(user));
     }
 
     /**

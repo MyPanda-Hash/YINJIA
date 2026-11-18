@@ -98,13 +98,17 @@ public class WorkOrderBomService {
         String code = productCode == null ? "" : productCode.trim();
         if (code.isEmpty()) return new Bom("", "", "", "", List.of());
         List<Map<String, Object>> docs = jdbc.queryForList(
-                "SELECT TOP 1 单据编号, ISNULL(版本号,N'') AS 版本号, ISNULL(来源,N'') AS 来源"
-                        + " FROM dbo.bs_asm_bom"
-                        + " WHERE 产品编码 = ? AND 工序 = N'组装' AND ISNULL(asp_cancel,'N') <> 'Y'"
-                        + "   AND ISNULL(状态,N'启用') <> N'停用'"
-                        + " GROUP BY 单据编号, 版本号, 默认BOM, 来源"
-                        + " ORDER BY CASE WHEN ISNULL(默认BOM,N'') = N'是' THEN 0 ELSE 1 END,"
-                        + " 版本号 DESC, 单据编号 DESC", code);
+                "SELECT TOP 1 b.单据编号, ISNULL(b.版本号,N'') AS 版本号, ISNULL(b.来源,N'') AS 来源"
+                        + " FROM dbo.bs_asm_bom b"
+                        + " WHERE b.产品编码 = ? AND b.工序 = N'组装' AND ISNULL(b.asp_cancel,'N') <> 'Y'"
+                        + "   AND ISNULL(b.状态,N'启用') <> N'停用'"
+                        // 2026-11-18:整张清单被「删除单据」作废(yj_doc_status.canceled='Y')后不能再参与领料/报工取数。
+                        // 行还在表里(作废只写状态,不删行),只看 asp_cancel 会把废单当有效 BOM 取走。
+                        + "   AND NOT EXISTS (SELECT 1 FROM dbo.yj_doc_status s WHERE s.panel_code = 'ASM_BOM'"
+                        + "       AND s.doc_no = b.单据编号 AND s.canceled = 'Y')"
+                        + " GROUP BY b.单据编号, b.版本号, b.默认BOM, b.来源"
+                        + " ORDER BY CASE WHEN ISNULL(b.默认BOM,N'') = N'是' THEN 0 ELSE 1 END,"
+                        + " b.版本号 DESC, b.单据编号 DESC", code);
         if (docs.isEmpty()) return new Bom("", "", "", "", List.of());
         Map<String, Object> doc = docs.get(0);
         String bomNo = str(doc.get("单据编号"));

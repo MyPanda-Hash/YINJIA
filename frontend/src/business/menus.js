@@ -814,6 +814,12 @@ export const menuTree = [
           //   位置按 README §基础档案 的登记顺序:计量单位 / 商品 / 物料清单 / 存货价格本。
           { code: 'wlbom', title: '物料清单', path: '/panelx/list/WLBOM', icon: 'Files', panelCode: 'WLBOM', operationName: '新增流程' },
           { code: 'invPrice', title: '存货价格本', path: '/panelx/list/INV_PRICE', icon: 'PriceTag', panelCode: 'INV_PRICE', operationName: '新增流程' },
+          // 混料物料清单(2026-11-18 用户口径「烧结工艺也要实现一个混料物料清单…」):
+          //   烧结侧基础数据,与「组装物料清单」对称。数据由**已归档**的烧结工艺清单/X烧结工艺清单
+          //   的配方表同步进来(归档入口 ButtonService.markArchived → ProcBomArchiveSyncService),
+          //   面板本身也可手工维护;「烧结类型」区分两种烧结来源。
+          //   位置:数据建模 → 物料及价格 → 存货价格本 之后(用户截图圈的就是这里)。
+          { code: 'mixBom', title: '混料物料清单', path: '/panelx/list/MIX_BOM', icon: 'Files', panelCode: 'MIX_BOM', operationName: '新增流程' },
         ],
       },
       {
