@@ -19,11 +19,15 @@
 
 SET NOCOUNT ON;
 
+-- ⚠ 三态自检（本文件所有批都按这个口径）：表不存在 = 提示跳过，不中断整条迁移链。
+--   两账套 schema 不同步（测试库可能还没有该表），一刀切 RAISERROR 会让部署链在测试库直接断掉。
 IF OBJECT_ID('rd_x_sinter_detail') IS NULL
-    RAISERROR(N'[xsinter-fix] 缺 rd_x_sinter_detail', 16, 1);
+    PRINT N'[xsinter-fix] 本库无 rd_x_sinter_detail，跳过（schema 滞后）';
 GO
 
 /* ---------- ① 数值列取 2 位小数（只处理小数位 > 2 的行） ---------- */
+IF OBJECT_ID('rd_x_sinter_detail') IS NOT NULL
+BEGIN
 DECLARE @cols TABLE (name sysname PRIMARY KEY);
 INSERT INTO @cols VALUES (N'单支含量g'), (N'添加比例'), (N'设计添加量');
 
@@ -51,18 +55,42 @@ BEGIN
 END
 CLOSE cur; DEALLOCATE cur;
 PRINT N'[xsinter-fix] 小数位订正合计 = ' + CAST(@rounded AS nvarchar(10));
+END
 GO
 
 /* ---------- ② 删除**全空**的配方行（物料编号与物料名称都为空） ---------- */
+IF OBJECT_ID('rd_x_sinter_detail') IS NOT NULL
+BEGIN
 DELETE d
   FROM rd_x_sinter_detail d
  WHERE d.[表区] = N'配方表'
    AND ISNULL(d.[物料编号], N'') = N''
    AND ISNULL(d.[物料名称], N'') = N'';
 PRINT N'[xsinter-fix] 删除全空配方行 = ' + CAST(@@ROWCOUNT AS nvarchar(10));
+END
+GO
+
+/* ---------- ②b 删除空行后重排连续序号（否则纸面出现 1,2,3,6 跳号） ---------- */
+IF OBJECT_ID('rd_x_sinter_detail') IS NOT NULL
+BEGIN
+    ;WITH seq AS (
+        SELECT id, ROW_NUMBER() OVER (PARTITION BY [单据编号]
+                                      ORDER BY TRY_CAST([序号] AS int), id) AS rn
+          FROM rd_x_sinter_detail
+         WHERE [表区] = N'配方表'
+    )
+    UPDATE d SET d.[序号] = CONVERT(nvarchar(20), s.rn)
+      FROM rd_x_sinter_detail d JOIN seq s ON s.id = d.id
+     WHERE ISNULL(d.[序号], N'') <> CONVERT(nvarchar(20), s.rn);
+    PRINT N'[xsinter-fix] 序号重排 = ' + CAST(@@ROWCOUNT AS nvarchar(10));
+END
 GO
 
 /* ---------- ③ 自检：不该再有 >2 位小数 / 全空行 ---------- */
+IF OBJECT_ID('rd_x_sinter_detail') IS NULL
+    PRINT N'[xsinter-fix] 缺表，自检跳过';
+ELSE
+BEGIN
 DECLARE @bad int = 0;
 SELECT @bad = COUNT(*) FROM rd_x_sinter_detail
  WHERE [表区] = N'配方表' AND ISNULL([物料编号],N'') = N'' AND ISNULL([物料名称],N'') = N'';
@@ -72,4 +100,5 @@ SELECT @bad = COUNT(*) FROM rd_x_sinter_detail
  WHERE [表区] = N'配方表' AND ISNULL([单支含量g],N'') LIKE N'%.[0-9][0-9][0-9]%';
 IF @bad > 0 RAISERROR(N'[xsinter-fix] 自检失败：仍有 >2 位小数的单支含量', 16, 1);
 PRINT N'[xsinter-fix] 自检通过。';
+END
 GO
