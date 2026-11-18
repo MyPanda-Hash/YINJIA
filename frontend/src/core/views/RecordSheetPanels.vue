@@ -600,8 +600,15 @@
               <!-- ⚠ span 必须写进 <col>：`样品信息` 这类 span:3 的列，若只生成一个不带 span 的 <col>，
                    浏览器就把它当 1 列宽 + 把另外两列当"无宽度列" ⇒ 表头 colspan=3 与下面的格子对不上，
                    整表宽度也会小于纸宽（2026-11-11 用户报「新增一个列字段之后」版面被压窄的根因）。 -->
+              <!-- ⚠ 2026-11-18 修「炭棒配方管控清单 配方表整表比纸宽出一倍」：
+                   `<col span=N style="width:W">` 按 HTML 语义是**每一列都 W**（总宽 = W×N），
+                   而配置里的 `w` 一直是"该列**总**宽"（所有可见列 w 之和 = 纸宽 780，
+                   wideSheetNarrow.test 也是这么钉的）⇒ 一旦某列既有 span 又有 w，就会被放大 N 倍：
+                   实测 炭棒配方表 物料种类 127×2=254、物料编号 181×4=724、物料名称 164×3=492，
+                   整表 780 → **1779px**，纸面横向溢出。
+                   修法：宽度先按 span 均分再乘缩放系数 ⇒ 该列总宽恒等于 w×K。 -->
               <col v-for="(c, i) in visCols(dt)" :key="'dc' + i" :span="(c.span || 1) > 1 ? c.span : undefined"
-                   :style="{ width: ((c.w || 100) * (dt.design ? designK(dt) : dtFillK(dt))).toFixed(1) + 'px' }" />
+                   :style="{ width: (((c.w || 100) * (dt.design ? designK(dt) : dtFillK(dt))) / (c.span || 1)).toFixed(1) + 'px' }" />
             </template>
             <template v-else>
               <col v-for="(w, i) in effGrid" :key="'dc' + i" :style="{ width: w + 'px' }" />
@@ -3833,7 +3840,10 @@ function dtW(dt) {
  * 结果就是表格 898px、下面那根「新增数据记录行」只有 720px（用户截图）。</p>
  */
 function dtColSum(dt) {
-  return visCols(dt).reduce((sum, c) => sum + (c.span || 1) * (c.w || 100), 0)
+  // 2026-11-18：与 colgroup 同口径 —— `w` 就是**该列总宽**（不再 × span）。
+  //   这两处必须同时改，否则「表格 width」与「colgroup 总宽」不一致，
+  //   浏览器会把列二次拉伸（本文件 2026-11-17 那段注释记的就是这类事故）。
+  return visCols(dt).reduce((sum, c) => sum + (c.w || 100), 0)
 }
 function dtTableW(dt) {
   return dtColSum(dt) * (dt.design ? designK(dt) : dtFillK(dt))
@@ -3853,7 +3863,7 @@ function dtTableW(dt) {
 function dtFillK(dt) {
   const merged = extMerged.value.get(dt)
   if (!merged || !merged.addedCount) return 1
-  const want = visCols(dt).reduce((sum, c) => sum + (c.span || 1) * (c.w || 100), 0)
+  const want = visCols(dt).reduce((sum, c) => sum + (c.w || 100), 0) // 同 dtColSum 口径
   return want ? gridW.value / want : 1
 }
 function designK(dt) {
