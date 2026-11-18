@@ -43,7 +43,8 @@ test('检测结果 = 可增删列:键恰好 结果1..结果20(2026-11-19 用户�
     Array.from({ length: 20 }, (_, i) => `结果${i + 1}`))
   assert.equal(QC_INSP_REC_RESULT_KEYS.length, QC_INSP_REC_MAX_RESULT_COLS, '键数 = 物理列上限')
   assert.equal(QC_INSP_REC_MAX_RESULT_COLS, 20, '上限 20 —— 改这个数必须同时加物理列 + yj_field 登记')
-  assert.equal(QC_INSP_REC_DEFAULT_RESULT_COLS, 5, '默认仍是 5 列(老单据的观感不变)')
+  // 2026-11-19 第二版用户口径「默认是1格。后面再自主增加。」
+  assert.equal(QC_INSP_REC_DEFAULT_RESULT_COLS, 1, '默认 1 格(要几格自己按 ＋ 新增列 加)')
   assert.equal(QC_INSP_REC_MIN_RESULT_COLS, 1, '最少 1 列')
   // 表体列里结果列排在 检验方法 之后、单项判定 之前,且逐个一位
   const labels = QC_INSP_REC_COLUMNS.map((c) => c.label)
@@ -55,7 +56,7 @@ test('检测结果 = 可增删列:键恰好 结果1..结果20(2026-11-19 用户�
   assert.equal(QC_INSP_REC_RESULT_COUNT_KEY, '结果列数')
 })
 
-test('列数收敛:clampResultColCount 把外来值夹到 [1,20],非数字回落到默认 5', () => {
+test('列数收敛:clampResultColCount 把外来值夹到 [1,20],非数字回落到默认 1', () => {
   assert.equal(clampResultColCount(8), 8)
   assert.equal(clampResultColCount('12'), 12)
   assert.equal(clampResultColCount(0), QC_INSP_REC_MIN_RESULT_COLS)
@@ -121,13 +122,15 @@ test('表尾按模板排成两行两对:检验人|检验结论 / 审核人|处�
   assert.notEqual(QC_INSP_REC_VERDICT_LIB, QC_INSP_REC_DISPOSAL_LIB)
 })
 
-test('导出:结果列数跟着该单的列数走(默认 5 列)', () => {
-  assert.deepEqual(exportHeaderRow(),
-    ['检验项', '检测标准', '检验方法', '结果1', '结果2', '结果3', '结果4', '结果5', '单项判定'])
+test('导出:结果列数跟着该单的列数走(默认 1 列)', () => {
+  // 默认 1 格(2026-11-19 第二版用户口径「默认是1格」):不传列数就只导出 结果1
+  assert.deepEqual(exportHeaderRow(), ['检验项', '检测标准', '检验方法', '结果1', '单项判定'])
   assert.deepEqual(exportRow({ 检验项: '外观', 结果1: '无异常', 结果5: '无异常', 单项判定: '合格' }),
-    ['外观', undefined, undefined, '无异常', undefined, undefined, undefined, '无异常', '合格'])
-  assert.deepEqual(exportRow(null), ['', '', '', '', '', '', '', '', ''])
-  // 10 列的单子导出 10 列结果(不多不少,不铺 20 个物理列)
+    ['外观', undefined, undefined, '无异常', '合格'])
+  assert.deepEqual(exportRow(null), ['', '', '', '', ''])
+  // 显式给 5 / 10 列时按该单的列数导出(不多不少,不铺 20 个物理列)
+  assert.deepEqual(exportHeaderRow(5),
+    ['检验项', '检测标准', '检验方法', '结果1', '结果2', '结果3', '结果4', '结果5', '单项判定'])
   const head10 = exportHeaderRow(10)
   assert.equal(head10.length, 3 + 10 + 1, '前三列 + 10 个结果列 + 单项判定')
   assert.deepEqual(head10.slice(3, 13), Array.from({ length: 10 }, (_, i) => `结果${i + 1}`))

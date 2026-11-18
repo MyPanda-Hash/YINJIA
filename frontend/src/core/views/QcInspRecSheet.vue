@@ -83,7 +83,7 @@
     <div class="qr-section">
       {{ tt('检验结果') }}
       <!-- 检测结果列数(2026-11-19 用户口径「检验结果改成可以新增列的形式,不要固定5格了」):
-           列数存头字段「结果列数」,纸面按它渲染 1..n 格 —— 默认 5,最少 1、最多 20
+           列数存头字段「结果列数」,纸面按它渲染 1..n 格 —— **默认 1 格**,最少 1、最多 20
            (上限 = 物理列 结果1..结果20)。与研发数据记录表「样品列 －n＋」同款交互:
            加列即时生效;减列会**清空被减那一列已填的值**(先确认)。打印不出现(no-print)。 -->
       <span v-if="editable" class="qr-colstep no-print" :title="tt('检测结果列数（抽几件就填几列）')">
@@ -119,6 +119,7 @@
         :style="{
           minWidth: tableMinWidth,
           '--qr-res-w': printResPct,
+          '--qr-band-w': printBandW,
           '--qr-base-scale': printBaseScale,
         }"
       >
@@ -436,7 +437,7 @@ const K = Object.freeze({
 
 /** 检测结果 = **可增删列**(2026-11-19 用户口径「检验结果改成可以新增列的形式,不要固定5格了」)。
  *  · 键与次序只有一处真源(@core/qc/qcInspRecColumns 的 QC_INSP_REC_RESULT_KEYS,结果1..结果20);
- *  · 一张单据显示几格 = 头字段「结果列数」(默认 5,最少 1、最多 20),纸面步进器「－ n ＋」维护;
+ *  · 一张单据显示几格 = 头字段「结果列数」(**默认 1 格**,最少 1、最多 20),纸面步进器「－ n ＋」维护;
  *  · 减列会清空被减列的值(确认后),加列即时生效;纸面渲染 / 导出 / 落库三处口径一致。 */
 const RESULT_KEYS = QC_INSP_REC_RESULT_KEYS
 const RESULT_COUNT_KEY = QC_INSP_REC_RESULT_COUNT_KEY
@@ -458,12 +459,12 @@ const props = defineProps({
 const emit = defineEmits(['dirty', 'refresh-config'])
 
 /* ── 检测结果的列数(2026-11-19 可增删列)── */
-/** 当前单据的结果列数(头字段优先;老单据没这个值 ⇒ 默认 5,与 2026-11-11 那版一致) */
+/** 当前单据的结果列数(头字段优先;没这个值 ⇒ 默认 1 格,用户口径「默认是1格,后面再自主增加」) */
 const resultColCount = computed(() => clampResultColCount(props.head?.[RESULT_COUNT_KEY] ?? QC_INSP_REC_DEFAULT_RESULT_COLS))
 /** 实际渲染的结果列键(纸面 1..n 格) */
 const resultKeys = computed(() => RESULT_KEYS.slice(0, resultColCount.value))
 /**
- * 检测结果每格的宽度(px) —— 与列数无关,固定 58px(默认 5 列时纸面宽度与旧版几乎一致)。
+ * 检测结果每格的宽度(px) —— 与列数无关,固定 58px(5 列时纸面宽度与旧版几乎一致)。
  * 结果区**不按百分比**算:按百分比时列数一多,表宽要按 34% 反算,整张纸会被拉成两三屏
  * (实测 20 列 = 2706px,「检验项/检测标准」各占 380px 却没内容,结果列全被推到屏幕外)。
  * 改成「基础列固定 px + 结果格固定 58px」后:20 列 = 766 + 1160 = 1926px,
@@ -483,14 +484,23 @@ const tableMinWidth = computed(() => `${STD_COLS_W + RESULT_COL_W * resultColCou
 /* ── 打印口径(2026-11-19)──
    屏幕上是「定宽 + 横向滚动」,纸面必须反过来:**整张压进一页**。
    所以打印时改回百分比 + 固定布局(fixed),由下面三个值决定"结果区占多宽、基础列怎么让位":
-     · 5 列及以内:结果区 34% —— 与 2026-11-11 五格版的打印版面**逐像素一致**(不回归);
-     · 之后每多一列 +4%,封顶 80%(20 列时每格约 4% ≈ 29px,还看得清一个数字);
+     · 每格纸面宽度按 6.8%(= 旧版五格里那一格的宽度),n 列就占 6.8n%:
+       n=1 → 6.8%(默认 1 格,纸面上就是窄窄一格,不占半张纸),n=5 → 34%(与 2026-11-11 版逐像素一致);
+     · 5 列以上每多一列 +4%,封顶 80%(20 列时每格约 4% ≈ 29px,还看得清一个数字);
      · 基础列(检验项 14% / 检测标准 21% / 检验方法 21% / 单项判定 10% = 66%)按
-       (100 − 结果区占比) ÷ 66 等比压缩 —— 两组加起来恒为 100%,不会横向切掉半张表。
+       (100 − 结果区占比) ÷ 66 等比缩放 —— 两组加起来恒为 100%,不会横向切掉半张表。
    这三个值以 CSS 变量挂到 <table> 上,由下面 @media print 的 !important 规则取用
    (内联的 px 宽度在打印里一律被 !important 覆盖)。 */
-const printBandPct = computed(() => Math.min(80, 34 + Math.max(0, resultColCount.value - 5) * 4))
+const printBandPct = computed(() => {
+  const n = resultColCount.value
+  return n <= 5 ? Number((n * 6.8).toFixed(2)) : Math.min(80, 34 + (n - 5) * 4)
+})
 const printResPct = computed(() => `${(printBandPct.value / resultColCount.value).toFixed(4)}%`)
+/** 结果区**整段**(「检测结果」那一格,colspan=n)的打印宽度 = 每格 × 列数。
+ *  ⚠ 必须和下面每个 c-res 的宽度**同源**:表的固定布局里"跨列表格(第一行)"与"子列(第二行)"
+ *  两处都给了宽度才算数 —— 只给子列时 Chrome 在 n=1 那种 colspan=1 的情况下会算出半格
+ *  (实测 A4 上 27px 而不是 54px,表头「检测结果」被挤成两行)。 */
+const printBandW = computed(() => `${printBandPct.value.toFixed(4)}%`)
 const printBaseScale = computed(() => ((100 - printBandPct.value) / 66).toFixed(4))
 
 /** 减列:把被减掉的那几格(keys[to..count-1])在每行里清成空串。
@@ -1379,7 +1389,7 @@ watch(
     width: calc(10% * var(--qr-base-scale, 1)) !important;
   }
   body.approval-printing .qr-table .c-result {
-    width: auto !important;
+    width: var(--qr-band-w, 34%) !important;
   }
   body.approval-printing .qr-table .c-res {
     width: var(--qr-res-w, 6.8%) !important;

@@ -3,7 +3,7 @@
  *
  * 【版式来源】《品质资料 2026.09.19.xlsx》「检验数据记录模版」页签(整张 YJ-QR-96 检验报告):
  *   抬头: 物料名称 / 物料编码 / 物料批次 / 检验日期 ｜ 来料日期 / 来料数量 / 文件编码(YJ-QR-96) / 检验依据(YJ-Q-30)
- *   表体: 检验项(数据库选择) | 检测标准 | 检测结果(可增删列,默认 5) | 单项判定
+ *   表体: 检验项(数据库选择) | 检测标准 | 检测结果(可增删列,默认 1) | 单项判定
  *   表尾: 检验结论 / 处理意见 ｜ 检验人(账号登录人自动生成) / 审核人(固定:冯敏)
  *
  * 【检测结果 = **可增删列**(2026-11-19 用户口径,取代 2026-11-11 的「固定五格」)】
@@ -47,8 +47,10 @@ export const QC_INSP_REC_HEAD_ROWS = Object.freeze([
 export const QC_INSP_REC_MAX_RESULT_COLS = 20
 /** 最少 1 列(「不要固定 5 格」⇒ 允许收到 1 格;0 列没有意义,纸面会缺整段) */
 export const QC_INSP_REC_MIN_RESULT_COLS = 1
-/** 默认 5 列(老单据 `结果列数` 为空、新增单据未动过步进器时都落到这里,与 2026-11-11 那版一致) */
-export const QC_INSP_REC_DEFAULT_RESULT_COLS = 5
+/** 默认 **1 列**(2026-11-19 第二版用户口径:「默认是1格。后面再自主增加。」)——
+ *  新单据 / `结果列数` 为空的单据都从 1 格起,要几格自己按「＋ 新增列」加;
+ *  ⚠ 老单据放的是库里存的自己的列数(迁移按"实际用到的格数"回填、最少 1),不受这个默认值影响。 */
+export const QC_INSP_REC_DEFAULT_RESULT_COLS = 1
 
 /** 计数载体:头字段数据键(= qc_insp_rec.结果列数 的 yj_field label;界面上不显示) */
 export const QC_INSP_REC_RESULT_COUNT_KEY = '结果列数'
@@ -58,7 +60,7 @@ export const QC_INSP_REC_RESULT_KEYS = Object.freeze(
   Array.from({ length: QC_INSP_REC_MAX_RESULT_COLS }, (_, i) => `结果${i + 1}`),
 )
 
-/** 把外来的列数收敛到 [MIN, MAX];非数字(undefined/空串/NaN) ⇒ 默认 5。
+/** 把外来的列数收敛到 [MIN, MAX];非数字(undefined/空串/NaN) ⇒ 默认 1。
  *  后端取回的是 int,但也可能被人手改成文本,这里统一按 parseInt 兜住。 */
 export function clampResultColCount(n) {
   const v = parseInt(n, 10)
@@ -123,7 +125,7 @@ export const QC_INSP_ITEM_LIB = 'qc.insp_item'
 /**
  * Excel 导出用的列定义:结果列**按该单的实际列数**取前 n 列(不是物理列的 20 列全铺)。
  * 与纸面同一份真源:纸面显示几列,导出就几列(张单据的列数在头字段 `结果列数`)。
- * @param {number} [count] 结果列数;不传按默认 5 列
+ * @param {number} [count] 结果列数;不传按默认 1 列
  */
 export function columnsForResultCount(count = QC_INSP_REC_DEFAULT_RESULT_COLS) {
   return [
@@ -135,7 +137,7 @@ export function columnsForResultCount(count = QC_INSP_REC_DEFAULT_RESULT_COLS) {
   ]
 }
 
-/** Excel 导出:表头行 + 一行取值(调用方应传该单的 结果列数;不传按默认 5 列) */
+/** Excel 导出:表头行 + 一行取值(调用方应传该单的 结果列数;不传按默认 1 列) */
 export function exportHeaderRow(count = QC_INSP_REC_DEFAULT_RESULT_COLS) {
   return columnsForResultCount(count).map((c) => c.label)
 }

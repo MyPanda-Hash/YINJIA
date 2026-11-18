@@ -4932,3 +4932,7 @@ migrate-material-ret-wo-line-nodetail-20261117.sql
 #   yj_field 登记 结果1..结果20(全部可见列,否则"清空"落不了库)、单项判定 seq 40→60、结果列数(header,隐藏);
 #   存量回填 结果列数=5 + 结果6..20/结果列数 的 en/ja/ko/zh-TW 译名;幂等;两账套。
 migrate-qc-insp-rec-resultcols-20261119.sql
+# 2026-11-19 检验报告「检测结果」列数**默认改为 1 格**(用户口径「默认是1格。后面再自主增加。」):
+#   存量每张单的 qc_insp_rec.结果列数 按"实际用到的格数"重算(最少 1,有值的格子一列都不藏);
+#   列说明改成「默认 1」口径;零业务数据改动(结果1..结果20 一个字节不改);幂等;两账套。
+migrate-qc-insp-rec-resultcols-default1-20261119.sql
