@@ -137,6 +137,56 @@ public class QueryService {
      * {@code core/progress/sampleFlow.js}）—— 这里只给原始标记，不在 SQL 里拼中文文案，
      * 免得以后改口径要动 jar。</p>
      */
+    /**
+     * 手填客户建档（2026-11-18 用户口径，Excel #10）：
+     * 「客户名称需要改为预选择和可直接手动输入……同时写进客户档案（KHDA），后续能选到，
+     *   但是弹窗要求填写客户编号和联系人，也可以选择不填编号和联系人，
+     *   但是不填就不回填客户档案」。
+     *
+     * <p>写 `dm_kh`（KHDA 面板现读的遗留表，用户已确认写这张），并打标记方便日后与金蝶同步行区分。</p>
+     *
+     * <p><b>为什么运行时读列清单</b>：`dm_kh` 是遗留表，联系人/备注等列名不规整（`联系人*` 一堆子列 +
+     * 大量 `备用N`）。硬写列名一旦该列不存在就是 207 整条失败 —— 这里按 INFORMATION_SCHEMA 实际列拼 INSERT，
+     * 缺哪列跳哪列（同 AGENTS §5⑤.1 的批编译期列名教训）。</p>
+     *
+     * @return created / exists / no_code
+     */
+    public String upsertCustomer(String name, String code, String contact) {
+        String mc = name == null ? "" : name.trim();
+        String dm = code == null ? "" : code.trim();
+        String lxr = contact == null ? "" : contact.trim();
+        if (mc.isEmpty()) throw new IllegalArgumentException("客户名称不能为空");
+        if (dm.isEmpty()) return "no_code";   // 用户口径：不填编号就不回填档案
+
+        java.util.Set<String> cols = new java.util.HashSet<>(jdbc.queryForList(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='dm_kh'", String.class));
+        if (!cols.contains("mc") || !cols.contains("dm"))
+            throw new IllegalStateException("客户档案表结构异常（缺 dm/mc 列）");
+
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(1) FROM dm_kh WHERE RTRIM(ISNULL(mc,N''))=? OR RTRIM(ISNULL(dm,N''))=?",
+                Integer.class, mc, dm);
+        if (n != null && n > 0) return "exists";
+
+        java.util.List<String> c = new java.util.ArrayList<>();
+        java.util.List<Object> v = new java.util.ArrayList<>();
+        if (cols.contains("comm")) { c.add("comm"); v.add("0"); }
+        c.add("dm"); v.add(dm);
+        c.add("mc"); v.add(mc);
+        if (!lxr.isEmpty()) {
+            if (cols.contains("联系人")) { c.add("联系人"); v.add(lxr); }
+            else if (cols.contains("备用1")) { c.add("备用1"); v.add(lxr); }
+        }
+        // 标记：备注列优先，没有就退 备用2
+        if (cols.contains("备注")) { c.add("备注"); v.add("MES手工新建"); }
+        else if (cols.contains("备用2")) { c.add("备用2"); v.add("MES手工新建"); }
+        if (cols.contains("asp_time1")) { c.add("asp_time1"); v.add(new java.sql.Timestamp(System.currentTimeMillis())); }
+        String sql = "INSERT INTO dm_kh (" + String.join(",", c) + ") VALUES ("
+                + String.join(",", java.util.Collections.nCopies(c.size(), "?")) + ")";
+        jdbc.update(sql, v.toArray());
+        return "created";
+    }
+
     public List<java.util.Map<String, Object>> sampleFlowRows() {
         String sql = "SELECT h.[单据编号], "
                 + "ISNULL(h.[客户名称], N'') AS 客户名称, "

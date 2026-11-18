@@ -143,6 +143,13 @@
                   <span class="as-ref-text">{{ head[f.key] || tt('点击选择') }}</span>
                   <el-icon class="as-ref-ico"><Search /></el-icon>
                 </div>
+                <!-- 手填新客户（2026-11-18，Excel #10）：参照选择之外再给一条"档案里没有"的路 -->
+                <span
+                  v-if="editable && f.manualRef"
+                  class="sg-manual-ref no-print"
+                  :title="tt('客户档案里没有？手动填一个新客户')"
+                  @click="openManualRef(f.key)"
+                >＋{{ tt('新客户') }}</span>
                 <el-select
                   v-else-if="editable && (f.kind === 'select' || selectOptions(f.key).length)"
                   v-model="head[f.key]" size="small" class="as-cell-input sg-info-input" :clearable="false"
@@ -251,6 +258,27 @@
         </tbody>
       </table>
       <div v-if="editable && gridAddable" class="sg-addrow no-print" @click="addGridRow">＋ {{ tt(gridAddLabel) }}</div>
+      <!-- 手填客户弹窗（2026-11-18，Excel #10）：三项都可留空提交，
+           但**只有填了客户编号**才回填客户档案（用户口径）。 -->
+      <el-dialog v-model="manualRefOpen" :title="tt('新增客户')" width="440px" append-to-body>
+        <div class="mref-row">
+          <span class="mref-label">{{ tt('客户名称') }}</span>
+          <el-input v-model="manualRefForm.name" size="small" maxlength="80" />
+        </div>
+        <div class="mref-row">
+          <span class="mref-label">{{ tt('客户编号') }}</span>
+          <el-input v-model="manualRefForm.code" size="small" maxlength="40" :placeholder="tt('留空 = 只写到本单，不进客户档案')" />
+        </div>
+        <div class="mref-row">
+          <span class="mref-label">{{ tt('联系人') }}</span>
+          <el-input v-model="manualRefForm.contact" size="small" maxlength="40" :placeholder="tt('选填')" />
+        </div>
+        <p class="mref-tip">{{ tt('填了客户编号才会写进客户档案（标记「MES手工新建」），以后其他单据能直接选到') }}</p>
+        <template #footer>
+          <el-button size="small" @click="manualRefOpen = false">{{ tt('取消') }}</el-button>
+          <el-button size="small" type="primary" :loading="manualRefBusy" @click="submitManualRef">{{ tt('确定') }}</el-button>
+        </template>
+      </el-dialog>
       <!-- 分页条(2026-11-06):一行一样品,超过 grid.pageSize 行就切页,避免一页太长 -->
       <div v-if="gridPaged && gridRows.length > gridPageSize" class="sg-pager no-print">
         <span class="sg-pager-btn" :class="{ off: gridPage <= 1 }" @click="gridPage = Math.max(1, gridPage - 1)">◀</span>
@@ -926,6 +954,53 @@ const remarkAttach = computed(() => attachFieldOf(props.fields))
  * 顶部附件条；表格式纸面是另一套模板（信息条 + 表体 + 签名条同属一张表），附件必须是
  * **表里的一行**，否则打印出来会脱离纸面线框。</p>
  */
+/* ── 手填客户（2026-11-18，Excel #10）─────────────────────────────────
+   用户口径：「客户名称需要改为预选择和可直接手动输入……同时写进客户档案（KHDA），
+     后续能选到，但是同时弹窗要求填写其客户编号和联系人，也可以选择不填编号和联系人，
+     但是不填就不回填客户档案」。 */
+const manualRefOpen = ref(false)
+const manualRefBusy = ref(false)
+const manualRefField = ref('')
+const manualRefForm = reactive({ name: '', code: '', contact: '' })
+
+function openManualRef(key) {
+  manualRefField.value = String(key || '')
+  manualRefForm.name = String(head[manualRefField.value] || '')
+  manualRefForm.code = ''
+  manualRefForm.contact = ''
+  manualRefOpen.value = true
+}
+
+async function submitManualRef() {
+  const key = manualRefField.value
+  const name = String(manualRefForm.name || '').trim()
+  if (!name) { ElMessage.warning(tt('请先填写客户名称')); return }
+  const code = String(manualRefForm.code || '').trim()
+  if (!code) {
+    // 不填编号 ⇒ 只写在这张单上，不碰客户档案（用户明确口径）
+    head[key] = name
+    emit('dirty')
+    manualRefOpen.value = false
+    ElMessage.info(tt('未填客户编号：已填进本单，不进客户档案'))
+    return
+  }
+  manualRefBusy.value = true
+  try {
+    const res = await request.post('/px/khdaUpsert', { name, code, contact: manualRefForm.contact })
+    const state = String(res?.data?.result || '')
+    head[key] = name
+    emit('dirty')
+    manualRefOpen.value = false
+    if (state === 'created') ElMessage.success(tt('已写进客户档案，之后其他单据可直接选到'))
+    else if (state === 'exists') ElMessage.warning(tt('客户档案里已有同名或同编号的客户，本次未新建'))
+    else ElMessage.info(tt('已填进本单'))
+  } catch (e) {
+    ElMessage.error(tt('写客户档案失败：') + (e?.response?.data?.message || e?.message || ''))
+  } finally {
+    manualRefBusy.value = false
+  }
+}
+
 const gridAttach = computed(() => {
   const a = props.config && props.config.attach
   if (!a || !a.key) return null
@@ -1772,6 +1847,15 @@ defineExpose({ focusField })
   border-top: none;
   vertical-align: middle;
 }
+.sg-manual-ref {
+  display: inline-block; margin-left: 6px; padding: 0 6px; height: 22px; line-height: 22px;
+  border: 1px dashed #7aa7d8; border-radius: 4px; color: #2b6cb0; font-size: 12px;
+  cursor: pointer; white-space: nowrap; vertical-align: middle;
+}
+.sg-manual-ref:hover { background: #f2f7fd; }
+.mref-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.mref-label { width: 72px; color: #606266; font-size: 13px; }
+.mref-tip { margin: 4px 0 0; font-size: 12px; color: #909399; line-height: 1.6; }
 .sg-attach-label {
   font-weight: 600;
   margin-right: 8px;

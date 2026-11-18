@@ -565,7 +565,12 @@ export const sampleExtSheetCfg = {
   // 分割线分别落在表体的 1/3/4/6 列边界上，竖线与下方表头逐条对齐。
   info: [
     { label: '样品单编号', key: '单据编号', span: 1, kind: 'docno' },
-    { label: '客户名称', key: '客户名称', span: 2 },
+    // 2026-11-18 用户口径（Excel #10）：客户名可**参照选择**也可**手填新客户**。
+    //   manualRef=true ⇒ DocSheet 在这一格右侧出一颗「＋新客户」按钮，
+    //   点开弹窗填 客户名称/客户编号/联系人（后两项可空）：
+    //     · 填了客户编号 → 调 /px/khdaUpsert 写进 dm_kh（标记「MES手工新建」），后续参照能选到；
+    //     · 没填编号   → 只写在这张单上，不进档案（用户原话「不填就不回填客户档案」）。
+    { label: '客户名称', key: '客户名称', span: 2, manualRef: true },
     { label: '费用', key: '费用', span: 1 },
     { label: '下单日期', key: '单据日期', span: 2, kind: 'date' },
     { label: '期望交期', key: '期望交期', span: 2, kind: 'date' },

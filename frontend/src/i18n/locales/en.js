@@ -5414,6 +5414,19 @@ export default {
     '没有符合条件的供应商': 'No matching suppliers',
     '请选择一个供应商': 'Please select a supplier',
     '加载供应商档案失败': 'Failed to load supplier master',
+    /* ── 研发管理·样品 → 手填客户（建档打标记）2026-11-18 ── */
+    '新客户': 'New customer',
+    '客户档案里没有？手动填一个新客户': 'Not in the customer master? Enter a new customer manually',
+    '客户编号': 'Customer code',
+    '留空 = 只写到本单，不进客户档案': 'Leave blank to use it on this document only (not saved to the customer master)',
+    '填了客户编号才会写进客户档案（标记「MES手工新建」），以后其他单据能直接选到': 'Only a filled customer code is saved to the customer master (marked as manually created in MES) and becomes selectable elsewhere',
+    '请先填写客户名称': 'Enter the customer name first',
+    '未填客户编号：已填进本单，不进客户档案': 'No customer code: filled on this document only, not saved to the customer master',
+    '已写进客户档案，之后其他单据可直接选到': 'Saved to the customer master; selectable in other documents now',
+    '客户档案里已有同名或同编号的客户，本次未新建': 'A customer with the same name or code already exists; nothing was created',
+    '已填进本单': 'Filled on this document',
+    '写客户档案失败：': 'Failed to save to the customer master: ',
+    '新增客户': 'New customer',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
     '样品进度跟踪': 'Sample Progress',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
