@@ -18,7 +18,10 @@
  *   <li>落哪张单:{@code ScanPick} 固定 MATERIAL_OUT(生产领料),本模块按 side 选 OTHER_OUT / MATERIAL_RET;</li>
  *   <li>**不绑工单**:这两页是「随手领/随手退」,物料码扫到什么就记什么,没有 BOM 约束、没有工单号;</li>
  *   <li>退料不查上限:退的是「手上这批货」,没有"已领多少"可比(与生产退料不同 ——
- *       那边能退多少 = 该领料单已领 − 已退)。</li>
+ *       那边能退多少 = 该领料单已领 − 已退);</li>
+ *   <li>**退料的仓库由现场选**(2026-11-19 用户口径「手机扫码的其他退料,改为可以选择退料的仓库」):
+ *       库存里查得到就默认它所在的仓,随时可改成别的仓(同一物料退到不同仓 = 两行,
+ *       见 {@link lineKey});领料仍固定按库存所在仓出,不给选。</li>
  *   </ul>
  *
  * <h3>⚠ 单据键名一律用**面板标签**(不是物理列名)</h3>
@@ -84,6 +87,66 @@ export function lineKey(l) {
   return [l?.code, l?.batch, l?.warehouseCode || l?.warehouse]
     .map((x) => String(x == null ? '' : x).trim())
     .join('|')
+}
+
+/**
+ * 仓库档案行 → 「退到仓库」下拉项 `{ code, name }`(**停用的仓不出现**)。
+ *
+ * <p>2026-11-19 实测 `bs_wh` 15 个仓里有 6 个 `停用=1`(原料仓 CK01 / 辅料仓 CK02 / 成品仓 CK03 /
+ * 半成品仓 CK04 / 不良品仓 CK05 / 辅料及配件区A仓 CK-A2),它们在 `kucun` 里结存全为 0 ——
+ * 下拉里混进来只会让现场选错仓,故一律排掉。
+ *
+ * <p>`停用` 在库里有 `bit` / `'1'` / `'是'` 几种可能的落库形态(面板引擎过 JSON 后可能已变成
+ * 布尔或字符串),这里统一按"真值即停用"判;字段拿不到(`undefined`)按**启用**处理,不误杀。
+ *
+ * @param {any[]} rows 仓库档案行(WH 面板的行,平表形态)
+ * @returns {{ code: string, name: string }[]}
+ */
+export function toWarehouseOptions(rows) {
+  const off = (v) => {
+    if (v === undefined || v === null || v === '') return false
+    if (v === true) return true
+    if (v === false) return false
+    const s = String(v).trim().toLowerCase()
+    return s === '1' || s === 'true' || s === '是' || s === 'y' || s === 'yes'
+  }
+  return (Array.isArray(rows) ? rows : [])
+    .map((w) => ({
+      code: String(w?.['仓库编码'] || '').trim(),
+      name: String(w?.['仓库名称'] || w?.['仓库编码'] || '').trim(),
+      disabled: off(w?.['停用']),
+    }))
+    .filter((w) => w.code && !w.disabled)
+    .map((w) => ({ code: w.code, name: w.name }))
+}
+
+/**
+ * 退料时下拉的**默认仓** = 库存行的仓库编码。
+ *
+ * <p>库存里查得到这个料 ⇒ 默认退回它原来所在的仓(现场十次有八次就是退原仓);
+ * 库存里没有(`kucun` 查不到,退的是手上这批)⇒ 空,逼现场自己选。
+ *
+ * @param {any} cand 候选行(STOCK_PICK 行,或档案补出来的行)
+ */
+export function defaultWarehouseCode(cand) {
+  return String(cand?.['仓库编码'] || '').trim()
+}
+
+/**
+ * 把现场选的仓库盖到候选行上 —— 退料落库要的是 **仓库名称 + 仓库编码** 两个标签
+ * (`MATERIAL_RET` 明细里 `仓库` 参照 WH.仓库名称、`仓库编码` 参照 WH.仓库编码),
+ * 只写编码会让纸面「仓库」那格空着。
+ *
+ * <p>纯函数:返回新对象,不改入参(候选行同时被界面与清单引用,就地改会串行)。
+ *
+ * @param {any} cand 候选行
+ * @param {{ code?: string, name?: string }} wh 选中的仓库
+ */
+export function withWarehouse(cand, wh) {
+  if (!cand) return cand
+  const code = String(wh?.code || '').trim()
+  if (!code) return cand
+  return { ...cand, 仓库编码: code, 仓库: String(wh?.name || code).trim() }
 }
 
 /**
