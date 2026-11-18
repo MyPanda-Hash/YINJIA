@@ -687,6 +687,18 @@ export default {
     // 日排产日期列整组用伪列统管(2026-11-13 生产工单列表已用到该伪列名,补上漏掉的译名)
     '顺序固定': 'Order fixed',
     '带锁的列只能显隐,顺序固定(冻结列始终在最左侧)': 'Locked columns can only be shown/hidden; their order is fixed (frozen columns always stay leftmost)',
+    // 2026-11-18 列设置「固定列位置」(用户口径:固定后该列不再随横向滚动移动)
+    '「固定」下拉 = 该列不随横向滚动移动,可固定在表格左侧或右侧(不改变列顺序)': 'The "Fix" dropdown pins a column to the left or right edge, so it stays put while you scroll sideways (column order is unchanged)',
+    '带锁的列只能显隐,顺序固定在冻结区(始终在最左侧)': 'Locked columns can only be shown/hidden; they are fixed inside the frozen area (always leftmost)',
+    '固定列位置': 'Fix column position',
+    '不固定': 'Not fixed',
+    '固定左侧': 'Fix left',
+    '固定右侧': 'Fix right',
+    // 2026-11-18 日排产:区间外(斜杠)格可填,填完把预计完工日期改到那一天
+    '不在本行排产区间(开工日~计划完工日)内;点此填写当天数量,保存后会把预计完工日期改到这一天': 'Outside this line\'s schedule range (start ~ planned finish). Click to enter the quantity for that day; on save the planned finish date moves to that day',
+    '已把预计完工日期改到': 'Planned finish date moved to',
+    // 2026-11-18 工序路线排线:上一道已实际完工时,下一道开工取实际完工日
+    '上一道已实际完工的，下一道计划开工日期自动取该实际完工日，计划完工按本道原时长顺延': 'If the previous step is actually finished, the next step starts on that actual finish date and keeps its own duration',
     '日排产日期列': 'Daily plan dates',
     // 当天没数据 → 弹窗询问是否跳到最近有数据的一天(2026-10-06 用户口径:不静默跳转)
     '没有数据': 'No data',
