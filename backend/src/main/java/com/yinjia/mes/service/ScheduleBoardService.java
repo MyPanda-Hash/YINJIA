@@ -636,6 +636,72 @@ public class ScheduleBoardService {
     }
 
     /**
+     * **区间外那天填了日排产 ⇒ 把本行的排产区间扩到包含那一天**(2026-11-18 用户口径)。
+     *
+     * <p>背景(用户 2026-11-18,附「工单排产」截图):日期列里落在本行排产区间
+     * ({@code plang.st_date} ~ {@code plang.cp_date})之外的格子原来是「/」不可填;用户要求
+     * **这些列也可以填**,填完保存后该工单行的「预计完工时间」({@code plang.cp_date},
+     * 也即计划完工日期)要改到**填写的那一天**。{@link WorkOrderDayPlanService#save} 在保存循环后
+     * 按行取本次填数格子的**最早/最晚日期**调本方法(见那里的注释)。
+     *
+     * <p><b>口径:只扩不缩</b> ——
+     * <ul>
+     *   <li>{@code from} 非空且(计划开工为空 或 from **早于** 计划开工)⇒ {@code st_date = from}
+     *       (往前填的格子把开工日前移到那一天);</li>
+     *   <li>{@code to} 非空且(预定完成为空 或 to **晚于** 预定完成)⇒ {@code cp_date = to}
+     *       (往后填的格子把预计完工时间改到那一天);</li>
+     *   <li>已经在区间内的日期 ⇒ 一个字段都不动(不会因为补填格子反而把交期提前)。</li>
+     * </ul>
+     *
+     * <p><b>已结案跳过</b>:按本类唯一口径 {@link #CLOSED} 判定,已结案直接返回空 Map
+     * —— **不抛错**:这是日排产保存的附带动作,不能因为某行已结案就把整笔保存打回滚。
+     *
+     * <p>写三处(同事务,与 {@link #updateRowDates} 同一套写法):
+     * <ol>
+     *   <li>{@code plang.st_date / cp_date}(唯一真源,asp_user2/asp_time2 留痕);</li>
+     *   <li>{@code plang_pc} —— 走 {@link WorkOrderScheduleRecord#sync} 镜像(看板读的是它);</li>
+     *   <li>{@code wo_process_line} **当前工序**那道 —— 复用 {@link #syncProcessRanges}
+     *       (日期列窗口有一部分就来自这些区间,不跟着改的话扩了交期也看不到新列)。</li>
+     * </ol>
+     *
+     * @param rowId 工单行id({@code plang.id})
+     * @param from  本次保存在该行填数格子里的**最早**计划日期(可以为 null)
+     * @param to    本次保存在该行填数格子里的**最晚**计划日期(可以为 null)
+     * @param user  当前登录账号
+     * @return 有变化时 {@code {行id, 计划开工日期, 预定完成日期}}(日期为 yyyy-MM-dd 字符串);
+     *         行不存在/已作废/已结案/区间没变化 ⇒ **空 Map**(调用方据此跳过,不当作失败)
+     */
+    @Transactional
+    public Map<String, Object> extendRowDates(long rowId, java.time.LocalDate from, java.time.LocalDate to, String user) {
+        if (rowId <= 0 || (from == null && to == null)) return java.util.Map.of();
+        Map<String, Object> row;
+        try {
+            row = jdbc.queryForMap(
+                    "SELECT p.id, CONVERT(varchar(10), p.st_date, 120) AS st,"
+                            + " CONVERT(varchar(10), p.cp_date, 120) AS cp,"
+                            + " CASE WHEN " + CLOSED + " THEN 1 ELSE 0 END AS 已结案标志"
+                            + " FROM dbo.plang p WHERE p.id=? AND ISNULL(p.asp_cancel,'N')<>'Y'", rowId);
+        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+            return java.util.Map.of();                       // 行不存在/已作废:静默跳过
+        }
+        if (Integer.valueOf(1).equals(row.get("已结案标志"))) return java.util.Map.of();   // 已结案跳过(不抛错)
+        java.time.LocalDate st = toDate(row.get("st"));
+        java.time.LocalDate cp = toDate(row.get("cp"));
+        java.time.LocalDate nst = (from != null && (st == null || from.isBefore(st))) ? from : st;
+        java.time.LocalDate ncp = (to != null && (cp == null || to.isAfter(cp))) ? to : cp;
+        if (java.util.Objects.equals(nst, st) && java.util.Objects.equals(ncp, cp)) return java.util.Map.of();
+        jdbc.update("UPDATE dbo.plang SET st_date=?, cp_date=?, asp_user2=?, asp_time2=GETDATE() WHERE id=?",
+                nst, ncp, user, rowId);
+        WorkOrderScheduleRecord.sync(jdbc, rowId, user);     // 镜像 plang_pc(看板读它)
+        syncProcessRanges(rowId, nst, ncp, user);            // 只同步当前工序那道台账
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("行id", rowId);
+        out.put("计划开工日期", nst == null ? "" : nst.toString());
+        out.put("预定完成日期", ncp == null ? "" : ncp.toString());
+        return out;
+    }
+
+    /**
      * 批量排入(plang 单轨):每行 {加工单号, 行id?(plang.id 精确到批次行), 排产数量?(空=沿用), 生产线?} + 公共参数
      * {生产线, 排产班组(≤4字写 lb), 预开工日→st_date, 预完工日→cp_date}。
      * 守卫:产线必填/停用线拒绝/未排产(scx 空)/未结案;排产数量≤需求数量;完工不早于开工。

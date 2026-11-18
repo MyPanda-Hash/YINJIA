@@ -214,8 +214,11 @@
                            :controls="false" :min="0" class="dp-input" autofocus
                            @blur="commitQty(row, c.d)" @keyup.enter="commitQty(row, c.d)" @keyup.esc="cancelQtyEdit" />
           <!-- 区间外(开工日~计划完工日之外)且当天无计划/实报:画「/」——
-               这一天不归本行排(2026-11-01 用户口径;例:开工日改成 11-02 后,11-01 的格子要画斜杠) -->
-          <span v-else-if="row.__dp[c.i].out" class="dp-out" :title="outCellTitle">/</span>
+               这一天不归本行排(2026-11-01 用户口径;例:开工日改成 11-02 后,11-01 的格子要画斜杠)。
+               2026-11-18 用户口径:「不可填写的日期列能被填写,填写后修改原来的预计完工时间到这列」
+               ⇒ 斜杠格也可点开编辑;保存后后端把该行计划完工日期扩到这一天(见 dayPlanApi / WorkOrderDayPlanService.save)。 -->
+          <span v-else-if="row.__dp[c.i].out" class="dp-out dp-out-fill"
+                :title="outCellFillTitle" @click="startQtyEdit(row, c.d)">/</span>
           <span v-else class="dp-plan" :class="row.__dp[c.i].cls"
                 :title="row.__dp[c.i].title" @click="startQtyEdit(row, c.d)">
             {{ row.__dp[c.i].text }}<span v-if="row.__dp[c.i].manual" class="dp-hand"
@@ -495,7 +498,8 @@ const tableRef = ref(null)
  * toggleRowSelection(本表 reserve-selection 跨页保留勾选,另存数组会打架)。</p>
  */
 function onRowClick(row, column, event) {
-  toggleRowOnRowClick(tableRef.value, row, event, { extra: '.dp-plan' })
+  // 区间外的「/」格现在也能填(2026-11-18),点它同样不该翻勾选
+  toggleRowOnRowClick(tableRef.value, row, event, { extra: '.dp-plan, .dp-out-fill' })
 }
 
 const lines = ref([])
@@ -935,7 +939,11 @@ function dayTitle(v) {
  * 2026-11-13 新口径:格内两数怎么读、原计划怎么来、标红什么意思,都写在列头 tooltip 里。
  */
 const dayHeadTitle = computed(() => tt('格内:原计划/报工;原计划 = 工序计划量按 开工日→交期 均摊(不扣报工、历史也保留);标红 = 当天已结束未达成'))
-const outCellTitle = computed(() => tt('不在本行排产区间(开工日~计划完工日)内'))
+/**
+ * 区间外斜杠格的提示(2026-11-18 起这格也能填):说清「点了会怎样、保存后日期怎么变」。
+ * 原文保留给单测/其它页面复用的一致性(工单排产页同一句话)。
+ */
+const outCellFillTitle = computed(() => tt('不在本行排产区间(开工日~计划完工日)内;点此填写当天数量,保存后会把预计完工日期改到这一天'))
 
 /** 悬停明细最多列多少条(超出只写「… 共 N 处」—— 不弹窗,别让 tooltip 长到拉不到底) */
 const SHORT_TITLE_MAX = 15
@@ -1046,6 +1054,9 @@ async function commitQty(row, d) {
       生产线: row.生产线 || '', 计划日期: d, 计划数量: v }])
     const o = (r['超分配'] || []).find((x) => String(x['工单行id']) === String(row.行id))
     if (o) ElMessage.warning(`${tt('人工指定已超出工序计划量')}: ${qtyText(o['超出'])}${tt('(只提示,不拦保存)')}`)
+    // 2026-11-18:区间外那天填了数 ⇒ 后端把该行「预计完工时间」扩到这一天,这里把结果说给用户
+    const adj = (r['日期调整'] || []).find((x) => String(x['行id']) === String(row.行id))
+    if (adj) ElMessage.info(`${tt('已把预计完工日期改到')} ${adj['预定完成日期']}`)
     await loadDayPlan()
   } catch (e) { err(e, '保存失败') }
 }
@@ -1569,6 +1580,9 @@ onBeforeUnmount(() => unbindTableScroll())
 /* 2026-11-01:本行排产区间(开工日~计划完工日)之外的空白格画「/」——
    一眼看出那一天**不归本行排**(例:开工日改成 11-02 后,11-01 就是斜杠,而不是空着像漏排) */
 .dp-out { color: #c0c4cc; font-weight: 400; line-height: 1.2; user-select: none; }
+/* 2026-11-18:区间外的斜杠格也能填 —— 给可编辑手型 + 悬停变色,别让人以为它还是死的 */
+.dp-out-fill { cursor: text; }
+.dp-out-fill:hover { color: #1e6fb8; background: #eef6ff; }
 .dp-input { width: 66px; }
 /* 人工指定过的格子加粗变色 + 「手」角标;超分配时角标标红(只提示,不拦保存) */
 .dp-plan.manual { color: #b88230; }
