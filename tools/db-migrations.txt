@@ -5017,3 +5017,5 @@ migrate-qc-insp-rec-resultcols-20261119.sql
 migrate-qc-insp-rec-resultcols-default1-20261119.sql
 # 2026-11-18 恢复 11-17 13:52 admin 连删的 10 张研发单据（疑似误删；其余删除保留）
 migrate-restore-rd-del-batch-20261117.sql
+# 2026-11-18 产品信息表：项目编号/项目名称 → 立项编号/立项名称；产品整体尺寸拆三格（外径/内径/长度）+ 存量回填
+migrate-prodinfo-labels-and-size-20261118.sql

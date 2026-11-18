@@ -37,7 +37,8 @@ test('产品信息表:第一节的字段与「产品形态|应用场景」同排
   assert.ok(sec, '缺「一、产品基本信息」')
   const pairsOf = (row) => (row.pairs || []).map((p) => p.key)
   const rows = sec.rows.map(pairsOf)
-  assert.deepEqual(rows[0], ['项目编号', '项目名称'], '第 1 行 = 项目编号 | 项目名称')
+  // 2026-11-18 用户口径：行1 显示名改为 **立项编号 | 立项名称**（数据键随 label 同步改）
+  assert.deepEqual(rows[0], ['立项编号', '立项名称'], '第 1 行 = 立项编号 | 立项名称')
   assert.deepEqual(rows[1], ['产品编号', '客户名称'], '第 2 行 = 产品编号 | 客户名称')
   // 2026-11-06 用户口径:「产品信息表的客户名称下边加上一个客户编码字段」—— 紧跟客户名称
   assert.deepEqual(rows[2], ['客户编码', '客户料号'], '第 3 行 = 客户编码 | 客户料号')
