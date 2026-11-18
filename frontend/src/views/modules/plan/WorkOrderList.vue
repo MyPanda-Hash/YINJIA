@@ -151,7 +151,8 @@
            锁定列(选择/工单号/生产状态/结案)固定在两端,不进列设置。 -->
       <el-table-column v-for="col in orderedColumns" :key="col.prop" :label="tt(col.label || col.prop)"
                        :prop="col.key || col.prop" :width="col.width" :min-width="col.minWidth"
-                       :align="col.align" :sortable="!!col.sortable" :show-overflow-tooltip="!!col.showOverflow">
+                       :align="col.align" :sortable="!!col.sortable" :show-overflow-tooltip="!!col.showOverflow"
+                       :fixed="col.fixed">
         <template #header>
           <span :title="col.headerTip ? tt(col.headerTip) : null">{{ tt(col.label || col.prop) }}</span>
         </template>
@@ -262,9 +263,9 @@
          刷新后仍按保存的显隐/顺序渲染。排序:拖动行(⠿)换位 + ▲▼ 微调。
          关闭/取消 = 丢弃未保存的勾选与顺序(回到后端已保存那份),否则"取消"后表格已经被改了。
          末尾的伪列「日排产日期列」= 整组日期列的显隐开关(日期列本身不进列设置)。 -->
-    <ColumnSettingsDialog :model-value="columnVisible" :columns="columnDraft"
+    <ColumnSettingsDialog :model-value="columnVisible" :columns="dialogColumns"
                           @update:model-value="onColumnDialogToggle"
-                          @toggle="onColToggle" @move="onColMove" @reorder="onColReorder"
+                          @toggle="onColToggle" @pin="onColPin" @move="onColMove" @reorder="onColReorder"
                           @reset="resetDraft" @save="saveColumns" />
 
     <!-- 工单排产弹窗(2026-10-05 用户口径):**内嵌快速排产页面本身**。
@@ -403,6 +404,7 @@ import { fetchDayPlan, saveDayPlan } from '@/business/dayPlanApi'
 import { useUserStore } from '@/stores/user'
 import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
 import { useReportColumns } from '@core/report/useReportColumns'
+import { columnPinOf, groupColumnsByPin, normalizePin } from '@core/report/reportColumnSettings'
 import ColumnSettingsDialog from '@core/views/ColumnSettingsDialog.vue'
 
 /**
@@ -689,10 +691,34 @@ const {
   openDialog, saveDialog, cancelDialog, init: initColumns, resetDraft,
 } = useReportColumns(ref('WORK_ORDER_LIST'), computed(() => MID_PROPS), rows)
 
-/** 表格实际渲染的可调整列:按「列设置」草稿顺序 + 显隐过滤(未保存过 = 默认顺序、全部显示) */
-const orderedColumns = computed(() => visibleProps.value
-  .map((prop) => MID_COLUMNS.find((c) => c.prop === prop))
-  .filter(Boolean))
+/** 草稿里某列的固定位置(设置里存过就用它,没存过 = 不固定;本页无可调整列的默认固定) */
+function draftPinOf(prop) {
+  return columnPinOf(columnDraft.value.find((c) => c.prop === prop), {})
+}
+/**
+ * 表格实际渲染的可调整列:按「列设置」草稿顺序 + 显隐过滤(未保存过 = 默认顺序、全部显示),
+ * 再按固定位置排成「固定左 → 不固定 → 固定右」(2026-11-18 用户口径「列固定位置,移动后不再随滚轮移动」)。
+ * el-table 自己也会把 fixed 列排到两端,这里先分好组是为了同端内部顺序 = 列设置里的顺序。
+ */
+const orderedColumns = computed(() => groupColumnsByPin(visibleProps.value
+  .map((prop) => {
+    const def = MID_COLUMNS.find((c) => c.prop === prop)
+    return def ? { ...def, pin: draftPinOf(prop) } : null
+  })
+  .filter(Boolean)))
+
+/** 列设置弹窗里的草稿:补上固定位置与「伪列」标记(伪列只给显隐/排序,不给固定) */
+const dialogColumns = computed(() => columnDraft.value.map((c) => ({
+  ...c,
+  pin: columnPinOf(c, {}),
+  pseudo: c.prop === DAY_PLAN_COL_PROP,
+})))
+
+/** 改固定位置(只改草稿,点弹窗「保存」才落后端) */
+function onColPin({ prop, pin }) {
+  const col = columnDraft.value.find((c) => c.prop === prop)
+  if (col) col.pin = normalizePin(pin)
+}
 
 /** 日排产日期列组是否显示:由伪列「日排产日期列」的勾选态决定(草稿还没建好 = 默认可见) */
 const dayPlanColVisible = computed(() => {

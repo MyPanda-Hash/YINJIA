@@ -204,7 +204,7 @@
                              :prop="col.key || col.prop" :label="col.date ? '' : tt(col.label || col.prop)"
                              :width="col.width" :min-width="col.minWidth" :align="col.align"
                              :sortable="!!col.sortable" :show-overflow-tooltip="!!col.showOverflow"
-                             :fixed="col.frozen ? 'left' : undefined"
+                             :fixed="col.fixed"
                              :label-class-name="col.date ? 'dp-col-' + dayColState(col.date, planToday) : undefined"
                              :class-name="col.date ? 'dp-col-' + dayColState(col.date, planToday) : undefined">
               <template #header>
@@ -288,7 +288,7 @@
          列表里的伪列「日排产日期列」= 整组日期列的显隐开关 + 插入点(日期列本身不进列设置)。 -->
     <ColumnSettingsDialog :model-value="columnVisible" :columns="dialogColumns"
                           @update:model-value="onColumnDialogToggle"
-                          @toggle="onColToggle" @move="onColMove" @reorder="onColReorder"
+                          @toggle="onColToggle" @pin="onColPin" @move="onColMove" @reorder="onColReorder"
                           @reset="resetDraft" @save="saveColumns" />
 
     <!-- 调拨弹窗(9.29 批次②;2026-10-29 收口「调拨只能调拨到当前工序的产线中」;
@@ -363,8 +363,9 @@ import { useUserStore } from '@/stores/user'
 import { canDo as canDoPerm, canDoAny } from '@core/auth/panelAccess'
 // 列设置(2026-11-18):列定义/渲染列序在 business/woBoardColumns.js(纯函数,带单测);
 // 显隐+顺序的持久化走系统级 useReportColumns → /px/reportColumnSettings(panelCode=WORK_ORDER_BOARD)。
-import { WO_BOARD_COLUMNS, WO_BOARD_FROZEN_PROPS, boardColumnProps, boardRenderColumns, clampToScrollZone } from '@/business/woBoardColumns'
+import { WO_BOARD_COLUMNS, WO_BOARD_FROZEN_PROPS, WO_BOARD_DEFAULT_PINS, DAY_PLAN_COL_PROP, boardColumnProps, boardRenderColumns, clampToScrollZone } from '@/business/woBoardColumns'
 import { useReportColumns } from '@core/report/useReportColumns'
+import { columnPinOf, normalizePin } from '@core/report/reportColumnSettings'
 import ColumnSettingsDialog from '@core/views/ColumnSettingsDialog.vue'
 
 /**
@@ -555,14 +556,26 @@ const {
 /** 表格实际渲染的列序:冻结区(顺序锁定)在前 → 滚动区按草稿顺序,日期组在伪列位置整组展开 */
 const renderCols = computed(() => boardRenderColumns(columnDraft.value, WO_BOARD_COLUMNS, planDates.value))
 
-/** 弹窗里的列草稿:冻结区 4 列带 locked(只能显隐,顺序固定),其余可拖动/▲▼ */
+/** 弹窗里的列草稿:冻结区 4 列带 locked(只能显隐,顺序固定),其余可拖动/▲▼/改固定位置
+ *  (2026-11-18 用户口径「列设置增加可以对列固定位置」);`pin` 是**生效值**(设置没存过就用默认冻结区)。 */
 const dialogColumns = computed(() => columnDraft.value
-  .map((c) => ({ ...c, locked: WO_BOARD_FROZEN_PROPS.includes(c.prop) })))
+  .map((c) => ({
+    ...c,
+    locked: WO_BOARD_FROZEN_PROPS.includes(c.prop),
+    pseudo: c.prop === DAY_PLAN_COL_PROP,
+    pin: columnPinOf(c, WO_BOARD_DEFAULT_PINS),
+  })))
 
 /** 勾选/取消勾选:只改草稿,点弹窗「保存」才落后端 */
 function onColToggle({ prop, visible }) {
   const col = columnDraft.value.find((c) => c.prop === prop)
   if (col) col.visible = visible
+}
+/** 改固定位置(只改草稿):冻结列恒固定左侧,不参与;其余列可固定左/右/取消固定 */
+function onColPin({ prop, pin }) {
+  if (WO_BOARD_FROZEN_PROPS.includes(prop)) return
+  const col = columnDraft.value.find((c) => c.prop === prop)
+  if (col) col.pin = normalizePin(pin)
 }
 /** ▲/▼ 微调列顺序(只改草稿):delta=-1 上移/靠左,+1 下移/靠右;冻结列顺序锁定 ⇒ 直接忽略 */
 function onColMove({ prop, delta }) {

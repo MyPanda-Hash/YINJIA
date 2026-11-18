@@ -12,6 +12,7 @@ import assert from 'node:assert/strict'
 import {
   DAY_PLAN_COL_PROP,
   WO_BOARD_COLUMNS,
+  WO_BOARD_DEFAULT_PINS,
   WO_BOARD_FROZEN_PROPS,
   boardColumnProps,
   boardRenderColumns,
@@ -142,4 +143,36 @@ test('列名与数据键不同的列必须带 key(el-table 取值/排序靠它)'
   // 其余列 prop 即数据键(不能凭空写 key,否则取不到值)
   const nonPlain = WO_BOARD_COLUMNS.filter((c) => c.key && !Object.keys(expectKey).includes(c.prop))
   assert.deepEqual(nonPlain, [])
+})
+
+// ── 2026-11-18 列设置「固定列位置」:固定后不随横向滚动移动 ─────────────────────────
+test('固定左侧的滚动列排到冻结区之后、且带 fixed:left', () => {
+  const draft = defaultDraft()
+  draft.find((c) => c.prop === '备注').pin = 'left'
+  const out = boardRenderColumns(draft, WO_BOARD_COLUMNS, DATES)
+  const seq = propsOf(out)
+  // 冻结区 4 列仍在最前,紧接着就是被固定的「备注」
+  assert.deepEqual(seq.slice(0, 4), WO_BOARD_FROZEN_PROPS)
+  assert.equal(seq[4], '备注')
+  assert.equal(out.find((c) => c.prop === '备注').fixed, 'left')
+})
+
+test('固定右侧的滚动列排在最后、且带 fixed:right(日期组不受影响)', () => {
+  const draft = defaultDraft()
+  draft.find((c) => c.prop === '操作员').pin = 'right'
+  const out = boardRenderColumns(draft, WO_BOARD_COLUMNS, DATES)
+  assert.equal(out.at(-1).prop, '操作员')
+  assert.equal(out.at(-1).fixed, 'right')
+  // 其余列的顺序/日期组位置不变
+  assert.deepEqual(datesOf(out), DATES)
+})
+
+test('pin 为默认值/空串 ⇒ 不固定(definition 里的 frozen 例外:冻结区仍固定左)', () => {
+  const draft = defaultDraft()
+  draft.find((c) => c.prop === '备注').pin = ''
+  const out = boardRenderColumns(draft, WO_BOARD_COLUMNS, DATES)
+  assert.equal(out.find((c) => c.prop === '备注').fixed, undefined)
+  assert.deepEqual(out.filter((c) => c.fixed === 'left').map((c) => c.prop), WO_BOARD_FROZEN_PROPS)
+  // 默认固定表 = 冻结区四列
+  assert.deepEqual(Object.keys(WO_BOARD_DEFAULT_PINS), WO_BOARD_FROZEN_PROPS)
 })

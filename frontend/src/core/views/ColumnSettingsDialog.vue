@@ -14,7 +14,7 @@
        两者都只改调用方的草稿,点「保存」才落库。
 
      契约(无状态,显隐/顺序草稿由调用方的 `useReportColumns` 持有):
-       · props.columns = [{ prop, label, visible, locked? }]  ← buildReportColumnSettings 的产物;
+       · props.columns = [{ prop, label, visible, locked?, pseudo?, pin? }]  ← buildReportColumnSettings 的产物;
          **数组顺序即列顺序**;`locked: true` = 只能显隐、顺序锁定(2026-11-18 为「工单排产」的冻结列补的:
          那 4 列必须始终 fixed 在最左,拖到滚动区中间会散掉冻结区 ⇒ 不给拖,▲▼ 换成一枚锁图标)。
        · emit('toggle',  { prop, visible })           ← 勾/取消勾某一列(父组件改草稿)
@@ -25,7 +25,7 @@
        · emit('update:modelValue', false)              ← 取消/关闭(父组件据此回滚草稿)
      锁定常显的列由调用方**不传进来**(弹窗只管可调整列)。 -->
 <template>
-  <el-dialog :model-value="modelValue" :title="tt('列设置')" width="480px" append-to-body
+  <el-dialog :model-value="modelValue" :title="tt('列设置')" width="600px" append-to-body
              class="csd-dialog" @update:model-value="(v) => emit('update:modelValue', v)">
     <div class="csd-bar">
       <el-button link type="primary" size="small" @click="setAll(true)">{{ tt('全选') }}</el-button>
@@ -35,7 +35,11 @@
     </div>
     <el-input v-model="kw" size="small" clearable :placeholder="tt('搜索')" class="csd-search" />
     <div class="csd-tip">{{ tt('勾选决定显示哪几列;拖动 ⠿ 或点 ▲▼ 调整列顺序(上移=靠左)') }}</div>
-    <div v-if="hasLocked" class="csd-tip">{{ tt('带锁的列只能显隐,顺序固定(冻结列始终在最左侧)') }}</div>
+    <!-- 固定列(2026-11-18 用户口径「列设置增加可以对列固定位置,移动后这个列不再随着滚轮移动」):
+         每行「固定」下拉 = 不固定 / 固定左侧 / 固定右侧;固定后该列钉在表格左右两端,横向滚动时不动。
+         伪列(日排产日期列整组)不给固定;冻结区(locked)顺序与固定端都由页面锁定,只留锁图标。 -->
+    <div class="csd-tip">{{ tt('「固定」下拉 = 该列不随横向滚动移动,可固定在表格左侧或右侧(不改变列顺序)') }}</div>
+    <div v-if="hasLocked" class="csd-tip">{{ tt('带锁的列只能显隐,顺序固定在冻结区(始终在最左侧)') }}</div>
     <div ref="listRef" class="csd-list" :class="{ 'is-dragging': dragging }">
       <template v-for="(c, i) in columns" :key="c.prop">
         <!-- 落点插入线:画在目标行之前(拖动时才出现) -->
@@ -46,6 +50,13 @@
           <span class="csd-drag" :title="c.locked ? tt('顺序固定') : tt('拖动调整列顺序')">⠿</span>
           <el-checkbox :model-value="!!c.visible" @change="(v) => emit('toggle', { prop: c.prop, visible: !!v })" />
           <span class="csd-label" :title="c.prop">{{ tt(c.label || c.prop) }}</span>
+          <!-- 固定位置(2026-11-18):伪列/冻结列不给选(冻结列恒固定左侧,由页面锁定) -->
+          <el-select v-if="!c.locked && !c.pseudo" :model-value="c.pin || ''" size="small" class="csd-pin"
+                     :title="tt('固定列位置')" @change="(v) => emit('pin', { prop: c.prop, pin: v })">
+            <el-option :label="tt('不固定')" value="" />
+            <el-option :label="tt('固定左侧')" value="left" />
+            <el-option :label="tt('固定右侧')" value="right" />
+          </el-select>
           <span v-if="c.locked" class="csd-lock" :title="tt('顺序固定')">
             <el-icon><Lock /></el-icon>
           </span>
@@ -78,7 +89,7 @@ const props = defineProps({
   /** 列草稿(数组顺序=列顺序):[{ prop, label, visible }](来自 useReportColumns.columnDraft) */
   columns: { type: Array, default: () => [] },
 })
-const emit = defineEmits(['update:modelValue', 'toggle', 'move', 'reorder', 'reset', 'save'])
+const emit = defineEmits(['update:modelValue', 'toggle', 'pin', 'move', 'reorder', 'reset', 'save'])
 
 /** 列名过滤(列多时找得快;只影响显示,不影响拖拽/▲▼ 的真实下标) */
 const kw = ref('')
@@ -115,7 +126,8 @@ function onRowPress(i, e) {
   if (props.columns[i]?.locked) return
   if (e.button !== undefined && e.button !== 0) return   // 只认左键(触屏 button=0)
   const t = e.target
-  if (t && typeof t.closest === 'function' && t.closest('.el-checkbox, .el-button, button, input, textarea, select')) return
+  // 控件(勾选框/▲▼/固定下拉)上放行原本的点击;下拉的点击目标可能是外层 wrapper,故把 el-select/el-input 也收进来
+  if (t && typeof t.closest === 'function' && t.closest('.el-checkbox, .el-button, .el-select, .el-input, button, input, textarea, select')) return
   if (e.cancelable) e.preventDefault()   // 防拖出文字选区
   startDrag(i, e)
 }
@@ -220,5 +232,8 @@ onBeforeUnmount(stopDrag)
 .csd-item.is-locked { cursor: default; }
 .csd-item.is-locked .csd-drag { cursor: default; color: #dcdfe6; }
 .csd-lock { display: inline-flex; align-items: center; padding: 0 4px; color: #c0c4cc; font-size: 12px; }
+/* 固定位置下拉(2026-11-18):窄一点,给列名留空间;行内点击不触发拖动(见 onRowPress 的排除表) */
+.csd-pin { width: 98px; flex: none; }
+.csd-pin :deep(.el-select__wrapper) { padding: 0 6px; font-size: 12px; min-height: 24px; }
 .csd-empty { color: #909399; font-size: 13px; padding: 8px 0; }
 </style>

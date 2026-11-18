@@ -20,6 +20,8 @@
  *     否则 el-table 取不到值、sortable 也按错的键排。
  */
 
+import { normalizePin } from '../core/report/reportColumnSettings.js'
+
 /** 列设置里的伪列:整组「日排产日期列」的显隐开关 + 日期列插入点(本身不出列) */
 export const DAY_PLAN_COL_PROP = '日排产日期列'
 
@@ -111,6 +113,15 @@ export const WO_BOARD_COLUMNS = [
 /** 冻结区列名(顺序锁定,列设置里只给显隐;ColumnSettingsDialog 按 locked 禁用拖动/▲▼) */
 export const WO_BOARD_FROZEN_PROPS = WO_BOARD_COLUMNS.filter((c) => c.frozen).map((c) => c.prop)
 
+/**
+ * 冻结区四列的**默认固定位置**(2026-11-18 起「固定」是列设置里的一项用户偏好):
+ * 没保存过设置时它们默认固定左侧(保住 2026-11-08 用户口径「产品编码/产品规格/订单数量显示在前面冻结」);
+ * 冻结列本身在列设置里顺序锁定、固定端不可改,所以这里只是 render 的默认值来源。
+ */
+export const WO_BOARD_DEFAULT_PINS = Object.fromEntries(
+  WO_BOARD_COLUMNS.filter((c) => c.frozen).map((c) => [c.prop, 'left'])
+)
+
 /** 传进 useReportColumns 的字段名列表(= 列定义顺序,伪列在自己的锚点位置 ⇒ 弹窗里也落在同一处) */
 export function boardColumnProps(columns = WO_BOARD_COLUMNS) {
   return columns.map((c) => c.prop)
@@ -142,11 +153,17 @@ export function clampToScrollZone(draft = [], index = 0, frozenProps = WO_BOARD_
  * 算出表格**实际渲染**的列序(列设置草稿 → 渲染列表)。
  *
  * 返回数组元素两种形态:
- *   · 普通列 = `{ ...列定义, fixed?: 'left' }`(冻结区列带 fixed)
+ *   · 普通列 = `{ ...列定义, fixed?: 'left'|'right' }`(固定列带 fixed)
  *   · 日期列 = `{ prop: '__dp__<日期>', date: '<日期>' }`(整组由伪列的位置与显隐决定)
- * 顺序:冻结区(声明顺序,锁定)→ 滚动区(草稿顺序,日期组在伪列位置展开)。
+ * 顺序:固定左(冻结区 → 用户固定左)→ 不固定(草稿顺序,日期组在伪列位置展开)→ 固定右(草稿顺序)。
  *
- * @param {{prop:string, visible:boolean}[]} draft - useReportColumns 的列草稿(空 = 还没 init)
+ * 2026-11-18 用户口径「列设置增加可以对列固定位置,移动后这个列不再随着滚轮移动」:
+ *   · 冻结区 4 列 = 定义层默认固定左(`frozen`),顺序按列定义锁定;
+ *   · 其余列按草稿里的 `pin` 分组(设置没存过 ⇒ 不固定);固定右的列由 el-table 自己贴到最右侧
+ *     (它会把 fixed 列统一重排成「固定左 + 非固定 + 固定右」,所以这里只需保证同端内部顺序
+ *     与弹窗一致,并把 `fixed` 属性交给模板)。
+ *
+ * @param {{prop:string, visible:boolean, pin?:string}[]} draft - useReportColumns 的列草稿(空 = 还没 init)
  * @param {Object[]} columns - 列定义
  * @param {string[]} dates - 日排产日期列(升序)
  * @param {string} anchorProp - 日排产日期列的伪列名
@@ -159,15 +176,17 @@ export function boardRenderColumns(draft = [], columns = WO_BOARD_COLUMNS, dates
     const hit = draft.find((x) => x && x.prop === prop)
     return !hit || hit.visible !== false
   }
-  const out = []
-  // ① 冻结区:一律按列定义的声明顺序(顺序锁定;草稿顺序不参与,免得被拖散)
+  const left = []
+  const middle = []
+  const right = []
+  // ① 冻结区:一律按列定义的声明顺序、固定左侧(顺序锁定;草稿顺序不参与,免得被拖散)
   const placed = new Set()
   for (const c of columns) {
     if (!c.frozen || !visibleOf(c.prop)) continue
-    out.push({ ...c, fixed: 'left' })
+    left.push({ ...c, fixed: 'left' })
     placed.add(c.prop)
   }
-  // ② 滚动区:按草稿顺序;草稿为空(首帧/还没拉到设置)⇒ 用列定义顺序兜底
+  // ② 其余列:按草稿顺序,再按 pin 分到 左/中/右 三组;伪列在「中」组展开成整组日期列
   const seq = draft.some((x) => x && x.prop)
     ? draft
     : columns.map((c) => ({ prop: c.prop, visible: true }))
@@ -177,20 +196,23 @@ export function boardRenderColumns(draft = [], columns = WO_BOARD_COLUMNS, dates
       // 伪列本身不出列:它只决定「日期组显示与否」+「日期组插在哪」
       placed.add(anchorProp)
       if (item.visible === false) continue
-      for (const d of dates) out.push({ prop: `__dp__${d}`, date: d, width: 88, align: 'center' })
+      for (const d of dates) middle.push({ prop: `__dp__${d}`, date: d, width: 88, align: 'center' })
       continue
     }
     const c = byProp.get(item.prop)
     if (!c || c.frozen) continue   // 冻结列已在 ① 出过;未知 prop(老存档里的死列名)直接丢
     placed.add(c.prop)
     if (item.visible === false) continue
-    out.push({ ...c })
+    const pin = normalizePin(item.pin)
+    if (pin === 'left') left.push({ ...c, fixed: 'left' })
+    else if (pin === 'right') right.push({ ...c, fixed: 'right' })
+    else middle.push({ ...c })
   }
-  // ③ 兜底:列定义里有、草稿里却没有的列(草稿过期/刚加的列)按定义顺序补在末尾,不静默丢列。
+  // ③ 兜底:列定义里有、草稿里却没有的列(草稿过期/刚加的列)按定义顺序补在「中」组末尾,不静默丢列。
   //    实际流程里 buildReportColumnSettings 总会把列定义全量并进草稿,这里只是防脏设置把新列吃掉。
   for (const c of columns) {
     if (c.frozen || c.anchor || placed.has(c.prop) || !visibleOf(c.prop)) continue
-    out.push({ ...c })
+    middle.push({ ...c })
   }
-  return out
+  return [...left, ...middle, ...right]
 }

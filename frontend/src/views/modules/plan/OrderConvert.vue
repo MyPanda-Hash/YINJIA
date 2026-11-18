@@ -96,6 +96,7 @@
              工艺路线/本次转单数量)固定在左右两端,不进列设置。 -->
         <el-table-column v-for="col in orderedColumns" :key="col.prop" :label="tt(col.label)" :prop="col.prop"
                          :width="col.width" :min-width="col.minWidth" :align="col.align"
+                         :fixed="col.fixed"
                          :show-overflow-tooltip="!!col.showOverflow">
           <template #default="{ row }">
             <span v-if="col.prop === '已排产数量'" :class="{ 'oc-blue': Number(row.已排产数量) > 0 }">{{ row.已排产数量 }}</span>
@@ -180,9 +181,9 @@
          保存走 /px/reportColumnSettings(panelCode=ORDER_CONVERT),刷新后仍按保存的显隐/顺序渲染。
          排序:拖动行(⠿)换位 + ▲▼ 微调(2026-10-30 用户口径「让这个能拖动」)。
          关闭/取消 = 丢弃未保存的勾选与顺序(回到后端已保存那份),否则"取消"后表格已经被改了 -->
-    <ColumnSettingsDialog :model-value="columnVisible" :columns="columnDraft"
+    <ColumnSettingsDialog :model-value="columnVisible" :columns="dialogColumns"
                           @update:model-value="onColumnDialogToggle"
-                          @toggle="onColToggle" @move="onColMove" @reorder="onColReorder"
+                          @toggle="onColToggle" @pin="onColPin" @move="onColMove" @reorder="onColReorder"
                           @reset="resetDraft" @save="saveColumns" />
     </div>
 
@@ -203,6 +204,7 @@ import { tt } from '@/i18n'
 import { useUserStore } from '@/stores/user'
 import { canDo } from '@core/auth/panelAccess'
 import { useReportColumns } from '@core/report/useReportColumns'
+import { columnPinOf, groupColumnsByPin, normalizePin } from '@core/report/reportColumnSettings'
 import DateRangeQuery from '@core/ui/DateRangeQuery.vue'
 import ColumnSettingsDialog from '@core/views/ColumnSettingsDialog.vue'
 import { applyRouteDefaults } from '@/business/routeDefaults'
@@ -292,10 +294,26 @@ const {
   openDialog, saveDialog, cancelDialog, init: initColumns, resetDraft,
 } = useReportColumns(ref('ORDER_CONVERT'), computed(() => MID_PROPS), rows)
 
-/** 表格实际渲染的可调整列:按「列设置」草稿顺序 + 显隐过滤(未保存过 = 默认顺序、全部显示) */
-const orderedColumns = computed(() => visibleProps.value
-  .map((prop) => MID_COLUMNS.find((c) => c.prop === prop))
-  .filter(Boolean))
+/** 表格实际渲染的可调整列:按「列设置」草稿顺序 + 显隐过滤(未保存过 = 默认顺序、全部显示),
+ *  再按固定位置排成「固定左 → 不固定 → 固定右」(2026-11-18 用户口径「列设置增加可以对列固定位置」)。
+ *  el-table 会把 fixed 列重排到两端,这里先分组是为了同端内部顺序 = 列设置里的顺序。 */
+const orderedColumns = computed(() => groupColumnsByPin(visibleProps.value
+  .map((prop) => {
+    const def = MID_COLUMNS.find((c) => c.prop === prop)
+    if (!def) return null
+    const draft = columnDraft.value.find((c) => c.prop === prop)
+    return { ...def, pin: columnPinOf(draft, {}) }
+  })
+  .filter(Boolean)))
+
+/** 列设置弹窗里的草稿:补上生效的固定位置(设置没存过 = 不固定) */
+const dialogColumns = computed(() => columnDraft.value.map((c) => ({ ...c, pin: columnPinOf(c, {}) })))
+
+/** 改固定位置(只改草稿,点弹窗「保存」才落后端) */
+function onColPin({ prop, pin }) {
+  const col = columnDraft.value.find((c) => c.prop === prop)
+  if (col) col.pin = normalizePin(pin)
+}
 
 /** 勾选/取消勾选:只改草稿,点弹窗「保存」才落后端 */
 function onColToggle({ prop, visible }) {
