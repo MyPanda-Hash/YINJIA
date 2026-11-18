@@ -89,42 +89,68 @@ public class OtherSlipController {
         return ApiResult.ok(out);
     }
 
-    /** 补齐明细页抬头:单据状态 / 创建人 / 创建时间 / 数量合计 */
+    /**
+     * 补齐明细页抬头:单据状态 / 审核人 / 数量合计 / 金额合计 / 行数。
+     *
+     * <p>2026-11-18 第三轮(用户口径「单据表头和各行明细的信息太少了,要和生产领料一样」):
+     * 明细页原先只有 编号/状态/日期/部门/创建人/数量合计 六行,连「审核人」「行数」都没有 ——
+     * 现场拿手机核对一张单时,看不出是谁审的、几行、多少钱。
+     *
+     * <p>「审核人」取 **MES 单据状态表(yj_doc_status.shr)** 优先(那是本系统里谁审的),
+     * 没有才回落到单据头自己的审核人列(金蝶同步过来的)。
+     */
     private void fillMeta(Map<String, Object> out, String panel, String no, List<Map<String, Object>> rows) {
         double sum = 0;
+        double amount = 0;
         for (Map<String, Object> r : rows) {
             Object q = r.get("实发数量");
             if (q instanceof Number n) sum += n.doubleValue();
+            Object a = r.get("金额");
+            if (a instanceof Number n) amount += n.doubleValue();
         }
-        out.put("数量合计", sum);
+        out.put("数量合计", round4(sum));
+        out.put("金额合计", round4(amount));
+        out.put("行数", rows.size());
         List<Map<String, Object>> st = jdbc.queryForList(
                 "SELECT shr, pending, canceled FROM dbo.yj_doc_status WHERE panel_code = ? AND doc_no = ?", panel, no);
         Map<String, Object> s = st.isEmpty() ? Map.of() : st.get(0);
         out.put("单据状态", statusOf(s));
+        String shr = str(s.get("shr"));
+        if (!shr.isEmpty()) out.put("审核人", shr);
     }
 
     /** 其他出库单(其他领料):头 = bd_other_out,行 = bl_other_out */
     private void fillOtherOut(Map<String, Object> out, String no) {
         List<Map<String, Object>> head = jdbc.queryForList(
-                "SELECT TOP 1 单据日期, 部门, 经手人, asp_user1, asp_time1 FROM dbo.bd_other_out"
+                "SELECT TOP 1 单据日期, 业务类型, 部门, 经手人, 备注, 审核人, asp_user1, asp_time1"
+                        + " FROM dbo.bd_other_out"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (head.isEmpty()) throw new IllegalArgumentException("没有找到其他出库单 " + no);
         Map<String, Object> h = head.get(0);
         out.put("单据日期", str(h.get("单据日期")));
         out.put("创建人", str(h.get("asp_user1")));
         out.put("创建时间", str(h.get("asp_time1")));
+        out.put("业务类型", str(h.get("业务类型")));
         // 纸面「领料部门」:部门优先,部门没填就退到经手人(现场至少看得出是谁领的)
+        // 🔴 但**明细页要分开显示**:部门与经手人是两个概念,合成一个字段等于丢信息
         String dept = str(h.get("部门"));
-        out.put("部门", dept.isEmpty() ? str(h.get("经手人")) : dept);
+        String handler = str(h.get("经手人"));
+        out.put("部门", dept.isEmpty() ? handler : dept);
+        out.put("经手人", handler.isEmpty() ? dept : handler);
+        out.put("备注", str(h.get("备注")));
+        String auditor = str(h.get("审核人"));
+        if (!auditor.isEmpty()) out.put("审核人", auditor);
 
+        // 明细列与明细页同一口径(2026-11-18):编码/名称/规格型号/计量单位/批号/仓库 + 数量/单价/金额/备注
         List<Map<String, Object>> lines = jdbc.queryForList(
-                "SELECT 存货编码, 存货名称, 规格型号, 计量单位, 数量, 批号, 仓库"
+                "SELECT 序号, 存货编码, 存货名称, 规格型号, 计量单位, 数量, 单价, 金额, 批号, 仓库, 明细备注"
                         + " FROM dbo.bl_other_out WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                         + " ORDER BY id", no);
         List<Map<String, Object>> rows = new ArrayList<>();
         for (Map<String, Object> l : lines) {
             rows.add(row(str(l.get("存货名称")), str(l.get("规格型号")), str(l.get("计量单位")),
-                    l.get("数量"), str(l.get("批号")), str(l.get("仓库")), str(l.get("存货编码"))));
+                    l.get("数量"), str(l.get("批号")), str(l.get("仓库")), str(l.get("存货编码")),
+                    l.get("序号"), l.get("单价"), l.get("金额"), str(l.get("明细备注"))));
         }
         out.put("明细", rows);
     }
@@ -132,25 +158,34 @@ public class OtherSlipController {
     /** 生产退料单(其他退料 / 生产退料):头 = bd_material_ret,行 = bl_material_ret */
     private void fillMaterialRet(Map<String, Object> out, String no) {
         List<Map<String, Object>> head = jdbc.queryForList(
-                "SELECT TOP 1 单据日期, 领用人, 加工单号, asp_user1, asp_time1 FROM dbo.bd_material_ret"
+                "SELECT TOP 1 单据日期, 业务类型, 领用人, 仓库, 加工单号, 来源单号, 备注, 审核人,"
+                        + " asp_user1, asp_time1 FROM dbo.bd_material_ret"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (head.isEmpty()) throw new IllegalArgumentException("没有找到生产退料单 " + no);
         Map<String, Object> h = head.get(0);
         out.put("单据日期", str(h.get("单据日期")));
         out.put("创建人", str(h.get("asp_user1")));
         out.put("创建时间", str(h.get("asp_time1")));
+        out.put("业务类型", str(h.get("业务类型")));
         out.put("部门", str(h.get("领用人")));
         // 生产退料单可能带工单号(手机扫码生产退料那条链路会写);有就带出去让纸面能对上工单
         out.put("工单号", str(h.get("加工单号")));
+        // 明细页要的抬头(2026-11-18):头级仓库 / 来源单号 / 备注 —— 空值由前端隐藏,不硬塞占位
+        out.put("仓库", str(h.get("仓库")));
+        out.put("来源单号", str(h.get("来源单号")));
+        out.put("备注", str(h.get("备注")));
+        String auditor = str(h.get("审核人"));
+        if (!auditor.isEmpty()) out.put("审核人", auditor);
 
         List<Map<String, Object>> lines = jdbc.queryForList(
-                "SELECT 材料编码, 材料名称, 规格型号, 计量单位, 数量, 批号, 仓库"
+                "SELECT 行号, 材料编码, 材料名称, 规格型号, 计量单位, 数量, 单价, 金额, 批号, 仓库, 明细备注"
                         + " FROM dbo.bl_material_ret WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                         + " ORDER BY id", no);
         List<Map<String, Object>> rows = new ArrayList<>();
         for (Map<String, Object> l : lines) {
             rows.add(row(str(l.get("材料名称")), str(l.get("规格型号")), str(l.get("计量单位")),
-                    l.get("数量"), str(l.get("批号")), str(l.get("仓库")), str(l.get("材料编码"))));
+                    l.get("数量"), str(l.get("批号")), str(l.get("仓库")), str(l.get("材料编码")),
+                    l.get("行号"), l.get("单价"), l.get("金额"), str(l.get("明细备注"))));
         }
         out.put("明细", rows);
     }
@@ -160,7 +195,8 @@ public class OtherSlipController {
      * 另附**明细页**要的键(物料编码/批号/仓库) —— 代理只读它认识的那几个,多给的键不影响出纸。
      */
     private static Map<String, Object> row(String name, String spec, String uom, Object qty,
-                                           String lot, String wh, String code) {
+                                           String lot, String wh, String code,
+                                           Object seq, Object price, Object amount, String lineNote) {
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("材料名称", name.isEmpty() ? code : name);
         r.put("规格", spec);
@@ -176,6 +212,17 @@ public class OtherSlipController {
         r.put("物料编码", code);
         r.put("批号", lot);
         r.put("仓库", wh);
+        // 2026-11-18 第三轮:明细页要和「生产领料」一样把每行的字段摊开(原来只有
+        // 「名称 + 编码·批号 + 规格·单位 + 数量」,规格型号/单位/仓库都挤成一坨)。
+        // 名称/规格/单位/数量再给一份**同义键**,页面直接用,不必在前端猜我这里的键名。
+        r.put("名称", name.isEmpty() ? code : name);
+        r.put("规格型号", spec);
+        r.put("计量单位", uom);
+        r.put("数量", qty == null ? 0 : qty);
+        r.put("序号", seq == null ? 0 : toInt(seq));
+        r.put("单价", price == null ? 0 : price);
+        r.put("金额", amount == null ? 0 : amount);
+        r.put("明细备注", lineNote);
         return r;
     }
 
@@ -290,5 +337,10 @@ public class OtherSlipController {
         } catch (RuntimeException e) {
             return 0;
         }
+    }
+
+    /** 4 位小数四舍五入(与前端 fmtQty 同口径:kg/米 这类数量不让浮点尾巴冒到页面上) */
+    private static double round4(double v) {
+        return Math.round(v * 10000d) / 10000d;
     }
 }
