@@ -6484,6 +6484,7 @@ export default {
     '已清空本次退料': 'This return has been cleared',
     '清空本次': 'Clear',
     '提交后生成一张生产退料单并入库,库存会增加。确定提交?': 'Submitting creates a production return note and stocks it in, which increases inventory. Submit now?',
+    '提交后生成生产退料单(草稿),要等仓管审核后库存才会增加。确定提交?': 'Submitting creates a production return note in DRAFT; inventory increases only after the warehouse keeper approves it. Submit now?',
     '这张单还没有退料单号': 'This document has no return note number yet',
   },
 

@@ -60,6 +60,8 @@ import java.util.Map;
  *   <li>**不直接写库存**:领料提交走 {@code ButtonService.callButton(MATERIAL_OUT, "审核")},
  *       由 {@link com.yinjia.mes.service.StockLedgerService} 按既有链路过账 —— 与所有别的单据同一条路,
  *       不另写 SQL 记账(2026-10-16 的教训:自己算一遍必然和看板分叉)。</li>
+ *   <li>**不替仓管审批**(2026-11-18 用户口径「所有生成的单都要是草稿状态」):手机端生成的
+ *       材料出库单 / 生产退料单一律留**草稿**,审核(过账)在对应面板里由仓管点。</li>
  *   <li>**不做批次追溯口径的改动**:出库批次仍按既有「先进先出拆批」逻辑,可用量仍按
  *       物料+仓库 判断(验收期权宜口径,见 {@code StockLedgerService.LOT_STRICT} 与
  *       「上线前必验-库存批次追溯」文档)。</li>
@@ -1396,7 +1398,11 @@ public class MobilePickController {
     }
 
     /**
-     * 提交退料:为本次退料生成一张**生产退料单**(业务类型「生产退料」)并审核入账。
+     * 提交退料:为本次退料生成一张**生产退料单**(业务类型「生产退料」),**状态保持草稿**。
+     *
+     * <p>🔴 2026-11-18 用户口径:「生产退料单怎么自动审批了,所有生成的单都要是草稿状态」——
+     * 生成后**不再**自动审核,库存等仓管在「生产退料单」面板点「审核」时才入账
+     * (与材料出库单"提交只建单、仓管审核才过账"完全同一口径)。
      *
      * <p>用户口径:「退多少生多少」(2026-10-30)+
      * 「手机扫码的生产退料扫码后退料后填入的单据从其他入库改成生产退料单」(2026-11-13)。
@@ -1503,10 +1509,18 @@ public class MobilePickController {
 
         String backNo = saveDoc(PANEL_BACK, backForm);
 
-        // ③ 审核 → StockLedgerService 按生产退料(+)过账,库存加回来
-        buttons.callButton(PANEL_BACK, "审核", docNoForm(backNo), null);
+        // ③ 🔴 2026-11-18 用户口径「生产退料单怎么自动审批了,所有生成的单都要是草稿状态」:
+        //   这里原来紧跟一句 `callButton(PANEL_BACK, "审核", …)` —— 手机一提交就**替仓管审了**,
+        //   库存当场加回来,面板里根本看不到待审的退料单(与「材料出库单提交时不审核、
+        //   等仓管点审核才过账」的既定口径也不一致)。
+        //   现在只生成**草稿**,审核是仓管在「生产退料单」面板点「审核」时的事,
+        //   过账(`StockLedgerService.postIn(MATERIAL_RET,…)`)仍在那一步发生。
+        //   ⇒ 不要在这里恢复智能审核:草稿被作废时 {@code ButtonService.voidDoc} 会把下面
+        //     第 ④ 步写的退料台账一并放回可退量。
 
         // ④ 退料台账:一行 = 一次退料(这是"已退数量"的唯一真源)
+        //   ⚠ 写在这里(而不是审核时):手机端"可退量 = 已领 − 已退"必须**提交即扣**,
+        //     否则两个操作员能先后把同一批料各退一遍。仓管作废这张草稿时台账会被放回。
         for (Map<String, Object> l : lines) {
             jdbc.update("INSERT INTO dbo.wo_pick_return"
                             + " (领料单号, 工单号, 工单行号, 物料编码, 物料名称, 计量单位, 仓库, 批号,"
@@ -1542,7 +1556,8 @@ public class MobilePickController {
         out.put("明细", lines);
         out.put("合计数量", total);
         out.put("剩余", remain);
-        out.put("说明", "已生成生产退料单 " + backNo + " 并审核入账");
+        out.put("单据状态", "草稿");
+        out.put("说明", "已生成生产退料单 " + backNo + "(草稿,待仓管在「生产退料单」里审核后入库)");
         return ApiResult.ok(out);
     }
 
@@ -2229,7 +2244,11 @@ public class MobilePickController {
      *
      * <p>{@code ButtonService.requireNo} 只读 {@code formData.get("编号")},而保存返回的也是
      * {@code {编号, 单据状态}} —— 两处键名一致。写「单据编号」会报"缺少表单编号"(实测)。
+     *
+     * <p>⚠ 当前**没有调用点**:2026-11-18 起手机端提交退料不再自动审核(生成的单保持草稿,
+     * 由仓管在面板上审)。保留它是因为将来若要恢复"提交即审核",单号必须按这个键传。
      */
+    @SuppressWarnings("unused")
     private static Map<String, Object> docNoForm(String no) {
         Map<String, Object> f = new LinkedHashMap<>();
         f.put("编号", no);

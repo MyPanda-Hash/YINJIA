@@ -4665,6 +4665,18 @@ public class ButtonService {
                 def.code(), no, user, user);
         jdbc.update("UPDATE form_flow_link SET link_status='RELEASED', release_time=SYSDATETIME()"
                 + " WHERE target_panel_code = ? AND target_form_no = ? AND link_status = 'ACTIVE'", def.code(), no);
+        // 生产退料单作废 ⇒ **把这次退料从"已退数量"台账里放回去**(2026-11-18)。
+        //
+        // 背景:手机端提交退料时只生成**草稿**(用户口径「生成的单都要是草稿状态」),但
+        // 「可退量 = 已领 − 已退」的台账({@code wo_pick_return})是在提交那一刻写的(必须即扣,
+        // 否则两人能各退一遍同一批料)。草稿被仓管作废 = 这次退料没发生 ⇒ 台账必须一并作废,
+        // 不然那张领料单的可退量被一张废单永久吃掉,现场再也退不了这份料。
+        if ("MATERIAL_RET".equals(def.code())) {
+            int released = jdbc.update("UPDATE dbo.wo_pick_return SET asp_cancel='Y', asp_user2=?,"
+                            + " asp_time2=GETDATE() WHERE 退料单号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    user, no);
+            if (released > 0) log.info("[生产退料作废] {} → 释放退料台账 {} 行(可退量已回补)", no, released);
+        }
         // 分批送料:作废**不回收**批次号与台账号(2026-09-21 口径 —— 批次号在采购入库单审核时已定,
         // 回收会让已编号批次重号;弃审/作废只作废单据,台账号原样保留,见 BatchService.RECYCLE_ON_RELEASE)
         batchService.releaseByTarget(def.code(), no);

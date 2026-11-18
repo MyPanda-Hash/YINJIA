@@ -770,7 +770,8 @@ function cancelReturn() {
 }
 
 /**
- * 提交退料:本次选中的所有物料一次生成**一张**生产退料单(MATERIAL_RET)并审核入账。
+ * 提交退料:本次选中的所有物料一次生成**一张**生产退料单(MATERIAL_RET),状态为**草稿**
+ * (2026-11-18 用户口径「生成的单都要是草稿状态」;仓管在「生产退料单」面板审核时才入账)。
  */
 async function submitReturn() {
   const items = Object.entries(returnQty.value)

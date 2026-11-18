@@ -204,7 +204,7 @@
  *   GET  /px/mobilePick/doc?id=           抬头 + 领料明细(带 已退数量)
  *   GET  /px/mobilePick/locate?woNo=LL-…  按领料单号反查台账 id(从生产领料跳过来时用)
  *   POST /px/mobilePick/returnScan        扫物料码 → 本次可退量(只校验、不落库)
- *   POST /px/mobilePick/submitReturn      提交 → 生成生产退料单并审核入账
+ *   POST /px/mobilePick/submitReturn      提交 → 生成**生产退料单(草稿)**,等仓管审核才入账
  */
 import { computed, nextTick, onActivated, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -461,8 +461,12 @@ function clearAll() {
 }
 
 /**
- * 提交:本次填了数量的所有行 → **一张生产退料单**(后端 submitReturn 审核入账并扣/加库存),
- * 提交后自动补打印那张单(与生产退料"提交即出纸"的口径一致),再重拉本页数据。
+ * 提交:本次填了数量的所有行 → **一张生产退料单**。
+ *
+ * <p>🔴 2026-11-18 用户口径「生产退料单怎么自动审批了,所有生成的单都要是草稿状态」——
+ * 后端 submitReturn 只建**草稿**,库存要等仓管在「生产退料单」面板点「审核」才加回来;
+ * 所以确认框必须把这件事说清楚(否则现场会以为"点了提交库存就该变")。
+ * 提交后照旧自动补打印那张单。
  */
 async function submit() {
   if (!progress.value.ok || !docId.value) return
@@ -470,7 +474,7 @@ async function submit() {
   try {
     await ElMessageBox.confirm(
       `${tt('将退')} ${p0.done} ${tt('项物料,合计')} ${fmtQty(p0.totalQty)}。`
-      + tt('提交后生成一张生产退料单并入库,库存会增加。确定提交?'),
+      + tt('提交后生成生产退料单(草稿),要等仓管审核后库存才会增加。确定提交?'),
       tt('退料确认'),
       { confirmButtonText: tt('确定退料'), cancelButtonText: tt('取消'), type: 'warning' },
     )
