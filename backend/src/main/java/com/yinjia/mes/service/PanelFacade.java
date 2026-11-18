@@ -42,7 +42,9 @@ public class PanelFacade {
             data.put("单据日期", LocalDate.now().toString());
             if (def.prefix() != null) {
                 PanelRegistry.FieldDef g = def.byCol(def.groupCol());
-                if (g != null) data.putIfAbsent(g.label(), formNoService.preview(def.prefix()));
+                // 2026-11-18：编号规则按面板分流（外部开发样品单 = 账号-日期-序号），
+                //   预览也必须同源，否则新建表单先显示 SPW-…、点「新增」又变成 liulei-2026-11-18-01。
+                if (g != null) data.putIfAbsent(g.label(), buttonService.previewDocNo(def));
             }
         } else if ("archive".equals(def.mode())) {
             data.put("状态", "启用");   // 基础档案单单据:panelState.dataName=状态

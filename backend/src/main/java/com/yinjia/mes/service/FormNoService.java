@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Locale;
 import java.util.List;
 
 /**
@@ -32,6 +33,8 @@ import java.util.List;
 public class FormNoService {
 
     private static final DateTimeFormatter NY_FMT = DateTimeFormatter.ofPattern("yyyy-MM");
+    /** 样品单的「年-月-日」段（2026-11-18 用户口径 #7）。 */
+    private static final DateTimeFormatter DAY_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     /** 候选号连续被占用的上限。正常情况下 max(号池, 业务表) 已经把序推到位,循环一次就出号;
      *  这里只是兜底(号池落后且某张表读不到时才会逐号扫)。 */
@@ -81,6 +84,76 @@ public class FormNoService {
     /** 预览下一个单号(不消耗号池;新建表单默认值展示用) */
     public String preview(String prefix) {
         return nextFree(prefix, LocalDate.now().format(NY_FMT));
+    }
+
+    /**
+     * 样品单取号（2026-11-18 用户口径，Excel #7）：
+     * 「编号规则按照 建表用户名称小写 + 年 + 月 + 日 + 序号」，例 liulei-2026-11-18-01。
+     *
+     * <p>与全局规则（前缀-yyyy-MM-4位）**并存**：只有登记在
+     * {@code ButtonService.USER_DAY_SEQ_PANELS} 的面板走这条（目前只有外部开发样品单
+     * RD_SAMPLE_EXT），其余面板的编号规则一个字符都不变。</p>
+     *
+     * <p>序号按「同一账号 + 同一天」从 01 起（两位补零；到 100 自然变三位）。
+     * 取号基准与 {@link #next} 同源：max(号池, 业务表) + 1，并逐号比对是否被占用
+     * —— 2026-10-19 那次「号池落后导致发重号」的修法在这里同样适用。</p>
+     *
+     * <p>号池 {@code s_allno} 照旧留痕：{@code lb}=前缀、{@code ny}=当天日期段。
+     * 与历史 yyyy-MM 行形态不同、天然隔离，不会互相串号。</p>
+     */
+    public synchronized String nextUserDay(String prefix, String user) {
+        String owner = sampleOwner(user);
+        String day = LocalDate.now().format(DAY_FMT);
+        String no = nextFreeUserDay(prefix, owner, day);
+        jdbc.update("INSERT INTO s_allno (comm, dh, lb, ny, asp_user1, asp_time1, asp_cancel) VALUES (?,?,?,?,?,GETDATE(),'N')",
+                "0", no, prefix, day, owner);
+        return no;
+    }
+
+    /** 预览按账号取样的下一个样品单号（不消耗号池，新建表单展示用） */
+    public String previewUserDay(String prefix, String user) {
+        return nextFreeUserDay(prefix, sampleOwner(user), LocalDate.now().format(DAY_FMT));
+    }
+
+    /** 账号小写；空值回落 admin（与号池 asp_user1 的既有兜底一致） */
+    private static String sampleOwner(String user) {
+        String u = user == null ? "" : user.trim().toLowerCase(Locale.ROOT);
+        return u.isEmpty() ? "admin" : u;
+    }
+
+    private String nextFreeUserDay(String prefix, String owner, String day) {
+        String base = owner + "-" + day + "-";
+        int seq = Math.max(maxPoolUserDaySeq(base), maxDocUserDaySeq(prefix, base)) + 1;
+        for (int i = 0; i < MAX_SKIP; i++) {
+            String no = base + String.format("%02d", seq++);
+            if (!taken(no, prefix)) return no;
+        }
+        throw new IllegalStateException("样品单号生成失败：" + base + " 连续 " + MAX_SKIP + " 个候选号都已被占用");
+    }
+
+    /** 号池里同一「账号-日期-」段的最大序号 */
+    private int maxPoolUserDaySeq(String base) {
+        Integer v = jdbc.queryForObject(
+                "SELECT MAX(TRY_CAST(SUBSTRING(dh, LEN(?) + 1, 10) AS int)) FROM s_allno WHERE dh LIKE ?",
+                Integer.class, base, base + "%");
+        return v == null ? 0 : v;
+    }
+
+    /** 业务表里同一「账号-日期-」段的最大序号（读不到就跳过，交给 taken 逐号兜底） */
+    private int maxDocUserDaySeq(String prefix, String base) {
+        int max = 0;
+        for (String[] tc : docTables(prefix)) {
+            try {
+                Integer v = jdbc.queryForObject(
+                        "SELECT MAX(TRY_CAST(SUBSTRING(RTRIM([" + tc[1] + "]), LEN(?) + 1, 10) AS int)) FROM [" + tc[0] + "]"
+                                + " WHERE RTRIM([" + tc[1] + "]) LIKE ?",
+                        Integer.class, base, base + "%");
+                if (v != null && v > max) max = v;
+            } catch (Exception ignored) {
+                // 元数据漂移不该挡住开单
+            }
+        }
+        return max;
     }
 
     /**

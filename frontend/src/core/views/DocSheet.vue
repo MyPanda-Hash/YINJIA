@@ -143,6 +143,13 @@
                   <span class="as-ref-text">{{ head[f.key] || tt('点击选择') }}</span>
                   <el-icon class="as-ref-ico"><Search /></el-icon>
                 </div>
+                <!-- 手填新客户（2026-11-18，Excel #10）：参照选择之外再给一条"档案里没有"的路 -->
+                <span
+                  v-if="editable && f.manualRef"
+                  class="sg-manual-ref no-print"
+                  :title="tt('客户档案里没有？手动填一个新客户')"
+                  @click="openManualRef(f.key)"
+                >＋{{ tt('新客户') }}</span>
                 <el-select
                   v-else-if="editable && (f.kind === 'select' || selectOptions(f.key).length)"
                   v-model="head[f.key]" size="small" class="as-cell-input sg-info-input" :clearable="false"
@@ -157,6 +164,27 @@
                 <span v-else class="sg-ro">{{ head[f.key] || '' }}</span>
               </span>
               </span>
+            </td>
+          </tr>
+          <!-- ①b 附件行（2026-11-18 用户口径，Excel #8）：
+               「在期望交期页面后面做个位置，可以添加附件（图片或 PDF 或者 Word 文档）」
+               —— 信息条下面紧接一整行，跨满列宽；只有配置里声明了 `attach` 的面板才出
+               （目前只有外部-开发样品单 RD_SAMPLE_EXT，见 docSheetConfigs.sampleExtSheetCfg）。
+               附件本身走通用组件 FileAttachCell：yj_attachment 表，锚点 = 面板 + 单据编号 + 字段名，
+               支持多个文件、保留原文件名、点开预览/下载；新建未保存（无单号）时提示先保存。 -->
+          <tr v-if="gridAttach" class="sg-attach-row">
+            <td :colspan="gridCols.length" class="sg-attach-cell">
+              <span class="sg-attach-label">{{ tt(gridAttach.label) }}：</span>
+              <FileAttachCell
+                class="sg-attach-ctl"
+                :panel-code="panelCode"
+                :doc-no="head['单据编号'] || ''"
+                :field-key="gridAttach.key"
+                :model-value="head[gridAttach.key] || ''"
+                :can-edit="attachCanEdit"
+                hide-when-empty
+                @update:model-value="(v) => { head[gridAttach.key] = v; emit('dirty') }"
+              />
             </td>
           </tr>
           <!-- ② 表头（模板 row3） -->
@@ -230,6 +258,27 @@
         </tbody>
       </table>
       <div v-if="editable && gridAddable" class="sg-addrow no-print" @click="addGridRow">＋ {{ tt(gridAddLabel) }}</div>
+      <!-- 手填客户弹窗（2026-11-18，Excel #10）：三项都可留空提交，
+           但**只有填了客户编号**才回填客户档案（用户口径）。 -->
+      <el-dialog v-model="manualRefOpen" :title="tt('新增客户')" width="440px" append-to-body>
+        <div class="mref-row">
+          <span class="mref-label">{{ tt('客户名称') }}</span>
+          <el-input v-model="manualRefForm.name" size="small" maxlength="80" />
+        </div>
+        <div class="mref-row">
+          <span class="mref-label">{{ tt('客户编号') }}</span>
+          <el-input v-model="manualRefForm.code" size="small" maxlength="40" :placeholder="tt('留空 = 只写到本单，不进客户档案')" />
+        </div>
+        <div class="mref-row">
+          <span class="mref-label">{{ tt('联系人') }}</span>
+          <el-input v-model="manualRefForm.contact" size="small" maxlength="40" :placeholder="tt('选填')" />
+        </div>
+        <p class="mref-tip">{{ tt('填了客户编号才会写进客户档案（标记「MES手工新建」），以后其他单据能直接选到') }}</p>
+        <template #footer>
+          <el-button size="small" @click="manualRefOpen = false">{{ tt('取消') }}</el-button>
+          <el-button size="small" type="primary" :loading="manualRefBusy" @click="submitManualRef">{{ tt('确定') }}</el-button>
+        </template>
+      </el-dialog>
       <!-- 分页条(2026-11-06):一行一样品,超过 grid.pageSize 行就切页,避免一页太长 -->
       <div v-if="gridPaged && gridRows.length > gridPageSize" class="sg-pager no-print">
         <span class="sg-pager-btn" :class="{ off: gridPage <= 1 }" @click="gridPage = Math.max(1, gridPage - 1)">◀</span>
@@ -913,6 +962,66 @@ const emit = defineEmits(['dirty', 'term-changed', 'progress-save'])
  */
 const remarkAttach = computed(() => attachFieldOf(props.fields))
 
+/**
+ * 表格式纸面（layout:'grid'）的附件行（2026-11-18）：配置显式声明 `attach: {label,key}` 才出。
+ *
+ * <p>为什么不复用上面的 {@link remarkAttach}（元数据发现）：那条链只服务**文书式**的备注列/
+ * 顶部附件条；表格式纸面是另一套模板（信息条 + 表体 + 签名条同属一张表），附件必须是
+ * **表里的一行**，否则打印出来会脱离纸面线框。</p>
+ */
+/* ── 手填客户（2026-11-18，Excel #10）─────────────────────────────────
+   用户口径：「客户名称需要改为预选择和可直接手动输入……同时写进客户档案（KHDA），
+     后续能选到，但是同时弹窗要求填写其客户编号和联系人，也可以选择不填编号和联系人，
+     但是不填就不回填客户档案」。 */
+const manualRefOpen = ref(false)
+const manualRefBusy = ref(false)
+const manualRefField = ref('')
+const manualRefForm = reactive({ name: '', code: '', contact: '' })
+
+function openManualRef(key) {
+  manualRefField.value = String(key || '')
+  manualRefForm.name = String(head[manualRefField.value] || '')
+  manualRefForm.code = ''
+  manualRefForm.contact = ''
+  manualRefOpen.value = true
+}
+
+async function submitManualRef() {
+  const key = manualRefField.value
+  const name = String(manualRefForm.name || '').trim()
+  if (!name) { ElMessage.warning(tt('请先填写客户名称')); return }
+  const code = String(manualRefForm.code || '').trim()
+  if (!code) {
+    // 不填编号 ⇒ 只写在这张单上，不碰客户档案（用户明确口径）
+    head[key] = name
+    emit('dirty')
+    manualRefOpen.value = false
+    ElMessage.info(tt('未填客户编号：已填进本单，不进客户档案'))
+    return
+  }
+  manualRefBusy.value = true
+  try {
+    const res = await request.post('/px/khdaUpsert', { name, code, contact: manualRefForm.contact })
+    const state = String(res?.data?.result || '')
+    head[key] = name
+    emit('dirty')
+    manualRefOpen.value = false
+    if (state === 'created') ElMessage.success(tt('已写进客户档案，之后其他单据可直接选到'))
+    else if (state === 'exists') ElMessage.warning(tt('客户档案里已有同名或同编号的客户，本次未新建'))
+    else ElMessage.info(tt('已填进本单'))
+  } catch (e) {
+    ElMessage.error(tt('写客户档案失败：') + (e?.response?.data?.message || e?.message || ''))
+  } finally {
+    manualRefBusy.value = false
+  }
+}
+
+const gridAttach = computed(() => {
+  const a = props.config && props.config.attach
+  if (!a || !a.key) return null
+  return { label: String(a.label || '附件'), key: String(a.key) }
+})
+
 const engine = usePanelRuntime()
 const stageLoading = ref(0)
 const router = useRouter()
@@ -1138,10 +1247,31 @@ function addGridRow() {
   emit('dirty')
 }
 /** 删除明细行(仅 detail 模式;留最后一行时不允许删空 —— 一张单至少一个样品) */
-function removeGridRow(idx) {
+/**
+ * 删除一行样品（2026-11-18 用户口径，Excel #11）：
+ *   「样品-内部开发 / 样品-开发外部 两个面板的删除行要二次确认」。
+ *
+ * <p>为什么做成**配置开关**而不是所有面板一刀切：其它单据（数据记录表/工艺清单）的行删除
+ * 是高频编辑动作，逐个弹窗会打断录入；这两个样品单一行 = 一个样品、删掉要重填，才值得拦一下。
+ * 开关名 `confirmDeleteRow`，只在 sampleExtSheetCfg / sampleIntSheetCfg 打开。</p>
+ *
+ * <p>取消（点"取消"或按 ESC）时不删、也不报错 —— ElMessageBox 的 reject 用 catch 吞掉即可。</p>
+ */
+async function removeGridRow(idx) {
   if (!props.editable || !gridAddable.value) return
   const items = props.head?.detail?.items
   if (!Array.isArray(items) || items.length <= 1) return
+  if (props.config && props.config.confirmDeleteRow) {
+    try {
+      await ElMessageBox.confirm(
+        tt('确定删除这一行吗？删除后需要重新填写。'),
+        tt('删除确认'),
+        { type: 'warning', confirmButtonText: tt('删除'), cancelButtonText: tt('取消') },
+      )
+    } catch (e) {
+      return // 用户取消
+    }
+  }
   items.splice(idx, 1)
   emit('dirty')
 }
@@ -1745,6 +1875,29 @@ defineExpose({ focusField })
 .sg-pager-no { font-variant-numeric: tabular-nums; }
 .sg-pager-tip { margin-left: auto; opacity: .75; }
 
+/* 表格式纸面的附件行（2026-11-18）：标签左、附件格右，跨满整行；打印时只留文件名 */
+.sg-attach-row td.sg-attach-cell {
+  height: 40px;
+  padding: 4px 8px;
+  border: 1px solid #8a8a8a;
+  border-top: none;
+  vertical-align: middle;
+}
+.sg-manual-ref {
+  display: inline-block; margin-left: 6px; padding: 0 6px; height: 22px; line-height: 22px;
+  border: 1px dashed #7aa7d8; border-radius: 4px; color: #2b6cb0; font-size: 12px;
+  cursor: pointer; white-space: nowrap; vertical-align: middle;
+}
+.sg-manual-ref:hover { background: #f2f7fd; }
+.mref-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.mref-label { width: 72px; color: #606266; font-size: 13px; }
+.mref-tip { margin: 4px 0 0; font-size: 12px; color: #909399; line-height: 1.6; }
+.sg-attach-label {
+  font-weight: 600;
+  margin-right: 8px;
+  white-space: nowrap;
+}
+.sg-attach-ctl { display: inline-flex; vertical-align: middle; }
 .sg-addrow {
   height: 30px;
   line-height: 30px;

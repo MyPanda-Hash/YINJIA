@@ -30,7 +30,8 @@ test('基本信息区行序与目标版式一致（客户名仍是单格，不�
       else flat.push(pair.key)
     }
   }
-  assert.deepEqual(flat.slice(0, 10), ['项目编号', '项目名称', '产品编号', '客户名称',
+  // 2026-11-18 用户口径：「立项编号和立项名称还没有弄好」⇒ 行1 显示名改为立项编号/立项名称
+  assert.deepEqual(flat.slice(0, 10), ['立项编号', '立项名称', '产品编号', '客户名称',
     '客户编码', '客户料号', '产品管控等级', '产品功能类别', '产品形态', '应用场景'])
   assert.ok(!flat.includes('客户编码') || flat.indexOf('客户编码') > flat.indexOf('客户名称'),
     '客户编码是独立一格（与客户名称并列），不是把客户名称拆成两列')
@@ -53,12 +54,13 @@ test('BOM 表默认生成一行（面板级 seedRows）', () => {
   assert.equal((cfg.dataTables || []).length, 1, '若将来加第二张明细表，seedRows 必须改成按表预置')
 })
 
-test('尺寸行按「外径±公差 / 内径±公差 / 长度±公差」写', () => {
+test('尺寸两行都是「三内格」（外径±公差mm / 内径±公差mm / 长度±公差）', () => {
+  // 2026-11-18 用户口径「产品整体尺寸还没有弄好」：目标版式里这一行与下方「炭棒尺寸」**同形**，
+  //   是一行标签 + 三个内格，而不是一整格自由文本（旧实现一整格，占位词里讲三段写法）。
   const size = (cfg.sections || []).find((s) => s.bar === '二、规格与尺寸')
   const overall = size.rows[0].pairs[0]
-  assert.match(overall.ph, /外径±公差/, '整体尺寸提示要含外径±公差')
-  assert.match(overall.ph, /内径±公差/)
-  assert.match(overall.ph, /长度±公差/)
+  assert.deepEqual(overall.cells.map((c) => c.key), ['整体外径', '整体内径', '整体长度'], '整体尺寸三格')
+  assert.deepEqual(overall.cells.map((c) => c.ph), ['外径±公差mm', '内径±公差mm', '长度±公差'])
   const rod = size.rows[1].pairs[0]
   assert.deepEqual(rod.cells.map((c) => c.ph), ['外径±公差mm', '内径±公差mm', '长度±公差'])
 })

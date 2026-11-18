@@ -581,7 +581,12 @@ export const sampleExtSheetCfg = {
   // 分割线分别落在表体的 1/3/4/6 列边界上，竖线与下方表头逐条对齐。
   info: [
     { label: '样品单编号', key: '单据编号', span: 1, kind: 'docno' },
-    { label: '客户名称', key: '客户名称', span: 2 },
+    // 2026-11-18 用户口径（Excel #10）：客户名可**参照选择**也可**手填新客户**。
+    //   manualRef=true ⇒ DocSheet 在这一格右侧出一颗「＋新客户」按钮，
+    //   点开弹窗填 客户名称/客户编号/联系人（后两项可空）：
+    //     · 填了客户编号 → 调 /px/khdaUpsert 写进 dm_kh（标记「MES手工新建」），后续参照能选到；
+    //     · 没填编号   → 只写在这张单上，不进档案（用户原话「不填就不回填客户档案」）。
+    { label: '客户名称', key: '客户名称', span: 2, manualRef: true },
     { label: '费用', key: '费用', span: 1 },
     { label: '下单日期', key: '单据日期', span: 2, kind: 'date' },
     { label: '期望交期', key: '期望交期', span: 2, kind: 'date' },
@@ -607,6 +612,14 @@ export const sampleExtSheetCfg = {
   },
   // 模板 row7：申请 / 审核 / 确认。跨列数按表体列边界归并（1 | 4 | 3 = 8），
   // 即 306 | 476 | 406 —— 两条竖线正好压在「产品整体规格/炭棒规格」与「产品功能/背景」的列缝上。
+  // 附件行（2026-11-18 用户口径，Excel #8）：「在期望交期页面后面做个位置，可以添加附件
+  //   （图片或 PDF 或者 Word 文档）」——只加在**外部-开发样品单**这一张。
+  // 落地方式：信息条（样品单编号/客户名称/费用/下单日期/期望交期）**下面新增一整行**，
+  //   左侧标签「附件」+ FileAttachCell（复用产品信息表「客户图纸或规格书」同一套 yj_attachment 机制，
+  //   支持多个文件、原文件名、点开预览/下载）。数据落头表 `附件` 列（文件名串）。
+  // 删除行二次确认（2026-11-18 用户口径，Excel #11）：一行 = 一个样品，删掉要重填，值得拦一下。
+  confirmDeleteRow: true,
+  attach: { label: '附件', key: '附件' },
   signCells: [
     { label: '申请', key: '申请', span: 1, type: 'text' },
     { label: '审核', key: '审核', span: 4, type: 'text' },
@@ -629,6 +642,11 @@ export const sampleExtSheetCfg = {
  */
 export const sampleNdSheetCfg = {
   ...sampleExtSheetCfg,
+  // 2026-11-18：附件行**只给外部-开发样品单**（用户明确「只加在外部-开发样品单」），
+  //   非开发样品单是展开继承来的，这里显式关掉，否则会跟着长出一行附件。
+  attach: null,
+  // 删除确认同理：用户只点了「内部开发 + 开发外部」两张单，非开发单不开。
+  confirmDeleteRow: false,
   titlePart2: '非开发样品申请单',
   signCells: [
     { label: '申请', key: '申请', span: 2, type: 'text' },
@@ -646,6 +664,8 @@ export const sampleNdSheetCfg = {
  * 给最小可写宽（≥100px），列序与列名一字不改。
  */
 export const sampleIntSheetCfg = {
+  // 2026-11-18 用户口径（Excel #11）：内部开发样品单也要删除行二次确认。
+  confirmDeleteRow: true,
   layout: 'grid',
   titlePart1: '内部',
   titlePart2: '开发样品申请单',

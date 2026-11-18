@@ -24,10 +24,16 @@ test('研发管理五个二级分组,顺序=项目管理/样品/测试记录/产
   assert.deepEqual((rd.children || []).map((c) => c.title), ['项目管理', '样品', '测试记录', '产品文件', '共享文件'])
 })
 
-test('样品组：外部-开发 / 内部-开发 / 外部-非开发 三张单', () => {
+test('样品组：三张单 + 一个只读进度页（外部-开发 / 内部-开发 / 外部-非开发 / 样品进度跟踪）', () => {
   // 2026-11-17 Excel #14：复制外部开发样品单 → 外部-非开发样品申请单
+  // 2026-11-18 Excel #9：新增只读页「样品进度跟踪 /rd/sampleFlow」（panelCode 复用 RD_SAMPLE_EXT，
+  //   权限就是那张单的查看权；它是**页面入口**不是新面板 —— 去重后仍是 3 张单的码）
   assert.deepEqual(leafCodes(group('rdSample')),
-    ['RD_SAMPLE_EXT', 'RD_SAMPLE_INT', 'RD_SAMPLE_ND'])
+    ['RD_SAMPLE_EXT', 'RD_SAMPLE_INT', 'RD_SAMPLE_ND', 'RD_SAMPLE_EXT'])
+  const flow = group('rdSample').children.find((c) => c.code === 'rdSampleFlow')
+  assert.ok(flow, '要有样品进度跟踪入口')
+  assert.equal(flow.path, '/rd/sampleFlow', '是独立页面，不是 /panelx/list 引擎列表')
+  assert.equal(flow.panelCode, 'RD_SAMPLE_EXT', '权限复用外部开发样品单')
   const ext = group('rdSample').children.find((c) => c.panelCode === 'RD_SAMPLE_EXT')
   assert.equal(ext.title, '外部-开发样品')
   assert.equal(ext.path, '/panelx/list/RD_SAMPLE_EXT')
@@ -244,8 +250,11 @@ test('研发管理 26 个面板一个不少(含新增 项目流程管控 与两�
   // 2026-11-17:叶子项 27 → 28、面板 26 → 27（新增「特殊数据记录表」RD_EXTRA_REC_FILE，
   //   挂在「数据记录表」下；它是页面级视图 + 独立表，**算一张真面板**，与该面板的权限矩阵同名）。
   // 2026-11-17 Excel #14：再 +1（新增「外部-非开发样品 RD_SAMPLE_ND」，独立面板 + 独立入口）
-  assert.equal(codes.length, 29, '叶子项 29 个（+ 外部-非开发样品）')
+  // 2026-11-18 Excel #9：样品组多一个「样品进度跟踪」页面入口（panelCode 复用 RD_SAMPLE_EXT）
+  //   ⇒ 叶子项 29 → 30，**去重后面板数不变（仍 28 张）**。
+  assert.equal(codes.length, 30, '叶子项 30 个（+ 样品进度跟踪）')
   assert.equal(new Set(codes).size, 28, '去重后 28 张面板')
+  assert.ok(codes.includes('RD_SAMPLE_EXT'), '样品进度跟踪复用 RD_SAMPLE_EXT 的权限')
   assert.ok(codes.includes('RD_EXTRA_REC_FILE'), '特殊数据记录表必须登记面板码（权限矩阵同源）')
   assert.ok(codes.includes('PROJECT_FLOW'), '项目流程管控必须挂在研发管理下')
   // 2026-10-30:X烧结工艺清单(RD_X_SINTER)是 RD_MOLD_PROC 页面内的第二个 Tab,

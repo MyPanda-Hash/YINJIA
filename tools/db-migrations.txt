@@ -5044,3 +5044,7 @@ migrate-restore-rd-del-batch-20261117.sql
 #   ②门禁判据配套:提交/审批/审核时按本单商品 bs_inv.是否过程检验 判,没勾=是 的不再强制关联两张
 #   出货检验单(门禁代码在 ButtonService,本脚本只自检判据列,不重复建);幂等;两账套。
 migrate-finish-in-failqty-20261118.sql
+# 2026-11-18 产品信息表：项目编号/项目名称 → 立项编号/立项名称；产品整体尺寸拆三格（外径/内径/长度）+ 存量回填
+migrate-prodinfo-labels-and-size-20261118.sql
+# 2026-11-18 外部-开发样品单加「附件」字段（只这一张；头表加列 + yj_field 一行）
+migrate-sample-ext-attach-20261118.sql

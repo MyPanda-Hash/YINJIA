@@ -107,6 +107,11 @@ const routes = [
       // 权限:不新造虚拟面板,直接挂 RD_PROD_DOCLIST 的查看权 —— 这份流程本来就是那张表的数据,
       // 没有它的查看权也不该看这条流程（省掉一条 yj_role_panel 迁移）。
       { path: 'rd/productFlow', component: () => import('@/views/rd/ProductFlow.vue'), meta: { title: '产品文件流程管控', code: 'rdProductFlow', panelCode: 'RD_PROD_DOCLIST' } },
+      // 样品进度跟踪（2026-11-18 用户口径，Excel #9）:独立只读一屏,一行 = 一张外部开发样品单,
+      //   列 = 样品单编号/客户名称/下单日期/审核人/确认人/当前节点/进度描述。
+      //   权限不新造虚拟码:挂 RD_SAMPLE_EXT 的查看权(这份数据就是那张单的数据);
+      //   菜单项带 panelCode ⇒ 不进 flatMenus 自动路由,故在此显式注册。
+      { path: 'rd/sampleFlow', component: () => import('@/views/rd/SampleFlow.vue'), meta: { title: '样品进度跟踪', code: 'rdSampleFlow', panelCode: 'RD_SAMPLE_EXT' } },
       // 订单结转·发单工作台(方案 V1.0):待结转行→转工单/转采购单;不进 flatMenus 自动路由。
       // 2026-10-16 权限化:四处看板页面各挂**页面级虚拟面板码**(定义见后端 PagePanelRegistry),
       // meta.panelCode 供下方守卫拦「直接敲 URL」——菜单隐藏挡不住手输地址。

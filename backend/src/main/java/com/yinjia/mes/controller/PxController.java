@@ -1321,6 +1321,34 @@ public class PxController {
         return ApiResult.ok(out);
     }
 
+    /**
+     * 样品进度跟踪（2026-11-18 用户口径，Excel #9）—— 只读一屏，一行 = 一张外部开发样品单。
+     * 权限沿用 RD_SAMPLE_EXT 的查看权（这份数据就是那张单的数据，没有查看权也不该看这个跟踪表）。
+     */
+    /**
+     * 手填客户建档（2026-11-18 用户口径，Excel #10）：只在填了客户编号时真正建档；
+     * 编号留空由前端直接写单上、不调本接口（返回 no_code 兜底）。
+     */
+    @PostMapping("/khdaUpsert")
+    public ApiResult<Map<String, Object>> khdaUpsert(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView("RD_SAMPLE_EXT");
+        String name = body.get("name") == null ? "" : String.valueOf(body.get("name"));
+        String code = body.get("code") == null ? "" : String.valueOf(body.get("code"));
+        String contact = body.get("contact") == null ? "" : String.valueOf(body.get("contact"));
+        String state = queryService.upsertCustomer(name, code, contact);
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("result", state);
+        out.put("客户名称", name);
+        out.put("客户编号", code);
+        return ApiResult.ok(out);
+    }
+
+    @GetMapping("/sampleFlow")
+    public ApiResult<List<Map<String, Object>>> sampleFlow() {
+        perm.requirePanelView("RD_SAMPLE_EXT");
+        return ApiResult.ok(queryService.sampleFlowRows());
+    }
+
     @PostMapping("/queryFormDataList")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> queryFormDataList(@RequestBody Map<String, Object> body) {

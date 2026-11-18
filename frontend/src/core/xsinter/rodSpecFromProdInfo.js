@@ -48,6 +48,12 @@ export function rodSpecFromProdInfo(source, current = null) {
   // ② 改过名的键（本面板叫 炭棒出货长度）
   put('炭棒出货长度', source['炭棒长度'] ?? source['炭棒出货长度'])
 
+  // ②b 产品整体尺寸的三格（2026-11-18 起产品信息表把它们拆成独立列，与炭棒三格同形）：
+  //    只在炭棒那三格仍为空时兜底 —— 炭棒尺寸才是本面板的真源。
+  put('炭棒外径', source['整体外径'])
+  put('炭棒内径', source['整体内径'])
+  put('炭棒出货长度', source['整体长度'])
+
   // ③ 整串解析：还有空格才做
   if (need('炭棒外径') || need('炭棒内径') || need('炭棒出货长度')) {
     const whole = textOf(source['炭棒尺寸']) || textOf(source['产品整体尺寸'])

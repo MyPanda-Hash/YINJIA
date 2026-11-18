@@ -125,6 +125,98 @@ public class QueryService {
 
     private final PanelRegistry registry;
     private final JdbcTemplate jdbc;
+
+    /**
+     * 样品进度跟踪（2026-11-18 用户口径，Excel #9）：
+     * 「设置类似产品文件列表的进度展示，提取样品单编号、客户名称、下单日期、审核人、确认人，
+     *   字段填充列标题；同时需要列标题加一项进度描述……销售填写申请单之后可到此列表查询样品进展，
+     *   可以看到到几级审核了」。
+     *
+     * <p>只读一屏：一行 = 一张外部开发样品单。数据源 = 头表 + {@code yj_doc_status}（审批状态），
+     * 节点文案由前端纯函数按 pending/approve_node/archived/canceled 推导（可单测，见
+     * {@code core/progress/sampleFlow.js}）—— 这里只给原始标记，不在 SQL 里拼中文文案，
+     * 免得以后改口径要动 jar。</p>
+     */
+    /**
+     * 手填客户建档（2026-11-18 用户口径，Excel #10）：
+     * 「客户名称需要改为预选择和可直接手动输入……同时写进客户档案（KHDA），后续能选到，
+     *   但是弹窗要求填写客户编号和联系人，也可以选择不填编号和联系人，
+     *   但是不填就不回填客户档案」。
+     *
+     * <p>写 `dm_kh`（KHDA 面板现读的遗留表，用户已确认写这张），并打标记方便日后与金蝶同步行区分。</p>
+     *
+     * <p><b>为什么运行时读列清单</b>：`dm_kh` 是遗留表，联系人/备注等列名不规整（`联系人*` 一堆子列 +
+     * 大量 `备用N`）。硬写列名一旦该列不存在就是 207 整条失败 —— 这里按 INFORMATION_SCHEMA 实际列拼 INSERT，
+     * 缺哪列跳哪列（同 AGENTS §5⑤.1 的批编译期列名教训）。</p>
+     *
+     * @return created / exists / no_code
+     */
+    public String upsertCustomer(String name, String code, String contact) {
+        String mc = name == null ? "" : name.trim();
+        String dm = code == null ? "" : code.trim();
+        String lxr = contact == null ? "" : contact.trim();
+        if (mc.isEmpty()) throw new IllegalArgumentException("客户名称不能为空");
+        if (dm.isEmpty()) return "no_code";   // 用户口径：不填编号就不回填档案
+
+        java.util.Set<String> cols = new java.util.HashSet<>(jdbc.queryForList(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='dm_kh'", String.class));
+        if (!cols.contains("mc") || !cols.contains("dm"))
+            throw new IllegalStateException("客户档案表结构异常（缺 dm/mc 列）");
+
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(1) FROM dm_kh WHERE RTRIM(ISNULL(mc,N''))=? OR RTRIM(ISNULL(dm,N''))=?",
+                Integer.class, mc, dm);
+        if (n != null && n > 0) return "exists";
+
+        java.util.List<String> c = new java.util.ArrayList<>();
+        java.util.List<Object> v = new java.util.ArrayList<>();
+        if (cols.contains("comm")) { c.add("comm"); v.add("0"); }
+        c.add("dm"); v.add(dm);
+        c.add("mc"); v.add(mc);
+        if (!lxr.isEmpty()) {
+            if (cols.contains("联系人")) { c.add("联系人"); v.add(lxr); }
+            else if (cols.contains("备用1")) { c.add("备用1"); v.add(lxr); }
+        }
+        // 标记：备注列优先，没有就退 备用2
+        if (cols.contains("备注")) { c.add("备注"); v.add("MES手工新建"); }
+        else if (cols.contains("备用2")) { c.add("备用2"); v.add("MES手工新建"); }
+        if (cols.contains("asp_time1")) { c.add("asp_time1"); v.add(new java.sql.Timestamp(System.currentTimeMillis())); }
+        String sql = "INSERT INTO dm_kh (" + String.join(",", c) + ") VALUES ("
+                + String.join(",", java.util.Collections.nCopies(c.size(), "?")) + ")";
+        jdbc.update(sql, v.toArray());
+        return "created";
+    }
+
+    public List<java.util.Map<String, Object>> sampleFlowRows() {
+        String sql = "SELECT h.[单据编号], "
+                + "ISNULL(h.[客户名称], N'') AS 客户名称, "
+                + "ISNULL(CONVERT(varchar(10), h.[单据日期], 23), '') AS 单据日期, "
+                + "ISNULL(h.[审核], N'') AS 审核人, "
+                + "ISNULL(h.[确认], N'') AS 确认人, "
+                + "ISNULL(h.[进度描述], N'') AS 进度描述, "
+                + "ISNULL(s.pending, 'N') AS pending, "
+                + "ISNULL(s.approve_node, 0) AS approve_node, "
+                + "ISNULL(s.archived, 'N') AS archived, "
+                + "ISNULL(s.canceled, 'N') AS canceled "
+                + "FROM rd_sample_ext_head h "
+                + "LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SAMPLE_EXT' AND s.doc_no = h.[单据编号] "
+                + "WHERE ISNULL(h.asp_cancel, 'N') <> 'Y' "
+                + "ORDER BY h.[单据日期] DESC, h.[单据编号] DESC";
+        return jdbc.query(sql, (rs, i) -> {
+            java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+            row.put("单据编号", rs.getString("单据编号"));
+            row.put("客户名称", rs.getString("客户名称"));
+            row.put("单据日期", rs.getString("单据日期"));
+            row.put("审核人", rs.getString("审核人"));
+            row.put("确认人", rs.getString("确认人"));
+            row.put("进度描述", rs.getString("进度描述"));
+            row.put("pending", rs.getString("pending"));
+            row.put("approve_node", rs.getInt("approve_node"));
+            row.put("archived", rs.getString("archived"));
+            row.put("canceled", rs.getString("canceled"));
+            return row;
+        });
+    }
     private final TranslationService translations;
 
     public QueryService(PanelRegistry registry, JdbcTemplate jdbc, TranslationService translations) {
