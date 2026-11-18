@@ -4922,3 +4922,7 @@ migrate-erp-linekey-repair-20261116.sql
 
 # 2026-11-17 采购入库单「多仓库入库」:bl_purchase_in 加 [源行id](拆分组锚点,支持按行缩进展示 + 合并回一行回退)。
 migrate-pur-in-wh-group-20261117.sql
+
+# 2026-11-17 生产退料单整页 500(列名 '工单行号' 无效)修复:「工单行号」place 由 query,header,detail 改为 query,header
+#   (行表 bl_material_ret 无该列,该字段只落在单据头 bd_material_ret;口径同材料出库单)纯元数据,零改表零改代码。
+migrate-material-ret-wo-line-nodetail-20261117.sql

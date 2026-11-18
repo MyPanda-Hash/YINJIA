@@ -1,0 +1,2 @@
+SET NOCOUNT ON;
+SELECT 'NODE|' + menu_code + '|' + ISNULL(CAST(parent_code AS nvarchar(50)),'-') + '|' + CAST(ISNULL(sort_no,0) AS nvarchar(10)) + '|' + CAST(ISNULL(hidden,0) AS nvarchar(2)) + '|' + ISNULL(title,'') FROM dbo.yj_menu_node;
