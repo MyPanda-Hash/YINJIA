@@ -4926,3 +4926,9 @@ migrate-pur-in-wh-group-20261117.sql
 # 2026-11-17 生产退料单整页 500(列名 '工单行号' 无效)修复:「工单行号」place 由 query,header,detail 改为 query,header
 #   (行表 bl_material_ret 无该列,该字段只落在单据头 bd_material_ret;口径同材料出库单)纯元数据,零改表零改代码。
 migrate-material-ret-wo-line-nodetail-20261117.sql
+
+# 2026-11-19 检验报告(YJ-QR-96,QC_INSP_REC)「检测结果」由固定五格改为**可增删列**:
+#   qc_insp_rec_detail 补 结果6..结果20 nvarchar(200)(逐列中文注明)+ qc_insp_rec.结果列数 int(计数载体,隐藏);
+#   yj_field 登记 结果1..结果20(全部可见列,否则"清空"落不了库)、单项判定 seq 40→60、结果列数(header,隐藏);
+#   存量回填 结果列数=5 + 结果6..20/结果列数 的 en/ja/ko/zh-TW 译名;幂等;两账套。
+migrate-qc-insp-rec-resultcols-20261119.sql

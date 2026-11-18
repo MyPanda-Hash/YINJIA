@@ -7,6 +7,13 @@ import {
   QC_INSP_REC_HEAD_ROWS,
   QC_INSP_REC_FOOT_ROWS,
   QC_INSP_REC_RESULT_KEYS,
+  QC_INSP_REC_RESULT_COUNT_KEY,
+  QC_INSP_REC_MAX_RESULT_COLS,
+  QC_INSP_REC_MIN_RESULT_COLS,
+  QC_INSP_REC_DEFAULT_RESULT_COLS,
+  clampResultColCount,
+  activeResultKeys,
+  columnsForResultCount,
   QC_INSP_REC_DISPOSAL_LIB,
   QC_INSP_REC_VERDICT_LIB,
   QC_INSP_ITEM_LIB,
@@ -15,8 +22,13 @@ import {
 } from './qcInspRecColumns.js'
 
 /** qc_insp_rec_detail 的元数据列(yj_field place=detail);键必须落在这里,否则保存被静默丢弃。
- *  ⚠ 旧列 `检测结果` 已转历史列(visible=0/hidden=1,整段文字),表体不再用它。 */
-const DB_DETAIL_COLUMNS = ['检验项', '检测标准', '检验方法', '结果1', '结果2', '结果3', '结果4', '结果5', '单项判定']
+ *  ⚠ 旧列 `检测结果` 已转历史列(visible=0/hidden=1,整段文字),表体不再用它。
+ *  ⚠ 结果1..结果20 是 2026-11-19「可增删列」的物理列(结果1..5 建于 2026-11-11,6..20 建于 11-19)。 */
+const DB_DETAIL_COLUMNS = [
+  '检验项', '检测标准', '检验方法',
+  ...Array.from({ length: 20 }, (_, i) => `结果${i + 1}`),
+  '单项判定',
+]
 
 test('每个表体列 key 必须存在于 qc_insp_rec_detail 的元数据列里', () => {
   const bad = QC_INSP_REC_COLUMNS
@@ -26,15 +38,46 @@ test('每个表体列 key 必须存在于 qc_insp_rec_detail 的元数据列里'
   assert.deepEqual([...QC_INSP_REC_DETAIL_COLUMNS], DB_DETAIL_COLUMNS)
 })
 
-test('检测结果 = 固定五格:键恰好 结果1..结果5(2026-11-11 用户口径)', () => {
-  assert.deepEqual([...QC_INSP_REC_RESULT_KEYS], ['结果1', '结果2', '结果3', '结果4', '结果5'])
-  assert.equal(QC_INSP_REC_RESULT_KEYS.length, 5, '必须固定 5 格,多/少都要同步改迁移脚本')
-  // 表体列里这五格各占一列,且排在 检测标准 之后、单项判定 之前
+test('检测结果 = 可增删列:键恰好 结果1..结果20(2026-11-19 用户口径「不要固定5格了」)', () => {
+  assert.deepEqual([...QC_INSP_REC_RESULT_KEYS],
+    Array.from({ length: 20 }, (_, i) => `结果${i + 1}`))
+  assert.equal(QC_INSP_REC_RESULT_KEYS.length, QC_INSP_REC_MAX_RESULT_COLS, '键数 = 物理列上限')
+  assert.equal(QC_INSP_REC_MAX_RESULT_COLS, 20, '上限 20 —— 改这个数必须同时加物理列 + yj_field 登记')
+  assert.equal(QC_INSP_REC_DEFAULT_RESULT_COLS, 5, '默认仍是 5 列(老单据的观感不变)')
+  assert.equal(QC_INSP_REC_MIN_RESULT_COLS, 1, '最少 1 列')
+  // 表体列里结果列排在 检验方法 之后、单项判定 之前,且逐个一位
   const labels = QC_INSP_REC_COLUMNS.map((c) => c.label)
-  assert.deepEqual(labels, ['检验项', '检测标准', '检验方法', '结果1', '结果2', '结果3', '结果4', '结果5', '单项判定'])
+  assert.deepEqual(labels, DB_DETAIL_COLUMNS)
   // 老的单列文本 `检测结果` 不得再出现在表体列里(否则纸面上会多出一列旧输入框)
   assert.ok(!labels.includes('检测结果'))
   assert.equal(new Set(labels).size, labels.length, '列名不可重复')
+  // 计数载体:头字段「结果列数」(qc_insp_rec.结果列数),界面上不显示
+  assert.equal(QC_INSP_REC_RESULT_COUNT_KEY, '结果列数')
+})
+
+test('列数收敛:clampResultColCount 把外来值夹到 [1,20],非数字回落到默认 5', () => {
+  assert.equal(clampResultColCount(8), 8)
+  assert.equal(clampResultColCount('12'), 12)
+  assert.equal(clampResultColCount(0), QC_INSP_REC_MIN_RESULT_COLS)
+  assert.equal(clampResultColCount(-3), QC_INSP_REC_MIN_RESULT_COLS)
+  assert.equal(clampResultColCount(999), QC_INSP_REC_MAX_RESULT_COLS)
+  assert.equal(clampResultColCount(undefined), QC_INSP_REC_DEFAULT_RESULT_COLS)
+  assert.equal(clampResultColCount(''), QC_INSP_REC_DEFAULT_RESULT_COLS)
+  assert.equal(clampResultColCount(null), QC_INSP_REC_DEFAULT_RESULT_COLS)
+  assert.equal(clampResultColCount('abc'), QC_INSP_REC_DEFAULT_RESULT_COLS)
+  // 小数向下取整(后端 int 列不会给小数,但前端手改可能)
+  assert.equal(clampResultColCount('7.9'), 7)
+})
+
+test('activeResultKeys:按列数取前 n 个键(1..n)', () => {
+  assert.deepEqual(activeResultKeys(5), ['结果1', '结果2', '结果3', '结果4', '结果5'])
+  assert.deepEqual(activeResultKeys(1), ['结果1'])
+  const keys = activeResultKeys(20)
+  assert.equal(keys.length, 20)
+  assert.equal(keys[19], '结果20')
+  // 超界/未传一律收敛(不是抛错):纸面渲染不能因为脏数据整块空白
+  assert.equal(activeResultKeys(999).length, 20)
+  assert.equal(activeResultKeys(undefined).length, QC_INSP_REC_DEFAULT_RESULT_COLS)
 })
 
 test('检验项挂在标准库 qc.insp_item(原表「检验项为数据库选择」)', () => {
@@ -78,12 +121,21 @@ test('表尾按模板排成两行两对:检验人|检验结论 / 审核人|处�
   assert.notEqual(QC_INSP_REC_VERDICT_LIB, QC_INSP_REC_DISPOSAL_LIB)
 })
 
-test('导出:表头=列显示名(五格各一列),行按列定义取值', () => {
+test('导出:结果列数跟着该单的列数走(默认 5 列)', () => {
   assert.deepEqual(exportHeaderRow(),
     ['检验项', '检测标准', '检验方法', '结果1', '结果2', '结果3', '结果4', '结果5', '单项判定'])
   assert.deepEqual(exportRow({ 检验项: '外观', 结果1: '无异常', 结果5: '无异常', 单项判定: '合格' }),
     ['外观', undefined, undefined, '无异常', undefined, undefined, undefined, '无异常', '合格'])
   assert.deepEqual(exportRow(null), ['', '', '', '', '', '', '', '', ''])
+  // 10 列的单子导出 10 列结果(不多不少,不铺 20 个物理列)
+  const head10 = exportHeaderRow(10)
+  assert.equal(head10.length, 3 + 10 + 1, '前三列 + 10 个结果列 + 单项判定')
+  assert.deepEqual(head10.slice(3, 13), Array.from({ length: 10 }, (_, i) => `结果${i + 1}`))
+  assert.deepEqual(exportRow({ 结果10: 'OK' }, 10).slice(3, 13),
+    [undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 'OK'])
+  // 列定义与列数一致
+  assert.equal(columnsForResultCount(7).length, 3 + 7 + 1)
+  assert.equal(columnsForResultCount(7).filter((c) => c.result).length, 7)
 })
 
 /** 源码级回归:纸张组件必须经 K 常量/RESULT_KEYS 取数键,不得裸写中文列名方括号 */
@@ -96,16 +148,30 @@ test('组件源码里取表体列值必须走 K 常量或 RESULT_KEYS', () => {
   assert.deepEqual(bad, [], `组件里裸写了列名取值,应改为 K 常量: ${bad.join(', ')}`)
 })
 
-/** 源码级回归:检测结果必须是**五个固定格子**渲染(不是原来那个自由文本域) */
-test('组件按 QC_INSP_REC_RESULT_KEYS 渲染五个格子,且不再用文本域当检测结果', () => {
+/**
+ * 源码级回归:检测结果是**可增删列**(2026-11-19),不再是固定五格:
+ *   · 表头 colspan 与渲染循环都必须跟着 resultColCount / resultKeys 走;
+ *   · 分区条必须有「检测结果列 － n ＋」步进器(列数存头字段「结果列数」);
+ *   · 减列要清空被减列(否则库里留着看不见的旧值,下次加列"自己长回来")。
+ */
+test('组件按 结果列数 渲染 1..n 个格子(可增删列),不再是固定五格', () => {
   const src = readFileSync(new URL('../views/QcInspRecSheet.vue', import.meta.url), 'utf8')
-  assert.match(src, /QC_INSP_REC_RESULT_KEYS/, '五格键必须来自 qcInspRecColumns 的唯一真源')
-  assert.match(src, /v-for="k in RESULT_KEYS"/, '表体检测结果必须按 5 个键循环出格子')
-  assert.match(src, /v-for="\(k, gi\) in RESULT_KEYS"/, '表头第二行必须标出 1..5')
-  assert.match(src, /colspan="5"/, '表头「检测结果」必须跨 5 列')
-  // 原来那一格是 type="textarea" + maxlength="500" 的自由文本域;五格是单值输入
+  assert.match(src, /QC_INSP_REC_RESULT_KEYS/, '结果列键必须来自 qcInspRecColumns 的唯一真源')
+  assert.match(src, /QC_INSP_REC_RESULT_COUNT_KEY/, '列数载体必须来自唯一真源')
+  assert.match(src, /v-for="k in resultKeys"/, '表体检测结果必须按 1..n 个键循环出格子')
+  assert.match(src, /v-for="\(k, gi\) in resultKeys"/, '表头第二行必须标出 1..n')
+  assert.match(src, /:colspan="resultColCount"/, '表头「检测结果」必须跨 n 列')
+  assert.ok(!/colspan="5"/.test(src), '固定五格的 colspan="5" 必须已去掉')
+  // 步进器(加列/减列)
+  assert.match(src, /setResultColCount\(resultColCount \+ 1\)/, '要有「增加列」入口')
+  assert.match(src, /setResultColCount\(resultColCount - 1\)/, '要有「减少列」入口')
+  assert.match(src, /props\.head\[RESULT_COUNT_KEY\] = n/, '列数要写进头字段(否则保存后丢失)')
+  assert.match(src, /clearResultColumn\(props\.head, cur, n\)/, '减列要清空被减列已填的值')
+  // 原来那一格是 type="textarea" + maxlength="500" 的自由文本域;格子是单值输入
   assert.ok(!/type="textarea"[\s\S]{0,200}maxlength="500"/.test(src),
-    '检测结果的自由文本域应已换成五个单值格子')
+    '检测结果的自由文本域应已换成 1..n 个单值格子')
+  // 列多了要能横向滚动,不能被纸面宽度挤掉
+  assert.match(src, /class="qr-table-scroll"/, '表体要套横向滚动容器')
 })
 
 /** 源码级回归:「处理意见」必须走标准库下拉 + 两个必填星号(2026-11-11 用户口径) */

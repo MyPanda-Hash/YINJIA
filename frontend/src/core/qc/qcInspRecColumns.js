@@ -3,17 +3,25 @@
  *
  * 【版式来源】《品质资料 2026.09.19.xlsx》「检验数据记录模版」页签(整张 YJ-QR-96 检验报告):
  *   抬头: 物料名称 / 物料编码 / 物料批次 / 检验日期 ｜ 来料日期 / 来料数量 / 文件编码(YJ-QR-96) / 检验依据(YJ-Q-30)
- *   表体: 检验项(数据库选择) | 检测标准 | 检测结果(固定五格) | 单项判定
+ *   表体: 检验项(数据库选择) | 检测标准 | 检测结果(可增删列,默认 5) | 单项判定
  *   表尾: 检验结论 / 处理意见 ｜ 检验人(账号登录人自动生成) / 审核人(固定:冯敏)
  *
- * 【检测结果 = 固定五格(2026-11-11 用户口径)】
- *   「检验数据记录的检验结果改为固定五格。」原来每行只有一个文本域,现在固定 5 个格子,
- *   一格一个实测值(抽 5 件 / 测 5 次),落库列 `结果1..结果5`(migrate-qc-insp-rec-result5-20261111.sql)。
- *   旧列 `检测结果`(整段文字)保留为历史 → 迁移时已把老值落到 `结果1`,那一列不再展示。
+ * 【检测结果 = **可增删列**(2026-11-19 用户口径,取代 2026-11-11 的「固定五格」)】
+ *   用户原话:「检验结果改成可以新增列的形式,不要固定5格了。」
+ *   · 列数存**头字段** `结果列数`(qc_insp_rec.结果列数 int,界面上不显示 —— 只做计数载体,
+ *     与研发数据记录表的「样品数」同型:一张纸抽几件就填几列,不同单据可以不一样);
+ *   · 纸面用「检测结果列 － n ＋」步进器维护:默认 **5**,最少 1、最多 **20**
+ *     (上限 = qc_insp_rec_detail 的物理列 结果1..结果20;要更多必须再加物理列 + yj_field 登记);
+ *   · 减列会**清空被减列已填的值**(确认弹窗后),加列即时生效;
+ *   · 物理列: `migrate-qc-insp-rec-result5-20261111.sql`(结果1..5) +
+ *     `migrate-qc-insp-rec-resultcols-20261119.sql`(结果6..20 + 头字段 结果列数)。
+ *   旧列 `检测结果`(整段文字)保留为历史 → 2026-11-11 迁移时已把老值落到 `结果1`,那一列不再展示。
  *
  * 【键口径】yj_field 里 label == col_name(与检验目录同理),所以前端中文列名即落库键;
  *   后端 rowToLabels 载入按标签、labelsToCols 保存按标签映射,两侧一致才不会丢库。
- *   ⚠ 五个格子必须各自在 yj_field(place=detail) 登记,**物理列有而 yj_field 没有 = 填了静默丢失**。
+ *   ⚠ 结果1..结果20 **全部**要按"可见列"在 yj_field(place=detail) 登记:
+ *     隐藏列(visible=0/hidden=1)在 ButtonService.labelsToCols 的更新路径上**不接受空串清空**,
+ *     于是"把格子删成空、保存后又变回原值"(2026-11-06 踩过)。物理列有而 yj_field 没有 = 填了静默丢失。
  */
 
 /** 抬头区(原表右上/左上两列成对布局):左标签-右值 各一行,两列成对。
@@ -30,13 +38,40 @@ export const QC_INSP_REC_HEAD_ROWS = Object.freeze([
 ])
 
 /**
- * 检测结果 = **固定五格**的数据键(顺序即纸面 1..5 的次序,唯一真源)。
- * 组件按它渲染 5 个格子 / 导出按它出 5 列;长度写死为 5,任何"多加一格"的改动都必须同时动
- * 迁移脚本(结果1..结果5)、yj_field 登记与本文,否则保存会丢值。
+ * 检测结果的可增删列 —— **唯一真源**(顺序即纸面 1..n 的次序)。
+ *
+ * 物理列 = `qc_insp_rec_detail.结果1..结果20`(两个迁移脚本建成);
+ * 张单据实际显示几列,由头字段 `结果列数` 决定(见 QC_INSP_REC_RESULT_COUNT_KEY)。
+ * ⚠ 改这个长度 = 必须同时动迁移脚本(加物理列 + yj_field 登记)与本文,否则保存会丢值。
  */
-export const QC_INSP_REC_RESULT_KEYS = Object.freeze(['结果1', '结果2', '结果3', '结果4', '结果5'])
+export const QC_INSP_REC_MAX_RESULT_COLS = 20
+/** 最少 1 列(「不要固定 5 格」⇒ 允许收到 1 格;0 列没有意义,纸面会缺整段) */
+export const QC_INSP_REC_MIN_RESULT_COLS = 1
+/** 默认 5 列(老单据 `结果列数` 为空、新增单据未动过步进器时都落到这里,与 2026-11-11 那版一致) */
+export const QC_INSP_REC_DEFAULT_RESULT_COLS = 5
 
-/** 表体数据列(qc_insp_rec_detail):检验项 | 检测标准 | 检验方法 | 结果1..结果5 | 单项判定
+/** 计数载体:头字段数据键(= qc_insp_rec.结果列数 的 yj_field label;界面上不显示) */
+export const QC_INSP_REC_RESULT_COUNT_KEY = '结果列数'
+
+/** 结果列的全部数据键(1..MAX;顺序即纸面次序) */
+export const QC_INSP_REC_RESULT_KEYS = Object.freeze(
+  Array.from({ length: QC_INSP_REC_MAX_RESULT_COLS }, (_, i) => `结果${i + 1}`),
+)
+
+/** 把外来的列数收敛到 [MIN, MAX];非数字(undefined/空串/NaN) ⇒ 默认 5。
+ *  后端取回的是 int,但也可能被人手改成文本,这里统一按 parseInt 兜住。 */
+export function clampResultColCount(n) {
+  const v = parseInt(n, 10)
+  if (!Number.isFinite(v)) return QC_INSP_REC_DEFAULT_RESULT_COLS
+  return Math.min(QC_INSP_REC_MAX_RESULT_COLS, Math.max(QC_INSP_REC_MIN_RESULT_COLS, v))
+}
+
+/** 某个列数下**实际渲染**的结果列键(纸面 1..n 格) */
+export function activeResultKeys(count) {
+  return QC_INSP_REC_RESULT_KEYS.slice(0, clampResultColCount(count))
+}
+
+/** 表体数据列(qc_insp_rec_detail):检验项 | 检测标准 | 检验方法 | 结果1..结果20 | 单项判定
  *  ⚠ 旧列 `检测结果`(整段文字)已转历史列(visible=0/hidden=1),不在表体列里;
  *  `检验方法` 是 2026-11-11 新增:来料检验要求「父目录 + 两个子目录」带入时,
  *  一个子目录的值进 检测标准、另一个进 检验方法(用户口径:检验项=父目录标题 / 检验标准=子目录1 / 检验方法=子目录2) */
@@ -44,7 +79,9 @@ export const QC_INSP_REC_DETAIL_COLUMNS = Object.freeze([
   '检验项', '检测标准', '检验方法', ...QC_INSP_REC_RESULT_KEYS, '单项判定',
 ])
 
-/** 表体列定义(label=表头显示名=落库数据键;width=Excel 导出列宽) */
+/** 表体列定义(label=表头显示名=落库数据键;width=Excel 导出列宽)。
+ *  ⚠ 这是**物理列全量**(结果1..结果20):用于「元数据列对得上」的回归比对,
+ *  不是某张单据实际显示的列 —— 实际列数看头字段 `结果列数`(见 columnsForResultCount)。 */
 export const QC_INSP_REC_COLUMNS = Object.freeze([
   { label: '检验项', key: '检验项', width: 18, lib: 'qc.insp_item' },
   { label: '检测标准', key: '检测标准', width: 24 },
@@ -83,10 +120,25 @@ export const QC_INSP_REC_VERDICT_LIB = 'qc.insp_verdict'
  *  这个库本身保留:历史检验项仍是下拉候选(回显/再选),新条目由「带入检验要求」带出。 */
 export const QC_INSP_ITEM_LIB = 'qc.insp_item'
 
-/** Excel 导出:表头行 + 一行取值 */
-export function exportHeaderRow() {
-  return QC_INSP_REC_COLUMNS.map((c) => c.label)
+/**
+ * Excel 导出用的列定义:结果列**按该单的实际列数**取前 n 列(不是物理列的 20 列全铺)。
+ * 与纸面同一份真源:纸面显示几列,导出就几列(张单据的列数在头字段 `结果列数`)。
+ * @param {number} [count] 结果列数;不传按默认 5 列
+ */
+export function columnsForResultCount(count = QC_INSP_REC_DEFAULT_RESULT_COLS) {
+  return [
+    { label: '检验项', key: '检验项', width: 18, lib: QC_INSP_ITEM_LIB },
+    { label: '检测标准', key: '检测标准', width: 24 },
+    { label: '检验方法', key: '检验方法', width: 24 },
+    ...activeResultKeys(count).map((k, i) => ({ label: k, key: k, width: 10, result: i + 1 })),
+    { label: '单项判定', key: '单项判定', width: 12 },
+  ]
 }
-export function exportRow(row) {
-  return QC_INSP_REC_COLUMNS.map((c) => (row ? row[c.key] : ''))
+
+/** Excel 导出:表头行 + 一行取值(调用方应传该单的 结果列数;不传按默认 5 列) */
+export function exportHeaderRow(count = QC_INSP_REC_DEFAULT_RESULT_COLS) {
+  return columnsForResultCount(count).map((c) => c.label)
+}
+export function exportRow(row, count = QC_INSP_REC_DEFAULT_RESULT_COLS) {
+  return columnsForResultCount(count).map((c) => (row ? row[c.key] : ''))
 }

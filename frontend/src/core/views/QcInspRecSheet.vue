@@ -82,6 +82,26 @@
          把「检验项(上方的列名) / 检测标准(下方该列的数据)」补进表体;只补缺失项,已填内容不动) -->
     <div class="qr-section">
       {{ tt('检验结果') }}
+      <!-- 检测结果列数(2026-11-19 用户口径「检验结果改成可以新增列的形式,不要固定5格了」):
+           列数存头字段「结果列数」,纸面按它渲染 1..n 格 —— 默认 5,最少 1、最多 20
+           (上限 = 物理列 结果1..结果20)。与研发数据记录表「样品列 －n＋」同款交互:
+           加列即时生效;减列会**清空被减那一列已填的值**(先确认)。打印不出现(no-print)。 -->
+      <span v-if="editable" class="qr-colstep no-print" :title="tt('检测结果列数（抽几件就填几列）')">
+        <span class="qr-colstep-label">{{ tt('检测结果列') }}</span>
+        <span
+          class="qr-colstep-btn"
+          :class="{ dim: resultColCount <= MIN_RESULT_COLS }"
+          :title="tt('减少检测结果列（清空该列数据）')"
+          @click="setResultColCount(resultColCount - 1)"
+        >－</span>
+        <span class="qr-colstep-num">{{ resultColCount }}</span>
+        <span
+          class="qr-colstep-btn"
+          :class="{ dim: resultColCount >= MAX_RESULT_COLS }"
+          :title="tt('增加检测结果列')"
+          @click="setResultColCount(resultColCount + 1)"
+        >＋</span>
+      </span>
       <span
         v-if="editable"
         class="qr-lib-btn no-print qr-carry-btn"
@@ -90,137 +110,154 @@
       >⧉ {{ carrying ? tt('带入中…') : tt('带入检验要求') }}</span>
     </div>
 
-    <!-- ④ 表体:检验项 | 检测标准 | 检测结果(固定五格) | 单项判定 -->
-    <table class="qr-table">
-      <thead>
-        <!-- 检测结果 = 固定五格(2026-11-11 用户口径「检验结果改为固定五格」):
-             表头两行 —— 第一行「检测结果」跨 5 列,第二行 1..5 标出第几格;
-             格子数据键 = 结果1..结果5(见 @core/qc/qcInspRecColumns 的 QC_INSP_REC_RESULT_KEYS) -->
-        <tr>
-          <th class="c-item" rowspan="2">
-            {{ tt('检验项') }}<span v-if="isRequired(K.ITEM)" class="qr-req" :title="tt('必填')">*</span>
-            <!-- 2026-11-12 用户口径:「检验项现在是带入的,不需要标准库维护」
-                 ⇒ 检验项列不再挂「⧉ 标准库维护」入口(检验项由「带入检验要求」带出来,
-                    历史值仍在下拉候选里可回显/可选,输入框本就 allow-create 可自由敲)。
-                 检验结论 / 处理意见 两处入口不受影响(它们仍是标准库下拉)。 -->
-          </th>
-          <th class="c-std" rowspan="2">{{ tt('检测标准') }}</th>
-          <!-- 检验方法(2026-11-11 用户口径):来料检验要求「父目录+两个子目录」带入时,
-               一个子目录进 检测标准、另一个进 检验方法 —— 报告表体必须有这一列 -->
-          <th class="c-method" rowspan="2">{{ tt('检验方法') }}</th>
-          <th class="c-result" colspan="5">{{ tt('检测结果') }}</th>
-          <!-- 单项判定必填(2026-11-11 用户口径) -->
-          <th class="c-judge" rowspan="2">
-            {{ tt('单项判定') }}<span v-if="isRequired(K.JUDGE)" class="qr-req" :title="tt('必填')">*</span>
-          </th>
-          <th v-if="editable" class="c-op" rowspan="2"></th>
-        </tr>
-        <tr>
-          <th v-for="(k, gi) in RESULT_KEYS" :key="'rh' + k" class="c-res">{{ gi + 1 }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="(row, i) in items" :key="row.id ?? ('new' + i)">
-          <td class="c-item" :title="row[K.ITEM] || ''">
-            <el-select
-              v-if="editable"
-              v-model="row[K.ITEM]"
-              size="small"
-              filterable
-              clearable
-              allow-create
-              default-first-option
-              class="qr-cell-input"
-              :placeholder="tt('请选择')"
-              @change="emit('dirty')"
-            >
-              <el-option v-for="o in itemOptions" :key="o.value" :label="o.label" :value="o.value" />
-            </el-select>
-            <span v-else class="qr-cell-text">{{ row[K.ITEM] || '' }}</span>
-          </td>
-          <td class="c-std" :title="row[K.STD] || ''">
-            <!-- 检测标准(2026-11-11 用户口径):源文本里本来就可能有**硬换行**(Excel Alt+Enter →
-                 char(10)/char(13)),而这一格原来是单行 el-input —— 换行显示不出来、超宽还被截断,
-                 于是同一份数据"草稿态一行、审核后多行",看着像带入不一致。现在:
-                 · 编辑态 = 多行 textarea(自动增高 1~6 行),硬换行按原样断行;
-                 · 只读态 = 保留换行的 span(.qr-pre = white-space: pre-wrap);
-                 · 两态都挂 tooltip:内容超过格高/格宽时,光标停上去看全文;
-                 · maxlength 500 → 1000(物理列是 nvarchar(1000),原来编辑一下就会被截到 500 字)。 -->
-            <el-tooltip
-              v-if="editable"
-              :content="row[K.STD] || ''"
-              placement="top-start"
-              popper-class="qc-std-tip"
-              :disabled="!row[K.STD]"
-              :show-after="400"
-            >
-              <el-input
-                v-model="row[K.STD]"
-                type="textarea"
-                :autosize="{ minRows: 1, maxRows: 6 }"
+    <!-- ④ 表体:检验项 | 检测标准 | 检验方法 | 检测结果(1..n 格,可增删) | 单项判定
+         列数一多整张纸会超过版面 ⇒ 外面套一层横向滚动容器(纸面宽度不再被挤压,
+         打印时由 @media print 把 min-width 收回 0,照旧一页纸) -->
+    <div class="qr-table-scroll">
+      <table
+        class="qr-table"
+        :style="{
+          minWidth: tableMinWidth,
+          '--qr-res-w': printResPct,
+          '--qr-base-scale': printBaseScale,
+        }"
+      >
+        <thead>
+          <!-- 检测结果 = **可增删列**(2026-11-19 用户口径,取代 2026-11-11 的「固定五格」):
+               表头两行 —— 第一行「检测结果」跨 n 列,第二行 1..n 标出第几格;
+               格子数据键 = 结果1..结果N(见 @core/qc/qcInspRecColumns 的 QC_INSP_REC_RESULT_KEYS,
+               n = 头字段「结果列数」,由上面那个「－ n ＋」步进器维护) -->
+          <tr>
+            <th class="c-item" rowspan="2">
+              {{ tt('检验项') }}<span v-if="isRequired(K.ITEM)" class="qr-req" :title="tt('必填')">*</span>
+              <!-- 2026-11-12 用户口径:「检验项现在是带入的,不需要标准库维护」
+                   ⇒ 检验项列不再挂「⧉ 标准库维护」入口(检验项由「带入检验要求」带出来,
+                      历史值仍在下拉候选里可回显/可选,输入框本就 allow-create 可自由敲)。
+                   检验结论 / 处理意见 两处入口不受影响(它们仍是标准库下拉)。 -->
+            </th>
+            <th class="c-std" rowspan="2">{{ tt('检测标准') }}</th>
+            <!-- 检验方法(2026-11-11 用户口径):来料检验要求「父目录+两个子目录」带入时,
+                 一个子目录进 检测标准、另一个进 检验方法 —— 报告表体必须有这一列 -->
+            <th class="c-method" rowspan="2">{{ tt('检验方法') }}</th>
+            <th class="c-result" :colspan="resultColCount" :style="{ width: resultBandWidth }">{{ tt('检测结果') }}</th>
+            <!-- 单项判定必填(2026-11-11 用户口径) -->
+            <th class="c-judge" rowspan="2">
+              {{ tt('单项判定') }}<span v-if="isRequired(K.JUDGE)" class="qr-req" :title="tt('必填')">*</span>
+            </th>
+            <th v-if="editable" class="c-op" rowspan="2"></th>
+          </tr>
+          <tr>
+            <th
+              v-for="(k, gi) in resultKeys"
+              :key="'rh' + k"
+              class="c-res"
+              :style="{ width: RESULT_COL_W + 'px' }"
+            >{{ gi + 1 }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(row, i) in items" :key="row.id ?? ('new' + i)">
+            <td class="c-item" :title="row[K.ITEM] || ''">
+              <el-select
+                v-if="editable"
+                v-model="row[K.ITEM]"
                 size="small"
-                class="qr-cell-input qr-std-input"
+                filterable
+                clearable
+                allow-create
+                default-first-option
+                class="qr-cell-input"
+                :placeholder="tt('请选择')"
+                @change="emit('dirty')"
+              >
+                <el-option v-for="o in itemOptions" :key="o.value" :label="o.label" :value="o.value" />
+              </el-select>
+              <span v-else class="qr-cell-text">{{ row[K.ITEM] || '' }}</span>
+            </td>
+            <td class="c-std" :title="row[K.STD] || ''">
+              <!-- 检测标准(2026-11-11 用户口径):源文本里本来就可能有**硬换行**(Excel Alt+Enter →
+                   char(10)/char(13)),而这一格原来是单行 el-input —— 换行显示不出来、超宽还被截断,
+                   于是同一份数据"草稿态一行、审核后多行",看着像带入不一致。现在:
+                   · 编辑态 = 多行 textarea(自动增高 1~6 行),硬换行按原样断行;
+                   · 只读态 = 保留换行的 span(.qr-pre = white-space: pre-wrap);
+                   · 两态都挂 tooltip:内容超过格高/格宽时,光标停上去看全文;
+                   · maxlength 500 → 1000(物理列是 nvarchar(1000),原来编辑一下就会被截到 500 字)。 -->
+              <el-tooltip
+                v-if="editable"
+                :content="row[K.STD] || ''"
+                placement="top-start"
+                popper-class="qc-std-tip"
+                :disabled="!row[K.STD]"
+                :show-after="400"
+              >
+                <el-input
+                  v-model="row[K.STD]"
+                  type="textarea"
+                  :autosize="{ minRows: 1, maxRows: 6 }"
+                  size="small"
+                  class="qr-cell-input qr-std-input"
+                  maxlength="1000"
+                  @input="emit('dirty')"
+                />
+              </el-tooltip>
+              <el-tooltip
+                v-else
+                :content="row[K.STD] || ''"
+                placement="top-start"
+                popper-class="qc-std-tip"
+                :disabled="!row[K.STD]"
+                :show-after="300"
+              >
+                <span class="qr-cell-text qr-pre">{{ row[K.STD] || '' }}</span>
+              </el-tooltip>
+            </td>
+            <td class="c-method" :title="row[K.METHOD] || ''">
+              <el-input
+                v-if="editable"
+                v-model="row[K.METHOD]"
+                size="small"
+                class="qr-cell-input"
                 maxlength="1000"
                 @input="emit('dirty')"
               />
-            </el-tooltip>
-            <el-tooltip
-              v-else
-              :content="row[K.STD] || ''"
-              placement="top-start"
-              popper-class="qc-std-tip"
-              :disabled="!row[K.STD]"
-              :show-after="300"
-            >
-              <span class="qr-cell-text qr-pre">{{ row[K.STD] || '' }}</span>
-            </el-tooltip>
-          </td>
-          <td class="c-method" :title="row[K.METHOD] || ''">
-            <el-input
-              v-if="editable"
-              v-model="row[K.METHOD]"
-              size="small"
-              class="qr-cell-input"
-              maxlength="1000"
-              @input="emit('dirty')"
-            />
-            <span v-else class="qr-cell-text qr-pre">{{ row[K.METHOD] || '' }}</span>
-          </td>
-          <td v-for="k in RESULT_KEYS" :key="'r' + k" class="c-res" :title="row[k] || ''">
-            <el-input
-              v-if="editable"
-              v-model="row[k]"
-              size="small"
-              class="qr-cell-input"
-              maxlength="200"
-              @input="emit('dirty')"
-            />
-            <span v-else class="qr-cell-text">{{ row[k] || '' }}</span>
-          </td>
-          <td class="c-judge" :title="row[K.JUDGE] || ''">
-            <el-select
-              v-if="editable"
-              v-model="row[K.JUDGE]"
-              size="small"
-              clearable
-              class="qr-cell-input"
-              :placeholder="tt('请选择')"
-              @change="emit('dirty')"
-            >
-              <el-option v-for="o in judgeOptions" :key="o.value" :label="o.label" :value="o.value" />
-            </el-select>
-            <span v-else class="qr-cell-text">{{ row[K.JUDGE] || '' }}</span>
-          </td>
-          <td v-if="editable" class="c-op">
-            <span class="qr-addrow" :title="tt('在该行后新增一行')" @click="insertAfter(i)">＋</span>
-            <span class="qr-del" :title="tt('删除该行')" @click="removeItem(i)">×</span>
-          </td>
-        </tr>
-        <tr v-if="!items.length">
-          <td :colspan="editable ? 10 : 9" class="qr-empty">{{ tt('暂无检验项，点击下方按钮新增') }}</td>
-        </tr>
-      </tbody>
-    </table>
+              <span v-else class="qr-cell-text qr-pre">{{ row[K.METHOD] || '' }}</span>
+            </td>
+            <td v-for="k in resultKeys" :key="'r' + k" class="c-res" :title="row[k] || ''">
+              <el-input
+                v-if="editable"
+                v-model="row[k]"
+                size="small"
+                class="qr-cell-input"
+                maxlength="200"
+                @input="emit('dirty')"
+              />
+              <span v-else class="qr-cell-text">{{ row[k] || '' }}</span>
+            </td>
+            <td class="c-judge" :title="row[K.JUDGE] || ''">
+              <el-select
+                v-if="editable"
+                v-model="row[K.JUDGE]"
+                size="small"
+                clearable
+                class="qr-cell-input"
+                :placeholder="tt('请选择')"
+                @change="emit('dirty')"
+              >
+                <el-option v-for="o in judgeOptions" :key="o.value" :label="o.label" :value="o.value" />
+              </el-select>
+              <span v-else class="qr-cell-text">{{ row[K.JUDGE] || '' }}</span>
+            </td>
+            <td v-if="editable" class="c-op">
+              <span class="qr-addrow" :title="tt('在该行后新增一行')" @click="insertAfter(i)">＋</span>
+              <span class="qr-del" :title="tt('删除该行')" @click="removeItem(i)">×</span>
+            </td>
+          </tr>
+          <tr v-if="!items.length">
+            <td :colspan="resultColCount + (editable ? 5 : 4)" class="qr-empty">{{ tt('暂无检验项，点击下方按钮新增') }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
     <div v-if="editable" class="qr-addbar">
       <div class="qr-add" @click="addItem">＋ {{ tt('新增检验项') }}</div>
     </div>
@@ -333,7 +370,7 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
 import { errMsg } from '@core/panel-engine'
@@ -348,6 +385,11 @@ import {
   QC_INSP_REC_HEAD_ROWS,
   QC_INSP_REC_FOOT_ROWS,
   QC_INSP_REC_RESULT_KEYS,
+  QC_INSP_REC_RESULT_COUNT_KEY,
+  QC_INSP_REC_MAX_RESULT_COLS,
+  QC_INSP_REC_MIN_RESULT_COLS,
+  QC_INSP_REC_DEFAULT_RESULT_COLS,
+  clampResultColCount,
   QC_INSP_REC_DISPOSAL_LIB,
   QC_INSP_REC_VERDICT_LIB,
 } from '@core/qc/qcInspRecColumns'
@@ -361,10 +403,14 @@ const K = Object.freeze({
   JUDGE: '单项判定',
 })
 
-/** 检测结果 = **固定五格**(2026-11-11 用户口径):结果1..结果5,一格一个实测值。
- *  键与次序只有一处真源(@core/qc/qcInspRecColumns 的 QC_INSP_REC_RESULT_KEYS),
- *  纸面渲染、导出、迁移脚本三处必须一致 —— 少一格就会有一个值无处落库。 */
+/** 检测结果 = **可增删列**(2026-11-19 用户口径「检验结果改成可以新增列的形式,不要固定5格了」)。
+ *  · 键与次序只有一处真源(@core/qc/qcInspRecColumns 的 QC_INSP_REC_RESULT_KEYS,结果1..结果20);
+ *  · 一张单据显示几格 = 头字段「结果列数」(默认 5,最少 1、最多 20),纸面步进器「－ n ＋」维护;
+ *  · 减列会清空被减列的值(确认后),加列即时生效;纸面渲染 / 导出 / 落库三处口径一致。 */
 const RESULT_KEYS = QC_INSP_REC_RESULT_KEYS
+const RESULT_COUNT_KEY = QC_INSP_REC_RESULT_COUNT_KEY
+const MIN_RESULT_COLS = QC_INSP_REC_MIN_RESULT_COLS
+const MAX_RESULT_COLS = QC_INSP_REC_MAX_RESULT_COLS
 
 /** 检验结论(表尾右列第 1 行):2026-11-11 第二轮起改为**标准库**(qc.insp_verdict:合格/不合格) */
 const VERDICT_KEY = '检验结论'
@@ -379,6 +425,72 @@ const props = defineProps({
   editable: { type: Boolean, default: false },
 })
 const emit = defineEmits(['dirty', 'refresh-config'])
+
+/* ── 检测结果的列数(2026-11-19 可增删列)── */
+/** 当前单据的结果列数(头字段优先;老单据没这个值 ⇒ 默认 5,与 2026-11-11 那版一致) */
+const resultColCount = computed(() => clampResultColCount(props.head?.[RESULT_COUNT_KEY] ?? QC_INSP_REC_DEFAULT_RESULT_COLS))
+/** 实际渲染的结果列键(纸面 1..n 格) */
+const resultKeys = computed(() => RESULT_KEYS.slice(0, resultColCount.value))
+/**
+ * 检测结果每格的宽度(px) —— 与列数无关,固定 58px(默认 5 列时纸面宽度与旧版几乎一致)。
+ * 结果区**不按百分比**算:按百分比时列数一多,表宽要按 34% 反算,整张纸会被拉成两三屏
+ * (实测 20 列 = 2706px,「检验项/检测标准」各占 380px 却没内容,结果列全被推到屏幕外)。
+ * 改成「基础列固定 px + 结果格固定 58px」后:20 列 = 766 + 1160 = 1926px,
+ * 基础列不再跟着膨胀,结果列尽量留在视口内。
+ */
+const RESULT_COL_W = 58
+/** 结果区之外的定宽列合计(检验项 150 + 检测标准 230 + 检验方法 230 + 单项判定 110 + 行操作 46) */
+const STD_COLS_W = 766
+/** 当前的结果区宽度(= 列数 × 每格宽度) */
+const resultBandWidth = computed(() => `${RESULT_COL_W * resultColCount.value}px`)
+/**
+ * 纸面表的最小宽度(px) = 基础列 + 结果列;比容器宽就由外层 .qr-table-scroll 横向滚动,
+ * 不再把基础列挤成一条缝(打印口径见下面的 print* 三个值)。
+ */
+const tableMinWidth = computed(() => `${STD_COLS_W + RESULT_COL_W * resultColCount.value}px`)
+
+/* ── 打印口径(2026-11-19)──
+   屏幕上是「定宽 + 横向滚动」,纸面必须反过来:**整张压进一页**。
+   所以打印时改回百分比 + 固定布局(fixed),由下面三个值决定"结果区占多宽、基础列怎么让位":
+     · 5 列及以内:结果区 34% —— 与 2026-11-11 五格版的打印版面**逐像素一致**(不回归);
+     · 之后每多一列 +4%,封顶 80%(20 列时每格约 4% ≈ 29px,还看得清一个数字);
+     · 基础列(检验项 14% / 检测标准 21% / 检验方法 21% / 单项判定 10% = 66%)按
+       (100 − 结果区占比) ÷ 66 等比压缩 —— 两组加起来恒为 100%,不会横向切掉半张表。
+   这三个值以 CSS 变量挂到 <table> 上,由下面 @media print 的 !important 规则取用
+   (内联的 px 宽度在打印里一律被 !important 覆盖)。 */
+const printBandPct = computed(() => Math.min(80, 34 + Math.max(0, resultColCount.value - 5) * 4))
+const printResPct = computed(() => `${(printBandPct.value / resultColCount.value).toFixed(4)}%`)
+const printBaseScale = computed(() => ((100 - printBandPct.value) / 66).toFixed(4))
+
+/** 减列:把被减掉的那几格(keys[to..count-1])在每行里清成空串。
+ *  为什么要显式写空串而不是 delete 键:后端 labelsToCols 的更新口径是
+ *  「行里带了这一格 + 空值 ⇒ 写 NULL;没带这一格 ⇒ 不动库里原值」——
+ *  delete 掉键只会在库里留一堆看不见的旧值(以后再想加列就"自己长回来")。 */
+function clearResultColumn(head, count, to) {
+  const rows = head?.detail?.items
+  if (!Array.isArray(rows)) return
+  for (const row of rows) {
+    for (let i = to; i < count; i++) row[RESULT_KEYS[i]] = ''
+  }
+}
+
+/** 调整结果列数(步进器):加列即时生效;减列先确认,并清空被减列已填的值 */
+async function setResultColCount(n) {
+  if (!props.editable) return
+  const cur = resultColCount.value
+  if (n === cur) return
+  if (n < MIN_RESULT_COLS) return ElMessage.warning(tt('已是最少列数'))
+  if (n > MAX_RESULT_COLS) return ElMessage.warning(tt('已是最大列数'))
+  if (n < cur) {
+    try {
+      await ElMessageBox.confirm(tt('减少检测结果列将清空该列已填数据，确定减少吗？'), tt('减少检测结果列'),
+        { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') })
+    } catch { return /* 取消 */ }
+    clearResultColumn(props.head, cur, n)
+  }
+  props.head[RESULT_COUNT_KEY] = n
+  emit('dirty')
+}
 
 /** 检验项明细行(来自当前单据 detail.items;新增行无 id,保存后由引擎写入) */
 const items = computed(() => {
@@ -875,8 +987,53 @@ watch(
   letter-spacing: 0;
   font-weight: 400;
 }
+/* 「检测结果列 － n ＋」(2026-11-19 可增删列):挂在分区条**左端**(与右侧「带入检验要求」对称),
+   同样绝对定位、不参与居中排版;打印不出现。与研发数据记录表的「样品列」同款观感。 */
+.qr-colstep {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  letter-spacing: 0;
+  font-weight: 400;
+  font-size: 12px;
+  user-select: none;
+}
+.qr-colstep-label { color: #1f5fa8; }
+.qr-colstep-num {
+  min-width: 16px;
+  text-align: center;
+  font-weight: 700;
+  color: #1f5fa8;
+}
+.qr-colstep-btn {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  line-height: 14px;
+  text-align: center;
+  border: 1px solid #8fb4e0;
+  border-radius: 3px;
+  background: #f4f9ff;
+  color: #1c4f8a;
+  cursor: pointer;
+}
+.qr-colstep-btn:hover { background: #e2efff; border-color: #5b93d6; }
+/* 到上下限时弱化(点了只弹提示,不改列数) */
+.qr-colstep-btn.dim { color: #b8c2cf; border-color: #dbe3ec; cursor: not-allowed; }
+.qr-colstep-btn.dim:hover { background: #f4f9ff; border-color: #dbe3ec; }
 
 /* ═══ 表体 ═══ */
+/* 检测结果列可增删(2026-11-19):列一多整张表会超过纸面宽度 ⇒ 外层横向滚动,
+   纸面本身不撑破页面(打印时由 @media print 把 min-width 收回 0,照旧一页纸) */
+.qr-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
 .qr-table {
   width: 100%;
   border-collapse: collapse;
@@ -903,17 +1060,17 @@ watch(
 .qr-table tr:hover td {
   background: #f7fbff;
 }
-/* 2026-11-11 加「检验方法」列后重排列宽(合计 100%):
-   检验项 14% / 检测标准 21% / 检验方法 21% / 检测结果五格 34%(每格 6.8%) / 单项判定 10% */
-.c-item { width: 14%; }
-.c-std { width: 21%; }
-.c-method { width: 21%; }
-/* 「检测结果」= 固定五格:表头第一行跨 5 列(34%),第二行 1..5 每格 6.8% */
-.c-result { width: 34%; }
-.c-res { width: 6.8%; }
-.c-judge { width: 10%; }
+/* 2026-11-19 检测结果改可增删列后,列宽改成**定宽模型**(合计不再是 100%):
+   检验项 150 / 检测标准 230 / 检验方法 230 / 单项判定 110 / 行操作 46 = 766px 固定,
+   检测结果 = 列数 × 58px(见组件 RESULT_COL_W / resultBandWidth,内联到 th 上);
+   整表 min-width = 766 + 60×n,超出纸面就横向滚动,基础列不再被挤压。
+   (2026-11-11 五格版的 14%/21%/21%/34%/10% 百分比模型已废。) */
+.c-item { width: 150px; }
+.c-std { width: 230px; }
+.c-method { width: 230px; }
+.c-judge { width: 110px; }
 .c-op { width: 46px; text-align: center; }
-/* 五格是窄格(约 6.8%),缩一缩左右内边距,数字/短文本不会被挤掉 */
+/* 结果列是窄格:缩一缩左右内边距,数字/短文本不会被挤掉 */
 .qr-table th.c-res,
 .qr-table td.c-res { padding-left: 2px; padding-right: 2px; }
 .qr-lib-btn {
@@ -1069,6 +1226,33 @@ watch(
      顺带把这一列从打印里摘掉:五格已经占满版面,再留一列空操作格会挤窄格子) */
   body.approval-printing .c-op {
     display: none !important;
+  }
+  /* 检测结果可增删列(2026-11-19):屏幕上是「基础列定宽 + 结果格 58px」+ 横向滚动,
+     纸面反过来 —— 收回 min-width、改回百分比固定布局,按 CSS 变量把整张表压进一页
+     (否则 20 列会把半张表切到纸外;5 列以内仍是 14/21/21/34/10 的老版面)。 */
+  body.approval-printing .qr-table-scroll {
+    overflow: visible !important;
+  }
+  body.approval-printing .qr-table {
+    min-width: 0 !important;
+    width: 100% !important;
+    table-layout: fixed !important;
+  }
+  body.approval-printing .qr-table .c-item {
+    width: calc(14% * var(--qr-base-scale, 1)) !important;
+  }
+  body.approval-printing .qr-table .c-std,
+  body.approval-printing .qr-table .c-method {
+    width: calc(21% * var(--qr-base-scale, 1)) !important;
+  }
+  body.approval-printing .qr-table .c-judge {
+    width: calc(10% * var(--qr-base-scale, 1)) !important;
+  }
+  body.approval-printing .qr-table .c-result {
+    width: auto !important;
+  }
+  body.approval-printing .qr-table .c-res {
+    width: var(--qr-res-w, 6.8%) !important;
   }
   @page {
     margin: 8mm;
