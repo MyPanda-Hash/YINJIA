@@ -1,0 +1,31 @@
+﻿ego-browser : == 生产领料单(已完成)底栏 ==
+所在位置 行:1 字符: 129
++ ... ew($false); ego-browser nodejs -e "await import('file:///C:/Users/Len ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (== 生产领料单(已完成)底栏 ==:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+{
+  "title": "LL-2026-11-0006",
+  "state": "已完成",
+  "foot": [
+    "打印二维码",
+    "去生产退料"
+  ]
+}
+== 点「去生产退料」之后 ==
+{
+  "btn": true,
+  "clicked": true,
+  "hash": "#/panelx/list/MOBILE_RETURN/doc?id=823",
+  "title": "LL-2026-11-0006",
+  "state": "可退料",
+  "kvFirst": [
+    "工单号 GD-2026-10-0217 #10",
+    "产品 A+级烧结炭棒/滤芯",
+    "物料编码 T042"
+  ],
+  "scanArea": true,
+  "err": ""
+}
+

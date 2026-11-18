@@ -1,0 +1,43 @@
+﻿ego-browser : == 8090 列表页 ==
+所在位置 行:1 字符: 129
++ ... ew($false); ego-browser nodejs -e "await import('file:///C:/Users/Len ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (== 8090 列表页 ==:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+{
+  "hash": "#/panelx/list/MOBILE_RETURN",
+  "chunk": "http://127.0.0.1:8090/assets/index-CSDNs0aM.js",
+  "sub": "查询单据 → 进单据明细 → 扫物料码退料 → 提交",
+  "groups": [
+    "可退单据 86 可退合计 265.8288 ›"
+  ],
+  "firstDoc": "LL-2026-11-0051\n组装\n可退 50\nGD-2026-11-0009 #1\n可退项数 1\nX烧结阻垢炭棒/滤芯\n已领 50 · 已退 0",
+  "err": ""
+}
+== 8090 明细页 ==
+{
+  "hash": "#/panelx/list/MOBILE_RETURN/doc?id=823",
+  "title": "LL-2026-11-0006",
+  "state": "可退料",
+  "kv": [
+    "工单号 GD-2026-10-0217 #10",
+    "产品 A+级烧结炭棒/滤芯",
+    "物料编码 T042",
+    "规格型号 28*12*180",
+    "计量单位 支",
+    "生产线 成型1线",
+    "领料单号 LL-2026-11-0006",
+    "领料类型 组装",
+    "退料单号 TL-2026-11-0009,TL-2026-11-0013,TL-2026-11-0014 含退料 补打印",
+    "本次退料 0 项 / 0"
+  ],
+  "rows": [
+    "热缩袋 物料编码 YJ-KBL-003 规格型号 160*220 计量单位 个 已领 10 个 已退 5 个 本次退 — 个",
+    "标签 物料编码 YJ-TBRW-001 规格型号 40*30 计量单位 张 已领 10 张 已退 2 张 本次退 — 张",
+    "加工切无纺布 物料编码 YJ-XWR-016 规格型号 200*300 计量单位 张 已领 5 张 已退 1 张 本次退 — 张"
+  ],
+  "scanArea": true,
+  "err": ""
+}
+
