@@ -80,6 +80,28 @@ cd frontend && node --test                                  # 2191 条全绿
 > 入口 chunk 哈希从 `index-ocazD-QA.js` 变成 `index-CT4iOomQ.js`,原因只是
 > `MobileOtherScan.vue` 那条注释改动换了分包哈希、入口引用了它(功能无变化)。
 
+## APK:出 **1.0.24**(versionCode 25,2026-11-19)
+
+用户口径「打包 apk」。整包嵌入模式 ⇒ 前端改了必须重打 APK,手机上才是新界面。
+
+```
+cd frontend && npm run build                     # 已由 rebuild-prod.ps1 重打过(dist 191 文件)
+powershell -ExecutionPolicy Bypass -File android\build.ps1
+```
+
+| 项 | 结果 |
+|---|---|
+| 产物 | `android/dist/yinjia-mes-1.0.24.apk` **2.82 MB**(2,958,382 字节) |
+| SHA-256 | `AC39AA42AD78B7BA60DC20384DE14FE86860ED75A444E35AD78AD1D3DE254193` |
+| 包信息 | `com.yinjia.mes.app`、versionCode **25**、versionName **1.0.24**、minSdk 24 / targetSdk 34 |
+| 签名 | `CN=Yinjia MES Debug`(= 上一版同一把钥匙 ⇒ 覆盖安装即可)**;**`zipalign -c 4` exit 0** |
+| 前端 | `assets/www` **191 个文件**,与 `frontend/dist` 逐文件 SHA-256 全等(0 失配/0 缺失/0 多余)、0 反斜杠;入口 `index-CT4iOomQ.js` |
+| 本版功能在包内 | `node tools/archive/_other-ret-wh-20261119/verify-apk-feature.mjs` → 8 条全 PASS |
+| 真机 | `adb devices` 为空,**未真机验证**;插上手机跑 `android\install.ps1` 覆盖安装 |
+
+> `verify-apk-feature.mjs` 判定「打包后的 showWh 变量名被压掉」这个坑已写进脚本注释:
+> 校验只认**字符串字面量**(文案 / 类名 / 占位符),不认压缩后会被改名的局部变量。
+
 ## 遗留 / 与本次无关但发现的现象
 
 跑 `tools/scripts/apply-frontend-only.ps1` 时,`start-prod.ps1` 的增量同步里
