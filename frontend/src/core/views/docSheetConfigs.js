@@ -591,6 +591,12 @@ export const sampleExtSheetCfg = {
   },
   // 模板 row7：申请 / 审核 / 确认。跨列数按表体列边界归并（1 | 4 | 3 = 8），
   // 即 306 | 476 | 406 —— 两条竖线正好压在「产品整体规格/炭棒规格」与「产品功能/背景」的列缝上。
+  // 附件行（2026-11-18 用户口径，Excel #8）：「在期望交期页面后面做个位置，可以添加附件
+  //   （图片或 PDF 或者 Word 文档）」——只加在**外部-开发样品单**这一张。
+  // 落地方式：信息条（样品单编号/客户名称/费用/下单日期/期望交期）**下面新增一整行**，
+  //   左侧标签「附件」+ FileAttachCell（复用产品信息表「客户图纸或规格书」同一套 yj_attachment 机制，
+  //   支持多个文件、原文件名、点开预览/下载）。数据落头表 `附件` 列（文件名串）。
+  attach: { label: '附件', key: '附件' },
   signCells: [
     { label: '申请', key: '申请', span: 1, type: 'text' },
     { label: '审核', key: '审核', span: 4, type: 'text' },
@@ -613,6 +619,9 @@ export const sampleExtSheetCfg = {
  */
 export const sampleNdSheetCfg = {
   ...sampleExtSheetCfg,
+  // 2026-11-18：附件行**只给外部-开发样品单**（用户明确「只加在外部-开发样品单」），
+  //   非开发样品单是展开继承来的，这里显式关掉，否则会跟着长出一行附件。
+  attach: null,
   titlePart2: '非开发样品申请单',
   signCells: [
     { label: '申请', key: '申请', span: 2, type: 'text' },

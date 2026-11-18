@@ -159,6 +159,27 @@
               </span>
             </td>
           </tr>
+          <!-- ①b 附件行（2026-11-18 用户口径，Excel #8）：
+               「在期望交期页面后面做个位置，可以添加附件（图片或 PDF 或者 Word 文档）」
+               —— 信息条下面紧接一整行，跨满列宽；只有配置里声明了 `attach` 的面板才出
+               （目前只有外部-开发样品单 RD_SAMPLE_EXT，见 docSheetConfigs.sampleExtSheetCfg）。
+               附件本身走通用组件 FileAttachCell：yj_attachment 表，锚点 = 面板 + 单据编号 + 字段名，
+               支持多个文件、保留原文件名、点开预览/下载；新建未保存（无单号）时提示先保存。 -->
+          <tr v-if="gridAttach" class="sg-attach-row">
+            <td :colspan="gridCols.length" class="sg-attach-cell">
+              <span class="sg-attach-label">{{ tt(gridAttach.label) }}：</span>
+              <FileAttachCell
+                class="sg-attach-ctl"
+                :panel-code="panelCode"
+                :doc-no="head['单据编号'] || ''"
+                :field-key="gridAttach.key"
+                :model-value="head[gridAttach.key] || ''"
+                :can-edit="attachCanEdit"
+                hide-when-empty
+                @update:model-value="(v) => { head[gridAttach.key] = v; emit('dirty') }"
+              />
+            </td>
+          </tr>
           <!-- ② 表头（模板 row3） -->
           <tr class="sg-head-row">
             <th v-for="c in gridCols" :key="'h-' + (c.key || c.label)" :style="{ height: gridHeadH + 'px' }">{{ tt(c.label) }}</th>
@@ -897,6 +918,19 @@ const emit = defineEmits(['dirty', 'term-changed', 'progress-save'])
  * 所以这里只要把字段发现出来挂 FileAttachCell,不写死键名。
  */
 const remarkAttach = computed(() => attachFieldOf(props.fields))
+
+/**
+ * 表格式纸面（layout:'grid'）的附件行（2026-11-18）：配置显式声明 `attach: {label,key}` 才出。
+ *
+ * <p>为什么不复用上面的 {@link remarkAttach}（元数据发现）：那条链只服务**文书式**的备注列/
+ * 顶部附件条；表格式纸面是另一套模板（信息条 + 表体 + 签名条同属一张表），附件必须是
+ * **表里的一行**，否则打印出来会脱离纸面线框。</p>
+ */
+const gridAttach = computed(() => {
+  const a = props.config && props.config.attach
+  if (!a || !a.key) return null
+  return { label: String(a.label || '附件'), key: String(a.key) }
+})
 
 const engine = usePanelRuntime()
 const stageLoading = ref(0)
@@ -1730,6 +1764,20 @@ defineExpose({ focusField })
 .sg-pager-no { font-variant-numeric: tabular-nums; }
 .sg-pager-tip { margin-left: auto; opacity: .75; }
 
+/* 表格式纸面的附件行（2026-11-18）：标签左、附件格右，跨满整行；打印时只留文件名 */
+.sg-attach-row td.sg-attach-cell {
+  height: 40px;
+  padding: 4px 8px;
+  border: 1px solid #8a8a8a;
+  border-top: none;
+  vertical-align: middle;
+}
+.sg-attach-label {
+  font-weight: 600;
+  margin-right: 8px;
+  white-space: nowrap;
+}
+.sg-attach-ctl { display: inline-flex; vertical-align: middle; }
 .sg-addrow {
   height: 30px;
   line-height: 30px;

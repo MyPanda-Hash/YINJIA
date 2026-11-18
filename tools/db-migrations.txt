@@ -5019,3 +5019,5 @@ migrate-qc-insp-rec-resultcols-default1-20261119.sql
 migrate-restore-rd-del-batch-20261117.sql
 # 2026-11-18 产品信息表：项目编号/项目名称 → 立项编号/立项名称；产品整体尺寸拆三格（外径/内径/长度）+ 存量回填
 migrate-prodinfo-labels-and-size-20261118.sql
+# 2026-11-18 外部-开发样品单加「附件」字段（只这一张；头表加列 + yj_field 一行）
+migrate-sample-ext-attach-20261118.sql
