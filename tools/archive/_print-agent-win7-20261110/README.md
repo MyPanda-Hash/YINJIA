@@ -155,3 +155,57 @@ PowerShell 会用空格把参数**拼成一条命令行**,打印机名 `EPSON LQ
 
 验证:临时目录放一份 config(打印机名带空格、站点"仓库"),只 `-File` 启动 →
 `/health = 200 {"printer":"EPSON LQ-635KII ESC/P2 (副本 1)","mode":"Auto"}`,不再被截断。
+## 第六轮:回归收口 + 把适配变成闸门(2026-11-18)
+
+起因:用户问「print-agent 改了很多,有没有做 PS2/Win7 适配」。复查发现**第一轮的适配主体都还在**
+(7 个 `.ps1` 全 UTF-8 BOM、`.bat` 全 GBK+`chcp 936`、compat 层被 7 个脚本在首次使用前 dot-source、
+`Get-Printer`/`Get-CimInstance` 已换 .NET/WMI),但**这五轮之后的两次改动又把 PS3+ 写法带回来了**:
+
+| # | 位置 | 问题 | PS2 现场后果 |
+|---|---|---|---|
+| ① | `diagnose.ps1` 第 9/10 段(11-16 新增诊断包) | `Get-Content -Tail 30/20` | 报「找不到与参数名称 Tail 匹配的参数」⇒ `诊断.txt` 里 **agent.log / watchdog.log 两段整段空掉**,而那正是判断"代理掉没掉"的证据 |
+| ② | `安装.ps1` 启动失败回显(第五轮加的) | `Get-Content -Tail 15` | 在 try 里被吞 ⇒ 客户看不到那 15 行,又回到"只能截图" |
+| ③ | `print-agent.ps1:1182` 站点名转 URL | `[uri]::EscapeDataString`(Win7 CLR 2.0 上不一定有,且**没包 try**) | 轮询 URL 拼不出来 ⇒ 直接不领任务 |
+| ④ | `deploy/yinjia-print-agent.zip` | 停在 11-16 的 **v1.1.0**;仓库已是 **v1.2.0** | 客户按包装到的还是老代理 ⇒「其他领料/其他退料/混料单 提交即打印」照样全失败 |
+
+**改法(功能零变化,输出逐字等价)**:
+
+- ①② `-Tail N` → 整读 `Get-Content -LiteralPath … -Encoding UTF8` 后截尾;顺带修掉"PS2 默认按 ANSI
+  读 UTF-8 日志会乱码"的隐患。`diagnose.ps1` 抽成 `Out-LogTail` 函数,`安装.ps1` 内联。
+- ③ 新增 `Url-Encode`:先 `try { [uri]::EscapeDataString }`,失败按 RFC3986 手工百分号转义
+  (仅对不使用 `EscapeDataString` 的老 CLR 生效,PS3+ 行为一字不变)。
+- ④ 新增 `tools/printing/make-print-agent-zip.ps1`:先跑闸门 → 按固定 13 文件清单打包 →
+  **回读 zip 内 `$AgentVersion` 与源目录核对**;已重打为 v1.2.0(69.3 KB)。
+
+**新增闸门 `tools/printing/check-ps2-compat.ps1`**(13 条规则 + 结构性检查,退出码可进 CI):
+
+- 语法/参数:`-Tail`/`-Raw`/`-File`/`-Directory`/`[pscustomobject]`/`-in`/`$using:`/`Get-CimInstance`/
+  `Get-Printer`/`ScheduledTask*`/`Get-FileHash` 等 PS2 没有的、`::new()`/`.ForEach{}`/`-NoNewline`;
+- 结构:`.ps1` 必须 **UTF-8 BOM**(没 BOM = 39 个解析错误,commit 62210a153);用了
+  `ConvertFrom/To-Json`、`Invoke-WebRequest` 就必须引用 compat 且**先加载后用**;
+  `::Tls12` 与 `EscapeDataString` 必须包在 `try` 里;`.bat` 出现 `chcp 65001` 直接判 FAIL。
+- 已核实**不**误报:`Read-Host -AsSecureString`(客户 PS2 实测可用 —— 11-10 的 install.log 已经跑到
+  「正在验证服务器与账号」,说明密码那步绑参成功)。
+
+**验证证据(本机 Windows PowerShell 5.1;真机 PS2 仍需现场复验)**:
+
+| 项 | 结果 |
+|---|---|
+| 闸门(改前/改后) | 改前 `FAIL 4 处`,改后 **PASS 0 处 / WARN 0** |
+| 语法解析(7 个 .ps1 + 2 个新脚本) | 0 错误;BOM 全 True;行尾统一 CRLF |
+| tail 逻辑等价性 | 20 行 UTF-8 BOM 中文日志:我的实现 15 行 vs 原生 `-Tail 15`,**逐行完全一致**;空文件不报错 |
+| `Url-Encode` 等价性 | `仓库`/`打印机-01`/`一车间 打印点`/`站点/1#2`/`A_b.c~d`/空串,原生与兜底**输出全等** |
+| 代理冒烟(副本目录、无 config、`-Port 18799 -Mode Pdf`) | `/health=200 {"version":"1.2.0","mode":"Pdf",...}` |
+| `安装.ps1 -DryRun` | 打印机枚举 + 登录 8090 成功,退出码 0 |
+| `诊断.bat` 同款 `diagnose.ps1` | 第 9/10 段真的打出日志(走新 helper),中文正常 |
+| 兼容层回归(archive 三件套) | `test-json` 五组 / `test-http` / `test-compat` 全 PASS |
+| 分发包 | 重打 13 文件 v1.2.0 → 解压后再跑闸门 **PASS**,7/7 BOM+解析 0 错误 |
+
+**以后动打印代理的规矩**:改完跑
+`powershell -NoProfile -ExecutionPolicy Bypass -File tools\printing\check-ps2-compat.ps1`,
+再 `tools\printing\make-print-agent-zip.ps1` 出包(它自带闸门 + 版本回读)。
+
+⚠ 一个已知的小脆弱(本次未改,与 PS2 无关):`安装.ps1` 在**没有控制台**的方式下跑
+(如 `powershell -File 安装.ps1` 且 stdin 被重定向)时,`Read-Host` 返回 `$null` ⇒ `(Read-Host …).Trim()`
+抛「不能对 Null 值表达式调用方法」。客户双击「安装.bat」有控制台,不受影响;自动化调用请显式传
+`-Server/-Pass/-Station`。

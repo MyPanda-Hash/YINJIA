@@ -211,7 +211,14 @@ if (Test-AgentAlive) {
             if ($proc -and $proc.HasExited) { Say ("       进程已退出,退出码 " + $proc.ExitCode) 'Yellow' }
         } catch { }
         try {
-            if (Test-Path $agentLog) { Get-Content $agentLog -Tail 15 | ForEach-Object { Say ("       " + $_) } }
+            # Win7/PS2 兼容(2026-11-18):Get-Content 的 -Tail 是 PowerShell 3.0 才有的参数,
+            # 客户那台 Win7 上会报「找不到与参数名称 Tail 匹配的参数」⇒ 整篇读进来再取末尾 15 行。
+            # 显式 -Encoding UTF8:日志由 Add-Content -Encoding UTF8 写入,PS2 默认按 ANSI 读会乱码。
+            if (Test-Path $agentLog) {
+                $tail = @(Get-Content -LiteralPath $agentLog -Encoding UTF8 -ErrorAction SilentlyContinue)
+                $from = [Math]::Max(0, $tail.Count - 15)
+                for ($i = $from; $i -lt $tail.Count; $i++) { Say ("       " + $tail[$i]) }
+            }
             else { Say '       同目录还没有 agent.log —— 说明脚本连第一行都没跑起来(权限/杀毒拦截?)' 'Yellow' }
         } catch { }
     }
