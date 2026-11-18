@@ -125,6 +125,48 @@ public class QueryService {
 
     private final PanelRegistry registry;
     private final JdbcTemplate jdbc;
+
+    /**
+     * 样品进度跟踪（2026-11-18 用户口径，Excel #9）：
+     * 「设置类似产品文件列表的进度展示，提取样品单编号、客户名称、下单日期、审核人、确认人，
+     *   字段填充列标题；同时需要列标题加一项进度描述……销售填写申请单之后可到此列表查询样品进展，
+     *   可以看到到几级审核了」。
+     *
+     * <p>只读一屏：一行 = 一张外部开发样品单。数据源 = 头表 + {@code yj_doc_status}（审批状态），
+     * 节点文案由前端纯函数按 pending/approve_node/archived/canceled 推导（可单测，见
+     * {@code core/progress/sampleFlow.js}）—— 这里只给原始标记，不在 SQL 里拼中文文案，
+     * 免得以后改口径要动 jar。</p>
+     */
+    public List<java.util.Map<String, Object>> sampleFlowRows() {
+        String sql = "SELECT h.[单据编号], "
+                + "ISNULL(h.[客户名称], N'') AS 客户名称, "
+                + "ISNULL(CONVERT(varchar(10), h.[单据日期], 23), '') AS 单据日期, "
+                + "ISNULL(h.[审核], N'') AS 审核人, "
+                + "ISNULL(h.[确认], N'') AS 确认人, "
+                + "ISNULL(h.[进度描述], N'') AS 进度描述, "
+                + "ISNULL(s.pending, 'N') AS pending, "
+                + "ISNULL(s.approve_node, 0) AS approve_node, "
+                + "ISNULL(s.archived, 'N') AS archived, "
+                + "ISNULL(s.canceled, 'N') AS canceled "
+                + "FROM rd_sample_ext_head h "
+                + "LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SAMPLE_EXT' AND s.doc_no = h.[单据编号] "
+                + "WHERE ISNULL(h.asp_cancel, 'N') <> 'Y' "
+                + "ORDER BY h.[单据日期] DESC, h.[单据编号] DESC";
+        return jdbc.query(sql, (rs, i) -> {
+            java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+            row.put("单据编号", rs.getString("单据编号"));
+            row.put("客户名称", rs.getString("客户名称"));
+            row.put("单据日期", rs.getString("单据日期"));
+            row.put("审核人", rs.getString("审核人"));
+            row.put("确认人", rs.getString("确认人"));
+            row.put("进度描述", rs.getString("进度描述"));
+            row.put("pending", rs.getString("pending"));
+            row.put("approve_node", rs.getInt("approve_node"));
+            row.put("archived", rs.getString("archived"));
+            row.put("canceled", rs.getString("canceled"));
+            return row;
+        });
+    }
     private final TranslationService translations;
 
     public QueryService(PanelRegistry registry, JdbcTemplate jdbc, TranslationService translations) {

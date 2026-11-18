@@ -42,6 +42,11 @@ export const menuTree = [
           //    2. 其他人有查阅权限但不能修改内容」
           //   版式复用外部开发样品单（见 PanelxList.docSheetConfig），只是面板码/表/前缀独立。
           { code: 'rdSampleNonDev', title: '外部-非开发样品', path: '/panelx/list/RD_SAMPLE_ND', panelCode: 'RD_SAMPLE_ND', icon: 'DocumentAdd', operationName: '申请样品' },
+          // 样品进度跟踪（2026-11-18 用户口径，Excel #9）:「设置类似产品文件列表的进度展示……
+          //   销售填写申请单之后可到此列表查询样品进展,可以看到到几级审核了」。
+          //   页面级只读视图（/rd/sampleFlow,非 PanelxList 引擎列表）;panelCode 复用 RD_SAMPLE_EXT
+          //   —— 权限就是那张单的查看权,省一条权限迁移。
+          { code: 'rdSampleFlow', title: '样品进度跟踪', path: '/rd/sampleFlow', panelCode: 'RD_SAMPLE_EXT', icon: 'DataLine' },
         ],
       },
       {

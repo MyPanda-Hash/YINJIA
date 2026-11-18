@@ -1289,6 +1289,16 @@ public class PxController {
         return ApiResult.ok(out);
     }
 
+    /**
+     * 样品进度跟踪（2026-11-18 用户口径，Excel #9）—— 只读一屏，一行 = 一张外部开发样品单。
+     * 权限沿用 RD_SAMPLE_EXT 的查看权（这份数据就是那张单的数据，没有查看权也不该看这个跟踪表）。
+     */
+    @GetMapping("/sampleFlow")
+    public ApiResult<List<Map<String, Object>>> sampleFlow() {
+        perm.requirePanelView("RD_SAMPLE_EXT");
+        return ApiResult.ok(queryService.sampleFlowRows());
+    }
+
     @PostMapping("/queryFormDataList")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> queryFormDataList(@RequestBody Map<String, Object> body) {

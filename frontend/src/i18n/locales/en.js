@@ -5414,6 +5414,38 @@ export default {
     '没有符合条件的供应商': 'No matching suppliers',
     '请选择一个供应商': 'Please select a supplier',
     '加载供应商档案失败': 'Failed to load supplier master',
+    /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
+    '样品进度跟踪': 'Sample Progress',
+    /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
+    '按外部开发样品单看进展：谁提交、审到第几级、谁在等确认，一屏看完': 'Follow each external development sample request: who submitted it, which approval level it is waiting on, and who needs to act',
+    /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
+    '数据来源：样品单头信息与审批状态实时计算，本页只读不改单': 'Computed live from sample request headers and approval status. Read-only',
+    /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
+    '样品单总数': 'Sample requests',
+    /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
+    '待一级审核': 'Awaiting level-1 review',
+    /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
+    '待二级确认': 'Awaiting level-2 confirmation',
+    /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
+    '等审核人处理': 'Waiting for reviewer',
+    /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
+    '等确认人签核': 'Waiting for confirmer',
+    /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
+    '已审核归档': 'Reviewed and archived',
+    /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
+    '样品单清单': 'Sample requests',
+    /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
+    '样品单编号': 'Sample request no.',
+    /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
+    '当前节点': 'Current step',
+    /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
+    '到几级审核看「当前节点」列': 'See the "Current step" column for the approval level',
+    /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
+    '暂无样品单；在「外部-开发样品」新增后会出现在这里': 'No sample requests yet. They appear here once created under "External - Development Sample"',
+    /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
+    '没有查看样品进度数据的权限（需要「外部-开发样品」的查看权）': 'No permission to view sample progress (requires view access to "External - Development Sample")',
+    /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
+    '输入样品单编号 / 客户名称 / 审核人 / 进度描述（支持片段）': 'Search by request no. / customer / reviewer / progress note (partial match)',
     /* ── 研发管理·项目管理 → 产品文件流程管控 /rd/productFlow(2026-11-11 新增) ── */
     '产品文件流程管控': 'Product File Flow Control',
     '按产品看这份开发包走到哪一步：产品信息表 + 4 张受控文件，哪一步还没建单、哪一步卡在开发中':
