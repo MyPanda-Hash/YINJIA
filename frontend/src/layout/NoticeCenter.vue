@@ -131,6 +131,13 @@ const MSG_TPL = {
   // 与上面两条的区别只是称呼:收件人是纸面「检验人/检验员」那一格的人,未必是建单的人。
   APPROVAL_APPROVED_INSPECTOR: { title: '审批通过', body: '您检验的「{panelName} {docNo}」已由 {actor} 审批通过。' },
   APPROVAL_REJECTED_INSPECTOR: { title: '审批被驳回', body: '您检验的「{panelName} {docNo}」被 {actor} 驳回。意见：{opinion}' },
+  // 上游审核自动生成下游草稿 → 受理角色**知情**(2026-11-17 用户口径:来料检验单审核自动生成的
+  // 「采购入库单 / 暂收退料单」要通知到**生产销售**和**仓库审核**两个角色,只知情、不需审批权)。
+  // 之所以要单独一条:自动生成的是**草稿**,草稿不进门户「待办」,且这两个角色按审批权找人收不到。
+  AUTO_DRAFT_FOR_AUDIT: {
+    title: '已自动生成待审核单据',
+    body: '{actor} 审核「来料检验单 {sourceNo}」后，已自动生成「{panelName} {docNo}」草稿，等待仓库审核，特此知会。',
+  },
   MODIFY_REQUESTED: { title: '新的修改申请', body: '{actor} 申请修改「{panelName} {docNo}」，等待您审批。' },
   DELETE_REQUESTED: { title: '新的删除申请', body: '{actor} 申请删除「{panelName} {docNo}」，等待您审批。' },
   // 规格书检验项目及标准变更 → 关联出货检验计划表核对(2026-09-11;仅变更提醒,不比对内容)

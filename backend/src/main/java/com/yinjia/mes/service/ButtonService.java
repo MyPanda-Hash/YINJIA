@@ -5119,6 +5119,43 @@ public class ButtonService {
     // ==================== 来料检验单审核 → 自动生成采购入库单(2026-09-15) ====================
 
     /**
+     * 「上游审核自动生成下游草稿」的**知情**收件角色(2026-11-17 用户口径:
+     * 「从来料检验单审批自动生成采购入库单和暂收退料单能不能消息通知到生产销售和仓库审核两个角色。
+     * 都是只要知情」)。
+     *
+     * <p>角色编码取 {@code yj_role.role_code}:**scxs = 生产销售**、**cksh = 仓库审核**。
+     *
+     * <p>⚠ 刻意**不用**审批权解析({@code MessageService.approversOf}):生产销售在这两张单上
+     * 没有 audit 权限(perms 只有 view/query/export/print/warn)⇒ 按审批权找人它永远收不到;
+     * 而且自动生成的是**草稿**,草稿不进门户「待办」(待办只认 {@code pending='Y'})。
+     * 面板级要改收件人不必改代码:{@code yj_panel.config} 的 {@code auditNotifyRoles}(角色)
+     * / {@code auditNotify}(点名账号),见 {@link MessageService#draftAuditNotifyTargets}。
+     */
+    private static final java.util.List<String> DRAFT_AUDIT_NOTIFY_ROLES =
+            java.util.List.of("scxs", "cksh");
+
+    /**
+     * 上游单据审核**自动生成了下游草稿** → 发一条「已生成、请知悉」消息(2026-11-17)。
+     *
+     * <p>消息挂在**下游单据**上({@code panelCode}=目标面板、{@code docNo}=新单号),
+     * 前端「消息」里点「去处理」直接跳到那张草稿单(见 NoticeCenter 的 {@code ?docNo=} 跳转)。
+     * 操作者本人不收自己的动作消息;发送失败不影响生单({@link #notify} 内部吞异常)。
+     *
+     * @param targetPanel 下游面板编码(PURCHASE_IN / QC_RETURN)
+     * @param targetNo    自动生成的下游单号
+     * @param inspNo      来源来料检验单号(消息正文带出来源,收件人不用自己回查)
+     * @param actor       触发人(审核来料检验单的人)
+     */
+    private void notifyAutoDraft(String targetPanel, String targetNo, String inspNo, String actor) {
+        notify(() -> {
+            java.util.List<String> to = messageService.draftAuditNotifyTargets(targetPanel, DRAFT_AUDIT_NOTIFY_ROLES)
+                    .stream().filter((u) -> !u.equals(actor)).toList();
+            return messageService.send(to, MessageService.AUTO_DRAFT_FOR_AUDIT, targetPanel, targetNo,
+                    java.util.Map.of("docNo", targetNo, "actor", actor, "sourceNo", inspNo), actor);
+        });
+    }
+
+    /**
      * 来料检验单(QC_INSP)审核后,把 合格数量>0 的明细行自动生成采购入库单(PURCHASE_IN)草稿:
      * 实收数量=合格数量;存货编码/存货名称/规格型号 ← 物料编码/物料名称/型号;行仓库 ← 仓库代码;
      * 计量单位/单价随行带入(2026-09-17 补单价——此前清单漏列致入库单单价断流);
@@ -5244,6 +5281,10 @@ public class ButtonService {
             jdbc.update("UPDATE qc_insp_detail SET 入库单号 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
                     piNo, user, r.get("id"));
         }
+        // 消息(2026-11-17 用户口径「能不能消息通知到生产销售和仓库审核两个角色,都是只要知情」):
+        // 自动生成的**草稿**入库单 → 生产销售 + 仓库审核 各一条「已生成、请知悉」。
+        // 草稿不进门户「待办」(只认 pending='Y'),所以这条消息是目前唯一的提醒入口。
+        notifyAutoDraft("PURCHASE_IN", piNo, no, user);
     }
 
     /**
@@ -5378,6 +5419,8 @@ public class ButtonService {
                     no, no + "#" + r.get("id"), thNo, thNo + "#" + tgtIds.get(i), r.get("物料编码"),
                     r.get("送检数量"), r.get("不合格数量"), h.get("批次号"), h.get("批次键"), user);
         }
+        // 消息(2026-11-17 同口径):自动生成的**草稿**暂收退料单 → 生产销售 + 仓库审核 各一条「已生成、请知悉」
+        notifyAutoDraft("QC_RETURN", thNo, no, user);
     }
 
     /** 来料检验单弃审联动:自动生成的采购入库单/暂收退回单草稿 → 作废留痕+释放占用+清 入库单号 回填;

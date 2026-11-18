@@ -3995,6 +3995,9 @@ export default {
     '您申请删除的「{panelName} {docNo}」被 {actor} 驳回，单据保持原状态。意见：{opinion}': 'Your deletion request for "{panelName} {docNo}" was rejected by {actor}; the document is unchanged. Comment: {opinion}',
     '您申请修改的「{panelName} {docNo}」已由 {actor} 同意，现在可以编辑，保存后将重新归档。': 'Your modification request for "{panelName} {docNo}" was approved by {actor}; you can edit it now, and it will be re-archived on save.',
     '您申请修改的「{panelName} {docNo}」被 {actor} 驳回。意见：{opinion}': 'Your modification request for "{panelName} {docNo}" was rejected by {actor}. Comment: {opinion}',
+    // 上游审核自动生成下游草稿 → 生产销售 / 仓库审核 知情(2026-11-17)
+    '已自动生成待审核单据': 'Draft document created automatically',
+    '{actor} 审核「来料检验单 {sourceNo}」后，已自动生成「{panelName} {docNo}」草稿，等待仓库审核，特此知会。': 'After {actor} audited incoming inspection "{sourceNo}", draft "{panelName} {docNo}" was created automatically and is awaiting warehouse audit. FYI.',
     '上传附件': 'Upload Attachment',
     '暂无附件': 'No attachments',
     '文件大小': 'File Size',
