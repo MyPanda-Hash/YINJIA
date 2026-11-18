@@ -1,7 +1,7 @@
 # 银嘉 MES · 安卓壳(`android/`)
 
-> **日期**:2026-10-20(2026-11-17 连出 1.0.14 ~ 1.0.20;2026-11-18~19 出 1.0.21 ~ **1.0.24**)
-> **产物**:`android/dist/yinjia-mes-1.0.24.apk`(自签名,可直接侧载 / 覆盖升级)
+> **日期**:2026-10-20(2026-11-17 连出 1.0.14 ~ 1.0.20;2026-11-18~19 出 1.0.21 ~ 1.0.24;最新 **1.0.25** = 2026-11-18 合并 origin/main 后整站重打)
+> **产物**:`android/dist/yinjia-mes-1.0.25.apk`(自签名,可直接侧载 / 覆盖升级)
 > **不依赖 Gradle / Android Studio**:用 SDK 的 `aapt2 / javac / d8 / apksigner` 四步手搓出包,
 > 离线、几十秒、可重复构建(本机没有 Gradle,也没有装 Studio)。
 
@@ -10,9 +10,10 @@
 | 项 | 值 |
 |---|---|
 | 包名 | `com.yinjia.mes.app`(**永不改**;改了就是另一个 App,旧图标/旧数据都不跟着走) |
-| 本版 | `versionName=1.0.24`、`versionCode=25`(1.0.23 = 24;1.0.22 = 23;1.0.21 = 22;1.0.20 = 21;1.0.19 = 20;1.0.18 = 19;1.0.17 = 18;1.0.16 = 17) |
+| 本版 | `versionName=1.0.25`、`versionCode=26`(1.0.24 = 25;1.0.23 = 24;1.0.22 = 23;1.0.21 = 22;1.0.20 = 21;1.0.19 = 20;1.0.18 = 19;1.0.17 = 18;1.0.16 = 17) |
 | 签名证书 | `CN=Yinjia MES Debug`(仓库内 `android/debug.keystore`,SHA-256 `b455080b…9cbc`) |
 | 覆盖升级 | 与旧版 **同一把钥匙 + versionCode 更大** ⇒ 手机上直接装新 APK 就是「更新」,不用卸载 |
+| 1.0.25 内容 | **整站前端重打(原生壳代码未改)**:合并 `origin/main` 后的新版前端 —— 混料领料/扫码混料改按《混料物料清单》取数、工艺清单归档同步基础数据清单(组装/混料物料清单)、出货检验表观选单准入改为「进入末道工序」、排单计划「未完成总数」改为「工序未报工量」。验证与指纹见 §18 |
 | 1.0.24 内容 | **整站前端重打(原生壳代码未改)**:**「手机扫码 · 其他退料」的退料仓库改成现场可选** —— 扫到物料就出「退到仓库」下拉,默认带库存行所在的仓、可改成别的仓;手选后**粘住**(连扫几条退同仓),提交/清空复位;下拉**排掉停用仓**;其他领料仍固定按库存所在仓。验证与指纹见 §17 |
 | 1.0.23 内容 | **整站前端重打(原生壳代码未改)**:生产退料提交只生成【草稿】(不再自动审批),确认框改成「生成生产退料单(草稿),等仓管审核后库存才增加」 |
 | 1.0.22 内容 | **整站前端重打(原生壳代码未改)**:修「生产退料扫组装/混料二维码都跳混料明细」——明细页单据标识改 computed 跟随路由 + watch 重取 |
@@ -550,3 +551,33 @@ SDK 位置探测见 `android/sdk.ps1`:`ANDROID_HOME` → `ANDROID_SDK_ROOT` →
 - **BOM 又踩一次(第三次)**:用编辑器改 `build.ps1` 的版本号后,文件开头 BOM 又被抹掉
   (`23 20 62` 而不是 `EF BB BF`),`Parser::ParseFile` 直接 2 个语法错误。
   已按老办法写回 UTF-8 with BOM 并复验 **0 errors** 才出包 ⇒ 改完 `android/*.ps1` **先验三字节再出包**。
+
+---
+
+## 18. 2026-11-18:重打 **1.0.25**(合并 origin/main 后整站前端重打)
+
+> 用户口径:「帮我把安卓打包了」。
+
+- **前置取证(免重建前端)**:`frontend/dist` 与仓库跟踪的 `backend/src/main/resources/static`
+  **192 个文件逐文件 SHA-256 全等**,且该 static 已随 HEAD 提交 ⇒ dist 就是当前 HEAD 的构建产物,
+  直接进 build.ps1 第 1 步,无需 `npm run build`(沙箱里 npm build 仍会 esbuild EPERM)。
+- **出包**:`powershell -ExecutionPolicy Bypass -File android\build.ps1`;`versionName=1.0.25`、
+  `versionCode=26`(1.0.24 = 25 ⇒ 覆盖升级可用)。**原生壳代码一行未改**(Java/资源/Manifest 均未动),
+  dex `class_defs_size` 仍为 **332**(与 1.0.13 一致 ⇒ 扫描/拍照/接口号逻辑不变)。
+- **验证(不需要手机的部分全绿)**:
+
+| 项 | 结果 |
+|---|---|
+| 构建 | `aapt2 / javac / d8 / zip / zipalign / apksigner` 全绿;`assets/www` 收进 **192 个文件 / 8242 KB** |
+| 包信息 | `com.yinjia.mes.app`、`versionCode=26`、`versionName=1.0.25`、`minSdk 24`、`targetSdk 34`、label「银嘉MES」、launcher `MainActivity` |
+| 签名/对齐 | `apksigner verify` 通过(v2+v3;`CN=Yinjia MES Debug`,SHA-256 `b455080b…9cbc` = 与上一版**同一把钥匙** ⇒ 可覆盖升级);`zipalign -c 4` exit 0 |
+| 体积/指纹 | `dist/yinjia-mes-1.0.25.apk` **2.83 MB**(2,962,568 字节),SHA-256 `56BC5414A57ED07F14E2EA05DB8F1DFB9E6D6C361D74C53975A96D95BF9E2873` |
+| 前端资源 | APK 内 `assets/www/` **192 个文件**,与 `frontend/dist` 逐文件 SHA-256 全等(**192/192,0 失配**)、**0 个反斜杠条目**、`index.html` 逐字节一致(10011 字节) |
+| 原生能力 | dex 字符串池含 `scanMulti / takePhoto / hasCamera / __yjPhotoResult / __yjScanResultMulti` |
+| 明文/网络 | manifest 二进制树:`usesCleartextTraffic=true` + `networkSecurityConfig=@0x7f060000` 仍在(否则 WebView 打不开 http 后端) |
+| 权限 | INTERNET / ACCESS_NETWORK_STATE / CAMERA / VIBRATE(与上一版一致) |
+| 真机 | `adb devices` 为空 ⇒ **仍未真机验证**;手机插上后跑 `powershell -ExecutionPolicy Bypass -File android\install.ps1`(按 `LastWriteTime` 取 `dist\` 下最新 APK,即 1.0.25) |
+| 自证脚本 | `tools/archive/_apk-1025-20261118/verify-apk.mjs`(条目/哈希/反斜杠/dex/manifest,可复跑) |
+
+- **版本号仍只写 `build.ps1`**:manifest 未加 versionCode/versionName;`aapt2 dump badging` 复核
+  `versionCode='26' versionName='1.0.25'` 与脚本一致 —— 否则就是 §0 记的「假发布」。
