@@ -128,11 +128,19 @@
             :data-edit="isEditing(row) ? '1' : null"
           >
             <td v-for="c in colsOf(tab)" :key="c.key" class="rs-td">
+              <!-- 编辑态用**自适应高度文本域**而不是单行 input(2026-11-18 用户报障:
+                   「点击修改后,当前的表格会缩小成单行,显示的字数内容无法查看完全」)。
+                   根因:只读态是 `.rs-txt`(pre-wrap,自动换行撑高行),一进编辑态换成
+                   `el-input` 单行框 ⇒ 整行塌成一行高,长文本(如「检验方法/检验标准」整段)
+                   只露出第一行。文本域 autosize 让行高跟着内容走,编辑与只读的版式一致。 -->
               <el-input
                 v-if="editable && isEditing(row)"
                 v-model="editDraft[c.key]"
+                type="textarea"
+                :autosize="{ minRows: 1, maxRows: 30 }"
+                resize="none"
                 size="small"
-                class="rs-c-in"
+                class="rs-c-in rs-c-area"
                 @input="touchDirty()"
               />
               <span v-else class="rs-txt">{{ row[c.key] || '' }}</span>
@@ -894,6 +902,20 @@ async function onExtFieldDone() {
 }
 .rs-c-in {
   width: 100%;
+}
+/* 编辑态文本域(2026-11-18):行高跟内容走,与只读 `.rs-txt` 同一行距口径;
+   去掉默认外描边与内边距,纸面上看起来仍是一格字,而不是浮着一个输入框。 */
+.rs-c-area :deep(.el-textarea__inner) {
+  padding: 2px 6px;
+  line-height: 1.7;
+  font-size: 13px;
+  box-shadow: none;
+  background: transparent;
+  border-radius: 2px;
+}
+.rs-c-area :deep(.el-textarea__inner):focus {
+  box-shadow: 0 0 0 1px #1c4f8a inset;
+  background: #fff;
 }
 /* 操作列无边框浮动:修改/删除 悬浮于网格右缘之外,不占表格边框 */
 .rs-th-op {

@@ -4984,3 +4984,10 @@ migrate-prod-info-scene-stdlib-20261117.sql
 migrate-asm-proc-fixed-manager-20261117.sql
 # 2026-11-17 数据记录表：把「表单审核人」纠正为真实审批人姓名（历史预填值/空白一并修）
 migrate-datarec-auditor-from-shr-20261117.sql
+
+# 2026-11-18 质量单据其余 6 张与紧急放行单同款改造 + 「可附图片」章节挂附件:
+#   ① 责任部门(5 张: BHC/BHZ/SCP/LYB/SCY 补列+字段, = 责任人所属部门, 后端自动写, 纸面只读;
+#      QC_BHG 的责任部门是表头业务值, 刻意不动);② 编码列参照→文本(产品编码/物料编码/产品物料编码 5 处);
+#   ③ 单据日期 置只读(各章节「日期」自动生成);④ BHC/BHZ/SCP/LYB 补 [附件] 列 + 附件字段(纸面「可附图片」
+#      章节内上传);两账套已执行;幂等
+migrate-qc-docs-twolevel-20261118.sql

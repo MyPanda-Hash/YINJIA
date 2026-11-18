@@ -441,6 +441,21 @@
                 @click="setCheck(row.key, o)"
               >{{ head[row.key] === o ? '☑' : '□' }} {{ tt(o) }}</span>
             </div>
+            <!-- 「可附图片」章节的附件位(2026-11-18 用户口径:提及可附图片的单据要在**这一处**
+                 能上传附件,复用既有 FileAttachCell / /api/attachment,不另造组件)。
+                 锚点 = panelCode + 单据编号 + row.attach(字段键;列由迁移
+                 migrate-qc-docs-twolevel-20261118.sql 补在单头,data_type=附件)。
+                 只读态也渲染(canEdit=false):保存后附件名仍可点开查看(与文书式附件同一口径)。 -->
+            <FileAttachCell
+              v-if="row.attach"
+              class="as-attach-inline"
+              :panel-code="panelCode"
+              :doc-no="head['单据编号'] || ''"
+              :field-key="row.attach"
+              :model-value="head[row.attach] || ''"
+              :can-edit="!!editable && !!head['单据编号']"
+              @update:model-value="(v) => { head[row.attach] = v }"
+            />
             <div v-if="row.sign" class="q-signline">
               <span class="q-sign-label">{{ tt(row.sign) }}：</span>
               <span class="q-sign-val">
@@ -2485,6 +2500,17 @@ defineExpose({ focusField })
 .q-value.q-col .q-signline {
   margin-top: auto;
 }
+/* 「可附图片」章节内的附件位(2026-11-18):贴在填写区与签名行之间,一行高、不撑破纸面;
+   文件名可点开查看,上传/删除按钮打印时隐藏(FileAttachCell 自带 no-print)。 */
+.as-attach-inline {
+  margin: 4px 0 2px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.as-attach-inline :deep(.fac-upload-btn) {
+  font-size: 12px;
+  padding: 1px 6px;
+}
 /* 签名行靠右(原图:申请人/签名 位于填写区右端) */
 .q-signline.end {
   justify-content: flex-end;
@@ -2504,24 +2530,33 @@ defineExpose({ focusField })
   display: inline-flex;
   align-items: center;
   gap: 2px;
+  /* 2026-11-18 用户报障「紧急放行单的日期没有显示出来,会被遮挡」:
+     签名行是 flex 容器,日期段原来可以被压缩(flex 默认 0 1 auto)⇒ 纸面一窄,
+     三个日期格被挤到只剩 1~2 个数字(实测 `2026 年 11 月 17 日` 显示成 `20… 年 1 月 1 日`)。
+     这里禁止收缩 + 不换行,宽度不足时整段换到下一行也不吃字。 */
+  flex: none;
+  white-space: nowrap;
 }
-/* 签名日期 年/月/日 三段空(纸面样式):年 4 位宽、月日 2 位宽(30px≈2 字符),居中无边距。
+/* 签名日期 年/月/日 三段空(纸面样式):年 4 位宽、月日 2 位宽,居中无边距。
    ⚠ 选择器必须写**两个类**:上面的 `.approval-sheet :deep(.as-cell-input){width:100%}` 编译后是
    (0,3,0),单个 `.q-date-in` 只有 (0,2,0) → 被它压成 width:100%,月/日 输入框撑满整行
    (即用户报的「编辑态间隔巨大」)。`.q-dy` 当年正是这么两个类绕开的;`.q-dm` 漏了,故单坏月/日。
-   两个类 = (0,3,0) 与之打平,再靠源码顺序在后取胜(本块在 812 行之后)。 */
+   两个类 = (0,3,0) 与之打平,再靠源码顺序在后取胜(本块在 812 行之后)。
+   2026-11-18:原 30/48px 装不下「11」「2026」(内边距 3px + 小号字)→ 用户看到被截断的数字,
+   按「两位数字 + 内边距」重定:月日 42px、年份 66px;字体内边距收窄到 2px。 */
 .q-date-in.q-dm,
 .q-date-in.q-dy {
   flex: none;
-  width: 30px;
+  width: 42px;
 }
 .q-date-in.q-dy {
-  width: 48px;
+  width: 66px;
 }
 .q-sign-date :deep(.el-input__inner),
 .q-dept-signline :deep(.el-input__inner) {
   text-align: center;
-  padding: 0 3px;
+  padding: 0 2px;
+  font-size: 12px;
 }
 /* 签名留白 = 5 个字符,与 .q-sign-val 同口径;只读态是空 span,靠 min-width 撑出同一格 */
 .q-sign-name {

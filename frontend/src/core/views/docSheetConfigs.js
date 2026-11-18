@@ -182,6 +182,26 @@ const qcInfo = (dept) => [
   { label: '责任部门', kind: 'static', text: dept },
   { label: '时间', key: '单据日期', kind: 'date' },
 ]
+
+/**
+ * 质量单据族的右上信息表 —— 责任部门 = **责任人(建单/提交人)所属部门**(动态,2026-11-18 用户口径)。
+ *
+ * 用户口径:
+ *   · 2026-11-17(紧急放行申请单截图):「责任部门: 责任人所属部门」;
+ *   · 2026-11-18(其余质量单据「一样的模式进行改动」,追问确认):「改成责任人所属部门(动态)」。
+ *
+ * 与 {@link qcInfo} 的区别:那一版把部门印死(印刷值),这一版留 key 由后端
+ * `ButtonService.putRespDept / prefillRespDept / syncRespDeptToSubmitter` 按 yj_user.dept_id →
+ * yj_dept.dept_name 写入,并在提交审批时跟随提交人刷新。字段 yj_field.editable=0 ⇒ 纸面只读。
+ *
+ * ⚠ QC_BHG(不合格报告·制程)不用本函数:它的「责任部门」是表头**录入的业务值**(问题责任部门),
+ *   而且该单右上信息表印的是「填写部门 / 填写人 / 填写日期」。
+ */
+const qcInfoRespDept = () => [
+  { label: '使用范围', kind: 'static', text: '公司内部' },
+  { label: '责任部门', key: '责任部门' },
+  { label: '时间', key: '单据日期', kind: 'date' },
+]
 // 通用底部落款
 const qcSignStd = (bianzhi) => [
   { label: '编制', key: bianzhi, flex: 1 },
@@ -222,11 +242,11 @@ export const qcSheetCfgs = {
         { label: '不合格品数量', key: '不合格品数量', flex: 0.9 },
         { label: '异常等级', key: '异常等级', kind: 'checks', options: ['一般不合格', '严重不合格'], flex: 1.6 },
       ] },
-      { kind: 'section', label: '异常描述', key: '异常描述', h: 110, max: 2000, sign: '签名' },
-      { kind: 'section', label: '原因分析（生产部）', key: '原因分析', h: 110, max: 2000, sign: '签名' },
-      { kind: 'section', label: '改善对策（生产部/IPQC）', key: '改善对策', h: 110, max: 2000, sign: '签名' },
-      { kind: 'section', label: '效果跟踪', key: '效果跟踪', h: 90, max: 1000, sign: '签名' },
-      { kind: 'section', label: '品质部意见', key: '品质部意见', h: 90, max: 1000, sign: '签名' },
+      { kind: 'section', label: '异常描述', key: '异常描述', h: 110, max: 2000, dateKey: '单据日期', sign: '签名' },
+      { kind: 'section', label: '原因分析（生产部）', key: '原因分析', h: 110, max: 2000, dateKey: '单据日期', sign: '签名' },
+      { kind: 'section', label: '改善对策（生产部/IPQC）', key: '改善对策', h: 110, max: 2000, dateKey: '单据日期', sign: '签名' },
+      { kind: 'section', label: '效果跟踪', key: '效果跟踪', h: 90, max: 1000, dateKey: '单据日期', sign: '签名' },
+      { kind: 'section', label: '品质部意见', key: '品质部意见', h: 90, max: 1000, dateKey: '单据日期', sign: '签名' },
     ],
     signKind: 'plain',
     signCells: qcSignStd('填写人'),
@@ -236,7 +256,7 @@ export const qcSheetCfgs = {
   QC_BHC: {
     docno: 'YJ-QR-59',
     titlePart1: '不合格品处理单', titlePart2: '制程', titlePart3: '',
-    info: qcInfo('质量管理中心'),
+    info: qcInfoRespDept(),   // 责任部门 = 责任人所属部门(2026-11-18)
     rows: [
       { kind: 'pairs', cells: [
         { label: '客户名称', key: '客户名称', flex: 1.1 },
@@ -263,10 +283,10 @@ export const qcSheetCfgs = {
           refExclude: ['文档编号'],
           refCarry: { '产品规格': ['异常产品规格'], '问题描述': ['异常描述'] } },
       ] },
-      { kind: 'section', label: '一．问题描述（可附图片，必要时另附问题品）', key: '问题描述', h: 110, max: 2000, sign: '责任人' },
-      { kind: 'section', label: '二．原因分析', key: '原因分析', h: 100, max: 2000, sign: '责任人' },
-      { kind: 'section', label: '三．性能验证', key: '性能验证', h: 90, max: 1000, sign: '责任人' },
-      { kind: 'section', label: '四．不合格品处理意见', key: '处理意见', h: 70, sign: '品质部', signKey: '责任人',
+      { kind: 'section', label: '一．问题描述（可附图片，必要时另附问题品）', key: '问题描述', h: 110, max: 2000, dateKey: '单据日期', sign: '责任人', signKey: '责任人', attach: '附件' },
+      { kind: 'section', label: '二．原因分析', key: '原因分析', h: 100, max: 2000, dateKey: '单据日期', sign: '责任人', signKey: '责任人' },
+      { kind: 'section', label: '三．性能验证', key: '性能验证', h: 90, max: 1000, dateKey: '单据日期', sign: '责任人', signKey: '责任人' },
+      { kind: 'section', label: '四．不合格品处理意见', key: '处理意见', h: 70, dateKey: '单据日期', sign: '品质部', signKey: '责任人',
         checks: ['返工达到规定要求', '让步使用', '报废', '筛选合格品留用'] },
       { kind: 'section', label: '五．相关部门处理意见', h: 34 },
       { kind: 'dept', label: '产品开发部意见', h: 130, subs: [
@@ -276,7 +296,7 @@ export const qcSheetCfgs = {
       { kind: 'dept', label: '销售部意见', h: 80, subs: [
         { key: '销售部意见', checks: ['同意使用', '不同意使用'], max: 250 },
       ] },
-      { kind: 'section', label: '六、改善效果验证（如有返工处理需填写）', key: '改善效果验证', h: 90, max: 1000, sign: '责任人' },
+      { kind: 'section', label: '六、改善效果验证（如有返工处理需填写）', key: '改善效果验证', h: 90, max: 1000, dateKey: '单据日期', sign: '责任人', signKey: '责任人' },
       { kind: 'section', label: '七．损失成本', h: 46 },
       { kind: 'pairs', cells: [
         { label: '材料费用', key: '材料费用', flex: 1 },
@@ -369,7 +389,7 @@ export const qcSheetCfgs = {
   QC_BHZ: {
     docno: 'YJ-QR-64',
     titlePart1: '不合格品处理单', titlePart2: '自制物料', titlePart3: '',
-    info: qcInfo('质量管理中心'),
+    info: qcInfoRespDept(),   // 责任部门 = 责任人所属部门(2026-11-18)
     rows: [
       { kind: 'pairs', cells: [
         { label: '物料名称', key: '物料名称', flex: 1.1 },
@@ -381,15 +401,15 @@ export const qcSheetCfgs = {
         { label: '问题来源', key: '问题来源', kind: 'checks', options: ['制程', '成品'], flex: 1.5 },
         { label: '责任人', key: '责任人', flex: 1 },
       ] },
-      { kind: 'section', label: '一．问题描述（可附图片，必要时另附问题品）', key: '问题描述', h: 110, max: 2000, sign: '责任人' },
-      { kind: 'section', label: '二．原因分析', key: '原因分析', h: 100, max: 2000, sign: '责任人' },
-      { kind: 'section', label: '三．性能验证', key: '性能验证', h: 90, max: 1000, sign: '责任人' },
-      { kind: 'section', label: '四．不合格品处理意见', key: '处理意见', h: 70, sign: '品质部', signKey: '责任人',
+      { kind: 'section', label: '一．问题描述（可附图片，必要时另附问题品）', key: '问题描述', h: 110, max: 2000, dateKey: '单据日期', sign: '责任人', signKey: '责任人', attach: '附件' },
+      { kind: 'section', label: '二．原因分析', key: '原因分析', h: 100, max: 2000, dateKey: '单据日期', sign: '责任人', signKey: '责任人' },
+      { kind: 'section', label: '三．性能验证', key: '性能验证', h: 90, max: 1000, dateKey: '单据日期', sign: '责任人', signKey: '责任人' },
+      { kind: 'section', label: '四．不合格品处理意见', key: '处理意见', h: 70, dateKey: '单据日期', sign: '品质部', signKey: '责任人',
         checks: ['返工达到规定要求', '让步使用', '报废', '筛选合格品留用'] },
       { kind: 'section', label: '五．相关部门处理意见', h: 34 },
       { kind: 'dept', label: '研发部意见', h: 85, subs: [{ key: '研发部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
       { kind: 'dept', label: '产品开发部意见', h: 85, subs: [{ key: '产品开发部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
-      { kind: 'section', label: '六、改善效果验证（如有返工处理需填写）', key: '改善效果验证', h: 90, max: 1000, sign: '责任人' },
+      { kind: 'section', label: '六、改善效果验证（如有返工处理需填写）', key: '改善效果验证', h: 90, max: 1000, dateKey: '单据日期', sign: '责任人', signKey: '责任人' },
       { kind: 'section', label: '七．成本损失', h: 46 },
       { kind: 'pairs', cells: [
         { label: '材料费用', key: '材料费用', flex: 1 },
@@ -409,11 +429,7 @@ export const qcSheetCfgs = {
     //   · 使用范围 = 印刷值「公司内部」;
     //   · 责任部门 = **责任人所属部门**(由后端按建单/提交人所属部门写入 qc_jjf.责任部门,只读);
     //   · 时间 = 单据日期(建单即当天,只读)。
-    info: [
-      { label: '使用范围', kind: 'static', text: '公司内部' },
-      { label: '责任部门', key: '责任部门' },
-      { label: '时间', key: '单据日期', kind: 'date' },
-    ],
+    info: qcInfoRespDept(),
     rows: [
       { kind: 'pairs', cells: [
         { label: '物料类型', key: '物料类型', kind: 'checks', options: ['外部来料', '自制物料'], flex: 3 },
@@ -451,7 +467,7 @@ export const qcSheetCfgs = {
   QC_SCP: {
     docno: 'YJ-QR-118',
     titlePart1: '试产材料使用申请单', titlePart2: '', titlePart3: '',
-    info: qcInfo('研发部'),
+    info: qcInfoRespDept(),   // 责任部门 = 责任人所属部门(2026-11-18)
     rows: [
       { kind: 'pairs', cells: [
         { label: '物料名称', key: '物料名称', flex: 1.1 },
@@ -462,8 +478,8 @@ export const qcSheetCfgs = {
         { label: '生产量', key: '生产量', flex: 0.9 },
         { label: '责任人', key: '责任人', flex: 2 },
       ] },
-      { kind: 'section', label: '一．材料来源描述（可附图片，必要时另附问题品）', key: '材料来源描述', h: 110, max: 2000, sign: '责任人' },
-      { kind: 'section', label: '二．测试结果', key: '测试结果', h: 110, max: 2000, sign: '责任人' },
+      { kind: 'section', label: '一．材料来源描述（可附图片，必要时另附问题品）', key: '材料来源描述', h: 110, max: 2000, dateKey: '单据日期', sign: '责任人', signKey: '责任人', attach: '附件' },
+      { kind: 'section', label: '二．测试结果', key: '测试结果', h: 110, max: 2000, dateKey: '单据日期', sign: '责任人', signKey: '责任人' },
       { kind: 'section', label: '三．相关部门处理意见', h: 34 },
       { kind: 'dept', label: '研发部意见', h: 80, subs: [{ key: '研发部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
       { kind: 'dept', label: '产品开发部意见', h: 80, subs: [{ key: '产品开发部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
@@ -477,7 +493,7 @@ export const qcSheetCfgs = {
   QC_LYB: {
     docno: 'YJ-QR-119',
     titlePart1: '来料异常分析报告', titlePart2: '', titlePart3: '',
-    info: qcInfo(''),
+    info: qcInfoRespDept(),   // 责任部门 = 责任人所属部门(2026-11-18)
     rows: [
       { kind: 'pairs', cells: [
         { label: '供应商', key: '供应商', flex: 1.2 },
@@ -491,12 +507,12 @@ export const qcSheetCfgs = {
         { label: '物料编码', key: '物料编码', flex: 1.2 },
         { label: '不良率', key: '不良率', flex: 1 },
       ] },
-      { kind: 'section', label: '一．异常描述（可附图片，必要时另附问题品）', key: '异常描述', h: 110, max: 2000, sign: '责任人', signKey: '编制人' },
+      { kind: 'section', label: '一．异常描述（可附图片，必要时另附问题品）', key: '异常描述', h: 110, max: 2000, dateKey: '单据日期', sign: '责任人', signKey: '编制人', attach: '附件' },
       { kind: 'section', label: '二、异常原因分析', h: 150, subs: [
         { label: '供应商原因', key: '供应商原因', max: 500 },
         { label: '内部原因（无则填无）', key: '内部原因', max: 500 },
       ] },
-      { kind: 'section', label: '三、处理方式（品质部）', key: '处理方式', h: 60, sign: '签名', signKey: '编制人',
+      { kind: 'section', label: '三、处理方式（品质部）', key: '处理方式', h: 60, dateKey: '单据日期', sign: '签名', signKey: '编制人',
         checks: ['整批退货', '全检挑选', '让步接收'] },
       { kind: 'section', label: '四．改善追踪结果', key: '改善追踪结果', h: 100, max: 1000 },
     ],
@@ -508,7 +524,7 @@ export const qcSheetCfgs = {
   QC_SCY: {
     docno: 'YJ-QR-120',
     titlePart1: '生产异常分析报告', titlePart2: '', titlePart3: '',
-    info: qcInfo('生产部'),
+    info: qcInfoRespDept(),   // 责任部门 = 责任人所属部门(2026-11-18)
     rows: [
       { kind: 'pairs', cells: [
         { label: '产品/物料名称', key: '产品物料名称', flex: 1.2 },
@@ -518,11 +534,11 @@ export const qcSheetCfgs = {
         { label: '产品/物料编码', key: '产品物料编码', flex: 1.2 },
         { label: '生产量', key: '生产量', flex: 1 },
       ] },
-      { kind: 'section', label: '异常描述', key: '异常描述', h: 110, max: 2000, sign: '签名', signKey: '编制人' },
-      { kind: 'section', label: '原因分析', key: '原因分析', h: 110, max: 2000, sign: '签名', signKey: '编制人' },
-      { kind: 'section', label: '改善对策', key: '改善对策', h: 110, max: 2000, sign: '签名', signKey: '编制人' },
-      { kind: 'section', label: '效果跟踪', key: '效果跟踪', h: 90, max: 1000, sign: '签名', signKey: '编制人' },
-      { kind: 'section', label: '品质部意见', key: '品质部意见', h: 90, max: 1000, sign: '签名', signKey: '编制人' },
+      { kind: 'section', label: '异常描述', key: '异常描述', h: 110, max: 2000, dateKey: '单据日期', sign: '签名', signKey: '编制人' },
+      { kind: 'section', label: '原因分析', key: '原因分析', h: 110, max: 2000, dateKey: '单据日期', sign: '签名', signKey: '编制人' },
+      { kind: 'section', label: '改善对策', key: '改善对策', h: 110, max: 2000, dateKey: '单据日期', sign: '签名', signKey: '编制人' },
+      { kind: 'section', label: '效果跟踪', key: '效果跟踪', h: 90, max: 1000, dateKey: '单据日期', sign: '签名', signKey: '编制人' },
+      { kind: 'section', label: '品质部意见', key: '品质部意见', h: 90, max: 1000, dateKey: '单据日期', sign: '签名', signKey: '编制人' },
     ],
     signKind: 'plain',
     signCells: qcSignStd('编制人'),

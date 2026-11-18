@@ -68,14 +68,14 @@ test('④ 底部落款:编制 = 责任人(不再绑检测人);审核/批准仍�
 test('④b 表头自动生成钩子:建单预填 + 保存补 + 提交时责任部门跟提交人刷新', () => {
   const setLine = JAVA.match(/PREPARER_CREATOR_PREFILL\s*=\s*java\.util\.Set\.of\(([^)]*)\)/)
   assert.ok(setLine && setLine[1].includes('"QC_JJF"'), 'QC_JJF 必须在「创建人预填」名单里(建单即出责任人)')
-  assert.match(JAVA, /private void prefillJjfOwner\(PanelRegistry\.PanelDef def, String no, String user\)/)
-  assert.match(JAVA, /private void putJjfOwner\(PanelRegistry\.PanelDef def, Map<String, Object> head, String user\)/)
-  assert.match(JAVA, /private void syncJjfDeptToSubmitter\(String table, String no, String operator\)/)
+  assert.match(JAVA, /private void prefillRespDept\(PanelRegistry\.PanelDef def, String no, String user\)/)
+  assert.match(JAVA, /private void putRespDept\(PanelRegistry\.PanelDef def, Map<String, Object> head, String user\)/)
+  assert.match(JAVA, /private void syncRespDeptToSubmitter\(PanelRegistry\.PanelDef def, String no, String operator\)/)
   // 提交审批路径必须真的调到(责任人刷成提交人的同一处)
-  assert.match(JAVA, /if \(JJF_PANEL\.equals\(def\.code\(\)\)\) syncJjfDeptToSubmitter\(def\.headTable\(\), no, operator\);/)
+  assert.match(JAVA, /if \(respDeptPanel\(def\)\) syncRespDeptToSubmitter\(def, no, operator\);/)
   // 空白草稿分支直接 return,必须在那条路上也补
   // 空白草稿分支里「预填」之后紧跟门禁/落账几步,最后 return result(no, "草稿") —— 只要求同在一个分支内
-  assert.match(JAVA, /prefillJjfOwner\(def, no, user\);[\s\S]{0,1200}?return result\(no, "草稿"\)/)
+  assert.match(JAVA, /prefillRespDept\(def, no, user\);[\s\S]{0,1200}?return result\(no, "草稿"\)/)
 })
 
 test('⑤ DocSheet:章节行签名支持 dateKey,且日期格认字段级只读', () => {
