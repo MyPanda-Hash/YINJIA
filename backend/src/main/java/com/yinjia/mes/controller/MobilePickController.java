@@ -41,7 +41,7 @@ import java.util.Map;
  *  (并且已完成和未完成都可以展开和收缩)。
  *  生产退料与领料一致,只是退料默认数量为0。可以不进行退料操作,退料生成的应该是其他入库单,并且写好备注。」
 
- * <h3>BOM 来源(2026-10-30 二次确认;2026-11-02 换表)</h3>
+ * <h3>BOM 来源(2026-10-30 二次确认;2026-11-02 换表;2026-11-18 混料侧换《混料物料清单》)</h3>
  * 用户二次确认:「就是组装BOM表(RD_ASM_BOM),我去把数据录进去」。
  * ⚠ 2026-11-02 起数据源已迁到 {@code bs_asm_bom}(数据建模 → 生产 → 组装物料清单,面板 ASM_BOM,
  * 单表 doc 模式;取数与明细见 {@link com.yinjia.mes.service.WorkOrderBomService})。
@@ -50,10 +50,20 @@ import java.util.Map;
  * 取数口径 = 按工单行的**产品编号 + 工序=N'组装'**取最新一版 BOM(默认BOM='是' 优先,其次版本号最大),
  * 再取该单 {@code 子件编码 / 子件名称 / 子件规格 / 标准用量}。
  *
+ * <p>🔴 2026-11-18 用户口径「生成工单领料的时候,关联物料清单生成混料领料单,从根据物料清单领料改为
+ * 根据混料物料清单生成」:同一工单行出的**两张单**取数来源不同 ——
+ * <pre>
+ *   组装领料单:工单产品的《组装物料清单》(bs_asm_bom,临时工单用料优先)   ← 不变
+ *   混料领料单:半成品(编码含 **TB)对应的《混料物料清单》(bs_mix_bom)      ← 本版改
+ * </pre>
+ * 混料侧取数收口在 {@link com.yinjia.mes.service.MixBomService}(定位键 = 产品编号 + 烧结类型;
+ * 「单支含量g」按存货计量单位换算成单件用量),与手机扫码「扫码混料」**同源**,一套配方不再维护两处。
+ * 上一版读的「半成品自己的组装物料清单」{@code bomService.standardOf(semiCode)} 已不再用于混料单。
+ *
  * <h3>为什么物料来源不能是「成型工艺清单」</h3>
  * {@code rd_mold_proc_detail} 的列是「物料种类/实际添加比例/单支物料含量/设计添加量」——
- * 那是**配比**不是可直接领用的数量,且当前 0 行;换算口径需要额外约定。
- * 组装物料清单直接就是「子件编码 + 标准用量」,与本页语义一一对应。
+ * 那是**配比**不是可直接领用的数量。混料领料单**不直读**研发单,读的是归档同步出来的
+ * 《混料物料清单》(同一批列 + 单位),换算口径(单支含量g → 存货单位)由 MixBomService 统一解释。
  *
  * <h3>本控制器不做的事</h3>
  * <ul>
@@ -100,7 +110,7 @@ public class MobilePickController {
     //           ③ 明细只做**单据级**区分(不给 wo_pick_line 加行级列)。
     /** 组装领料(= 原来那张单,按工单产品的组装物料清单展开) */
     private static final String KIND_ASSEMBLY = WoPickDocService.KIND_ASSEMBLY;
-    /** 混料领料(按半成品自己的物料清单展开;清单空则不出单) */
+    /** 混料领料(按半成品对应的《混料物料清单》展开;清单空则不出单) */
     private static final String KIND_MIX = WoPickDocService.KIND_MIX;
 
     // ══════════════════════ 半成品:只显示、不领料、可跳过 ══════════════════════
@@ -195,16 +205,23 @@ public class MobilePickController {
      * 此前后端在本类与 WorkReportController 各写一套 SQL,改排序就要改两处(见类注释)。
      */
     private final WorkOrderBomService bomService;
+    /**
+     * 混料物料清单取数(2026-11-18):混料领料单按半成品的《混料物料清单》展开用料。
+     * 与手机扫码「扫码混料」共用同一份取数/单位换算 —— 否则扫码带出的料与领料单明细会两套。
+     */
+    private final com.yinjia.mes.service.MixBomService mixBomService;
 
     public MobilePickController(JdbcTemplate jdbc, WoPickDocService docs,
                                 ButtonService buttons, PanelPermissionService perm,
-                                FormNoService formNo, WorkOrderBomService bomService) {
+                                FormNoService formNo, WorkOrderBomService bomService,
+                                com.yinjia.mes.service.MixBomService mixBomService) {
         this.jdbc = jdbc;
         this.docs = docs;
         this.buttons = buttons;
         this.perm = perm;
         this.formNo = formNo;
         this.bomService = bomService;
+        this.mixBomService = mixBomService;
     }
 
     // ══════════════════════════ ⓪ 开单工作台(批量生单) ══════════════════════════
@@ -484,21 +501,26 @@ public class MobilePickController {
         made.add(asm);
         Map<String, Object> mix = null;
 
-        // ② 混料领料单(2026-11-18 用户口径)——
+        // ② 混料领料单(2026-11-18 用户口径,同日二次改口径)——
         //   「一种是混料领料(根据半成品的物料清单)」+ 三问确认「**有明细才生成**,
-        //    半成品清单为空就不产生空单」。
-        //   半成品 = 组装清单里编码含 **TB 的那一行(与"只显示不领料"同一判定);
-        //   它自己的清单 = bs_asm_bom 里 产品编码 = 半成品编码 的组装 BOM。
+        //    半成品清单为空就不产生空单」;
+        //   🔴 2026-11-18:「生成工单领料的时候…从根据物料清单领料改为根据混料物料清单生成」
+        //   ⇒ 半成品 = 组装清单里编码含 **TB 的那一行(与"只显示不领料"同一判定);
+        //     它自己的清单 = 《混料物料清单》(bs_mix_bom,面板 MIX_BOM)里 产品编号 = 半成品编码
+        //     (归一后)的那一张 —— 与手机扫码「扫码混料」同源,不再读半成品的组装物料清单。
         try {
             for (Map<String, Object> b : bomLines) {
                 String semiCode = str(b.get("物料编号"));
                 if (!isSemiFinished(semiCode)) continue;
-                // 半成品自己的清单 = 该编码在《组装物料清单》里的标准 BOM
-                // (2026-11-16 合并:原来的 latestAsmBom/bomDetail 已收口到 WorkOrderBomService)
-                WorkOrderBomService.Bom mixBom = bomService.standardOf(semiCode);
-                if (mixBom.isEmpty()) continue;                       // 半成品没维护清单 ⇒ 不出单
-                List<Map<String, Object>> mixLines = toPickLines(mixBom.lines());
-                if (mixLines.isEmpty()) continue;                     // 清单是空的 ⇒ 不出空单
+                // 半成品自己的混料配方:MixBomService 负责候选归一(**TB / -tb)与清单定位
+                com.yinjia.mes.service.MixBomService.Doc mixBom = mixBomService.of(semiCode);
+                if (mixBom.isEmpty()) {                               // 半成品没维护混料清单 ⇒ 不出单
+                    log.info("工单 {} 第 {} 行的半成品 {} 在《混料物料清单》里没有明细,不生成混料领料单",
+                            lineWoNo, line, semiCode);
+                    continue;
+                }
+                List<Map<String, Object>> mixLines = mixToPickLines(mixBom.lines());
+                if (mixLines.isEmpty()) continue;                     // 清单行都没有物料编号 ⇒ 不出空单
                 // 需求基数 = 工单数量 × 该半成品在组装清单里的单件用量(多数是 1:1,但不假定)
                 double base = round4(woQty * num(b.get("用量")));
                 String mixNo = mixBom.docNo();
@@ -522,10 +544,37 @@ public class MobilePickController {
     }
 
     /**
+     * 把 {@link com.yinjia.mes.service.MixBomService} 的**混料物料清单行**映射成领料行形态。
+     *
+     * <p>2026-11-18 拆出来:混料单的 BOM 已从「半成品的组装物料清单」换成《混料物料清单》,
+     * 行的键不同({@code 物料编号/物料名称/单位/标准用量} 而不是 {@code 子件编码/子件名称/计量单位}),
+     * 不能复用 {@link #toPickLines}。{@code 标准用量} 已是「单支含量g → 存货单位」换算后的单件用量
+     * ({@link com.yinjia.mes.service.MixBomService}),这里只做改名,**不再乘/除任何单位**。
+     */
+    private static List<Map<String, Object>> mixToPickLines(List<Map<String, Object>> mixLines) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (mixLines == null) return out;
+        for (Map<String, Object> b : mixLines) {
+            String code = str(b.get("物料编号"));
+            if (code.isEmpty()) continue;      // 没有物料编号的行不参与领料
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("物料编号", code);
+            m.put("物料名", str(b.get("物料名称")));
+            m.put("物料规格", str(b.get("规格型号")));
+            m.put("用量", num(b.get("标准用量")));
+            m.put("计量单位", str(b.get("单位")));
+            out.add(m);
+        }
+        return out;
+    }
+
+    /**
      * 把 WorkOrderBomService 的 BOM 子件行映射成领料行形态(物料编号/物料名/物料规格/用量/计量单位)。
      *
-     * <p>2026-11-16 合并时抽出来:组装单与混料单**同一套映射**(混料单的 BOM 是取半成品编码的
-     * 标准 BOM,再用本方法转一次),两处各写一遍迟早会不一致(单位/用量列一改就漏)。
+     * <p>2026-11-16 抽出来时组装单与混料单是同一套映射;**2026-11-18 混料单改用《混料物料清单》**
+     * ({@link com.yinjia.mes.service.MixBomService})后行结构不同,混料侧已另拆
+     * {@link #mixToPickLines} —— 别再把两者混用(组装行的 {@code 子件编码} 与混料行的
+     * {@code 物料编号} 键名不同,用错只会静默丢行)。
      * 没有物料编号的行直接丢掉 —— 没编码的行不可能领料。
      */
     private static List<Map<String, Object>> toPickLines(List<Map<String, Object>> bomLines) {

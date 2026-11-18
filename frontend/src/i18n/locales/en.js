@@ -6602,7 +6602,8 @@ export default {
     '已投': 'Done',
     '没有指定单据:请从「扫码混料」列表点进来': 'No sheet specified: open it from the "Scan Mixing" list',
     '扫物料码 · 确认投料': 'Scan material code · confirm feed',
-    '扫物料码解锁:只有本单物料清单里的料才能确认;数量默认取电子秤读数,可手改': 'Scan a material code to unlock it: only materials on this sheet\'s material list can be confirmed; the quantity defaults to the scale reading and can be edited',
+    // 2026-11-18:取料表从《物料清单》(mate)改为《混料物料清单》(bs_mix_bom),文案跟着改;旧键保留(别的页面还在用)
+    '扫物料码解锁:只有本单混料物料清单里的料才能确认;数量默认取电子秤读数,可手改': 'Scan a material code to unlock it: only materials on this sheet\'s mixing BOM can be confirmed; the quantity defaults to the scale reading and can be edited',
     '确认后重新锁回扫码状态,再扫下一个物料;全部确认完毕才可提交': 'After confirming, the field locks again for the next material; submit only once everything is confirmed',
     '取秤': 'Take weight',
     '已取秤': 'Weight taken',
@@ -6617,6 +6618,7 @@ export default {
     '项物料没有确认,确认完才能提交': 'material(s) not confirmed yet — confirm them all before submitting',
     '已提交的混料单只能查看与补打印;要再配一锅请回「扫码混料」扫工单码重新开一张': 'A submitted mixing sheet is view-only (reprint allowed); to mix another batch go back to "Scan Mixing" and scan the work-order code',
     '该产品在「物料清单」里还没有维护用料,请先在 数据建模 → 生产 → 物料清单 录入': 'No materials maintained for this product in "Material List"; enter them under Data Modeling → Production → Material List',
+    '该产品在「混料物料清单」里还没有维护用料,请先在 数据建模 → 物料及价格 → 混料物料清单 维护,或归档烧结工艺清单/X烧结工艺清单': 'No materials maintained for this product in the "Mixing BOM"; maintain them under Data Modeling → Materials & Prices → Mixing BOM, or archive the sintering process sheet / X-sintering process sheet first',
     // ── 生产退料 · 列表页 + 退料单明细页(2026-11-18 第四轮)──
     '不可退': 'Not returnable',
     '可退料': 'Returnable',

@@ -33,9 +33,9 @@ import java.util.Map;
  *       「未完成 / 已完成」两组 —— {@link #openDocs} = 已确认过料、还没整单提交的工单行;
  *       {@link #docsOf} = 已保存的混料单;</li>
  *   <li><b>明细页</b>({@code MobileMixDoc.vue})=「生产领料单」同款:{@link #taskOf} 一次取齐
- *       抬头 + 明细(物料清单的应投 / 已确认实投);扫物料码 → {@link #scanMaterial}
+ *       抬头 + 明细(混料物料清单的应投 / 已确认实投);扫物料码 → {@link #scanMaterial}
  *       <b>只解锁不落库</b> → 读电子秤 → 点「确认」→ {@link #saveScan} 写入该行;</li>
- *   <li><b>全部物料确认完毕才可提交</b>:{@link #saveDoc} 会再按物料清单校一遍,
+ *   <li><b>全部物料确认完毕才可提交</b>:{@link #saveDoc} 会再按混料物料清单校一遍,
  *       缺项直接拒绝(界面上的按钮同样置灰)。</li>
  * </ol>
  *
@@ -51,10 +51,15 @@ import java.util.Map;
  * 字段口径与老系统那 8 行完全同构:{@code 单据编号(PL…)/工单号/工单行号/序号/物料编号/物料名称/
  * 计划用量/实际用量/标记(N 保存前 / Y 保存后)/asp_print(打印次数)}。
  *
- * <h3>与「生产领料」的取料差别(刻意不一致)</h3>
+ * <h3>取料表(2026-11-18 改口径:读《混料物料清单》)</h3>
  * 生产领料读《组装物料清单》({@code bs_asm_bom},组装件:炭棒/垫片…);
- * 混料投的是**炭粉/活性炭**这类原料,走的是《物料清单》({@code mate})——
- * 这是用户 2026-11-18 明确点出的口径,别"顺手统一"成组装BOM。
+ * 混料投的是**炭粉/活性炭**这类原料 ⇒ 读《混料物料清单》({@code bs_mix_bom},面板 {@code MIX_BOM})。
+ *
+ * <p>🔴 2026-11-18 用户口径:「扫码混料也是一样,扫工单码查询对应的物料清单,带出需要称重的物料,
+ * 带入的bom从物料清单改为混料物料清单。」—— 上一版读的是遗留表 {@code mate}(面板 WLBOM《物料清单》),
+ * 实测正式库 0 行 ⇒ 扫工单永远带不出料。现改由 {@link MixBomService} 统一取数(定位键 = 产品编号 +
+ * 烧结类型;单支含量g 按存货单位换算成单件用量),与「生成工单领料 → 混料领料单」同源,
+ * 一套配方不再维护两处。
  *
  * <p>只读取数之外的写操作都限定在本服务内做参数校验与行级过滤(不接通用面板引擎:
  * {@code wo_mixing_list} 是报表型 flat 表,没有 yj_panel 的单据头/审批链)。
@@ -72,12 +77,18 @@ public class MixScanService {
     private static final String MARK_SAVED = "Y";
 
     private final JdbcTemplate jdbc;
+    /**
+     * 混料物料清单取数(2026-11-18 收口):扫码混料与「生成工单领料 → 混料领料单」共用同一份
+     * {@code bs_mix_bom} 取数/单位换算,避免两端各读一张表导致"扫码能带出料、领料单却是另一套"。
+     */
+    private final MixBomService mixBom;
 
-    public MixScanService(JdbcTemplate jdbc) {
+    public MixScanService(JdbcTemplate jdbc, MixBomService mixBom) {
         this.jdbc = jdbc;
+        this.mixBom = mixBom;
     }
 
-    // ═══════════════════════ 取数:工单行 + 物料清单 ═══════════════════════
+    // ═══════════════════════ 取数:工单行 + 混料物料清单 ═══════════════════════
 
     /**
      * 按工单号(+可选行号)取工单行。
@@ -118,17 +129,18 @@ public class MixScanService {
     }
 
     /**
-     * 按产品编码取**一级BOM = 物料清单**(面板 {@code WLBOM} 的底表 {@code mate}).
+     * 按产品编码取**混料物料清单**(面板 {@code MIX_BOM} 的底表 {@code bs_mix_bom})。
      *
-     * <p>表结构要点(mate 是经典遗留表,列名是拼音缩写):
-     * {@code m_no}=产品编码 / {@code wzdm2}=子件代码 / {@code wzmc2}=子件名称 /
-     * {@code gg2}=规格 / {@code jldw2}=子件单位 / {@code bzl}=标准用量 / {@code sl2}=损耗量。
+     * <p>🔴 2026-11-18 用户口径:「带入的bom从物料清单改为混料物料清单」—— 上一版读遗留表
+     * {@code mate}(面板 WLBOM《物料清单》),正式库实测 0 行,扫工单永远带不出料。现在改读
+     * 《混料物料清单》(数据来自已归档的烧结工艺清单/X烧结工艺清单),与「生成工单领料 → 混料领料单」
+     * **同源**(都走 {@link MixBomService})。
      *
-     * <p>没有维护 BOM 时**返回空列表**而不是抛错:页面据此提示
-     * 「该产品在「物料清单」里还没有维护用料」—— 2026-11-18 实测正式库 {@code mate} 仍是 0 行,
-     * 静默显示空清单会让人以为是系统坏了。
+     * <p>没有维护清单时**返回空列表**而不是抛错:页面据此提示
+     * 「该产品在「混料物料清单」里还没有维护用料,请先归档烧结工艺清单或到 数据建模 → 物料及价格 →
+     * 混料物料清单 维护」,静默显示空清单会让人以为是系统坏了。
      *
-     * @param productCode 产品编码({@code mate.m_no})
+     * @param productCode 产品编码(工单产品 / 半成品编码皆可,候选归一在 {@link MixBomService} 内)
      */
     public List<Map<String, Object>> bomOf(String productCode) {
         List<Map<String, Object>> out = new ArrayList<>();
@@ -148,45 +160,24 @@ public class MixScanService {
     }
 
     /**
-     * 物料清单的**归一化行**(内部统一键,明细页/扫料解锁/整单校验共用一份取数)。
+     * 混料物料清单的**归一化行**(内部统一键,明细页/扫料解锁/整单校验共用一份取数)。
      *
-     * <p>同一产品可能有多张单(历史重复录入):按 {@code m_date} 倒序、{@code xc} 行序取;
-     * 同一物料在清单里出现多次时**只认第一行**(不累加,免得把重复录入算成两倍),
-     * 这是与「应投量」计算一致的口径。
+     * <p>行结构由 {@link MixBomService#rowsOf(String)} 给出,与领料端同口径:
+     * {@code 标准用量} = 单支含量g 按存货计量单位换算后的**单件用量**,{@code 损耗量} = 0
+     * (混料清单没有损耗列)。同一物料多行只认第一行、不累加。
      *
-     * @param productCode 产品编码({@code mate.m_no})
-     * @return [{物料编号, 物料名称, 规格型号, 单位, 标准用量, 损耗量, 备注}]
+     * @param productCode 产品编码(候选归一在 {@link MixBomService} 内,支持 {@code **TB} / {@code -tb} 写法)
+     * @return [{物料编号, 物料名称, 规格型号, 单位, 标准用量, 损耗量, 备注, 单支含量g, 添加比例, 设计添加量}]
      */
     public List<Map<String, Object>> bomRowsOf(String productCode) {
-        String code = trim(productCode);
-        if (code.isEmpty()) return List.of();
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT m_no, m_date, xc, wzdm2, wzmc2, gg2, jldw2, bzl, sl2, bz"
-                        + " FROM dbo.mate WHERE m_no = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
-                        + " ORDER BY m_date DESC, xc, id", code);
-        List<Map<String, Object>> out = new ArrayList<>();
-        java.util.Set<String> seen = new java.util.HashSet<>();
-        for (Map<String, Object> r : rows) {
-            String item = trim(r.get("wzdm2"));
-            if (item.isEmpty() || !seen.add(item)) continue;
-            Map<String, Object> v = new LinkedHashMap<>();
-            v.put("物料编号", item);
-            v.put("物料名称", trim(r.get("wzmc2")));
-            v.put("规格型号", trim(r.get("gg2")));
-            v.put("单位", trim(r.get("jldw2")));
-            v.put("标准用量", dbl(r.get("bzl")));
-            v.put("损耗量", dbl(r.get("sl2")));
-            v.put("备注", trim(r.get("bz")));
-            out.add(v);
-        }
-        return out;
+        return mixBom.rowsOf(productCode);
     }
 
     /**
-     * 按物料清单 + 排产数量算出**应投料量**:标准用量 × 排产数量 + 损耗量(与界面/纸面同一口径)。
+     * 按混料物料清单 + 排产数量算出**应投料量**:单件用量 × 排产数量 + 损耗量(与界面/纸面同一口径)。
      *
-     * @param standard 标准用量({@code mate.bzl},单支产品用量)
-     * @param loss     损耗量({@code mate.sl2})
+     * @param standard 单件用量({@code MixBomService} 归一行:单支含量g 已按存货单位换算)
+     * @param loss     损耗量(混料清单没有损耗列 ⇒ 0)
      * @param planQty  排产数量({@code plang.pl_sl})
      * @return 应投量(4 位小数)
      */
@@ -245,7 +236,7 @@ public class MixScanService {
             v.put("生产线", wo == null ? "" : trim(wo.get("生产线")));
             v.put("排产数量", wo == null ? 0d : dbl(wo.get("排产数量")));
             v.put("已确认项数", intOf(g.get("已确认项数")));
-            // 明细数 = 物料清单行数(提交闸门的分母;清单没维护时为 0,页面据此提示)
+            // 明细数 = 混料物料清单行数(提交闸门的分母;清单没维护时为 0,页面据此提示)
             v.put("明细数", bomRowsOf(product).size());
             v.put("应投合计", dbl(g.get("应投合计")));
             v.put("实投合计", dbl(g.get("实投合计")));
@@ -364,7 +355,7 @@ public class MixScanService {
     /**
      * 扫物料码 → **解锁该项**(2026-11-18 第四轮,对应「生产领料」的 {@code /scanMaterial})。
      *
-     * <p>只做校验与取数,**不落库**:物料不在本工单行的《物料清单》里就明确拒绝并列出该投哪些料;
+     * <p>只做校验与取数,**不落库**:物料不在本工单行的《混料物料清单》里就明确拒绝并列出该投哪些料;
      * 命中则回该行的应投/已投/待投与单位,页面据此把数量框解锁(默认填电子秤读数)。
      *
      * @param orderNo 工单号
@@ -395,9 +386,10 @@ public class MixScanService {
                 if (names.length() > 0) names.append("、");
                 names.append(trim(l.get("物料编号")));
             }
-            throw new IllegalArgumentException("该物料不在本工单行的物料清单里:" + matCode
+            throw new IllegalArgumentException("该物料不在本工单行的混料物料清单里:" + matCode
                     + (names.length() == 0
-                        ? "(该产品在《物料清单》里还没有维护用料)"
+                        ? "(该产品在《混料物料清单》里还没有维护用料,请先归档烧结工艺清单/X烧结工艺清单,"
+                            + "或到 数据建模 → 物料及价格 → 混料物料清单 维护)"
                         : "(本单应投:" + names + ")"));
         }
         Map<String, Object> out = new LinkedHashMap<>(hit);
@@ -477,7 +469,7 @@ public class MixScanService {
                 "SELECT COUNT(*) FROM dbo.wo_mixing_list WHERE 工单号 = ? AND 工单行号 = ? AND 标记 = ?"
                         + " AND ISNULL(asp_cancel,'N') <> 'Y'", Integer.class, woNo, woLine, MARK_DRAFT));
 
-        // 单支物料含量/配料比/设计添加量 本版不写(官方口径走物料清单,不挂成型配方)
+        // 单支物料含量/配料比/设计添加量 本版不写(官方口径走混料物料清单,不挂成型配方)
         jdbc.update("INSERT INTO dbo.wo_mixing_list ("
                         + "工单号, 工单行id, 工单行号, 序号, 物料编号, 物料名称, 计划用量, 实际用量, 物料批次, 标记,"
                         + "asp_user1, asp_time1, asp_cancel) VALUES (?,?,?,?,?,?,?,?,?,?,?,GETDATE(),'N')",
@@ -530,7 +522,7 @@ public class MixScanService {
      *
      * <p>🔴 2026-11-18 第四轮用户口径:「全部物料确认完毕后,才可以提交」——
      * 上一版允许"先存已投的料"(缺料是车间常态),本版按用户口径改成**硬闸门**:
-     * 先按《物料清单》算出本单应投的料,再核对草稿行,缺任何一项都拒绝提交并点名缺哪几项。
+     * 先按《混料物料清单》算出本单应投的料,再核对草稿行,缺任何一项都拒绝提交并点名缺哪几项。
      * 界面上的「提交」按钮同样按这个判据置灰 —— 这里再挡一道,是防旧客户端/重放请求绕过。
      *
      * <p>单号口径与老系统一致:{@code PL + yyMMdd + 4 位流水},按当天已有单号取 max+1
@@ -571,12 +563,12 @@ public class MixScanService {
     }
 
     /**
-     * 提交前的硬闸门:**按《物料清单》核对本单每一项是否都确认了实投**。
+     * 提交前的硬闸门:**按《混料物料清单》核对本单每一项是否都确认了实投**。
      *
      * <p>用户口径「全部物料确认完毕后,才可以提交」。判据与界面完全一致:
-     * 物料清单里有的每一项物料,草稿里都要有一行且 {@code 实际用量 > 0}。
+     * 混料物料清单里有的每一项物料,草稿里都要有一行且 {@code 实际用量 > 0}。
      *
-     * <p>清单里没维护用料({@code mate} 空,2026-11-18 实测正式库就是 0 行)时**不拦** ——
+     * <p>清单里没维护用料(混料物料清单 0 行,正式库在烧结单归档前就是这种状态)时**不拦** ——
      * 那时明细页本身是空的,没有"该确认的项",拦下来只会让人提交不了已扫的料。
      *
      * @param woNo   工单号
@@ -781,7 +773,7 @@ public class MixScanService {
             realSum += dbl(r.get("实际用量"));
         }
 
-        // 明细页要显示「规格型号 / 计量单位」(与生产领料单同一口径):按物料清单补两份字典,
+        // 明细页要显示「规格型号 / 计量单位」(与生产领料单同一口径):按混料物料清单补两份字典,
         // 清单里查不到就留空(历史单可能已经不在清单里了,不能因此让整张单打不开)
         Map<String, Map<String, Object>> bomIndex = new LinkedHashMap<>();
         for (Map<String, Object> b : bomRowsOf(wo == null ? "" : trim(wo.get("dm")))) {

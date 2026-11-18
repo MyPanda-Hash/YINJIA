@@ -1,0 +1,11 @@
+SET NOCOUNT ON;
+PRINT '== TEST bs_mix_bom 概况 ==';
+SELECT COUNT(*) AS rows, COUNT(DISTINCT 单据编号) AS docs, COUNT(DISTINCT 产品编号) AS prods FROM dbo.bs_mix_bom;
+PRINT '== TEST bs_mix_bom 样本 ==';
+SELECT TOP 30 单据编号, 产品编号, 产品名称, 烧结类型, 行序, 物料种类, 物料编号, 物料名称, 添加比例, 单支含量g, 设计添加量 FROM dbo.bs_mix_bom ORDER BY 单据编号, 行序;
+PRINT '== bs_inv: A-48-41 系列 ==';
+SELECT 存货编码, 存货名称, 规格型号, 计量单位 FROM dbo.bs_inv WHERE 存货编码 LIKE 'A-48-41%' OR 存货编码 LIKE 'B-92-25%';
+PRINT '== 烧结工艺清单表头 产品编号 样本 ==';
+SELECT TOP 10 单据编号, 产品编号, 产品名称, 版本号 FROM dbo.rd_mold_proc_head ORDER BY id DESC;
+PRINT '== X烧结工艺清单表头 产品编号 样本 ==';
+SELECT TOP 10 单据编号, 产品编号, 产品名称, 版本号 FROM dbo.rd_x_sinter_head ORDER BY id DESC;
