@@ -199,8 +199,17 @@ async function removeFile(a) {
   } catch { return /* 取消 */ }
   try {
     await request.post('/attachment/delete', { id: a.id })
-    if (isMulti.value) await loadAll(true)
-    else await load(true)
+    if (isMulti.value) {
+      await loadAll(true)
+    } else {
+      await load(false)
+      /* 2026-11-18 用户报障:「上传附件删除后会显示这些文字,刷新后才会消失」——
+         删掉附件后必须把**头列文本模型**同步给父级(删空也要发空串),否则父级 modelValue
+         还留着旧文件名串,模板里 `!files.length && legacyText` 那条"历史文件名"分支就把它
+         当成遗留文本继续显示,只有刷新重读单据才消失。
+         ⚠ 这里不能改成"load 时一律回抛":历史只有文本、没有 yj_attachment 行的老单会被清空。 */
+      emit('update:modelValue', files.value.map((f) => f.fileName).join('、'))
+    }
     ElMessage.success(tt('附件已删除'))
   } catch (err) {
     ElMessage.error(tt('附件删除失败') + (err?.response?.data?.message ? '：' + err.response.data.message : ''))
