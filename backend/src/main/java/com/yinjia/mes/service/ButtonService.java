@@ -970,7 +970,7 @@ public class ButtonService {
         if (no == null) {
             if (items.isEmpty()) {
                 // directAdd 语义:空表单 -> 建一张空白草稿单(头行式写头表,单表式写一行占位行)
-                no = formNoService.next(def.prefix(), user);
+                no = nextDocNoFor(def, user);
                 String table = split ? def.headTable() : def.lineTable();
                 Map<String, Object> cols = new LinkedHashMap<>();
                 cols.put(def.groupCol(), no);
@@ -1043,7 +1043,7 @@ public class ButtonService {
                 markDocSaved(def.code(), no, markSaved);
                 return result(no, "草稿");
             }
-            no = formNoService.next(def.prefix(), user);
+            no = nextDocNoFor(def, user);
             clearStaleDocStatus(def, no);
             // 版本号自动带当日流水(同空白草稿分支口径):见 nextVersionNo 注释
             String vno2 = nextVersionNo(split ? def.headTable() : def.lineTable());
@@ -9424,6 +9424,33 @@ public class ButtonService {
         } catch (Exception e) {
             return "";
         }
+    }
+
+    /**
+     * 取号规则为「**账号小写-yyyy-MM-dd-NN**」的面板（2026-11-18 用户口径，Excel #7）。
+     *
+     * <p>用户原话：「编号规则按照 建表用户名称小写 + 年 + 月 + 日 + 序号，
+     * 例 liulei-2026-11-18-01、xieqin-2026-11-18-01」。**只对外部开发样品单**
+     * （RD_SAMPLE_EXT）生效 —— 内部开发/非开发样品单仍用全局 `前缀-年月-四位` 规则。</p>
+     *
+     * <p>按面板码判断而不是加元数据列：本文件已有 170 处同类分支，加列要动
+     * PanelDef/PanelRegistry 的构造与全量面板查询，收益不抵风险。</p>
+     */
+    private static final java.util.Set<String> USER_DAY_SEQ_PANELS = java.util.Set.of("RD_SAMPLE_EXT");
+
+    /** 新建取号：登记在 USER_DAY_SEQ_PANELS 的面板走「账号-日期-序号」，其余走原全局规则 */
+    private String nextDocNoFor(PanelRegistry.PanelDef def, String user) {
+        return USER_DAY_SEQ_PANELS.contains(def.code())
+                ? formNoService.nextUserDay(def.prefix(), user)
+                : formNoService.next(def.prefix(), user);
+    }
+
+    /** 新建表单「单据编号」预览（供 PanelFacade.getNewFormPermMatrix） */
+    public String previewDocNo(PanelRegistry.PanelDef def) {
+        String user = currentUserName();
+        return USER_DAY_SEQ_PANELS.contains(def.code())
+                ? formNoService.previewUserDay(def.prefix(), user)
+                : formNoService.preview(def.prefix());
     }
 
     // ============ 工具 ============
