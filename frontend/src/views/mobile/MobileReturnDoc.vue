@@ -225,13 +225,21 @@ const router = useRouter()
 const nativeScan = hasNativeScan()
 
 /**
- * 单据标识 —— 必须**响应式**(与 MobilePickDoc 同一个坑:vue-router 复用组件实例,
- * 只有 onMounted 取一次的话,换一张单还是上一张的数据)。
+ * 单据标识 —— 必须**跟着路由走**(与 MobilePickDoc / MobileMixDoc 同一个坑)。
+ *
+ * <p>🔴 2026-11-18 用户报障:「生产退料扫组装的二维码和混料的二维码都是跳到混料的明细」。
+ * 根因就在这一行:原来写成 `const docId = ref(Number(route.query.id) || 0)`,只在**第一次挂载**
+ * 取一次值;而 vue-router 对同一路由页**复用组件实例** —— 从列表/扫码再进另一张单时只改
+ * `query.id`,组件不重建、onMounted 不重跑、`watch(docId)` 也不会触发
+ * ⇒ 页面永远停在**第一次打开的那张单**(先开过混料,之后扫组装看到的还是混料)。
+ * 修法与那两页一致:用 computed 跟随 query,watch 它重新取数。
  *
  * <p>两种入口:列表页点进来带 {@code ?id=}(台账主键);从「生产领料」的已完成单点
- * 「去生产退料」带 {@code ?no=领料单号} —— 后者先按单号反查 id。
+ * 「去生产退料」带 {@code ?no=领料单号} —— 后者先按单号反查 id(结果放 idFromNo,
+ * 以 query.id 为准,免得 replace 之后又触发一次重载)。
  */
-const docId = ref(Number(route.query.id) || 0)
+const idFromNo = ref(0)
+const docId = computed(() => Number(route.query.id) || idFromNo.value || 0)
 const docNoParam = computed(() => String(route.query.no || '').trim())
 
 const loading = ref(false)
@@ -294,7 +302,10 @@ onActivated(() => {
   load()
 })
 
-/** 只在挂载时按 ?no= 反查 id;之后切单靠 watch(docId) */
+/**
+ * 切单:vue-router 复用实例只改 query.id ⇒ 必须 watch **computed 的 docId**(不是 ref),
+ * 否则从列表再扫/再点另一张单时页面不换(2026-11-18 报障的直接原因)。
+ */
 watch(docId, () => { softReset(); load() })
 
 function softReset() {
@@ -325,9 +336,9 @@ async function resolveIdByNo() {
     const res = await request.get('/px/mobilePick/locate', { params: { woNo: no } })
     const d = res.data?.data || res.data || {}
     if (d.found && Number(d.id) > 0) {
-      docId.value = Number(d.id)
-      // 地址栏补上 id,刷新页面就不用再反查
-      router.replace({ path: '/panelx/list/MOBILE_RETURN/doc', query: { id: String(docId.value) } })
+      idFromNo.value = Number(d.id)
+      // 地址栏补上 id,刷新页面就不用再反查(换成 ?id= 后 docId 的取值不变 ⇒ 不会二次重载)
+      router.replace({ path: '/panelx/list/MOBILE_RETURN/doc', query: { id: String(idFromNo.value) } })
       return
     }
     errText.value = tt('没有找到这张领料单') + ` (${no})`

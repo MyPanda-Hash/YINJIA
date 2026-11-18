@@ -127,7 +127,7 @@
  * side: 'pick' = 其他领料(其他出库单) / 'ret' = 其他退料(生产退料单)
  * 单号从路由 query 取(?no=OO-…),由列表页点行时带过来。
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { tt } from '@/i18n'
 import { isRet, titleOfSide } from '@/business/scanOther'
@@ -215,6 +215,18 @@ async function doPrint() {
 function back() {
   router.push(isReturn.value ? '/panelx/list/MOBILE_OTHER_RET' : '/panelx/list/MOBILE_OTHER_PICK')
 }
+
+/**
+ * 切单:vue-router 对同一路由页**复用组件实例**,只改 `?no=` 不会重跑 onMounted
+ * (生产领料/混料/生产退料三页都踩过同一个坑)⇒ 必须 watch 单号重新取数,
+ * 否则从列表再点另一张单,页面还是上一张。
+ */
+watch(docNo, (v, old) => {
+  if (v === old) return
+  data.value = null
+  okText.value = ''
+  load()
+})
 
 onMounted(load)
 </script>
