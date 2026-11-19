@@ -1,7 +1,7 @@
 # 银嘉 MES · 安卓壳(`android/`)
 
-> **日期**:2026-10-20(2026-11-17 连出 1.0.14 ~ 1.0.20;2026-11-18~19 出 1.0.21 ~ 1.0.24;最新 **1.0.25** = 2026-11-18 合并 origin/main 后整站重打)
-> **产物**:`android/dist/yinjia-mes-1.0.25.apk`(自签名,可直接侧载 / 覆盖升级)
+> **日期**:2026-10-20(2026-11-17 连出 1.0.14 ~ 1.0.20;2026-11-18~19 出 1.0.21 ~ 1.0.25;最新 **1.0.26** = 2026-11-19 扫码混料「数量只认电子秤实时读数」)
+> **产物**:`android/dist/yinjia-mes-1.0.26.apk`(自签名,可直接侧载 / 覆盖升级)
 > **不依赖 Gradle / Android Studio**:用 SDK 的 `aapt2 / javac / d8 / apksigner` 四步手搓出包,
 > 离线、几十秒、可重复构建(本机没有 Gradle,也没有装 Studio)。
 
@@ -10,9 +10,10 @@
 | 项 | 值 |
 |---|---|
 | 包名 | `com.yinjia.mes.app`(**永不改**;改了就是另一个 App,旧图标/旧数据都不跟着走) |
-| 本版 | `versionName=1.0.25`、`versionCode=26`(1.0.24 = 25;1.0.23 = 24;1.0.22 = 23;1.0.21 = 22;1.0.20 = 21;1.0.19 = 20;1.0.18 = 19;1.0.17 = 18;1.0.16 = 17) |
+| 本版 | `versionName=1.0.26`、`versionCode=27`(1.0.25 = 26;1.0.24 = 25;1.0.23 = 24;1.0.22 = 23;1.0.21 = 22;1.0.20 = 21;1.0.19 = 20;1.0.18 = 19;1.0.17 = 18;1.0.16 = 17) |
 | 签名证书 | `CN=Yinjia MES Debug`(仓库内 `android/debug.keystore`,SHA-256 `b455080b…9cbc`) |
 | 覆盖升级 | 与旧版 **同一把钥匙 + versionCode 更大** ⇒ 手机上直接装新 APK 就是「更新」,不用卸载 |
+| 1.0.26 内容 | **整站前端重打(原生壳代码未改)**:扫码混料明细页的「实投重量」改成**电子秤实时读数(只读,不能手输)**,核对无误再点「确认」;并修掉 `/dc/monitor` 默认设备不是秤导致「永远等待称重」的根因。验证与指纹见 §19 |
 | 1.0.25 内容 | **整站前端重打(原生壳代码未改)**:合并 `origin/main` 后的新版前端 —— 混料领料/扫码混料改按《混料物料清单》取数、工艺清单归档同步基础数据清单(组装/混料物料清单)、出货检验表观选单准入改为「进入末道工序」、排单计划「未完成总数」改为「工序未报工量」。验证与指纹见 §18 |
 | 1.0.24 内容 | **整站前端重打(原生壳代码未改)**:**「手机扫码 · 其他退料」的退料仓库改成现场可选** —— 扫到物料就出「退到仓库」下拉,默认带库存行所在的仓、可改成别的仓;手选后**粘住**(连扫几条退同仓),提交/清空复位;下拉**排掉停用仓**;其他领料仍固定按库存所在仓。验证与指纹见 §17 |
 | 1.0.23 内容 | **整站前端重打(原生壳代码未改)**:生产退料提交只生成【草稿】(不再自动审批),确认框改成「生成生产退料单(草稿),等仓管审核后库存才增加」 |
@@ -581,3 +582,40 @@ SDK 位置探测见 `android/sdk.ps1`:`ANDROID_HOME` → `ANDROID_SDK_ROOT` →
 
 - **版本号仍只写 `build.ps1`**:manifest 未加 versionCode/versionName;`aapt2 dump badging` 复核
   `versionCode='26' versionName='1.0.25'` 与脚本一致 —— 否则就是 §0 记的「假发布」。
+
+---
+
+## 19. 2026-11-19:出 **1.0.26**(扫码混料「数量只认电子秤实时读数」)
+
+> 用户口径:「手机扫码混料,扫物料码解锁后,**不能手动填写数据,应该实时抓取电子秤的数据**。
+>  等他们确认数量无误后再点击确认就可以。」→ 改完 →「打包」→「打包apk」。
+
+- **做法**:先取证 `frontend/dist` 与仓库跟踪的 `backend/src/main/resources/static`
+  **194 个文件逐文件 SHA-256 全等(0 失配 / 0 缺失 / 0 多余)**,且 static 已随 HEAD `3df78728b` 提交
+  ⇒ dist 就是当前 HEAD 的构建产物,直接进 `build.ps1` 第 1 步(本次仍重跑过 `npm run build`,
+  入口 chunk `index-B2zPqiAZ.js`)。**原生壳代码一行未改**(Java/资源/Manifest 均未动)
+  ⇒ dex `class_defs_size` 仍 **332**,扫描 / 拍照 / 接口号 / 多码选择逻辑与 1.0.25 一致。
+  `versionName=1.0.26`、`versionCode=27`(1.0.25 = 26 ⇒ 可覆盖升级)。
+- **本版带上的前端改动**:扫码混料明细页「实投重量」从输入框换成**只读实时读数**
+  (`mix-live-qty`),删掉手输与「取秤」按钮,「确认」= 以当下这一秤为准(读数不稳定点不亮);
+  另修 `/dc/monitor` 不带 `deviceId` 时读到「排序第一台设备(不是秤)」导致永远「等待称重」的根因
+  —— 页面先认准电子秤再按 `deviceId` 取数。详见 `tools/archive/_mix-scan-scale-only-20261119/README.md`。
+- **验证(不需要手机的部分全绿)**:
+
+| 项 | 结果 |
+|---|---|
+| 构建 | `aapt2 / javac / d8 / zip / zipalign / apksigner` 全绿;`assets/www` 收进 **194 个文件 / 8261 KB** |
+| 包信息 | `com.yinjia.mes.app`、`versionCode=27`、`versionName=1.0.26`、`minSdk 24`、`targetSdk 34`、label「银嘉MES」 |
+| 签名/对齐 | `apksigner verify` 通过(`CN=Yinjia MES Debug`,SHA-256 `b455080b…9cbc` = 与上一版**同一把钥匙** ⇒ 可覆盖升级);`zipalign -c 4` **Verification succesful** |
+| 体积/指纹 | `dist/yinjia-mes-1.0.26.apk` **2.83 MB**(2,970,933 字节),SHA-256 `0C538C2BAA1680C8ECE4AF75BF5CD67E6774D411F8051FC6B87B5CE38AB06569` |
+| 前端资源 | APK 内 `assets/www/` **194 个文件**,与 `frontend/dist` 逐文件 SHA-256 全等(**194/194,0 失配**)、**0 个反斜杠条目**、`index.html` 逐字节一致(9850 字节) |
+| 本版改动在包内 | `assets/www/assets/MobileMixDoc-B41xvz7B.js` 含 `mix-live-qty` /「数量来自电子秤实时读数」/「不能手输」,且**不含** `el-input-number`、`curQty`;`mixScan-gLBkuFyC.js` 含认秤正则 `/^DZ-/i` 与 `/电子秤\|秤/` |
+| dex | `class_defs_size=332`;`scanMulti / takePhoto / hasCamera / __yjPhotoResult / __yjScanResultMulti` 全在 |
+| 明文/网络 | manifest 二进制树:`usesCleartextTraffic=true` + `networkSecurityConfig` 仍在 |
+| 真机 | `adb devices` 为空 ⇒ **仍未真机验证**;手机插上后跑 `powershell -ExecutionPolicy Bypass -File android\install.ps1`(按 `LastWriteTime` 取 `dist\` 下最新 APK,即 1.0.26) |
+| 自证脚本 | `tools/archive/_apk-1025-20261118/verify-apk.mjs`(条目/逐文件哈希/反斜杠/index.html/dex 桥方法),输出留档 `tools/archive/_mix-scan-scale-only-20261119/verify-apk-1.0.26.txt` |
+
+- **BOM 铁律再确认**:本轮改版本号用 node 写回 `'\uFEFF' + 内容`,已验前三字节 `EF BB BF`、
+  `Parser::ParseFile` **0 errors** 后才出包。
+- **装机提醒**:整包嵌入前端 ⇒ 手机要看到新口径**必须装这个新包**(覆盖安装即可);
+  后端无需改动(接口形状未变,仅一处报错文案),服务端部署另行走 `deploy_src.py`。
