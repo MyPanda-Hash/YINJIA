@@ -19,9 +19,10 @@ const leafCodes = (node) => (node.children || []).map((child) => child.panelCode
  * ⇒ 二级分组由 4 个变 5 个，「样品」插在「项目管理」之后、「测试记录」之前
  *   （研发流程顺序：立项 → 打样 → 测试 → 出文件）。
  */
-test('研发管理五个二级分组,顺序=项目管理/样品/测试记录/产品文件/共享文件', () => {
-  assert.deepEqual((rd.children || []).map((c) => c.code), ['rdProject', 'rdSample', 'rdTest', 'rdFiles', 'rdShare'])
-  assert.deepEqual((rd.children || []).map((c) => c.title), ['项目管理', '样品', '测试记录', '产品文件', '共享文件'])
+test('研发管理六个二级分组,顺序=项目管理/样品/自制料/测试记录/产品文件/共享文件', () => {
+  // 2026-11-19 用户口径：「新建「自制料」分组，和样品平级」
+  assert.deepEqual((rd.children || []).map((c) => c.code), ['rdProject', 'rdSample', 'rdSelfmade', 'rdTest', 'rdFiles', 'rdShare'])
+  assert.deepEqual((rd.children || []).map((c) => c.title), ['项目管理', '样品', '自制料', '测试记录', '产品文件', '共享文件'])
 })
 
 test('样品组：三张单 + 一个只读进度页（外部-开发 / 内部-开发 / 外部-非开发 / 样品进度跟踪）', () => {
@@ -252,8 +253,9 @@ test('研发管理 26 个面板一个不少(含新增 项目流程管控 与两�
   // 2026-11-17 Excel #14：再 +1（新增「外部-非开发样品 RD_SAMPLE_ND」，独立面板 + 独立入口）
   // 2026-11-18 Excel #9：样品组多一个「样品进度跟踪」页面入口（panelCode 复用 RD_SAMPLE_EXT）
   //   ⇒ 叶子项 29 → 30，**去重后面板数不变（仍 28 张）**。
-  assert.equal(codes.length, 30, '叶子项 30 个（+ 样品进度跟踪）')
-  assert.equal(new Set(codes).size, 28, '去重后 28 张面板')
+  assert.equal(codes.length, 32, '叶子项 32 个（+ 自制料：录入 + 查询）')
+  assert.equal(new Set(codes).size, 29, '去重后 29 张面板（+ RD_SELFMADE）')
+  assert.ok(codes.includes('RD_SELFMADE'), '自制料面板必须登记面板码（权限矩阵同源）')
   assert.ok(codes.includes('RD_SAMPLE_EXT'), '样品进度跟踪复用 RD_SAMPLE_EXT 的权限')
   assert.ok(codes.includes('RD_EXTRA_REC_FILE'), '特殊数据记录表必须登记面板码（权限矩阵同源）')
   assert.ok(codes.includes('PROJECT_FLOW'), '项目流程管控必须挂在研发管理下')

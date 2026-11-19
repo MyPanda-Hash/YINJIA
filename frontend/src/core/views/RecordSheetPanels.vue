@@ -4639,7 +4639,31 @@ function setFooterFieldValue(dt, v) {
  *   注意插入点是**底层 items 数组**里的位置(rowsOf 只是过滤后的视图),否则跨表区分组时
  *   会把行插到别的表区/分组里。
  */
+/**
+ * 子批次自动编号（2026-11-19 用户口径，自制料制程记录录入）：
+ *   子批次 = `主批次-序号`，序号按**行序**重排；最少 1 行、最多 10 行。
+ *   不让人手填：手改必出重号/断号；由行序推导后，增行/删行/改主批次都自动对齐。
+ */
+function applySubBatch(dt) {
+  const sb = dt && dt.subBatch
+  if (!sb || !sb.key) return
+  const rows = rowsOf(dt)
+  const base = String(props.head?.[sb.from] || '').trim()
+  rows.forEach((r, i) => {
+    const no = i + 1
+    r[sb.key] = base ? `${base}-${no}` : String(no)
+  })
+}
+
+/** 本表区是否已到上限（自制料：最多 10 行） */
+function subBatchFull(dt) {
+  const sb = dt && dt.subBatch
+  return !!(sb && sb.max && rowsOf(dt).length >= sb.max)
+}
+
 function addRow(dt, afterRow) {
+  // 自制料：子批次最多 10 行（用户口径「最少一个，最多10个」）
+  if (subBatchFull(dt)) { ElMessage.warning(tt('子批次最多 10 个')); return }
   const row = dt.filterKey ? { [dt.filterKey]: dt.filterVal } : {}
   if (dt.metric) row['指标'] = dt.metric
   // 新行必须带上当前下拉值:否则它会飘在"空组"里,切到别组就看不见、重开也可能归错组
@@ -4659,14 +4683,26 @@ function addRow(dt, afterRow) {
   else arr.push(row)
   // 中间插入会把后续行号顶乱 ⇒ 本表区重排序号(仅自动序号表;手填序号的表不动用户的值)
   if (autoSeq) rowsOf(dt).forEach((r, i) => { r['序号'] = String(i + 1) })
+  applySubBatch(dt)
   emit('dirty')
 }
 function removeRow(row) {
   const arr = touch()
   const i = arr.indexOf(row)
   if (i >= 0) arr.splice(i, 1)
+  // 子批次表：删行后重排，保证 `主批次-1..N` 连续
+  for (const dt of (cfg.value?.dataTables || [])) if (dt && dt.subBatch) applySubBatch(dt)
   emit('dirty')
 }
+
+// 自制料：主批次或行数变化后重排子批次（`主批次-N`）。
+// 放在 seedRows 预置之前 —— 预置补行后同样会触发本 watch，子批次随之补齐。
+watch(
+  () => [props.head?.['主批次'], (props.head?.detail?.items || []).length],
+  () => {
+    for (const dt of (cfg.value?.dataTables || [])) if (dt && dt.subBatch) applySubBatch(dt)
+  },
+)
 
 // 明细预置(seedRows):进入草稿编辑且明细为空时自动带出标准行(浸泡安全 17 项卫生项目/组装工艺 20 道工序)
 // 监听含 head 对象本身:cur 整体替换(单据加载)时也会触发,避免预填丢失

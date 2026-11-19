@@ -5068,3 +5068,5 @@ migrate-sample-catalog-rev-20261119.sql
 #   同批 yj_translation 补 panel 级 en 译名(Internal Test Catalog),前端 locales/en.js 同词条。
 #   幂等(已声明同值命中 0 行);两账套(HSDZ_MES / HSDZ_MES_TEST)均已执行(2026-11-19)。
 migrate-sample-reg-detail-tab-20261119.sql
+# 2026-11-19 研发管理·自制料（制程记录录入面板 + 头/明细表 + 字段 + 权限骨架）
+migrate-selfmade-20261119.sql
