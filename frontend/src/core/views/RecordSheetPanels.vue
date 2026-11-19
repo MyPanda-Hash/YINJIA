@@ -155,7 +155,11 @@
         <tr>
           <td v-if="companySpan > 0" class="rs-td rs-company-cell" :colspan="companySpan">{{ COMPANY_NAME }}</td>
           <td v-if="gapLeftSpan > 0" class="rs-td" :colspan="gapLeftSpan"></td>
+          <!-- 2026-11-19 用户口径：「所有数据记录表右上角加一个项目编号前缀，
+               现在只是直接引用编号但是没有前缀标识」—— 只有声明了 dualDocNo 的记录表才加，
+               且是**标签前缀**（不写进数据），其它面板/单据纸面一个字不动。 -->
           <td v-if="docnoSpan > 0" class="rs-td rs-docno" :colspan="docnoSpan">
+            <span v-if="cfg.dualDocNo" class="rs-docno-pre">{{ tt('项目编号') }}：</span>
             <!-- ⚠ 同格版式的排排坐必须落在**内层 div** 上:给 <td> 加 display:flex 会让它不再是
                  table-cell(浏览器另生匿名格包住它,colspan 随之失效 —— 实测 colspan=10 的格子只剩
                  一列宽、公司名与编号挤成两行)。缺省(非 rs-onecell)时这层 div 就是普通块级,
@@ -5842,6 +5846,7 @@ body.approval-printing .rs-mold-pick { display: none !important; }
   display: none;
 }
 /* 纸面格内控件一律铺满格子(文本/下拉/自动完成) */
+.rs-docno-pre { font-size: 12px; color: #595959; margin-right: 2px; }
 .rs-t-in,
 .rs-c-in {
   width: 100%;
