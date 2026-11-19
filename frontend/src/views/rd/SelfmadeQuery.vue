@@ -19,7 +19,9 @@
 
     <section v-if="denied" class="smq-card smq-denied">{{ tt('没有自制料面板的查看权限') }}</section>
     <section v-else class="smq-card">
-      <el-table :data="rows" size="small" border max-height="560" v-loading="loading">
+      <!-- 合并单元格（2026-11-19 用户口径：「主批次合并，录入人、材料名、打印二维码合并」）：
+         el-table 的 span-method 按「同一张单（单据编号）」把这几列纵向合并。 -->
+      <el-table :data="rows" size="small" border max-height="560" v-loading="loading" :span-method="mergeSpan">
         <!-- 列序照 Excel《记录查询界面》：主批次 | 子批次 | 流程卡 | 配料表 | 异常 | 录入人，
              其后是本系统补充的 材料名 / 录入日期 / 二维码 -->
         <el-table-column prop="主批次" :label="tt('主批次')" width="130" />
@@ -57,7 +59,7 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { tt } from '@/i18n'
 import request from '@/core/request'
 import QRCode from 'qrcode'
@@ -69,6 +71,29 @@ const q = reactive({ name: '', batchFrom: '', batchTo: '' })
 const qr = reactive({ open: false, dataUrl: '', text: '' })
 
 const fileText = (v) => (String(v || '').trim() ? tt('已上传') : '—')
+
+/** 合并列（索引按当前列序）：0 主批次 / 5 录入人 / 6 材料名 / 8 二维码 */
+const MERGE_COLS = [0, 5, 6, 8]
+/** 按「单据编号」把行分组（一张单 = 一个主批次），得到每组的首行下标 → 行数 */
+const groupSpans = computed(() => {
+  const map = {}
+  rows.value.forEach((r, i) => {
+    const k = String(r['单据编号'] || '') + '|' + String(r['主批次'] || '') + '|' + String(r['材料名'] || '')
+    if (!map[k]) map[k] = { start: i, count: 0 }
+    map[k].count += 1
+  })
+  const startOf = {}
+  const countOf = {}
+  Object.values(map).forEach((g) => { startOf[g.start] = g.count; countOf[g.start] = g.count })
+  return { startOf, countOf }
+})
+function mergeSpan({ rowIndex, columnIndex }) {
+  if (!MERGE_COLS.includes(columnIndex)) return [1, 1]
+  const { startOf, countOf } = groupSpans.value
+  const count = countOf[rowIndex]
+  if (!count) return [0, 0]              // 非组首行：隐藏该格（被上一行的 rowspan 覆盖）
+  return [count, 1]
+}
 
 async function load() {
   loading.value = true
