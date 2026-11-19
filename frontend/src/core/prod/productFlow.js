@@ -50,6 +50,8 @@ export function flowStepsOf(row) {
     at: String(row.at || ''),
     // 2026-11-19 销售问题汇总 P14：每个步骤显示填写人
     actor: String(row.actor || ''),
+    // 2026-11-19：同类多张数据记录表（同一项目编号反复测试）——全部单号列在这里
+    docs: Array.isArray(row.docs) ? row.docs.map((d) => ({ no: String(d.no || ''), state: String(d.state || ''), at: String(d.at || ''), actor: String(d.actor || '') })) : [],
     state: String(row.state || ''),
     tone: String(row.state || '') === '已归档' ? STEP_STATE.done
       : (String(row.state || '').trim() && String(row.state) !== '草稿' ? STEP_STATE.doing : STEP_STATE.none),

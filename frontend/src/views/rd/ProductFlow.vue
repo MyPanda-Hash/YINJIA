@@ -79,12 +79,24 @@
                       <span class="pfl-step-name">{{ tt(st.label) }}</span>
                       <!-- 状态标签:与项目流程管控的 el-tag 同款(三档统一说法,不再吐「草稿」原文) -->
                       <el-tag size="small" :type="tagTypeOf(st.tone)" effect="plain">{{ tt(stateLabel(st)) }}</el-tag>
-                      <span v-if="st.docNo" class="pfl-step-no">{{ st.docNo }}</span>
+                      <!-- 2026-11-19 用户口径 A：同类多张数据记录表 —— 显示「· N 张」，点开列全部 -->
+                      <span
+                        v-if="st.docs && st.docs.length > 1"
+                        class="pfl-step-count" @click.stop="toggleDocs(st)"
+                      >· {{ st.docs.length }} {{ tt('张') }}</span>
+                      <span v-else-if="st.docNo" class="pfl-step-no">{{ st.docNo }}</span>
                       <!-- 填写人（2026-11-19 销售问题汇总 P14：「要跟项目查询一样，增加填写人名字」） -->
                       <span v-if="st.actor" class="pfl-step-actor" :title="tt('填写人')">{{ st.actor }}</span>
                       <!-- 最后操作时间(2026-11-17 取代原来的「处理人」;取不到显示「-」,不编造) -->
                       <span class="pfl-step-at" :title="tt('最后操作时间')">{{ st.at || '-' }}</span>
                     </div>
+                    <ul v-if="openDocs.has(st.key) && st.docs && st.docs.length" class="pfl-docs">
+                      <li v-for="d in st.docs" :key="d.no" class="pfl-doc" @click.stop="openDoc(d.no)">
+                        <span class="pfl-doc-no">{{ d.no }}</span>
+                        <span class="pfl-doc-at">{{ d.at || '-' }}</span>
+                        <span class="pfl-doc-by">{{ d.actor || '-' }}</span>
+                      </li>
+                    </ul>
                     <p v-if="st.reaudited" class="pfl-step-detail">{{ tt('曾经审核又被弃审，需重走这一步') }}</p>
                   </div>
                 </li>
@@ -150,7 +162,8 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { tt } from '@/i18n'
 import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
@@ -158,6 +171,27 @@ import {
   STEP_STATE, currentStepOf, docMetaOf, filterFlowRows, flowKpisOf, flowStatusOf, flowStepsOf,
   nextStepOf, stateLabelOf,
 } from '@/core/prod/productFlow'
+
+const router = useRouter()
+/** 展开状态：哪些步骤的多单据清单是打开的（2026-11-19） */
+const openDocs = reactive(new Set())
+function toggleDocs(st) {
+  if (openDocs.has(st.key)) openDocs.delete(st.key)
+  else openDocs.add(st.key)
+}
+/** 点单号进对应单据（按单号前缀判面板：LXA=立项、其余=实施计划/数据记录表走对应面板） */
+function openDoc(no) {
+  const v = String(no || '')
+  if (!v) return
+  const panel = v.startsWith('LXA') ? 'RD_APPROVAL' : (panelOfNo(v) || 'RD_PROGRESS')
+  router.push({ path: `/panelx/list/${panel}`, query: { focus: v } })
+}
+/** 数据记录表单号 → 面板（碱性 YJ-PD-… 等；取不到就落回项目控制列表） */
+function panelOfNo(no) {
+  const map = { 'YJ-PD': 'RD_ALKALINE' }
+  for (const k of Object.keys(map)) if (String(no).startsWith(k)) return map[k]
+  return ''
+}
 
 const rows = ref([])
 const loading = ref(false)
@@ -367,4 +401,8 @@ onBeforeUnmount(() => window.removeEventListener('resize', syncWidth))
   .pfl-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .pfl-step-actor { margin-left: 8px; font-size: 12px; color: #595959; }
+.pfl-step-count { margin-left: 6px; font-size: 12px; color: #0958d9; cursor: pointer; }
+.pfl-docs { margin: 4px 0 0 20px; padding: 0; list-style: none; }
+.pfl-doc { display: flex; gap: 10px; font-size: 12px; color: #595959; padding: 2px 0; cursor: pointer; }
+.pfl-doc:hover { color: #0958d9; }
 </style>

@@ -202,13 +202,31 @@ public class RdDevProductService {
         try {
             PanelRegistry.PanelDef def = registry.panel(panelCode);
             if (def == null || !hasColumn(def.headTable(), "产品编号")) return n;
+            // 2026-11-19 用户口径：「一个项目下同类数据记录表可能有多张（同编号反复测试），
+            //   流程里要都能看到」——原来 TOP 1 只显示最新一张。现在取**全部**单据，
+            //   docs = [{no, state, done, at, actor}]；单值字段仍取最新一张（old 兼容）。
             List<Map<String, Object>> ds = jdbc.queryForList(
-                    "SELECT TOP 1 h.[单据编号] AS no FROM " + def.headTable() + " h"
+                    "SELECT h.[单据编号] AS no FROM " + def.headTable() + " h"
                             + " LEFT JOIN yj_doc_status s ON s.panel_code = ? AND s.doc_no = h.[单据编号]"
                             + " WHERE ISNULL(h.asp_cancel,'N') <> 'Y' AND ISNULL(s.canceled,'N') <> 'Y'"
                             + " AND h.[产品编号] IN (?, ?) ORDER BY h.id DESC",
                     panelCode, forms.get(0), forms.get(1));
             if (ds.isEmpty()) return n;
+            java.util.List<Map<String, Object>> docs = new java.util.ArrayList<>();
+            for (Map<String, Object> d : ds) {
+                String dno = str(d.get("no"));
+                if (dno == null || dno.isBlank()) continue;
+                String dst = statusOf(panelCode, dno);
+                Map<String, Object> one = new LinkedHashMap<>();
+                one.put("no", dno);
+                one.put("state", dst);
+                one.put("done", "已归档".equals(dst) || "已审核".equals(dst) || "已生效".equals(dst));
+                one.put("at", lastActionAt(panelCode, dno));
+                one.put("actor", lastActorOf(panelCode, dno));
+                docs.add(one);
+            }
+            n.put("docs", docs);
+            if (docs.isEmpty()) return n;
             String no = str(ds.get(0).get("no"));
             String st = statusOf(panelCode, no);
             n.put("docNo", no == null ? "" : no);
