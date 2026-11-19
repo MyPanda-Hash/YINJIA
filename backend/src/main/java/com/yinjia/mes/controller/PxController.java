@@ -1343,6 +1343,16 @@ public class PxController {
         return ApiResult.ok(out);
     }
 
+    /** 自制料制程记录查询（2026-11-19）：材料名 + 批次起止；只读。 */
+    @GetMapping("/selfmadeQuery")
+    public ApiResult<List<Map<String, Object>>> selfmadeQuery(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String name,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String batchFrom,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String batchTo) {
+        perm.requirePanelView("RD_SELFMADE");
+        return ApiResult.ok(queryService.selfmadeRows(name, batchFrom, batchTo));
+    }
+
     @GetMapping("/sampleFlow")
     public ApiResult<List<Map<String, Object>>> sampleFlow() {
         perm.requirePanelView("RD_SAMPLE_EXT");

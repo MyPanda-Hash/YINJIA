@@ -49,6 +49,15 @@ export const menuTree = [
           { code: 'rdSampleFlow', title: '样品进度跟踪', path: '/rd/sampleFlow', panelCode: 'RD_SAMPLE_EXT', icon: 'DataLine' },
         ],
       },
+      // 自制料（2026-11-19 用户口径）：与「样品」平级的二级分组，两个入口 ——
+      //   ① 制程记录录入（RD_SELFMADE，普通单据面板，无审批）
+      //   ② 制程记录查询（/rd/selfmadeQuery，只读页，带导出/二维码）
+      {
+        code: 'rdSelfmade', title: '自制料', icon: 'Box', children: [
+          { code: 'rdSelfmadeEntry', title: '制程记录录入', path: '/panelx/list/RD_SELFMADE', panelCode: 'RD_SELFMADE', icon: 'DocumentAdd', operationName: '录入制程记录' },
+          { code: 'rdSelfmadeQuery', title: '制程记录查询', path: '/rd/selfmadeQuery', panelCode: 'RD_SELFMADE', icon: 'Search' },
+        ],
+      },
       {
         code: 'rdTest', title: '测试记录', icon: 'Notebook', children: [
           {

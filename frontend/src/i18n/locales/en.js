@@ -5433,6 +5433,20 @@ export default {
     '没有符合条件的供应商': 'No matching suppliers',
     '请选择一个供应商': 'Please select a supplier',
     '加载供应商档案失败': 'Failed to load supplier master',
+    /* ── 研发管理·自制料（2026-11-19）── */
+    '自制料': 'In-house material',
+    '制程记录录入': 'Process record entry',
+    '制程记录查询': 'Process record query',
+    '自制功能料制程记录查询': 'In-house functional material process records',
+    '材料名（支持片段）': 'Material (partial match)',
+    '批次起止': 'Batch range',
+    '没有自制料面板的查看权限': 'No permission to view in-house material records',
+    '没有符合条件的记录': 'No matching records',
+    '二维码': 'QR code',
+    '子批次最多 10 个': 'At most 10 sub-batches',
+    '材料与批次': 'Material and batch',
+    '子批次明细': 'Sub-batch details',
+    '银嘉自制功能材料制程记录': 'YINJIA in-house functional material process record',
     /* ── 研发管理·样品 → 手填客户（建档打标记）2026-11-18 ── */
     '删除后需要重新填写。': 'It will need to be filled in again.',
 

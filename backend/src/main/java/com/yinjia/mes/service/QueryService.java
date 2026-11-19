@@ -187,6 +187,39 @@ public class QueryService {
         return "created";
     }
 
+    /**
+     * 自制料制程记录查询（2026-11-19 用户口径）：按 材料名 + 批次起止 查，一行 = 一个子批次。
+     * 返回列与 Excel《记录查询界面》一致：主批次 / 子批次 / 流程卡 / 配料表 / 异常情况描述 /
+     * 录入人 / **录入日期**（用户补充要求显示这一列）。
+     */
+    public List<java.util.Map<String, Object>> selfmadeRows(String name, String batchFrom, String batchTo) {
+        StringBuilder sql = new StringBuilder(
+                "SELECT h.[单据编号], ISNULL(h.[材料名], N'') AS 材料名, ISNULL(h.[主批次], N'') AS 主批次, "
+              + "ISNULL(d.[子批次], N'') AS 子批次, ISNULL(d.[流程卡], N'') AS 流程卡, "
+              + "ISNULL(d.[配料表], N'') AS 配料表, ISNULL(d.[异常情况描述], N'') AS 异常情况描述, "
+              + "ISNULL(h.[录入人], N'') AS 录入人, ISNULL(CONVERT(varchar(10), h.[单据日期], 23), '') AS 录入日期 "
+              + "FROM rd_selfmade_head h JOIN rd_selfmade_detail d ON d.[单据编号] = h.[单据编号] "
+              + "WHERE ISNULL(h.asp_cancel, 'N') <> 'Y' AND ISNULL(d.asp_cancel, 'N') <> 'Y'");
+        java.util.List<Object> args = new java.util.ArrayList<>();
+        if (name != null && !name.isBlank()) { sql.append(" AND h.[材料名] LIKE ?"); args.add("%" + name.trim() + "%"); }
+        if (batchFrom != null && !batchFrom.isBlank()) { sql.append(" AND ISNULL(h.[主批次],'') >= ?"); args.add(batchFrom.trim()); }
+        if (batchTo != null && !batchTo.isBlank()) { sql.append(" AND ISNULL(h.[主批次],'') <= ?"); args.add(batchTo.trim()); }
+        sql.append(" ORDER BY h.[主批次] DESC, h.[单据编号] DESC, TRY_CAST(d.[序号] AS int)");
+        return jdbc.query(sql.toString(), (rs, i) -> {
+            java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+            row.put("单据编号", rs.getString("单据编号"));
+            row.put("材料名", rs.getString("材料名"));
+            row.put("主批次", rs.getString("主批次"));
+            row.put("子批次", rs.getString("子批次"));
+            row.put("流程卡", rs.getString("流程卡"));
+            row.put("配料表", rs.getString("配料表"));
+            row.put("异常情况描述", rs.getString("异常情况描述"));
+            row.put("录入人", rs.getString("录入人"));
+            row.put("录入日期", rs.getString("录入日期"));
+            return row;
+        }, args.toArray());
+    }
+
     public List<java.util.Map<String, Object>> sampleFlowRows() {
         String sql = "SELECT h.[单据编号], "
                 + "ISNULL(h.[客户名称], N'') AS 客户名称, "

@@ -532,7 +532,51 @@ const RD_MOLD_FORMULA = {
     ],
   }
 
+/**
+ * ═══ 研发管理 · 自制料（2026-11-19 用户口径，《新建 XLS 工作表.xls》）═══
+ *   制程记录录入：材料名（手填）/ 主批次（手填）/ 子批次（自动 主批次-1…-N，最少 1 行最多 10 行）
+ *   / 流程卡·配料表（附件格，图片或文件、可点开查看）/ 异常情况描述 / 录入人（默认练庆文）。
+ *   无审批、可修改；所有有录入权的人都能改任意一条。
+ *   ⚠ 「子批次」不让人手填：加载/增删行时按行序重排成 `主批次-序号`（见 RecordSheetPanels 的
+ *     subBatch 逻辑），避免手改出错、也保证重号不存在。
+ */
 export const recordSheetConfigs = {
+
+  // ── 研发管理·自制料：制程记录录入 ──────────────────────────────────────
+  RD_SELFMADE: {
+    headMode: 'report',
+    staticTitle: '银嘉自制功能材料制程记录',
+    grid: [130, 260, 130, 260],
+    head: { title: 2, infoLabel: 1, infoValue: 1, docnoPrefix: '单据编号' },
+    info: [
+      { label: '录入人', key: '录入人', type: 'text' },
+      { label: '单据日期', key: '单据日期', type: 'text' },
+    ],
+    sections: [
+      { bar: '材料与批次', rows: [
+        { pairs: [
+          { label: '材料名', key: '材料名', type: 'text', ph: '手填，如 BK1-D/10' },
+          { label: '主批次', key: '主批次', type: 'text', ph: '手填，如 261025' },
+        ]},
+      ]},
+    ],
+    dataTables: [
+      {
+        bar: '子批次明细',
+        // 子批次自动编号：加载/增删行时按行序重排为「主批次-N」，最少 1 行、最多 10 行
+        subBatch: { key: '子批次', from: '主批次', max: 10, min: 1 },
+        autoSeqBar: true,
+        blankRows: 1,
+        cols: [
+          { key: '序号', label: '序号', hiddenCol: true, w: 60 },
+          { key: '子批次', label: '子批次', w: 170, ro: true },
+          { key: '流程卡', label: '流程卡', w: 190, type: 'file' },
+          { key: '配料表', label: '配料表', w: 190, type: 'file' },
+          { key: '异常情况描述', label: '异常情况描述', w: 240, area: true },
+        ],
+      },
+    ],
+  },
   RD_ALKALINE: {
     /** 文档编号这格走「左右双源」选择(2026-10-29):左=立项申请项目编号,右=测试申请单单据编号。
      *  声明的是**哪个字段**用双源弹窗,不是面板码写死 —— 别的记录表要挂测试申请单,加这一行即可。 */
