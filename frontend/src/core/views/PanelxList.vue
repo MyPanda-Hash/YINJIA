@@ -2915,6 +2915,9 @@ import RecordSheetPanels from './RecordSheetPanels.vue'
 import { recordSheetConfigs } from './recordSheetConfigs'
 // 单据预览卡片的摘要口径（2026-11-11）：按面板挑「最主要的信息」，纯函数 + 单测
 import { previewLineText, previewSummaryOf } from '@core/panel/docPreview.js'
+// 列表按单号定位的公共口径（2026-11-20）：单号键序 编号→单据编号→锭号、预览下标换页码。
+// load() 的 ?focus= 深链与「预览点跳转」的 focus 消费共用，纯函数 + 单测见 docFocus.test.js
+import { docNoOf, findDocIndex, pageOfPreviewIndex } from '@core/panel/docFocus.js'
 import { missingKeyFromMessage } from './recordSheetFocus'
 // 产品变更申请表：会签人填本部门行 / 管理员终审的纯判断（单测见 changeCosign.test.js）
 import {
@@ -5179,13 +5182,22 @@ async function closeApprovalPreview() {
  *   与 gotoDocNo / 派发后的跳转保持同一套写法。
  */
 async function jumpToApprovalDoc(row) {
-  const no = String(row?.['单据编号'] || '').trim()
+  // 单号键序统一走 core/panel/docFocus（编号 → 单据编号 → 锭号）：
+  //   产品信息表的 group_col 是「单据编号」，历史面板可能只有 编号/锭号 ——
+  //   别让「跳转」因为取错键拿到空单号而静默不跳。
+  const no = docNoOf(row)
   // 2026-11-19 用户报障：「跳转对应单据功能不对」——
   //   原来写死 /panelx/list/RD_APPROVAL，产品信息表点「跳转」会跑到立项申请列表。
   //   现在跳**当前面板**并带 ?focus=单号（focus 定位逻辑见 load() 里的 route.query.focus）。
+  // 2026-11-20 用户报障：「跳转回到第一张草稿」——
+  //   关闭浮层会还原 pageSize（200 → 分页大小）并 load 一次；随后的 router.push 同 path
+  //   只改 query，组件不重挂、load 不重跑 ⇒ ?focus= 从来没被消费，curIdx 停在 0。
+  //   这里**先**记下目标在预览列表（200 条一页取全）里的下标，关浮层后再由
+  //   watch(route.query.focus) → consumeFocusQuery() 消费：还原分页后靠这个下标换算页码。
+  previewFocusHint = { no, index: no ? findDocIndex(list.value, no) : -1 }
   await closeApprovalPreview()
   if (!no) return
-  router.push({ path: `/panelx/list/${panelCode.value}`, query: { focus: no } })
+  router.push({ path: `/panelx/list/${panelCode.value}`, query: { ...route.query, focus: no } })
 }
 
 /** 返回：恢复右侧操作栏（操作按钮原样回来） */
@@ -5194,6 +5206,15 @@ function closeSidePreview() {
   previewKw.value = ''
 }
 let previewPrevPageSize = null
+/**
+ * 「预览浮层里点跳转」记下的目标在**预览列表**（pageSize=200 一页取全）里的下标。
+ *
+ * <p>关闭浮层会把 pageSize 还原成分页大小（通常 20），同一张单在还原后的列表里可能落到
+ * 第 2 页以后 —— 只按"当前 list"找会找不到，用户看到的仍是第一张草稿。consumeFocusQuery
+ * 用这个下标换算目标页码。只在 jumpToApprovalDoc → consumeFocusQuery 之间有效，消费完即清空；
+ * no 对不上（期间又跳了别的单）时按无提示处理（回第 1 页），不会把两张单的定位串在一起。</p>
+ */
+let previewFocusHint = { no: '', index: -1 }
 /**
  * 摘要内容 = 纯函数 core/panel/docPreview.js 的口径（2026-11-11 用户口径：
  * 「立项申请的单据预览做成和销售订单左侧栏类似，显示最主要的信息方便去查找对应单据」）：
@@ -13659,7 +13680,12 @@ async function onScanApply(payload) {
   ElMessage.success('识别数据已填入草稿，请核对后保存')
 }
 
+/** 当前 list 属于哪个面板（load 成功时落账；切面板清空 list 时归零）。见 consumeFocusQuery 的时序闸门 */
+let loadedPanelCode = ''
+
 async function load(clamping = false) {
+  // 本次取数对应的面板码：响应回来时若已切走面板，不能把"新面板的 list 已就绪"记错
+  const loadCode = String(panelCode.value)
   delMode.value = false
   delSel.value = []
   archPage.value = 1 // 档案分页随每次载入回到首页
@@ -13690,7 +13716,7 @@ async function load(clamping = false) {
   loading.value = true
   try {
     loadReportTemplates() // 服务端报表入口(该面板有模板才显示;不阻塞列表)
-    const params = { panelCode: panelCode.value, condition: { ...condition }, pageNo: query.pageNo, pageSize: query.pageSize }
+    const params = { panelCode: loadCode, condition: { ...condition }, pageNo: query.pageNo, pageSize: query.pageSize }
     // 供应商门户(2026-10-25):供应商账号看采购订单时,取数**强制**带本供应商编码。
     // 服务端 QueryService 把它解析成 `供应商编码 LIKE 值` 并 AND 进 WHERE(与「查询」弹窗里
     // 选供应商同一口径),页面版式/交互与采购订单面板完全一致,只有数据范围不同。
@@ -13729,6 +13755,9 @@ async function load(clamping = false) {
     reportSums.value = reportMode.value && res && res.sums && typeof res.sums === 'object' ? res.sums : null
     list.value = res.list || []
     total.value = res.totalSize || 0
+    // focus 消费的时序闸门：只有"当前 list 确实属于当前面板"时才让 watch 抢跑消费；
+    // 切面板的深链继续由 panelCode watcher 那趟 load() 消费（详见 consumeFocusQuery 注释）
+    if (String(panelCode.value) === loadCode) loadedPanelCode = loadCode
     // 档案「改动行提交」基线:载入即快照,保存只发改动行(见 archiveBaseline 注释)
     snapshotArchiveBaseline()
     // 页码越界自愈(末页删单/换每页条数/筛选后页码残留):回落到最后一页重取,避免空白页与页码错乱
@@ -13746,7 +13775,9 @@ async function load(clamping = false) {
     //   用户以为单子丢了。只回退一次（第二趟 railStatusTab 已是 all，不会来回跳）。
     const focus = route.query.focus
     if (focus) {
-      const fi = list.value.findIndex((r) => (r['编号'] || r['单据编号'] || r['锭号']) === String(focus))
+      // 单号键序统一走 core/panel/docFocus（编号 → 单据编号 → 锭号），
+      // 与「预览点跳转」的 focus 消费同一套，避免两处各写一份慢慢漂移。
+      const fi = findDocIndex(list.value, String(focus))
       if (fi < 0 && railStatusTabs.value.length && railStatusTab.value !== 'all') {
         railStatusTab.value = 'all'
         query.pageNo = 1
@@ -13918,6 +13949,9 @@ watch(
     // 拆除顺序(2026-09-28):先清行、再清配置 —— 若在仍挂着旧行数据时清 gridTabs,
     // el-table 每删一列都会对全部行重渲染一次(O(列×行),宽表拆除的主长帧来源之一)。
     list.value = []
+    // list 已经不属于这个面板了：focus watcher 的闸门先关掉，深链交给下面这趟 load() 消费
+    // （否则它会抢在"清空之后、重载之前"用旧/空列表消费掉 ?focus=，目标单据就丢了）
+    loadedPanelCode = ''
     total.value = 0
     reportSums.value = null // 整段合计属于上一个面板的查询条件,切面板先清掉(防串味)
     cfgCache.value = null
@@ -13990,6 +14024,61 @@ watch(
   (v) => {
     if (!v || Date.now() - lastDocJumpAt < 400) return
     if (applyDocNoQuery()) load()
+  }
+)
+
+/**
+ * 消费 URL 上的 `?focus=单号`（2026-11-20 用户报障：「立项查询」里点跳转回到第一张草稿）。
+ *
+ * <p>时序（报障根因）：预览浮层里点行/「跳转」→ jumpToApprovalDoc 先
+ * {@link closeApprovalPreview}（还原 pageSize 并 load 一次），再 `router.push` 到**同一 path**
+ * 只改 query —— 组件不重挂、panelCode 不变，load **不会再跑**，于是 load() 里那段 focus 定位
+ * 永远轮不到，curIdx 停在 0，看起来就是"回到第一张草稿"。所以同 path 的 focus 必须由
+ * 这条 watch 消费（外部带 ?focus= 进来的深链仍走 load()，两条入口共用同一套键序/定位）。</p>
+ *
+ * <p>定位顺序：① 当前 list 里按 编号/单据编号/锭号 找，命中就 curIdx=下标（不再取数）；
+ * ② 没命中（关闭浮层已把 pageSize 从 200 还原、目标落在后面的页 / 被页签挡住 / keep-alive
+ * 复用的旧列表）⇒ 按 jumpToApprovalDoc 记下的预览下标换算页码、必要时切「全部」页签，
+ * 然后 **load() 一次**（load 里的 focus 段会再定位一次并摘 query）；③ 最后 replace 摘掉 focus，
+ * 避免后退回来又跳一次。整段最多一次 load，route.query.focus 被清后本 watch 不再触发 ⇒ 幂等。</p>
+ *
+ * <p>与切面板深链不打架：panelCode watcher 会先清空 list（并把 loadedPanelCode 归零），
+ * 那条深链由它自己那趟 load() 消费；这里用 loadedPanelCode 闸门主动让路，不抢跑、不白 load。</p>
+ */
+let focusConsuming = false
+async function consumeFocusQuery(no) {
+  const key = String(no || '').trim()
+  if (!key || focusConsuming) return
+  focusConsuming = true
+  try {
+    let fi = findDocIndex(list.value, key)
+    if (fi < 0) {
+      // 目标不在当前 list：被「未完成/已完成」页签挡住时就回退「全部」（与 load() 的深链口径一致）
+      if (railStatusTabs.value.length && railStatusTab.value !== 'all') railStatusTab.value = 'all'
+      // 预览列表是 pageSize=200 一页取全，关闭浮层后分页已还原 ⇒ 用记下的下标换算目标页码；
+      // no 对不上（期间跳了别的单）或没有提示时回第 1 页，绝不把两张单的定位串在一起。
+      const page = pageOfPreviewIndex(previewFocusHint.no === key ? previewFocusHint.index : -1, query.pageSize)
+      if (page !== query.pageNo) query.pageNo = page
+      await load()
+      fi = findDocIndex(list.value, key)
+    }
+    if (fi >= 0) curIdx.value = fi
+    // 定位结束就摘掉 focus（不论是否命中）：否则后退/刷新回来会再跳一次，且 URL 长期留脏参数。
+    // load() 里若有消费会先 replace 一次，这里用 route.query.focus 判空避免重复导航。
+    if (route.query.focus) router.replace({ path: route.path, query: { ...route.query, focus: undefined } })
+  } finally {
+    previewFocusHint = { no: '', index: -1 }
+    focusConsuming = false
+  }
+}
+watch(
+  () => route.query.focus,
+  (v) => {
+    if (!v) return
+    // 切面板的深链由 panelCode watcher 的 load() 消费（它已把 list 清空并归零 loadedPanelCode）；
+    // 这里抢跑只会在旧/空列表上白找一趟，所以让路。
+    if (loadedPanelCode !== String(panelCode.value)) return
+    consumeFocusQuery(v)
   }
 )
 
