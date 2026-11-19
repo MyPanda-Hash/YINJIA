@@ -140,8 +140,8 @@
                   v-else-if="editable && isRefKey(f.key)" class="as-ref-ctl sg-info-ref"
                   :title="tt('点击选择')" @click="openProdRef(f.key)"
                 >
+                  <span v-if="custCodeOf(f.key)" class="as-ref-code is-prefix">{{ custCodeOf(f.key) }}</span>
                   <span class="as-ref-text">{{ head[f.key] || tt('点击选择') }}</span>
-                  <span v-if="custCodeOf(f.key)" class="as-ref-code">{{ custCodeOf(f.key) }}</span>
                   <el-icon class="as-ref-ico"><Search /></el-icon>
                 </div>
                 <!-- 手填新客户（2026-11-18，Excel #10）：参照选择之外再给一条"档案里没有"的路 -->
@@ -363,8 +363,8 @@
                     </div>
                   </template>
                   <div v-else-if="editable && isRefKey(c.key)" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
+                    <span v-if="custCodeOf(c.key)" class="as-ref-code is-prefix">{{ custCodeOf(c.key) }}</span>
                     <span class="as-ref-text">{{ head[c.key] || tt('点击选择') }}</span>
-                    <span v-if="custCodeOf(c.key)" class="as-ref-code">{{ custCodeOf(c.key) }}</span>
                     <el-icon class="as-ref-ico"><Search /></el-icon>
                   </div>
                   <el-date-picker
@@ -2102,6 +2102,9 @@ defineExpose({ focusField })
   text-align: right;
 }
 .as-ref-code { margin-left: 6px; font-size: 12px; color: #8c8c8c; font-variant-numeric: tabular-nums; }
+/* 2026-11-19 销售问题汇总 P16：「增加客户编码，所以就是客户编码+客户名字」⇒ 编号放**前面**，
+   与客户名同一行显示成「A-60 欧科塑胶制品(深圳)有限公司」 */
+.as-ref-code.is-prefix { margin-left: 0; margin-right: 6px; color: #595959; }
 .as-ref-text.is-empty { color: #a8b6c4; }   /* 空值时的背景提示词,与 input placeholder 同观感 */
 .as-ref-ico {
   flex-shrink: 0;
