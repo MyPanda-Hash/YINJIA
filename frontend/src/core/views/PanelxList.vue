@@ -2559,7 +2559,7 @@
       :owner-key="previewOwnerKey"
       :subject="previewSubject"
       :panel-code="String(panelCode || '')"
-      @close="approvalPreviewOpen = false"
+      @close="closeApprovalPreview"
       @jump="jumpToApprovalDoc"
     />
     <!-- 检验项目/检验方案(2026-10-09 **合并口径**):三类工序检验单(成型/切炭/组装成品)工具栏**唯一**入口 ——
@@ -5110,15 +5110,35 @@ async function openApprovalPreview() {
 }
 
 /**
+ * 关闭全屏预览（2026-11-19 用户报障：「单据预览的查询的数据不对」）：
+ * 打开时把 pageSize 拉到 200 一次取全，**关闭必须还原**并重新取数 ——
+ * 原来只把 open 置 false，分页/查询条件就永久停在"取 200 条、第 1 页"的状态，
+ * 用户再点查询看到的结果与分页都不对（正是这个报障）。
+ */
+async function closeApprovalPreview() {
+  approvalPreviewOpen.value = false
+  if (previewPrevPageSize !== null) {
+    query.pageSize = previewPrevPageSize
+    previewPrevPageSize = null
+  }
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+}
+
+/**
  * 浮层里点「跳转」= 回到本面板并定位到那张单（?focus=单号）。
  * ⚠ 用 focus 而不是 docNo：本面板走列表式定位（applyDocNoQuery 那条是 RD_SPEC_DOC 的深链口径），
  *   与 gotoDocNo / 派发后的跳转保持同一套写法。
  */
-function jumpToApprovalDoc(row) {
+async function jumpToApprovalDoc(row) {
   const no = String(row?.['单据编号'] || '').trim()
-  approvalPreviewOpen.value = false
+  // 2026-11-19 用户报障：「跳转对应单据功能不对」——
+  //   原来写死 /panelx/list/RD_APPROVAL，产品信息表点「跳转」会跑到立项申请列表。
+  //   现在跳**当前面板**并带 ?focus=单号（focus 定位逻辑见 load() 里的 route.query.focus）。
+  await closeApprovalPreview()
   if (!no) return
-  router.push({ path: '/panelx/list/RD_APPROVAL', query: { focus: no } })
+  router.push({ path: `/panelx/list/${panelCode.value}`, query: { focus: no } })
 }
 
 /** 返回：恢复右侧操作栏（操作按钮原样回来） */
