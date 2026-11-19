@@ -9,13 +9,44 @@
       <el-input v-model="head['单据编号']" class="sme-no" readonly size="small" placeholder="单据编号" />
       <el-date-picker v-model="head['单据日期']" type="date" value-format="YYYY-MM-DD" size="small" class="sme-date" :clearable="false" />
       <el-button size="small" @click="createNew">{{ tt('新增') }}</el-button>
-      <el-select v-model="openNo" class="sme-open" size="small" clearable filterable :placeholder="tt('打开已有单据')" @change="openDoc">
-        <el-option v-for="d in docList" :key="d.单据编号" :label="`${d.单据编号}${d['材料名'] ? ' · ' + d['材料名'] : ''}`" :value="d.单据编号" />
-      </el-select>
+      <el-button size="small" @click="openDrawer">{{ tt('打开已有单据') }}</el-button>
       <el-button size="small" type="primary" :loading="saving" @click="save">{{ tt('保存') }}</el-button>
       <el-button size="small" :disabled="!head['单据编号']" @click="removeDoc">{{ tt('删除') }}</el-button>
       <span class="sme-tip">{{ tt('子批次自动生成，最少 1 行最多 10 行') }}</span>
     </div>
+
+    <!-- 打开已有单据 = 右侧抽屉（2026-11-19 用户口径：「做成侧边栏打开，侧边栏用设计库重新一遍」）
+         设计口径（antd 设计库）：卡片 0 层用边框不用阴影、圆角 6、控件高 32、正文 14/22、
+         间距 8 的倍数；列表行 hover 高亮、当前单左侧色条。 -->
+    <el-drawer v-model="drawerOpen" :title="tt('打开已有单据')" direction="rtl" size="440px" append-to-body>
+      <div class="smd-bar">
+        <el-input v-model="drawerKw" size="default" clearable :placeholder="tt('模糊搜索：单号 / 材料名 / 主批次')" />
+        <el-button type="primary" @click="loadDrawerDocs">{{ tt('查找') }}</el-button>
+      </div>
+      <div class="smd-count">{{ tt('共') }} {{ drawerTotal }} {{ tt('条') }}</div>
+      <div class="smd-list">
+        <div
+          v-for="d in drawerList" :key="d.单据编号"
+          class="smd-item" :class="{ on: d.单据编号 === head['单据编号'] }"
+          @click="pickDoc(d.单据编号)"
+        >
+          <div class="smd-line1">
+            <span class="smd-no">{{ d.单据编号 }}</span>
+            <span class="smd-date">{{ d.单据日期 || '' }}</span>
+          </div>
+          <div class="smd-line2">
+            <span class="smd-material">{{ d['材料名'] || tt('（未填材料名）') }}</span>
+            <span class="smd-batch">{{ d['主批次'] || '—' }}</span>
+          </div>
+        </div>
+        <div v-if="!drawerList.length" class="smd-empty">{{ tt('没有符合条件的单据') }}</div>
+      </div>
+      <div class="smd-pager">
+        <el-button size="small" :disabled="drawerPage <= 1" @click="drawerPage--, loadDrawerDocs()">{{ tt('上一页') }}</el-button>
+        <span>{{ drawerPage }} / {{ drawerPages }}</span>
+        <el-button size="small" :disabled="drawerPage >= drawerPages" @click="drawerPage++, loadDrawerDocs()">{{ tt('下一页') }}</el-button>
+      </div>
+    </el-drawer>
 
     <table class="sme-table">
       <colgroup>
@@ -144,7 +175,7 @@ async function save() {
     const res = await request.post('/px/callButton', { panelCode: 'RD_SELFMADE', buttonName: '保存', formData: payload, buttonParam: {} })
     const no = res?.data?.编号 || head['单据编号']
     await load(no)   // 重新拉取拿回行 id（附件格要靠 id 做锚点）
-    await fetchDocs()
+    if (drawerOpen.value) await loadDrawerDocs()
     ElMessage.success(tt('已保存'))
   } catch (e) {
     ElMessage.error(tt('保存失败：') + (e?.response?.data?.message || e?.message || ''))
@@ -176,6 +207,33 @@ function printQr() {
   const w = window.open('', '_blank', 'width=420,height=520'); if (!w) return
   w.document.write(`<html><body style="text-align:center;font-family:sans-serif"><img src="${qr.dataUrl}" style="width:240px"/><div style="margin-top:8px">${qr.text}</div></body></html>`)
   w.document.close(); w.focus(); w.print()
+}
+
+/* ── 打开已有单据：右侧抽屉（模糊搜索 + 分页）── */
+const drawerOpen = ref(false)
+const drawerKw = ref('')
+const drawerPage = ref(1)
+const drawerPageSize = 20
+const drawerList = ref([])
+const drawerTotal = ref(0)
+const drawerPages = computed(() => Math.max(1, Math.ceil(drawerTotal.value / drawerPageSize)))
+
+function openDrawer() { drawerOpen.value = true; drawerPage.value = 1; loadDrawerDocs() }
+
+async function loadDrawerDocs() {
+  try {
+    const res = await request.post('/px/queryFormDataList', {
+      panelCode: 'RD_SELFMADE', keyword: drawerKw.value, pageNo: drawerPage.value, pageSize: drawerPageSize,
+    })
+    const d = res?.data || {}
+    drawerList.value = d.list || []
+    drawerTotal.value = Number(d.total || (d.list || []).length)
+  } catch (e) { drawerList.value = []; drawerTotal.value = 0 }
+}
+
+async function pickDoc(no) {
+  await load(no)
+  drawerOpen.value = false
 }
 
 /** 读最近单据列表（供「打开已有单据」下拉；不改当前编辑中的单） */
@@ -211,7 +269,22 @@ onMounted(async () => {
 .sme-qr-ops { margin-top: 2px; }
 .sme-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
 .sme-no { width: 190px; }
-.sme-open { width: 220px; } .sme-date { width: 150px; }
+.smd-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+.smd-count { font-size: 12px; color: #8c8c8c; margin-bottom: 8px; }
+.smd-list { border: 1px solid #f0f0f0; border-radius: 6px; overflow: hidden; }
+.smd-item { padding: 10px 16px; border-bottom: 1px solid #f0f0f0; cursor: pointer; position: relative; }
+.smd-item:last-child { border-bottom: none; }
+.smd-item:hover { background: #fafafa; }
+.smd-item.on { background: #f5f9ff; }
+.smd-item.on::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #1677ff; }
+.smd-line1 { display: flex; justify-content: space-between; align-items: baseline; }
+.smd-no { font-size: 14px; color: #1f1f1f; font-weight: 500; font-variant-numeric: tabular-nums; }
+.smd-date { font-size: 12px; color: #8c8c8c; }
+.smd-line2 { display: flex; justify-content: space-between; margin-top: 2px; }
+.smd-material { font-size: 13px; color: #595959; }
+.smd-batch { font-size: 13px; color: #1f1f1f; font-variant-numeric: tabular-nums; }
+.smd-empty { padding: 32px 16px; text-align: center; color: #8c8c8c; font-size: 14px; }
+.smd-pager { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 12px; font-size: 13px; color: #595959; } .sme-date { width: 150px; }
 .sme-tip { font-size: 12px; color: #909399; }
 .sme-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .sme-table th, .sme-table td { border: 1px solid #8a8a8a; padding: 4px 6px; font-size: 13px; vertical-align: middle; }
