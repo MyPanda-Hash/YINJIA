@@ -9,7 +9,10 @@
          公司名格 | 编号格的**分列照设计原表**:功能性滤效 B2:J2 公司名(9 列)+ K2:L2 编号(2 列),
          列宽(pt,见设计 dump 的 B..L:26.25/13.63/11.25/14.5/12.63/13.63/14.38/15.63/17 | 18.13/20)
          ⇒ 公司名格 138.9 : 编号格 38.13 = 78.46% : 21.54%(原来写死 300px ≈ 25.4%,竖线偏右)。
-         编号格里是**裸编号**("YJ-PD-01",无「编号：」前缀),与设计原值一致 ⇒ 不加前缀标识。 -->
+         编号格（2026-11-20 用户口径「所有数据记录表右上角加一个项目编号前缀，现在只是直接引用编号
+         但是没有前缀标识」）：前缀「项目编号：」只是**展示标签**（12px/#595959/#margin-right 2px，
+         与 RecordSheetPanels 的 .rs-docno-pre 同款），不进 head、不改取数/保存/打印逻辑。
+         上一轮漏了这张，因为它是**手写纸面**、没走 RecordSheetPanels 的模板。 -->
     <table class="rs-t rs-head-t">
       <colgroup><col style="width:78.46%" /><col style="width:21.54%" /></colgroup>
       <tbody>
@@ -19,6 +22,9 @@
             <!-- 文档编号:配置为参照时(数据记录表→立项申请右上角编号)点击弹参照;否则保持纯输入。
                  2026-10-29 用户口径「选择编号的弹窗改为左右两边,左边还是立项申请的项目编号关联,
                  右边加入测试申请单的单据编号」⇒ 数据记录表这格走**左右双源**弹窗。 -->
+            <!-- 2026-11-20 用户口径：前缀是**展示标签**，与其它 8 张数据记录表同款；
+                 打印态照常显示（不要加 .no-print、也不要进 @media print 的隐藏名单）。 -->
+            <span class="rs-docno-pre">{{ tt('项目编号') }}：</span>
             <div v-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openDocNoPick">
               <span class="rs-ref-text">{{ head['文档编号'] || tt('点击选择') }}</span>
               <el-icon class="rs-ref-ico"><Search /></el-icon>
@@ -833,6 +839,13 @@ function removeRow(i) {
   font-size: 14px;
   padding: 6px 14px !important;
   vertical-align: middle;
+}
+/* 编号格标签前缀(2026-11-20 用户口径「所有数据记录表右上角加一个项目编号前缀」):
+   与 RecordSheetPanels 的 .rs-docno-pre **同款**(两处值不许各自漂);纯展示,打印态照常显示。 */
+.rs-docno-pre {
+  font-size: 12px;
+  color: #595959;
+  margin-right: 2px;
 }
 .rs-docno-text {
   display: inline-block;
