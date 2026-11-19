@@ -1952,6 +1952,36 @@ defineExpose({ focusField })
 }
 /* 输入控件去边框:保持原版表格线条(编辑/聚焦均无提示线) */
 .approval-sheet :deep(.el-input__wrapper),
+/**
+ * 纸面下拉内容过长导致**被覆盖/截断**（2026-11-19 用户报障：X烧结配方工艺管控清单的
+ * 「产品形态」等标准库下拉，长选项如「外PP棉+炭棒」后半截被裁）。
+ * 与 RecordSheetPanels 同一口径：选中项允许折行，控件高度随内容走；
+ * 打印时同样折行（否则纸上仍是省略号）。
+ */
+.approval-sheet :deep(.el-select__selected-item),
+.approval-sheet :deep(.el-select__placeholder) {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 18px;
+  word-break: break-all;
+}
+.approval-sheet :deep(.el-select__wrapper) {
+  height: auto;
+  min-height: 28px;
+  align-items: flex-start;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+@media print {
+  .approval-sheet :deep(.el-select__selected-item),
+  .approval-sheet :deep(.el-select__placeholder) {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+  .approval-sheet :deep(.el-select__wrapper) { height: auto !important; min-height: 0 !important; }
+}
 .approval-sheet :deep(.el-select__wrapper),
 .approval-sheet :deep(.el-input__wrapper.is-focus),
 .approval-sheet :deep(.el-select__wrapper.is-focused),
