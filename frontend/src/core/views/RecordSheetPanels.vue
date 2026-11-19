@@ -5723,6 +5723,35 @@ body.approval-printing .rs-mold-pick { display: none !important; }
 }
 .rs-focus :deep(.el-input__wrapper),
 .rs-focus :deep(.el-textarea__inner),
+/**
+ * 下拉框内容**自动换行**（2026-11-19 用户报障：炭棒工艺管控清单的「烧结炉参数 /
+ * 烧结时间·调速器参数 / 冷却参数设置 / 密度管控」这些标准库下拉，选项文字较长，
+ * 单行显示会把后半截**盖住**）：
+ *   el-select 默认 nowrap + ellipsis；这里把选中项改成可换行、外层高度随内容走。
+ * 只作用于纸面内的下拉（.rs-t / .rsp-sheet），不影响表单页与列表页的普通下拉。
+ */
+.rs-t :deep(.el-select__selected-item),
+.rsp-sheet :deep(.el-select__selected-item) {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 18px;
+  word-break: break-all;
+}
+.rs-t :deep(.el-select__wrapper),
+.rsp-sheet :deep(.el-select__wrapper) {
+  height: auto;
+  min-height: 28px;
+  align-items: flex-start;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+.rs-t :deep(.el-select__placeholder),
+.rsp-sheet :deep(.el-select__placeholder) {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+}
 .rs-focus :deep(.el-select__wrapper) {
   box-shadow: 0 0 0 1px #f56c6c inset;
 }
