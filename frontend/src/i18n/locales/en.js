@@ -5458,6 +5458,7 @@ export default {
     '材料与批次': 'Material and batch',
     '子批次明细': 'Sub-batch details',
     '银嘉自制功能材料制程记录': 'YINJIA in-house functional material process record',
+    '仅记录文件名，原文件未入库': 'Only the file name was recorded; the original file is not in the system',
     /* ── 研发管理·样品 → 手填客户（建档打标记）2026-11-18 ── */
     '删除后需要重新填写。': 'It will need to be filled in again.',
 

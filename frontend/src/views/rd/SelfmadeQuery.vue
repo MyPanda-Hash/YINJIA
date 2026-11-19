@@ -31,11 +31,10 @@
         <el-table-column prop="主批次" :label="tt('主批次')" width="130" />
         <el-table-column prop="子批次" :label="tt('子批次')" width="140" />
         <!-- 附件格可点开预览（2026-11-19 用户口径）：只读 FileAttachCell。
-             附件清单由后端 selfmadeRows 统一解析（行锚点 → 文件名 → 字段名三级兜底），
-             前端不再自己猜锚点 —— 历史单据的上传锚点可能不是 字段-明细id，精确查会查空、
-             FileAttachCell 就只剩“历史文件名”纯文本，点不开。点击 chip = openAttachmentPreview
-             （FileAttachCell 内部复用 core/panel/attachmentPreview），可预览/下载。
-             没有附件时显示「—」，与 Excel 一致。 -->
+             附件清单由后端 selfmadeRows 统一解析（行 id 本单/跨单 → 序号 → 文件名 → 字段名单行兜底），
+             前端不再自己猜锚点 —— 历史单据保存换号后，附件可能还挂在旧单号下。
+             清单为空但列里存着文件名时，**保留文件名文本**（2026-11-20 用户报障：不能把已有信息藏成「—」），
+             点击提示「仅记录文件名，原文件未入库」；真没有才显示「—」。 -->
         <el-table-column :label="tt('流程卡')" width="150">
           <template #default="{ row }">
             <FileAttachCell
@@ -43,6 +42,10 @@
               :field-key="row['明细id'] ? `流程卡-${row['明细id']}` : '流程卡'" :attachments="attachList(row, '流程卡')"
               :can-edit="false"
             />
+            <span
+              v-else-if="legacyText(row, '流程卡')" class="smq-file smq-legacy"
+              @click="showLegacyOnly(row, '流程卡')"
+            >{{ legacyText(row, '流程卡') }}</span>
             <span v-else class="smq-file">—</span>
           </template>
         </el-table-column>
@@ -53,6 +56,10 @@
               :field-key="row['明细id'] ? `配料表-${row['明细id']}` : '配料表'" :attachments="attachList(row, '配料表')"
               :can-edit="false"
             />
+            <span
+              v-else-if="legacyText(row, '配料表')" class="smq-file smq-legacy"
+              @click="showLegacyOnly(row, '配料表')"
+            >{{ legacyText(row, '配料表') }}</span>
             <span v-else class="smq-file">—</span>
           </template>
         </el-table-column>
@@ -84,6 +91,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import request from '@/core/request'
 import QRCode from 'qrcode'
@@ -97,12 +105,30 @@ const q = reactive({ name: '', batchFrom: '', batchTo: '', field: '主批次', k
 const qr = reactive({ open: false, dataUrl: '', text: '' })
 
 /**
- * 查询页附件清单（后端 selfmadeRows 已按「行锚点 → 文件名 → 字段名」三级兜底解析好）。
- * 键 = 字段名 + '附件'；没有清单时返回空数组（模板显示「—」，不再退化成不可点文本）。
+ * 查询页附件清单（后端 selfmadeRows 已按「行 id 本单/跨单 → 序号 → 文件名 → 字段名」解析好）。
+ * 键 = 字段名 + '附件'；没有清单时返回空数组。
  */
 function attachList(row, field) {
   const list = row?.[`${field}附件`]
   return Array.isArray(list) ? list : []
+}
+/**
+ * 列里存的文件名文本（2026-11-20 用户报障）：
+ * 附件行没解析出来时，**不能把列里已有的文件名也藏成「—」** —— 保留文本至少让人知道上传过什么；
+ * 点击由 showLegacyOnly 提示「仅记录文件名，原文件未入库」。
+ */
+function legacyText(row, field) {
+  if (attachList(row, field).length) return ''
+  return String(row?.[field] || '').trim()
+}
+/** legacy 文本点击：说明只有文件名、原文件没入库（不假装能预览） */
+function showLegacyOnly(row, field) {
+  const names = legacyText(row, field)
+  ElMessageBox.alert(
+    `${tt('仅记录文件名，原文件未入库')}：${names}`,
+    tt('提示'),
+    { type: 'info', confirmButtonText: tt('知道了') },
+  )
 }
 /** 导出/展示用：优先用解析出的真实附件名，旧数据没有清单时退回表内文件名串 */
 function fileNamesOf(row, field) {
@@ -194,6 +220,9 @@ onMounted(load)
 .smq-denied { padding: 24px; text-align: center; color: #909399; }
 .smq-empty { margin: 16px 0 0; text-align: center; color: #909399; font-size: 13px; }
 .smq-file { font-size: 12px; color: #909399; }
+/* legacy 文件名：可点，但只给提示（原文件没入库，不能假装可预览） */
+.smq-legacy { color: #1d6fd1; cursor: pointer; text-decoration: underline dotted; word-break: break-all; }
+.smq-legacy:hover { color: #0a58ca; }
 .smq-qr { text-align: center; }
 .smq-qr-img { width: 200px; height: 200px; }
 .smq-qr-text { margin: 8px 0 0; font-size: 13px; color: #222; }

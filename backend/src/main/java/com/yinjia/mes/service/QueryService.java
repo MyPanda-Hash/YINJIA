@@ -194,7 +194,7 @@ public class QueryService {
      */
     public List<java.util.Map<String, Object>> selfmadeRows(String name, String batchFrom, String batchTo, String field, String keyword) {
         StringBuilder sql = new StringBuilder(
-                "SELECT ISNULL(CAST(d.id AS varchar(20)), '') AS 明细id, h.[单据编号], ISNULL(h.[材料名], N'') AS 材料名, ISNULL(h.[主批次], N'') AS 主批次, "
+                "SELECT ISNULL(CAST(d.id AS varchar(20)), '') AS 明细id, ISNULL(d.[序号], N'') AS 序号, h.[单据编号], ISNULL(h.[材料名], N'') AS 材料名, ISNULL(h.[主批次], N'') AS 主批次, "
               + "ISNULL(d.[子批次], N'') AS 子批次, ISNULL(d.[流程卡], N'') AS 流程卡, "
               + "ISNULL(d.[配料表], N'') AS 配料表, ISNULL(d.[异常情况描述], N'') AS 异常情况描述, "
               + "ISNULL(h.[录入人], N'') AS 录入人, ISNULL(CONVERT(varchar(10), h.[单据日期], 23), '') AS 录入日期 "
@@ -222,6 +222,7 @@ public class QueryService {
         java.util.List<java.util.Map<String, Object>> rows = jdbc.query(sql.toString(), (rs, i) -> {
             java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
             row.put("明细id", rs.getString("明细id"));
+            row.put("序号", rs.getString("序号"));
             row.put("单据编号", rs.getString("单据编号"));
             row.put("材料名", rs.getString("材料名"));
             row.put("主批次", rs.getString("主批次"));
@@ -238,12 +239,22 @@ public class QueryService {
     }
 
     /**
-     * 查询页的附件清单（2026-11-19 用户报障「流程卡/配料表只显示文件名文本、点击打不开」）：
-     * <p>根因不是附件没上传，而是**锚点对不上** —— 查询页原先拿 `字段-明细id` 去 /attachment/list
-     * 精确查，历史数据的 field_key 可能是字段名本身（早期）或旧的明细行 id（行重排/重建过），
-     * 查空以后 FileAttachCell 只剩 modelValue 里的「历史文件名」纯文本（.fac-legacy），点不开。
-     * <p>改成**后端统一解析**：一次批量取出本页单据的全部附件，再逐行按三级兜底匹配，
-     * 前端只渲染返回的清单，不再自己猜锚点。
+     * 查询页的附件清单（2026-11-19 用户报障「流程卡/配料表只显示文件名文本、点击打不开」；
+     * 2026-11-20 生产库复核后修正根因）：
+     * <p>根因不是"附件没上传"，也不只是"锚点前缀写错" —— 是**单号变了**：
+     * 自制料录入页保存时载荷只带「单据编号」、没带后端 save() 读取的「编号」，
+     * 后端每次都当新建单 ⇒ 另开一张头表单号（如 ZL-…-0002），并把带 id 的明细行
+     * **改挂到新单号**下；而附件仍留在上传当时的旧单号（如 ZL-…-0001）下。
+     * 于是查询页拿本页单号去精确查附件，查空 ⇒ 显示「—」。
+     * <p>实测：附件 field_key 的数字段 = **明细行 id**（不是序号；0005 的 8..11 与
+     * 序号 1..4 对不上），所以「字段名-序号」不能替代行 id。
+     * <p>解析策略（每行按顺序，任一级命中即返回；全程一次批量查询、无 N+1）：
+     * <ol>
+     *   <li>① 字段名-明细行id：先本单，再**跨单**（明细行 id 全局唯一，换号后旧附件仍能命中）；</li>
+     *   <li>② 字段名-序号（本单）：用户口径里的旧锚点形态，兼容 序号 与 id 相同的历史数据；</li>
+     *   <li>③ 该单按 file_name 与列里存的文件名逐一匹配（列里可能是多文件、逗号/分号/冒号分隔）；</li>
+     *   <li>④ 同一单该字段名只有一组时直接取这组（仅单行单）。</li>
+     * </ol>
      * <p>返回元素与 {@code /attachment/list} 同构：id / fileName / fileSize / contentType /
      * uploader / uploadTime —— 可直接作为 FileAttachCell 的 attachments 入参。
      */
@@ -259,51 +270,93 @@ public class QueryService {
         }
         if (docNos.isEmpty()) return;
         String in = String.join(",", java.util.Collections.nCopies(docNos.size(), "?"));
+        // 候选池 = 本页单据的附件 + 本页明细行 id 锚点跨单命中的附件（EXISTS 按 d.id 匹配，
+        // 不把每行 id 当参数传，避免明细行多时超 SQL Server 2100 参数上限）。
+        // 2026-11-20 生产库实测：附件在 0001/0004、明细行已挪到 0002/0005，靠后半段才能命中。
         java.util.List<java.util.Map<String, Object>> files = jdbc.queryForList(
                 "SELECT a.id, a.doc_no AS docNo, a.field_key AS fieldKey, a.file_name AS fileName, "
               + "a.file_size AS fileSize, a.content_type AS contentType, a.asp_user1 AS uploader, "
               + "CONVERT(varchar(19), a.asp_time1, 120) AS uploadTime "
-              + "FROM yj_attachment a WHERE a.panel_code = N'RD_SELFMADE' AND a.doc_no IN (" + in + ") "
-              + "ORDER BY a.id", docNos.toArray());
-        java.util.Map<String, java.util.List<java.util.Map<String, Object>>> byDoc = new java.util.HashMap<>();
-        for (java.util.Map<String, Object> f : files) {
-            byDoc.computeIfAbsent(strOf(f.get("docNo")), k -> new java.util.ArrayList<>()).add(f);
-        }
+              + "FROM yj_attachment a WHERE a.panel_code = N'RD_SELFMADE' AND ("
+              + "a.doc_no IN (" + in + ") OR EXISTS (SELECT 1 FROM rd_selfmade_detail d "
+              + "WHERE d.[单据编号] IN (" + in + ") AND a.field_key IN ("
+              + "N'流程卡-' + CAST(d.id AS varchar(20)), N'配料表-' + CAST(d.id AS varchar(20))))) "
+              + "ORDER BY a.id", duplicateArgs(docNos));
         for (java.util.Map<String, Object> row : rows) {
             String no = strOf(row.get("单据编号"));
-            java.util.List<java.util.Map<String, Object>> docFiles =
-                    byDoc.getOrDefault(no, java.util.List.of());
             // 「字段名本身」这级兜底只对**单行单**开放：多行单的旧数据整单挂在同一个键下，
             // 逐行复制会把同一份文件贴到每一行（错行比空着更糟）。
             boolean singleRow = rowCountByDoc.getOrDefault(no, 0) == 1;
-            row.put("流程卡附件", pickSelfmadeFiles(docFiles, "流程卡", row.get("明细id"), row.get("流程卡"), singleRow));
-            row.put("配料表附件", pickSelfmadeFiles(docFiles, "配料表", row.get("明细id"), row.get("配料表"), singleRow));
+            row.put("流程卡附件", pickSelfmadeFiles(files, "流程卡", no, row.get("明细id"), row.get("序号"),
+                    row.get("流程卡"), singleRow));
+            row.put("配料表附件", pickSelfmadeFiles(files, "配料表", no, row.get("明细id"), row.get("序号"),
+                    row.get("配料表"), singleRow));
         }
     }
 
-    /** 单行附件匹配：① 字段-明细行id（现行锚点）→ ② 列里显示的文件名 → ③ 字段名本身（仅单行单）。 */
+    /** 同一批单号再排一遍（SQL 里 doc_no 与 EXISTS 子查询各要一份），保持参数顺序与占位符一致。 */
+    private static Object[] duplicateArgs(java.util.Collection<String> values) {
+        java.util.List<Object> args = new java.util.ArrayList<>(values.size() * 2);
+        args.addAll(values);
+        args.addAll(values);
+        return args.toArray();
+    }
+
+    /**
+     * 单行附件匹配：① 字段-明细行id（本单 → 跨单）→ ② 字段-序号（本单）→
+     * ③ 列内文件名（本单）→ ④ 字段名本身（仅单行单）。
+     */
     private java.util.List<java.util.Map<String, Object>> pickSelfmadeFiles(
-            java.util.List<java.util.Map<String, Object>> files, String baseKey, Object rowId, Object columnText,
-            boolean singleRow) {
+            java.util.List<java.util.Map<String, Object>> files, String baseKey, String docNo, Object rowId,
+            Object seq, Object columnText, boolean singleRow) {
         if (files.isEmpty()) return java.util.List.of();
         String id = strOf(rowId);
         if (!id.isEmpty()) {
             String anchor = baseKey + "-" + id;
-            java.util.List<java.util.Map<String, Object>> hit = files.stream()
-                    .filter(f -> anchor.equals(String.valueOf(f.get("fieldKey")))).toList();
+            // ①-a 本单；①-b 跨单：保存换号后附件仍挂在旧单号下，明细行 id 全局唯一所以不会串行
+            java.util.List<java.util.Map<String, Object>> hit = selfmadeHitByAnchor(files, anchor, docNo, true);
+            if (hit.isEmpty()) hit = selfmadeHitByAnchor(files, anchor, docNo, false);
+            if (!hit.isEmpty()) return selfmadeFilePayload(hit);
+        }
+        String seqText = strOf(seq).trim();
+        if (!seqText.isEmpty()) {
+            java.util.List<java.util.Map<String, Object>> hit =
+                    selfmadeHitByAnchor(files, baseKey + "-" + seqText, docNo, true);
             if (!hit.isEmpty()) return selfmadeFilePayload(hit);
         }
         java.util.Set<String> names = selfmadeFileNames(columnText);
         if (!names.isEmpty()) {
-            java.util.List<java.util.Map<String, Object>> hit = files.stream()
-                    .filter(f -> names.contains(strOf(f.get("fileName")))).toList();
+            // ③ 只在本单按文件名匹配：文件名（1.jpg / 2.jpg）跨单会重名，跨单贴错比空着更糟；
+            //    换号后的旧附件已由 ①-b 按明细行 id 精确命中，不需要再拿文件名跨单猜。
+            java.util.List<java.util.Map<String, Object>> hit = selfmadeHitByNames(files, names, docNo, true);
             if (!hit.isEmpty()) return selfmadeFilePayload(hit);
         }
-        // ③ 字段名本身：只在单行单兜底（多行单分不清是哪一行的，宁可空着也不贴错）
+        // ④ 字段名本身：只在单行单兜底（多行单分不清是哪一行的，宁可空着也不贴错）
         if (!singleRow) return java.util.List.of();
         java.util.List<java.util.Map<String, Object>> hit = files.stream()
-                .filter(f -> baseKey.equals(String.valueOf(f.get("fieldKey")))).toList();
+                .filter(f -> docNo.equals(strOf(f.get("docNo"))))
+                .filter(f -> baseKey.equals(String.valueOf(f.get("fieldKey"))))
+                .toList();
         return hit.isEmpty() ? java.util.List.of() : selfmadeFilePayload(hit);
+    }
+
+    /** 按锚点取附件；sameDocOnly=true 只认本单，false 允许跨单（明细行 id 全局唯一）。 */
+    private java.util.List<java.util.Map<String, Object>> selfmadeHitByAnchor(
+            java.util.List<java.util.Map<String, Object>> files, String anchor, String docNo, boolean sameDocOnly) {
+        return files.stream()
+                .filter(f -> anchor.equals(strOf(f.get("fieldKey"))))
+                .filter(f -> !sameDocOnly || docNo.equals(strOf(f.get("docNo"))))
+                .toList();
+    }
+
+    /** 按列内文件名取附件；本单专用（跨单重名风险，见 ③ 的注释）。 */
+    private java.util.List<java.util.Map<String, Object>> selfmadeHitByNames(
+            java.util.List<java.util.Map<String, Object>> files, java.util.Set<String> names, String docNo,
+            boolean sameDocOnly) {
+        return files.stream()
+                .filter(f -> names.contains(strOf(f.get("fileName"))))
+                .filter(f -> !sameDocOnly || docNo.equals(strOf(f.get("docNo"))))
+                .toList();
     }
 
     /** 明细列里的文件名串（上传后由 AttachmentService 同步为「、」拼接）→ 去重后的文件名集合。 */
@@ -311,7 +364,7 @@ public class QueryService {
         String text = columnText == null ? "" : String.valueOf(columnText).trim();
         if (text.isEmpty()) return java.util.Set.of();
         java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>();
-        for (String part : text.split("[、,，;；\\n\\r]+")) {
+        for (String part : text.split("[、,，;；:：\\n\\r]+")) {
             String name = part.trim();
             if (!name.isEmpty()) names.add(name);
         }
