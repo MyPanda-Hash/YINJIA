@@ -1329,9 +1329,12 @@
             <!-- 新增数据(2026-10-21 起可下拉):物料清单(WLBOM)用户口径「可以通过点击新增数据的下拉栏:
                  导入商品数据,然后勾选商品里面的数据进行一个批量导入」⇒ 同一颗按钮点开是两项菜单。
                  ⚠ 只有声明过商品导入的面板(当前 = WLBOM)才下拉,其余面板保持原来的一击加行,
-                   免得一次无人要求的按钮改版波及全部单据面板。 -->
+                   免得一次无人要求的按钮改版波及全部单据面板。
+                 🔴 2026-11-19:两个分支都改判 canAddDetailRow(b) = 单据可编辑 ∧ 面板「新增保存」(add)词。
+                   取消该面板的 add 词后按钮即消失;下拉里的「导入商品数据」同样是加行,一并受控
+                   (真闸门在后端 ButtonService.saveArchive 的新增行校验)。 -->
             <el-dropdown
-              v-if="detailEditable(b) && canImportProducts(b)"
+              v-if="canAddDetailRow(b) && canImportProducts(b)"
               trigger="click"
               @command="(cmd) => onAddDetailCommand(cmd, b)"
             >
@@ -1345,7 +1348,7 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <el-button v-else-if="detailEditable(b)" size="small" type="primary" :icon="Plus" :class="{ 'btn-blink': isMissingHintTab(b) }" @click="addInlineDetailRow(b)">{{ tt('新增数据') }}</el-button>
+            <el-button v-else-if="canAddDetailRow(b)" size="small" type="primary" :icon="Plus" :class="{ 'btn-blink': isMissingHintTab(b) }" @click="addInlineDetailRow(b)">{{ tt('新增数据') }}</el-button>
             <span class="dt-ic" v-for="ic in b.isMain ? iconA : iconB" :key="ic" @click="onIcon(ic, b)">{{ tt(ic) }}</span>
           </span>
         </div>
@@ -2882,7 +2885,7 @@ import { applyCodes, applyFuzzy, applyPicked, clearField, normalizeCodeList } fr
 // 产品文件列表的矩阵行筛选(单一口径,与 ProdDocListSheet 共用;纯函数 + 单测)
 import { PROD_DOC_FIELD_OPTIONS, buildProdDocFilter, filterProdDocRows } from '@core/prod/prodDocSearch'
 import { nextSortState, sortRows } from '@core/sort/rowSort'
-import { canConfigFields, canConfigWarn, canViewPanel } from '@core/auth/panelAccess'
+import { canConfigFields, canConfigWarn, canPanelDo, canViewPanel } from '@core/auth/panelAccess'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import { BARCODE_PANELS, barcodeLabelsOf } from '@core/panel/barcodeLabel'
 import RefPickDialog from './RefPickDialog.vue'
@@ -10432,6 +10435,26 @@ function detailEditable(b) {
   return draftEditable.value && !!b && tabView(b, activeTab(b)) !== 'summary'
 }
 
+/**
+ * 明细「新增数据」闸门(2026-11-19 用户口径)。
+ *
+ * 需求原话:「送样登记表明细页签工具栏的绿色『+ 新增数据』按钮,其『新增』要能在
+ * 组织架构 → 角色与面板权限里去掉:取消该面板的『新增保存』(add 词)后,按钮应消失;
+ * 后端也不能靠直调接口绕过」。
+ *
+ * 判据 = 单据状态可编辑(**原有**) ∧ 当前角色在该面板持有 add 词(**新增**):
+ *   · 原实现两个分支都只看 detailEditable(草稿/修改中即可加行),与 yj_role_panel.perms 无关;
+ *   · 现在走 canPanelDo(user, panelCode, 'add') —— 与后端权威闸门
+ *     ButtonService.saveArchive(新增行校验 add)同一份 yj_role_panel.perms,显示层不再自成一派。
+ * 只作用于**加行**:保存/删除/行内编辑一律不经过这里(它们的词表见后端 BUTTON_PERMS)。
+ */
+const canAddRowsHere = computed(() => canPanelDo(user, panelCode.value, 'add'))
+
+/** 本明细区块此刻能否加行(= detailEditable ∧ 面板 add 词);绿色「新增数据」与加行函数共用 */
+function canAddDetailRow(b) {
+  return detailEditable(b) && canAddRowsHere.value
+}
+
 function detailRefTrigger(field) {
   return field?.refTrigger || field?.trigger || 'click'
 }
@@ -10527,7 +10550,9 @@ function newDetailRow(tabKey) {
 }
 
 function addInlineDetailRow(b) {
-  if (!detailEditable(b)) return
+  // 加行闸门(2026-11-19):不只隐藏按钮,函数自身也拦 —— 占位行点击/下拉命令等其它入口
+  // 都汇到这里;判据见 canAddDetailRow(面板「新增保存」add 词)。
+  if (!canAddDetailRow(b)) return
   const tabKey = activeTab(b).key
   if (!cur.value.detail) cur.value.detail = {}
   const rows = cur.value.detail[tabKey] || (cur.value.detail[tabKey] = [])
@@ -10577,8 +10602,11 @@ function canImportProducts(b) {
   return !!b && PRODUCT_IMPORT_PANELS.has(panelCode.value) && detailEditable(b)
 }
 
-/** 「新增数据」下拉的命令分发:加一行 / 打开商品导入弹窗 */
+/** 「新增数据」下拉的命令分发:加一行 / 打开商品导入弹窗(两个命令都属"加行",同一 add 词闸门) */
 function onAddDetailCommand(cmd, b) {
+  // 2026-11-19:下拉在模板层已由 canAddDetailRow 控制显隐,这里再挡一次 ——
+  // 命令分发是"加行"的唯一入口(含「导入商品数据」批量追加行),不能只靠按钮 v-if。
+  if (!canAddDetailRow(b)) return
   if (cmd === 'importProduct') {
     if (!canImportProducts(b)) return
     productImpBlockId.value = b.id

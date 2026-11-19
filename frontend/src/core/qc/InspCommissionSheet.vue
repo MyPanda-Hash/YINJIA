@@ -550,7 +550,7 @@
 import { computed, ref, watch } from 'vue'
 import { tt } from '@/i18n'
 import SampleCatalogPickDialog from './SampleCatalogPickDialog.vue'
-import { vatTotalText } from './inspCommissionVat'
+import { sampleCountOf, vatTotalText } from './inspCommissionVat'
 
 const props = defineProps({
   /** 当前单据(与首件/巡线/出厂检验同一口径:表头字段平铺 + detail.items 明细行) */
@@ -749,12 +749,35 @@ const feeTotal = computed(() => {
   return items.value.reduce((sum, row) => sum + feeOf(row), 0)
 })
 
-/** 一行行表 → 含税总金额文本(2026-11-16 用户口径:原基础上 +6%) */
+/**
+ * 样品数量(件数)—— 总金额的**乘数**(2026-11-19 用户口径)。
+ *
+ * 用户口径:「收费列是『一个样/元』(100 元 = 一个样品检验的金额),所以总金额必须乘上『样品数量』」
+ *   ⇒ 行表「收费」仍是**一个样/元**的单价(行表显示与收费列一律不动),乘数量只发生在总金额这一处。
+ *
+ * 「样品数量」是**表头文本**(纸样允许「2L/3支」这类写法)⇒ 解析规则只在
+ * `inspCommissionVat.sampleCountOf` 一处实现(空 / 非数字 / ≤0 / 多段写法一律按 1 件,那边有单测),
+ * 组件不各写一份,免得纸面显示与回写表头两套口径。
+ *
+ * `bump.value`:表头写值走 setHead(写完 bump++);依赖它 + head 里那格值,
+ *   样品数量一改,纸面总金额与回写的「合计收费」都立刻跟着变。
+ */
+const sampleQty = computed(() => {
+  bump.value
+  return sampleCountOf(props.head?.['样品数量'])
+})
+
+/**
+ * 行表 → 含税总金额文本 = 行表「收费」合计 × 样品数量 × (1 + 6%)。
+ *   2026-11-16:原基础上 +6%;2026-11-19:再乘「样品数量」(收费是一个样/元的单价)。
+ * 纸面显示与表头「合计收费」都只调这一个函数(同一口径,不各写一份)。
+ */
 function vatTotalTextOf(rows) {
-  return vatTotalText(rows.reduce((sum, row) => sum + feeOf(row), 0))
+  const net = (rows || []).reduce((sum, row) => sum + feeOf(row), 0)
+  return vatTotalText(net, sampleQty.value)
 }
 
-/** 纸面显示值 = 含税总金额(不是净额) */
+/** 纸面显示值 = 含税总金额(不是净额;已乘样品数量) */
 const feeTotalText = computed(() => {
   bump.value
   return vatTotalTextOf(items.value)
@@ -783,7 +806,8 @@ function renumber() {
 /**
  * 整份行表重算三处汇总(契约 §4.2 第 2~4 条,带入与删行后都要重算):
  *   检验类别 = 检测元素去重后「、」拼接;检验依据 = 检测标准去重后「；」拼接;
- *   合计收费 = 行表「收费」求和 × (1+6%)(2026-11-16 用户口径:总金额含增值税 6%)。
+ *   合计收费 = 行表「收费」求和 × 样品数量 × (1+6%)
+ *            (2026-11-16:总金额含增值税 6%;2026-11-19:收费是「一个样/元」⇒ 再乘样品数量)。
  * 只写这三格,用户手填的其它表头字段一律不动。
  */
 function recomputeSummary() {
@@ -1075,12 +1099,15 @@ watch(
 )
 
 /**
- * 含税总金额回写表头(2026-11-16 用户口径:合计收费 = 行表收费合计 × (1+6%))。
- * 纸面显示本来就按行表实时算,但库里的「合计收费」可能是旧口径(净额)⇒ 打开单据时按现行口径
- * 静默重算一次,保证后续保存/打印/审批取到的是**含税总金额**;只写这一格,不改其它字段、不标脏。
+ * 含税总金额回写表头(2026-11-16 用户口径:合计收费 = 行表收费合计 × (1+6%);
+ * 2026-11-19 补:收费是「一个样/元」⇒ 再乘「样品数量」)。
+ * 纸面显示本来就按行表实时算,但库里的「合计收费」可能是旧口径(净额、或没乘样品数量)⇒ 打开单据时
+ * 按现行口径静默重算一次,保证后续保存/打印/审批取到的是**含税总金额**;只写这一格,不改其它字段、不标脏。
+ * 依赖里带上表头「样品数量」:样品数量是总金额的乘数,改了它也要把库里这格同步过来(纸面显示本来就是
+ * 响应式的,但表头那格不会自己变 —— 不写就出现"纸面 1060.00 / 列表里 106.00")。
  */
 watch(
-  () => docKeyOf() + '|' + items.value.length,
+  () => docKeyOf() + '|' + items.value.length + '|' + String(props.head?.['样品数量'] ?? ''),
   () => {
     if (!props.head || !items.value.length) return
     const next = vatTotalTextOf(items.value)
@@ -1217,12 +1244,8 @@ watch(
   margin-left: 2px;
   line-height: 1;
 }
-/* 编号可改(2026-11-17):只读态还是纸面的裸号,编辑态给一个下划线输入框 */
-.ic-meta-no-input {
-  width: 190px;
-  margin-left: 2px;
-  vertical-align: middle;
-}
+/* 编号可改(2026-11-17):只读态还是纸面的裸号,编辑态是一个带下划线的输入框 ——
+   样式(宽度/下划线)统一写在下面 `.ic-input` 块之后,那里才能压过 `.ic-input` 的 `border: none`。 */
 
 /* ── ③ 主表:6 列基准栅格(列宽 = 纸样实测 / 1054px) ──
    186 / 152 / 174 / 134 / 137 / 271  ⇒  17.6% 14.4% 16.5% 12.7% 13.0% 25.8% */
@@ -1306,6 +1329,31 @@ watch(
   font-family: inherit;
   font-size: 13px;
   height: 20px;
+}
+/* ── 委托单编号:编辑态的下划线输入框(2026-11-19 用户口径)──
+   「检验委托单的『委托单编号』处增加横杠,作为提示填写单据编号的样式」——
+   原来只在上面留了一句注释写着"编辑态给一个下划线输入框",实际只声明了 width/margin,**根本没有线**;
+   现在补上:透明底 + 一条灰线下边框 + 直角,让用户一眼看出这格能填单号,
+   同时保持 el-input 的纸面观感(不要网页控件的圆角/阴影/白底)。
+   ⚠ 位置必须在本块(`.ic-input`)**之后**:`.ic-input .el-input__wrapper` 里有同权重的 `border: none`,
+     排在它前面会被抹掉 —— 这正是「注释说有下划线、实际没有」的成因。
+     `.is-focus` 那条规则权重更高(多一个类),所以聚焦态也要单独写一遍,否则点进去线就消失了。
+   ⚠ 只给单号这一格加线;行表/其它格仍是纸样的空白格(没有线)。
+   ⚠ width:190px 也挪到这里:`.ic-input { width: 100% }` 同权重且在后面,原来那行 width 一直是失效的。
+   打印态由文件末尾 @media print 把这条线去掉(纸样该位置是干净的单号文字)。 */
+.ic-meta-no-input {
+  width: 190px;
+  margin-left: 2px;
+  vertical-align: middle;
+}
+.ic-meta-no-input :deep(.el-input__wrapper),
+.ic-meta-no-input :deep(.el-input__wrapper.is-focus) {
+  box-shadow: none !important;
+  border: none;
+  border-bottom: 1px solid #8a8a8a;
+  border-radius: 0;
+  background: transparent;
+  padding: 0 2px;
 }
 .ic-textarea {
   width: 100%;
@@ -1764,6 +1812,21 @@ watch(
   .ic-sheet .el-input__suffix,
   .ic-sheet .el-input__prefix {
     display: none !important;
+  }
+  /* 委托单编号的下划线只是"这里可以填"的**屏幕**提示(2026-11-19 用户口径「增加横杠」),
+     不是纸样内容:纸样该位置是空白,印一条线出来就是多余的黑线 ⇒ 打印回干净的单号文字
+     (输入的值照常打印,只去掉线)。`.is-focus` 一并覆盖,免得打印前刚点过这格就带线。
+     放在这段**不依赖 body 类**的裸 @media print 里:侧栏「打印」、Ctrl+P / 浏览器预览、
+     「导出 → 打印预览 / PDF」都走原生打印通道(`PanelxList.previewSheetPdf` 对 `.ic-sheet`
+     直接调 `printApprovalSheet`),三条路拿到的是同一份版式。 */
+  .ic-sheet .ic-meta-no-input .el-input__wrapper,
+  .ic-sheet .ic-meta-no-input .el-input__wrapper.is-focus {
+    border-bottom: none !important;
+  }
+  /* 屏幕上的 190px 是"提示框"宽度,纸上不该继承:超长的手工号会被这个框截断。
+     打印态回满宽(等于本条改动之前的纸面行为),只是文字照常输出。 */
+  .ic-sheet .ic-meta-no-input {
+    width: 100% !important;
   }
   .ic-sheet input::placeholder,
   .ic-sheet textarea::placeholder {

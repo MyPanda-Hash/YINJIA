@@ -5052,3 +5052,19 @@ migrate-sample-ext-attach-20261118.sql
 # 2026-11-18 产品信息表新版式收尾：① 立项编号/立项名称/整体外径/整体内径/整体长度 补 10 语种译名；
 #   ② 旧聚合格「产品整体尺寸」required 归 0（纸面已改三内格，避免必填挡提交）
 migrate-prodinfo-i18n-required-20261118.sql
+
+# 2026-11-19 送样登记表(SAMPLE_REG)「内部检测目录」复核/部署版:
+#   用户新给的 提供系统更新版2026.11.17(1).xls 的「内部检测目录」sheet 与 2026-11-17 版内容**逐格一致**
+#   ⇒ 本脚本为在册复核版(重跑全部幂等步骤:内部检出限→标准方法检出限 label 改名 + en 译名
+#   + 55 行(54 检测项 + 外送部分)按检测元素逐行 upsert + 目录外旧项置作废 + 自检 55 行),
+#   不新增/不删除目录项。生成器 tools/archive/_sample-catalog-20261119/gen-migration.mjs(可重跑再生)。
+#   幂等;两账套(HSDZ_MES / HSDZ_MES_TEST)均已执行(2026-11-19)。
+migrate-sample-catalog-rev-20261119.sql
+
+# 2026-11-19 送样登记表明细页签标题:「送样登记表明细」→「内部检测目录」(用户口径)。
+#   零 DDL:yj_panel.config 用 JSON_MODIFY 合并写入 "detailTabLabel":"内部检测目录"(保留既有 uniqueKeys)
+#   ⇒ 后端 PanelConfigService.buildArchiveConfig 用它做 tabLabel(gridTabs 与 detail.tabs 同源),
+#   PanelRegistry.PanelDef.detailTabLabel() 读取(缺省/非法回落原「面板名+明细」);
+#   同批 yj_translation 补 panel 级 en 译名(Internal Test Catalog),前端 locales/en.js 同词条。
+#   幂等(已声明同值命中 0 行);两账套(HSDZ_MES / HSDZ_MES_TEST)均已执行(2026-11-19)。
+migrate-sample-reg-detail-tab-20261119.sql

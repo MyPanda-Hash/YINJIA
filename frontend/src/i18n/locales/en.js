@@ -6485,6 +6485,9 @@ export default {
     // ---- 样品检验:送样登记表 / 检验委托单(SAMPLE_REG / INSP_COMMISSION,2026-11-15)----
     "样品检验": "Sample Inspection",
     "送样登记表": "Sample Submission Register",
+    // 2026-11-19 用户口径:SAMPLE_REG 明细页签标题「送样登记表明细」→「内部检测目录」
+    // (yj_panel.config 的 detailTabLabel;后端下发中文数据键,显示层由 tt() 翻译 —— ADR-0001)
+    "内部检测目录": "Internal Test Catalog",
     "检验委托单": "Inspection Commission Order",
     // ---- 样品检验:检验委托单纸面 + 送样登记表选择弹窗(InspCommissionSheet / SampleCatalogPickDialog,2026-11-15)----
     "水家电综合检测中心": "Water Appliance Comprehensive Testing Center",

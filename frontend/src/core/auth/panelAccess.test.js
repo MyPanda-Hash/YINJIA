@@ -13,7 +13,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { canViewPanel, canConfigFields, canConfigWarn, canDo, canDoAny, PAGE_PANELS } from './panelAccess.js'
+import { canViewPanel, canConfigFields, canConfigWarn, canDo, canDoAny, canPanelDo, PAGE_PANELS } from './panelAccess.js'
 
 const ADMIN = { isAdmin: true, visiblePanels: [] }
 const LIMITED = { isAdmin: false, visiblePanels: ['RD_PROD_DOCLIST', 'RD_SPEC_DOC'] }
@@ -153,4 +153,63 @@ test('canDoAny:同一动作两个入口任一授予即可(与后端 requireButto
   assert.equal(canDoAny({ isAdmin: false, pagePerms: { WORK_ORDER_LIST: 'view' } }, entries, 'assign'), false)
   assert.equal(canDoAny(PLANNER, [], 'assign'), false)
   assert.equal(canDoAny(PLANNER, null, 'assign'), false)
+})
+
+/* ── canPanelDo:真实面板(yj_panel)的动作词(2026-11-19) ──
+ * 判据与 canDo 逐字一致,数据源换成 user.panelPerms(AuthController.panelPermsOf 下发:
+ * panel_code → yj_role_panel.perms csv;管理员 = {"*":"*"})。
+ * 首个用例:送样登记表 SAMPLE_REG 的绿色「新增数据」按钮显隐 —— 取消「新增保存」(add)后必须消失;
+ * 真闸门在后端 ButtonService.saveArchive(新增行校验 add),两边同一份 perms。 */
+
+const QC_CLERK = {
+  isAdmin: false,
+  panelPerms: {
+    SAMPLE_REG: 'view,query,add,export',
+    INSP_COMMISSION: 'view,query,modify',
+  },
+}
+
+test('canPanelDo:管理员恒可(isAdmin 标志与后端 {"*":"*"} 两种载荷都认)', () => {
+  assert.equal(canPanelDo(ADMIN, 'SAMPLE_REG', 'add'), true)
+  assert.equal(canPanelDo(ADMIN, '任意面板', '任意词'), true)
+  // 后端 panelPermsOf 对管理员只放一行 '*' → '*' 键也要认(旧会话丢了 isAdmin 标志时同理)
+  assert.equal(canPanelDo({ isAdmin: false, panelPerms: { '*': '*' } }, 'SAMPLE_REG', 'add'), true)
+})
+
+test('canPanelDo:普通账号按 panelPerms 逐面板、逐词精确匹配', () => {
+  assert.equal(canPanelDo(QC_CLERK, 'SAMPLE_REG', 'add'), true)
+  assert.equal(canPanelDo(QC_CLERK, 'SAMPLE_REG', 'export'), true)
+  // 同一账号在别的面板没有 add 词 ⇒ 该面板不显示「新增数据」(否则点下去也是 403)
+  assert.equal(canPanelDo(QC_CLERK, 'INSP_COMMISSION', 'add'), false)
+  assert.equal(canPanelDo(QC_CLERK, 'INSP_COMMISSION', 'modify'), true)
+  // 面板整条不在 panelPerms 里 ⇒ 全部动作不放行
+  assert.equal(canPanelDo(QC_CLERK, 'RD_SPEC_DOC', 'add'), false)
+})
+
+test('canPanelDo:取消「新增保存」(add)后即为 false —— 送样登记表按钮消失的判据', () => {
+  // 角色与面板权限里把 SAMPLE_REG 的 add 勾掉后,perms 里就不再有这个词
+  const noAdd = { isAdmin: false, panelPerms: { SAMPLE_REG: 'view,query,export' } }
+  assert.equal(canPanelDo(noAdd, 'SAMPLE_REG', 'add'), false)
+  assert.equal(canPanelDo(noAdd, 'SAMPLE_REG', 'view'), true)
+  // modify(申请修改)不能顶替 add(新增保存):改已有行 ≠ 加新行
+  assert.equal(canPanelDo({ isAdmin: false, panelPerms: { SAMPLE_REG: 'view,modify' } }, 'SAMPLE_REG', 'add'), false)
+})
+
+test('canPanelDo:逐词精确匹配,不吃前缀(add ≠ add2、audit ≠ selfaudit)', () => {
+  assert.equal(canPanelDo({ isAdmin: false, panelPerms: { SAMPLE_REG: 'view,add2' } }, 'SAMPLE_REG', 'add'), false)
+  assert.equal(canPanelDo({ isAdmin: false, panelPerms: { SAMPLE_REG: 'view,selfaudit' } }, 'SAMPLE_REG', 'audit'), false)
+  // 管理员形载荷的 csv 值 '*' 也放行(与 canDo 的 pagePerms 口径一致)
+  assert.equal(canPanelDo({ isAdmin: false, panelPerms: { SAMPLE_REG: '*' } }, 'SAMPLE_REG', 'add'), true)
+})
+
+test('canPanelDo:拿不到权限信息 / 空参数时不放行', () => {
+  assert.equal(canPanelDo(null, 'SAMPLE_REG', 'add'), false)
+  assert.equal(canPanelDo(undefined, 'SAMPLE_REG', 'add'), false)
+  assert.equal(canPanelDo({ isAdmin: false }, 'SAMPLE_REG', 'add'), false, '无 panelPerms')
+  assert.equal(canPanelDo({ isAdmin: false, panelPerms: null }, 'SAMPLE_REG', 'add'), false)
+  assert.equal(canPanelDo({ isAdmin: false, panelPerms: 'view,add' }, 'SAMPLE_REG', 'add'), false, 'map 不是对象')
+  assert.equal(canPanelDo(QC_CLERK, '', 'add'), false)
+  assert.equal(canPanelDo(QC_CLERK, null, 'add'), false)
+  assert.equal(canPanelDo(QC_CLERK, 'SAMPLE_REG', ''), false)
+  assert.equal(canPanelDo(QC_CLERK, 'SAMPLE_REG', null), false)
 })

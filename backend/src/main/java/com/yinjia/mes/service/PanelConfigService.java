@@ -115,7 +115,13 @@ public class PanelConfigService {
     private Map<String, Object> buildArchiveConfig(PanelRegistry.PanelDef def) {
         boolean foreign = isForeign();
         String panelDisplay = foreign ? panelDict().getOrDefault(def.name(), def.name()) : def.name();
-        String tabLabel = panelDisplay + (foreign ? " Details" : "明细");
+        // 明细页签标题(2026-11-19,数据驱动):yj_panel.config 声明了 "detailTabLabel" 就用它
+        // (现役唯一消费者:SAMPLE_REG ⇒「内部检测目录」),否则沿用「面板名 + 明细」。
+        // 列表 gridTabs 与 detail.tabs 共用这一个变量 —— 一处声明、两处同源,前端不会出现两个标题。
+        String declaredTabLabel = def.detailTabLabel();
+        String tabLabel = declaredTabLabel != null
+                ? declaredTabLabel
+                : panelDisplay + (foreign ? " Details" : "明细");
         String tabKey = def.tabKey();
 
         List<Map<String, Object>> detailFields = new ArrayList<>();

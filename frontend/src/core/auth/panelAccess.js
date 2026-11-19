@@ -114,6 +114,44 @@ export function canDo(user, panelCode, word) {
 }
 
 /**
+ * 「当前账号在某**真实面板**(yj_panel)上能不能执行某个动作」的纯判定 —— 2026-11-19。
+ *
+ * 判据与 {@link canDo} 逐字一致,只有数据源不同(分工见上面 PAGE_PANELS 注释):
+ *   · `canDo` 读 `user.pagePerms`,里面**只有页面级虚拟面板**(订单结转/快速排产/…);
+ *   · 本函数读 `user.panelPerms`(AuthController.panelPermsOf 下发:panel_code → yj_role_panel.perms csv),
+ *     单据/档案面板(SAMPLE_REG、QC_FIRST_INSP、WO_ORDER …)**只**在这里。
+ *   管理员:前端 isAdmin 恒 true;后端载荷本身是 `{"*":"*"}`(两个口径都认)。
+ *   取不到 csv / 取不到 map ⇒ **一律 false**(拿不到权限不放行,宁可少显示按钮,也别让用户点出一个 403)。
+ *   词按逗号切分后 trim 精确匹配(`add` ≠ `add2`、`audit` 不能顶替 `selfaudit`)。
+ *
+ * 与后端真闸门同源:PanelPermissionService.hasAnyPerm / requireButton 用的是同一份
+ * yj_role_panel.perms。⚠ **本函数只用于显示层(按钮/入口显隐)** —— 前端藏起来不等于拦得住,
+ * 写操作的权威闸门在服务端(例:新增数据行走 ButtonService.saveArchive 的 add 词校验,
+ * 绕过界面直调 /api/px/callButton 一样吃 403)。
+ *
+ * @param {{isAdmin?:boolean, panelPerms?:Record<string,string>}|null|undefined} user
+ * @param {string} panelCode 真实面板码(yj_panel.panel_code,如 SAMPLE_REG)
+ * @param {string} word 动作词(view/query/add/modify/modlog/del/export/audit/field/…;
+ *   见后端 SysAdminController.PERMISSION_ACTIONS 与 PanelPermissionService.PERM_LABEL)
+ * @returns {boolean}
+ */
+export function canPanelDo(user, panelCode, word) {
+  const code = String(panelCode ?? '').trim()
+  const w = String(word ?? '').trim()
+  if (!code || !w) return false
+  if (!user) return false
+  if (user.isAdmin === true) return true
+  const map = user.panelPerms
+  if (!map || typeof map !== 'object') return false
+  // 管理员载荷是 { '*': '*' }(panelPermsOf 只放这一行,不像 pagePerms 逐码展开)——
+  // 除了 isAdmin 标志再认一次通配键,老会话/标志丢失时也不至于把管理员挡在外面。
+  const csv = map[code] ?? map['*'] ?? ''
+  if (!csv) return false
+  if (String(csv).trim() === '*') return true
+  return String(csv).split(',').some((p) => p.trim() === w)
+}
+
+/**
  * 「任一页面上持有该动作词」—— 对应后端 requireButtonAny:
  * 同一动作有两个入口时(如「排产」在快速排产页与生产工单页各一个按钮),
  * 任一处授予即可;两处都没授则为 false。

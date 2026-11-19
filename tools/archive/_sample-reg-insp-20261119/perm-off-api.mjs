@@ -1,0 +1,10 @@
+const base='http://127.0.0.1:8090';
+const lr=await fetch(base+'/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({userName:'yyt',password:'123456',factory:'YJ_TEST'})});
+const lj=await lr.json();
+console.log('login',lj.code,lj.message,'factory',lj.data?.user?.factory,'perms',lj.data?.user?.panelPerms?.SAMPLE_REG);
+const token=lj.data?.token;
+const body={panelCode:'SAMPLE_REG',buttonName:'提交',formData:{备注:'',detail:{items:[{检测元素:'API越权测试项',收费:1,序号:999}]}},buttonParam:{'档案全量':true}};
+const r=await fetch(base+'/api/px/callButton',{method:'POST',headers:{'content-type':'application/json',Authorization:'Bearer '+token},body:JSON.stringify(body)});
+console.log('callButton HTTP',r.status);
+const t=await r.text();
+console.log(t.slice(0,400));

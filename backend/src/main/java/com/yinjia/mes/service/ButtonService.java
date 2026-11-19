@@ -88,6 +88,14 @@ public class ButtonService {
      */
     private final UnitQtyNormalizer unitQty;
 
+    /**
+     * 面板权限(2026-11-19):「新增保存」(add)词的二道闸 —— 档案面板保存时若含**无 id 的新行**,
+     * 必须持有该面板 add 词。前端「+ 新增数据」按钮的显隐读的是同一份 yj_role_panel.perms
+     * (前端 core/auth/panelAccess.canPanelDo),这里补上服务端权威判定,防止绕过界面直调接口。
+     * 该类只依赖 JdbcTemplate + PanelRegistry,与 ButtonService 无循环依赖。
+     */
+    private final PanelPermissionService panelPermissionService;
+
     public ButtonService(PanelRegistry registry, QueryService queryService,
                          FormNoService formNoService, JdbcTemplate jdbc,
                          DevTaskService devTaskService, MessageService messageService,
@@ -98,7 +106,8 @@ public class ButtonService {
                          ManuWritebackService manuWriteback, CalcRuleService calcRuleService,
                          ProcessTaskService processTask, StockMonthCloseService monthCloseService,
                          QcInspAutoService qcInspAuto, UnitQtyNormalizer unitQty,
-                         ProcBomArchiveSyncService procBomSync) {
+                         ProcBomArchiveSyncService procBomSync,
+                         PanelPermissionService panelPermissionService) {
         this.registry = registry;
         this.queryService = queryService;
         this.formNoService = formNoService;
@@ -119,6 +128,7 @@ public class ButtonService {
         this.qcInspAuto = qcInspAuto;
         this.unitQty = unitQty;
         this.procBomSync = procBomSync;
+        this.panelPermissionService = panelPermissionService;
     }
 
     /** 发送业务事件消息(失败不影响业务操作) */
@@ -2518,9 +2528,34 @@ public class ButtonService {
      * 模糊搜索 keyword / 高级筛选)时后端只回**子集**,前端若把子集当整档提交,"缺席=删除"就会把
      * 没被筛出来的行全删掉 —— 实测正式库「商品」一次保存软删 3873/3874 行
      * (yj_archive_change_log id=8 removedRows=3873),而金蝶同步按外部指纹跳过未变更商品、不会自愈。
+     *
+     * <p><b>④ 新增行闸门 —— 与前端「新增数据」按钮显隐同源的二道闸(2026-11-19)</b>:
+     * 提交里只要出现**无 id 的行**(= 插入新行),就要求当前登录角色在该面板持有「新增保存」({@code add})
+     * 词,否则 403({@link PanelPermissionService#hasAnyPerm})。前端 {@code PanelxList} 的绿色
+     * 「+ 新增数据」按钮读的是同一份 {@code yj_role_panel.perms},本层专防"绕过界面直调
+     * /api/px/callButton"——只靠前端 v-if,拿 token 直接打接口照样能把行塞进库。
+     * 带 id 的行(改已有行)不在此闸门内:{@code modify}(申请修改)与 {@code add} 各管一段。
      */
     private Map<String, Object> saveArchive(PanelRegistry.PanelDef def, List<Map<String, Object>> items, String user,
                                             Map<String, Object> buttonParam, Map<String, Object> formData) {
+        // ══ 「新增保存」(add)词的二道闸(2026-11-19,与前端按钮显隐**同源**)══
+        // 前端 PanelxList 的绿色「+ 新增数据」按钮,显隐读 user.panelPerms[panelCode] 的 add 词
+        // (core/auth/panelAccess.canPanelDo → canAddDetailRow)。这里在**落库前**再判一次:
+        // 用户口径「取消该面板的『新增保存』后按钮应消失;后端也不能靠直调接口绕过」——
+        // 少了这一层,不带界面直接 POST /api/px/callButton(buttonName=保存/保存新增)就能把新行塞进库。
+        // 判据:行对象 id 为空 = 插入新行(insertRow 分支)⇒ 必须持有该面板 add 词;
+        //       带 id = 改已有行(编辑/申请修改场景,归 modify 管,不属「新增保存」范畴,放行)。
+        // 只判 add、不拿 modify 兜底 —— 两个词各管一段:modify 管"改已有行",add 管"加新行"。
+        // 管理员由 PanelPermissionService.hasAnyPerm 恒真;无登录态(system)按无权限处理,
+        // 而 saveArchive 只由用户点保存/保存新增触发,不受影响。
+        boolean hasNewRow = items.stream().anyMatch(it -> {
+            Object id = it == null ? null : it.get("id");
+            return id == null || String.valueOf(id).isBlank();
+        });
+        if (hasNewRow && !panelPermissionService.hasAnyPerm(def.code(), "add")) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "当前角色无该面板「新增保存」权限，不能新增数据行");
+        }
         boolean patchMode = buttonParam != null && truthy(buttonParam.get("只提交改动行"));
         boolean archiveFullLoad = !patchMode && buttonParam != null && truthy(buttonParam.get("档案全量"));
         List<Object> removeIds = patchMode ? idListOf(formData == null ? null : formData.get("作废行id")) : List.of();
