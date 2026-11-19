@@ -146,6 +146,12 @@ const routes = [
       //   按送样人 / 按委托单两个视角 + 今日/本周/本月快捷区间 + 导出 Excel(前端 xlsx 现生成)。
       //   页面级虚拟面板 INSP_SUMMARY(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由,显式注册。
       { path: 'qc/inspSummary', component: () => import('@/views/modules/qc/InspSummary.vue'), meta: { title: '样品检验汇总表', code: 'qcInspSummary', panelCode: 'INSP_SUMMARY' } },
+      // 测试申请汇总表(2026-11-19 用户口径:「做一个类似于样品检验汇总单一样的按照人员进行一个汇总分类的
+      //   有关测试申请单的测试申请汇总面板,还可以点击跳转到对应的测试申请单」):
+      //   按申请人 / 按单据两个视角 + 今日/本周/本月快捷区间 + 导出 Excel;点单号跳 RD_DOM_TEST 并 focus 该单。
+      //   权限**复用测试申请单面板码 RD_DOM_TEST**(能看到这张单的人才看得到它的汇总,不新造虚拟码、不加权限行)
+      //   ⇒ 菜单项带 panelCode 不进 flatMenus 自动路由,故在此显式注册。
+      { path: 'qc/testApplySummary', component: () => import('@/views/modules/qc/TestApplySummary.vue'), meta: { title: '测试申请汇总表', code: 'qcTestApplySummary', panelCode: 'RD_DOM_TEST' } },
       // ══════════ 手机扫码(2026-10-30 新增一级目录)══════════
       // 用户口径:「把生产领料和工序报工这两个 app 的面版重新放在一个新的『手机扫码』(和生产计划平级)
       //   导航下。工序报工不变。生产领料重写。」

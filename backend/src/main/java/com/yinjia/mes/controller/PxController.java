@@ -67,6 +67,8 @@ public class PxController {
     private final com.yinjia.mes.service.PanelFieldViewService fieldView;
     /** 采购入库单「一行拆多个仓库」(2026-11-17 客户口径):只在草稿、未转ERP 时可用 */
     private final com.yinjia.mes.service.PurInSplitService purInSplit;
+    /** 测试申请汇总表只读取数(2026-11-19):按申请人汇总测试申请单(内部委托 / 销售端两个页签) */
+    private final com.yinjia.mes.service.TestApplySummaryService testApplySummaryService;
     /**
      * 工艺清单归档 → 基础数据清单的同步(2026-11-18):组装工艺清单→组装物料清单、
      * 烧结/X烧结工艺清单→混料物料清单。同步主体挂在归档入口(ButtonService.markArchived),
@@ -93,7 +95,8 @@ public class PxController {
                         com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate,
                         com.yinjia.mes.service.PanelFieldViewService fieldView,
                         com.yinjia.mes.service.PurInSplitService purInSplit,
-                        com.yinjia.mes.service.ProcBomArchiveSyncService procBomSync) {
+                        com.yinjia.mes.service.ProcBomArchiveSyncService procBomSync,
+                        com.yinjia.mes.service.TestApplySummaryService testApplySummaryService) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -115,6 +118,7 @@ public class PxController {
         this.fieldView = fieldView;
         this.purInSplit = purInSplit;
         this.procBomSync = procBomSync;
+        this.testApplySummaryService = testApplySummaryService;
     }
 
     // 2026-11-18:原「工单扫码领料」的四个端点(/woPick/lines|bom|scanLog|attachDoc|scanLogs)已随页面下架，
@@ -1412,6 +1416,36 @@ public class PxController {
     public ApiResult<List<Map<String, Object>>> linkedRecordSheets(@RequestParam String domNo) {
         perm.requirePanelView("RD_DOM_TEST");
         return ApiResult.ok(configService.linkedRecordSheets(domNo));
+    }
+
+    /**
+     * 测试申请汇总表(2026-11-19,只读)—— 按**申请人**汇总「内部委托-测试申请单」与
+     * 「销售端-测试/检测申请表」,并给出每张单的明细(前端展开 + 点单号跳转用)。
+     *
+     * <p>用户口径(原话):「做一个类似于样品检验汇总单一样的按照人员进行一个汇总分类的有关测试申请单的
+     * 测试申请汇总面板,还可以点击跳转到对应的测试申请单」;补充确认:「内部和销售端放在同一张表里查询,
+     * 按申请人分组,列按你拟的」。两张申请表其实是同一张 {@code RD_DOM_TEST} 的两个页签
+     * (共用 {@code rd_dom_test_detail},按 {@code [表区]} 分块),故一条 SQL 合并取数。
+     *
+     * <p>权限:复用测试申请单的**查看权**({@code requirePanelView("RD_DOM_TEST")})——
+     * 不新造页面级虚拟面板码:能看到这张单的人才看得到它的汇总;也不新增
+     * {@code yj_role_panel} 授权行(权限矩阵里已经勾过这张单)。
+     *
+     * @param from      日期起 YYYY-MM-DD(缺省 = 今天)
+     * @param to        日期止 YYYY-MM-DD(缺省 = 日期起)
+     * @param applicant 申请人模糊匹配(申请人口径见 {@link com.yinjia.mes.service.TestApplySummaryService})
+     * @param status    草稿/审批中/已审核/已作废/已中止;空或「全部」= 全部(排除已作废/已中止)
+     * @param keyword   单据编号 / 申请人 / 样品 / 检测项目 / 备注
+     */
+    @GetMapping("/testApplySummary")
+    public ApiResult<Map<String, Object>> testApplySummary(
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) String applicant,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword) {
+        perm.requirePanelView("RD_DOM_TEST");
+        return ApiResult.ok(testApplySummaryService.summary(from, to, applicant, status, keyword));
     }
 
     @PostMapping("/callButton")

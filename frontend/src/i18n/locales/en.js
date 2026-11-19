@@ -6759,6 +6759,21 @@ export default {
     '单': 'orders',
     '项': 'items',
 
+    // ---- 测试申请汇总表(2026-11-19:按申请人汇总内部委托/销售端两张测试申请表 + 点单号跳转)----
+    // 数据源 = 测试申请单 RD_DOM_TEST 的两个页签;列序见 TestApplySummary.vue 的 SUMMARY_COLUMNS。
+    '测试申请汇总表': 'Test Application Summary',
+    '按申请人': 'By applicant',
+    '按单据': 'By document',
+    '申请人数': 'Applicants',
+    '申请单据数': 'Applications',
+    '申请类型': 'Application type',
+    '面板码': 'Panel code',
+    '最近申请日期': 'Last application date',
+    '该申请人的测试申请单': "This applicant's test applications",
+    '该单的检测项目明细': 'Test item details of this document',
+    '当前时间范围内没有测试申请单': 'No test applications in this date range',
+    '统计口径：测试申请单的「单据日期」；内部委托与销售端两个页签合并统计；默认不含已作废/已中止的单；本面板暂无金额字段，收费合计按 0.00 显示': 'Basis: the test application "Doc date"; the internal-commission and sales tabs are merged; void or stopped documents are excluded by default; this panel has no amount field yet, so Total fee shows 0.00',
+
   },
 
 }
