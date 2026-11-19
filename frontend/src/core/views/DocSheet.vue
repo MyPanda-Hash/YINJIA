@@ -137,8 +137,25 @@
               <span class="sg-info-line">
               <span class="sg-info-label">{{ tt(f.label) }}：</span>
               <span class="sg-info-value">
+                <!-- 手填客户（2026-11-18，Excel #10；2026-11-20 补 grid 版式）：
+                     输入框 + 放大镜 +「＋新客户」必须作为**同一条 v-if 链的首支**。
+                     ⚠ 之前「＋新客户」是独立 v-if，把链断成两段：docno/date 先渲染一次，
+                     又落进下面的通用输入框分支 ⇒ 样品单编号出现两个输入框（前一个被挤成截断小徽标），
+                     两个日期格也多挂了一个纯文本框。 -->
+                <span v-if="editable && f.manualRef" class="as-ref-input sg-info-manual">
+                  <el-input
+                    v-model="head[f.key]" size="small" class="as-ref-in sg-info-input"
+                    :placeholder="tt('输入客户名称，或点放大镜选择')" @input="emit('dirty')"
+                  />
+                  <el-icon v-if="isRefKey(f.key)" class="as-ref-ico" :title="tt('点击选择')" @click.stop="openProdRef(f.key)"><Search /></el-icon>
+                  <span
+                    class="sg-manual-ref no-print"
+                    :title="tt('客户档案里没有？手动填一个新客户')"
+                    @click="openManualRef(f.key)"
+                  >＋{{ tt('新客户') }}</span>
+                </span>
                 <el-input
-                  v-if="editable && f.kind === 'docno'" v-model="head[f.key]" size="small"
+                  v-else-if="editable && f.kind === 'docno'" v-model="head[f.key]" size="small"
                   maxlength="30" class="as-docno-input sg-info-input" @input="emit('dirty')"
                 />
                 <el-date-picker
@@ -154,13 +171,6 @@
                   <span class="as-ref-text">{{ head[f.key] || tt('点击选择') }}</span>
                   <el-icon class="as-ref-ico"><Search /></el-icon>
                 </div>
-                <!-- 手填新客户（2026-11-18，Excel #10）：参照选择之外再给一条"档案里没有"的路 -->
-                <span
-                  v-if="editable && f.manualRef"
-                  class="sg-manual-ref no-print"
-                  :title="tt('客户档案里没有？手动填一个新客户')"
-                  @click="openManualRef(f.key)"
-                >＋{{ tt('新客户') }}</span>
                 <el-select
                   v-else-if="editable && (f.kind === 'select' || selectOptions(f.key).length)"
                   v-model="head[f.key]" size="small" class="as-cell-input sg-info-input" :clearable="false"
@@ -992,7 +1002,7 @@ const manualRefForm = reactive({ name: '', code: '', contact: '' })
 
 function openManualRef(key) {
   manualRefField.value = String(key || '')
-  manualRefForm.name = String(head[manualRefField.value] || '')
+  manualRefForm.name = String(props.head?.[manualRefField.value] || '')
   manualRefForm.code = ''
   manualRefForm.contact = ''
   manualRefOpen.value = true
@@ -1005,7 +1015,7 @@ async function submitManualRef() {
   const code = String(manualRefForm.code || '').trim()
   if (!code) {
     // 不填编号 ⇒ 只写在这张单上，不碰客户档案（用户明确口径）
-    head[key] = name
+    props.head[key] = name
     emit('dirty')
     manualRefOpen.value = false
     ElMessage.info(tt('未填客户编号：已填进本单，不进客户档案'))
@@ -1015,7 +1025,7 @@ async function submitManualRef() {
   try {
     const res = await request.post('/px/khdaUpsert', { name, code, contact: manualRefForm.contact })
     const state = String(res?.data?.result || '')
-    head[key] = name
+    props.head[key] = name
     emit('dirty')
     manualRefOpen.value = false
     if (state === 'created') ElMessage.success(tt('已写进客户档案，之后其他单据可直接选到'))
@@ -1915,6 +1925,12 @@ defineExpose({ focusField })
   cursor: pointer; white-space: nowrap; vertical-align: middle;
 }
 .sg-manual-ref:hover { background: #f2f7fd; }
+/* 表格式信息条的 manualRef 格（2026-11-20）：输入框 + 放大镜 +「＋新客户」同一行，
+   高度/边框/字号与同排 date/docno 输入框一致（size=small + 同一套 el-input 边框）。 */
+.sg-info-manual { gap: 6px; }
+.sg-info-manual .as-ref-in { flex: 1; min-width: 0; }
+.sg-info-manual .as-ref-ico { flex: none; }
+.sg-info-manual .sg-manual-ref { flex: none; margin-left: 0; }
 .mref-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .mref-label { width: 72px; color: #606266; font-size: 13px; }
 .mref-tip { margin: 4px 0 0; font-size: 12px; color: #909399; line-height: 1.6; }
