@@ -12,6 +12,8 @@ import { applyDocDefaults } from '../panel/docDefaults.js'
 
 const sheet = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
 const page = readFileSync(new URL('../../views/rd/SelfmadeQuery.vue', import.meta.url), 'utf8')
+const attachCell = readFileSync(new URL('./FileAttachCell.vue', import.meta.url), 'utf8')
+const querySvc = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/service/QueryService.java', import.meta.url), 'utf8')
 const mig = readFileSync(new URL('../../../../tools/migrate-selfmade-20261119.sql', import.meta.url), 'utf8')
 
 test('录入面板：两格手填 + 附件格 + 子批次自动编号(1~10)', () => {
@@ -47,6 +49,36 @@ test('查询页：材料名+批次区间、录入日期列、导出 Excel、二�
   assert.match(page, /tt\('录入日期'\)/, '结果要显示录入日期')
   assert.match(page, /xlsx/, '导出 Excel')
   assert.match(page, /const text = `\$\{row\['材料名'\] \|\| ''\} \$\{row\['主批次'\] \|\| ''\}`\.trim\(\)/, '二维码内容 = 材料名 + 主批次')
+})
+
+test('查询页附件列：只读 FileAttachCell + 后端附件清单，点击走预览', () => {
+  assert.ok(page.includes('<FileAttachCell'), '流程卡/配料表必须用附件组件渲染，否则只是不可点文本')
+  assert.ok(page.includes(':can-edit="false"'), '查询页只读：不能上传/删除，但必须能点开看')
+  assert.ok(page.includes(':attachments="attachList(row, \'流程卡\')"'), '流程卡用后端返回的附件清单渲染')
+  assert.ok(page.includes(':attachments="attachList(row, \'配料表\')"'), '配料表用后端返回的附件清单渲染')
+  assert.ok(page.includes('function attachList(row, field)'), '缺附件清单取值函数')
+  assert.ok(page.includes('`流程卡-${row[\'明细id\']}`'), '锚点与录入页一致：流程卡-明细行id')
+  assert.ok(page.includes('`配料表-${row[\'明细id\']}`'), '锚点与录入页一致：配料表-明细行id')
+  assert.ok(page.includes('<span v-else class="smq-file">—</span>'), '没有附件时显示「—」')
+  // 点击 chip 由 FileAttachCell 内部调 openAttachmentPreview（预览/下载复用现成实现）
+  assert.ok(attachCell.includes('openAttachmentPreview(a, {'), '附件点击必须进预览，不是纯文本')
+})
+
+test('FileAttachCell：attachments 清单模式不再按锚点请求列表', () => {
+  assert.ok(attachCell.includes('attachments: { type: Array, default: null }'), '缺只读附件清单入参')
+  assert.ok(attachCell.includes('if (Array.isArray(props.attachments)) {'), '传清单时必须直接渲染，不能再猜锚点')
+  assert.ok(attachCell.includes('files.value = props.attachments.map((a) => ({ ...a }))'), '清单要复制进本地列表')
+})
+
+test('查询接口：每行带 流程卡附件/配料表附件，老数据按文件名/字段名兜底', () => {
+  assert.ok(querySvc.includes('row.put("流程卡附件"'), '后端必须回传流程卡附件清单')
+  assert.ok(querySvc.includes('row.put("配料表附件"'), '后端必须回传配料表附件清单')
+  assert.ok(querySvc.includes('a.doc_no IN ('), '一次批量取本页单据的附件（避免 N+1）')
+  assert.ok(querySvc.includes('baseKey + "-" + id'), '一级锚点 = 字段-明细行id')
+  assert.ok(querySvc.includes('split("[、,，;；'), '按列里的文件名兜底拆分（历史「、」拼接）')
+  assert.ok(querySvc.includes('baseKey.equals(String.valueOf(f.get("fieldKey")))'), '最后按字段名锚点兜底')
+  assert.ok(querySvc.includes('boolean singleRow'), '多行单不能把同一份旧附件贴到每一行（错行比空着更糟）')
+  assert.ok(querySvc.includes('if (!singleRow) return java.util.List.of();'), '字段名兜底只对单行单开放')
 })
 
 test('迁移：头/明细表 + 面板 + 附件字段 + 权限骨架', () => {

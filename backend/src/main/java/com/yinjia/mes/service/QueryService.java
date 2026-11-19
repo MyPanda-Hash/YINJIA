@@ -219,7 +219,7 @@ public class QueryService {
         if (batchFrom != null && !batchFrom.isBlank()) { sql.append(" AND ISNULL(h.[主批次],'') >= ?"); args.add(batchFrom.trim()); }
         if (batchTo != null && !batchTo.isBlank()) { sql.append(" AND ISNULL(h.[主批次],'') <= ?"); args.add(batchTo.trim()); }
         sql.append(" ORDER BY h.[主批次] DESC, h.[单据编号] DESC, TRY_CAST(d.[序号] AS int)");
-        return jdbc.query(sql.toString(), (rs, i) -> {
+        java.util.List<java.util.Map<String, Object>> rows = jdbc.query(sql.toString(), (rs, i) -> {
             java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
             row.put("明细id", rs.getString("明细id"));
             row.put("单据编号", rs.getString("单据编号"));
@@ -233,6 +233,106 @@ public class QueryService {
             row.put("录入日期", rs.getString("录入日期"));
             return row;
         }, args.toArray());
+        attachSelfmadeFiles(rows);
+        return rows;
+    }
+
+    /**
+     * 查询页的附件清单（2026-11-19 用户报障「流程卡/配料表只显示文件名文本、点击打不开」）：
+     * <p>根因不是附件没上传，而是**锚点对不上** —— 查询页原先拿 `字段-明细id` 去 /attachment/list
+     * 精确查，历史数据的 field_key 可能是字段名本身（早期）或旧的明细行 id（行重排/重建过），
+     * 查空以后 FileAttachCell 只剩 modelValue 里的「历史文件名」纯文本（.fac-legacy），点不开。
+     * <p>改成**后端统一解析**：一次批量取出本页单据的全部附件，再逐行按三级兜底匹配，
+     * 前端只渲染返回的清单，不再自己猜锚点。
+     * <p>返回元素与 {@code /attachment/list} 同构：id / fileName / fileSize / contentType /
+     * uploader / uploadTime —— 可直接作为 FileAttachCell 的 attachments 入参。
+     */
+    private void attachSelfmadeFiles(java.util.List<java.util.Map<String, Object>> rows) {
+        if (rows.isEmpty()) return;
+        java.util.LinkedHashSet<String> docNos = new java.util.LinkedHashSet<>();
+        java.util.Map<String, Integer> rowCountByDoc = new java.util.HashMap<>();
+        for (java.util.Map<String, Object> row : rows) {
+            String no = strOf(row.get("单据编号"));
+            if (no.isEmpty()) continue;
+            docNos.add(no);
+            rowCountByDoc.merge(no, 1, Integer::sum);
+        }
+        if (docNos.isEmpty()) return;
+        String in = String.join(",", java.util.Collections.nCopies(docNos.size(), "?"));
+        java.util.List<java.util.Map<String, Object>> files = jdbc.queryForList(
+                "SELECT a.id, a.doc_no AS docNo, a.field_key AS fieldKey, a.file_name AS fileName, "
+              + "a.file_size AS fileSize, a.content_type AS contentType, a.asp_user1 AS uploader, "
+              + "CONVERT(varchar(19), a.asp_time1, 120) AS uploadTime "
+              + "FROM yj_attachment a WHERE a.panel_code = N'RD_SELFMADE' AND a.doc_no IN (" + in + ") "
+              + "ORDER BY a.id", docNos.toArray());
+        java.util.Map<String, java.util.List<java.util.Map<String, Object>>> byDoc = new java.util.HashMap<>();
+        for (java.util.Map<String, Object> f : files) {
+            byDoc.computeIfAbsent(strOf(f.get("docNo")), k -> new java.util.ArrayList<>()).add(f);
+        }
+        for (java.util.Map<String, Object> row : rows) {
+            String no = strOf(row.get("单据编号"));
+            java.util.List<java.util.Map<String, Object>> docFiles =
+                    byDoc.getOrDefault(no, java.util.List.of());
+            // 「字段名本身」这级兜底只对**单行单**开放：多行单的旧数据整单挂在同一个键下，
+            // 逐行复制会把同一份文件贴到每一行（错行比空着更糟）。
+            boolean singleRow = rowCountByDoc.getOrDefault(no, 0) == 1;
+            row.put("流程卡附件", pickSelfmadeFiles(docFiles, "流程卡", row.get("明细id"), row.get("流程卡"), singleRow));
+            row.put("配料表附件", pickSelfmadeFiles(docFiles, "配料表", row.get("明细id"), row.get("配料表"), singleRow));
+        }
+    }
+
+    /** 单行附件匹配：① 字段-明细行id（现行锚点）→ ② 列里显示的文件名 → ③ 字段名本身（仅单行单）。 */
+    private java.util.List<java.util.Map<String, Object>> pickSelfmadeFiles(
+            java.util.List<java.util.Map<String, Object>> files, String baseKey, Object rowId, Object columnText,
+            boolean singleRow) {
+        if (files.isEmpty()) return java.util.List.of();
+        String id = strOf(rowId);
+        if (!id.isEmpty()) {
+            String anchor = baseKey + "-" + id;
+            java.util.List<java.util.Map<String, Object>> hit = files.stream()
+                    .filter(f -> anchor.equals(String.valueOf(f.get("fieldKey")))).toList();
+            if (!hit.isEmpty()) return selfmadeFilePayload(hit);
+        }
+        java.util.Set<String> names = selfmadeFileNames(columnText);
+        if (!names.isEmpty()) {
+            java.util.List<java.util.Map<String, Object>> hit = files.stream()
+                    .filter(f -> names.contains(strOf(f.get("fileName")))).toList();
+            if (!hit.isEmpty()) return selfmadeFilePayload(hit);
+        }
+        // ③ 字段名本身：只在单行单兜底（多行单分不清是哪一行的，宁可空着也不贴错）
+        if (!singleRow) return java.util.List.of();
+        java.util.List<java.util.Map<String, Object>> hit = files.stream()
+                .filter(f -> baseKey.equals(String.valueOf(f.get("fieldKey")))).toList();
+        return hit.isEmpty() ? java.util.List.of() : selfmadeFilePayload(hit);
+    }
+
+    /** 明细列里的文件名串（上传后由 AttachmentService 同步为「、」拼接）→ 去重后的文件名集合。 */
+    private static java.util.Set<String> selfmadeFileNames(Object columnText) {
+        String text = columnText == null ? "" : String.valueOf(columnText).trim();
+        if (text.isEmpty()) return java.util.Set.of();
+        java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>();
+        for (String part : text.split("[、,，;；\\n\\r]+")) {
+            String name = part.trim();
+            if (!name.isEmpty()) names.add(name);
+        }
+        return names;
+    }
+
+    /** 只回传前端要的字段（与 /attachment/list 同构），不把 doc_no/stored_name 等内部列抛出去。 */
+    private static java.util.List<java.util.Map<String, Object>> selfmadeFilePayload(
+            java.util.List<java.util.Map<String, Object>> files) {
+        java.util.List<java.util.Map<String, Object>> out = new java.util.ArrayList<>(files.size());
+        for (java.util.Map<String, Object> f : files) {
+            java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("id", f.get("id"));
+            item.put("fileName", f.get("fileName"));
+            item.put("fileSize", f.get("fileSize"));
+            item.put("contentType", f.get("contentType"));
+            item.put("uploader", f.get("uploader"));
+            item.put("uploadTime", f.get("uploadTime"));
+            out.add(item);
+        }
+        return out;
     }
 
     public List<java.util.Map<String, Object>> sampleFlowRows() {
