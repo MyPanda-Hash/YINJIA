@@ -134,4 +134,7 @@ test('② 值来源：默认值清空 + headDefaults/存量清理迁移 + 审批
   assert.match(btn, /body\.remove\("审核人（二级审批人）"\)/, '保存入参必须剥离二级审批人（防旧页面回写）')
   assert.match(btn, /private void clearProdInfoApprovers\(/, '驳回/弃审要清审批人签名')
   assert.match(btn, /clearProdInfoApprovers\(def\.code\(\), no\)/, '驳回/弃审路径必须调用清理')
+  // 部署时停在「待二级审批」的单被迁移清过 L1 ⇒ 二级通过时按 APPROVE_L1 留痕补写，不能永久空白
+  assert.match(btn, /l1ApproverOf\(def\.code\(\), no\)[\s\S]{0,80}writeBackL1Approver\(def\.code\(\), no, l1\)/,
+    '二级签核通过要按一级审批留痕补写一级审批人')
 })

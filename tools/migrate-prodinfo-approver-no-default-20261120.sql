@@ -23,6 +23,8 @@
  * ⚠ 审批之后的名字由代码写：ButtonService.approveApproval 一级通过 →
  *   writeBackL1Approver（审核人一级）；一级选人 → writeBackL2Approver（审核人二级）；
  *   驳回/弃审 → clearProdInfoApprovers。前端纸面另有 signoffVisibility 状态门禁。
+ * ⚠ 部署时正停在「待二级审批」的单：本脚本会连一级签名一起清；二级通过时
+ *   ButtonService.approveSecond 按审批留痕 APPROVE_L1 的 operator 补写一级审批人，不会永久空白。
  */
 
 SET NOCOUNT ON;

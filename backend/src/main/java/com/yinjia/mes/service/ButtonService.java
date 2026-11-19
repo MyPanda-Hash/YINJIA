@@ -4314,6 +4314,14 @@ public class ButtonService {
         int n = jdbc.update("UPDATE yj_doc_status SET pending = 'N', shr = ?, shsj = GETDATE(), approve_node = NULL, update_at = GETDATE()"
                         + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y' AND approve_node = 2", operator, def.code(), no);
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
+        // 2026-11-20 产品信息表：二级签核通过时再补一次「审核人（一级审批人）」。
+        //   迁移会清空未审批单据的两级签名（含部署时正停在「待二级审批」的单据），那类单的
+        //   一级审批人不能靠 L1 通过路径补写（在迁移之前就过了）⇒ 这里按审批留痕 APPROVE_L1
+        //   的 operator 反查实际姓名补上。新建单在 L1 已写过，这里幂等覆盖为同一人。
+        if ("RD_PROD_INFO".equals(def.code())) {
+            String l1 = l1ApproverOf(def.code(), no);
+            if (!l1.isBlank()) writeBackL1Approver(def.code(), no, l1);
+        }
         recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion, 2);
         // 外部开发样品申请单(两级):纸面「确认」格 = 二级确认通过的人(确认人=冯总)
         writeSampleSign(def.code(), no, SAMPLE_SIGN_CONFIRM, operator);
