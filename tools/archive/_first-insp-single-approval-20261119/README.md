@@ -74,6 +74,7 @@ cd .. && CP="backend/target/classes;$(tr '\n' ';' < backend/target/cp.txt)"
 | `ego/round-26-paper-bottom.png`（测试账套，缩放后整张纸） | 十条 + 表尾三段全貌；页面文本里**不出现「批准」**（`bodyHasApprover=false`） |
 | `ego/round-08b-filled.png`（测试账套 3# 外径） | 输入 `34.25` 失焦后仍为 **34.25**，无取整提示（旧规则会变 34.3） |
 | API 走单级审批（`ego/round-20.mjs`，测试账套 SJ-2026-11-0013） | `提交审批 → 单据状态=审批中`；`审批通过（一次）→ 已审核`；**无「待二级审批」节点** |
+| `ego/round-28-8090.png`（**打包版** 127.0.0.1:8090，jar 内 static） | 同样是 10 条 + 表尾三段 + 页面无「批准」⇒ `rebuild-prod.ps1` 出的 jar 已带本轮前端与报表模板 |
 
 审批落库取证（`q-approve-proof.sql`，HSDZ_MES_TEST）：
 
