@@ -6,7 +6,7 @@
        报告头/条件区/数据表竖线全页对齐;数据键=字段 label(中文)
        特例块:碱性原水水质条 / 浸泡安全(浸泡液用量+仪器检出限) / 矿化(4 指标块+散点图)
        ═══════════════════════════════════════════════════════════════════ -->
-  <div ref="rootEl" class="record-sheet rsp-sheet">
+  <div ref="rootEl" class="record-sheet rsp-sheet" :class="{ 'rs-align-center': cfg.cellAlign === 'center' }">
     <!-- ═══ 页签(规格书多页结构:封面/修订与范围/检验要求/关键物料/包装运输) ═══ -->
     <div v-if="pageList.length" class="rsp-pages">
       <div
@@ -5847,6 +5847,17 @@ body.approval-printing .rs-mold-pick { display: none !important; }
 }
 /* 纸面格内控件一律铺满格子(文本/下拉/自动完成) */
 .rs-docno-pre { font-size: 12px; color: #595959; margin-right: 2px; }
+/* 值格居中（2026-11-19，烧结/X烧结两张工艺清单）：
+   只居中**数据格**（.rs-td 里非标签的 td）与其中的输入控件，标签列与栏目带不动。 */
+.rs-align-center .rs-td:not(.rs-label):not(.rs-company-cell):not(.rs-topic-cell):not(.rs-info-label) {
+  text-align: center;
+}
+.rs-align-center .rs-td:not(.rs-label) :deep(input),
+.rs-align-center .rs-td:not(.rs-label) :deep(textarea),
+.rs-align-center .rs-td:not(.rs-label) :deep(.el-input__inner),
+.rs-align-center .rs-td:not(.rs-label) :deep(.el-select__selected-item) {
+  text-align: center;
+}
 .rs-t-in,
 .rs-c-in {
   width: 100%;

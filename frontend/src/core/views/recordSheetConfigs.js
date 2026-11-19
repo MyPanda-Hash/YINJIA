@@ -1221,6 +1221,8 @@ export const recordSheetConfigs = {
   //(No.1 / 物料种类3[=146+64+64] / 物料编号2[=52+52+... ] 见下方配方表 cols 注释),总宽 1040 不变;
   // 页 0 只有一张自持列宽的数据表(合计 1040,与另两页左右缘对齐),不画报告头。
   RD_MOLD_PROC: {
+    // 2026-11-19 用户口径：值格数据居中（与 X烧结 同一口径）
+    cellAlign: 'center',
     headMode: 'report',
     staticTitle: '炭棒工艺管控清单',
     info: [
@@ -1362,6 +1364,9 @@ export const recordSheetConfigs = {
   // ══════════════════════════════════════════════════════════════════════
   RD_X_SINTER: {
     headMode: 'report',
+    // 2026-11-19 用户口径：「烧结工艺清单和 X烧结工艺清单的字段内容，数据内容居中好看一点」
+    //   ⇒ 值格（标签右侧的数据格）文字居中；标签列仍居中，表头/栏目带不受影响。
+    cellAlign: 'center',
     staticTitle: 'X烧结配方工艺管控清单',
     info: [
       { label: '表单管理人', key: '表单管理人', type: 'text' },
