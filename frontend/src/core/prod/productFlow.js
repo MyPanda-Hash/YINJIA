@@ -30,15 +30,31 @@ export function stepStateOf(node) {
 /**
  * 一个产品的 5 步（产品信息表 + 4 张文件）。
  *
+ * <p>2026-11-20 用户口径：**步骤行不显示单据编号，显示这一行所属产品的「产品编号」**。
+ * 单据编号只保留在多单据清单里（那是用来区分同类多张单的，必需）。</p>
+ *
  * @param {Record<string, any>|null} row /px/rdDevOverview 的一行
- * @returns {Array<{key: string, label: string, docNo: string, state: string, tone: string, reaudited: boolean}>}
+ * @returns {Array<{key: string, label: string, productCode: string, docNo: string, actor: string,
+ *   at: string, state: string, tone: string, docs: Array, reaudited: boolean}>}
  */
 export function flowStepsOf(row) {
   if (!row) return []
   const nodes = Array.isArray(row.nodes) ? row.nodes : []
+  // 产品编号 = 这一行所属产品的业务编号（如 A-54-08），**不是**单据编号（PI-…）。
+  // 每一步都带上：步骤行改渲染它（2026-11-20），多单据清单每行也要它。
+  const productCode = String(row['产品编号'] || '')
+  // 同类多张单：后端 node.docs=[{no,state,done,at,actor}]，逐项透传并补产品编号。
+  const docsOf = (list) => (Array.isArray(list) ? list.map((d) => ({
+    no: String(d.no || ''),
+    state: String(d.state || ''),
+    at: String(d.at || ''),
+    actor: String(d.actor || ''),
+    productCode,
+  })) : [])
   const head = {
     key: 'RD_PROD_INFO',
     label: '产品信息表',
+    productCode,
     docNo: String(row['单据编号'] || ''),
     // 处理人（2026-11-11 用户口径）：产品信息表 = **填写并提交审批的人**；
     // 规格书 = 产品信息表的二级负责人；成型/组装/出货 = 签核后分发给该文件的负责人。
@@ -48,10 +64,12 @@ export function flowStepsOf(row) {
     // 最后操作时间（2026-11-17 用户口径「每个都显示处理的日期」）：后端 yyyy-MM-dd HH:mm，
     // 取不到就是空串 ⇒ 界面显示「—」，不编造。
     at: String(row.at || ''),
-    // 2026-11-19 销售问题汇总 P14：每个步骤显示填写人
-    actor: String(row.actor || ''),
+    // 2026-11-19 销售问题汇总 P14：每个步骤显示填写人。
+    // 2026-11-20：row.actor 缺失时回落「填写人」—— 后端老版本没有 actor 也不至于整行空白；
+    //   后端新版本 actor 已解析成姓名，优先用它。
+    actor: String(row.actor || row['填写人'] || ''),
     // 2026-11-19：同类多张数据记录表（同一项目编号反复测试）——全部单号列在这里
-    docs: Array.isArray(row.docs) ? row.docs.map((d) => ({ no: String(d.no || ''), state: String(d.state || ''), at: String(d.at || ''), actor: String(d.actor || '') })) : [],
+    docs: docsOf(row.docs),
     state: String(row.state || ''),
     tone: String(row.state || '') === '已归档' ? STEP_STATE.done
       : (String(row.state || '').trim() && String(row.state) !== '草稿' ? STEP_STATE.doing : STEP_STATE.none),
@@ -60,9 +78,15 @@ export function flowStepsOf(row) {
   return [head, ...nodes.map((n) => ({
     key: String(n.panel || n.label || ''),
     label: String(n.label || n.panel || ''),
+    productCode,
     docNo: String(n.docNo || ''),
     owner: String(n.owner || ''),
     at: String(n.at || ''),
+    // 2026-11-19 P14 后端 nodeOf 已下发 actor，但这里上一轮只给产品信息表那步映射了 actor
+    //   ⇒ 4 张文件的填写人永远传不到页面（2026-11-20 生产实测：接口有 actor、页面没有）。
+    actor: String(n.actor || ''),
+    // 同类多张数据记录表：同样上一轮漏映射 ⇒「· N 张」永远不出现。这里一并透传。
+    docs: docsOf(n.docs),
     state: String(n.state || ''),
     tone: stepStateOf(n),
     reaudited: !!n.reaudited,

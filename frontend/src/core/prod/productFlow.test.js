@@ -239,3 +239,69 @@ test('⑮ 展开行「单据信息」五项与项目流程管控同构（纯函�
   const blank = docMetaOf({ 产品编号: '', 产品名称: '', 立项文档编号: '', 单据编号: '', at: '' })
   assert.ok(blank.every((m) => m.value === '-'), '空值一律显示 -')
 })
+
+/* ═══ 2026-11-20 用户口径 ═══
+ * ① 「每个步骤的填写负责人没显示出来」—— 上一轮 actor 只映射到产品信息表那一步，
+ *    4 张文件的 actor 被 flowStepsOf 丢掉；产品信息表那步后端又没下发 actor。
+ * ② 「步骤行不要显示单据编号，应该显示产品编号」—— 单号只留在多单据清单里区分多张单。
+ */
+
+test('⑯ 步骤行渲染产品编号 + 填写人，不再渲染单据编号；多单据清单仍保留单号', () => {
+  const r = row('A-54-08', '阻垢滤芯', '已归档', [
+    {
+      panel: 'RD_SPEC_DOC', label: '规格书', state: '已归档', done: true, docNo: 'SD-0013',
+      at: '2026-11-06 13:52', actor: '陈秀丽',
+      docs: [{ no: 'SD-0013', state: '已归档', at: '2026-11-06 13:52', actor: '陈秀丽' }],
+    },
+    {
+      panel: 'RD_MOLD_PROC', label: '成型工艺清单', state: '开发中', done: false, docNo: 'MP-0029',
+      at: '2026-11-17 14:15', actor: '刘磊',
+      docs: [
+        { no: 'MP-0029', state: '开发中', at: '2026-11-17 14:15', actor: '刘磊' },
+        { no: 'MP-0020', state: '已归档', at: '2026-11-10 13:58', actor: '系统管理员' },
+      ],
+    },
+    { panel: 'RD_ASM_PROC', label: '组装工艺清单', state: '未开发', done: false },
+    { panel: 'RD_INSP_PLAN', label: '出货检验计划表', state: '未开发', done: false },
+  ], { actor: '谢琴', at: '2026-11-13 14:41' })
+
+  const steps = flowStepsOf(r)
+  // 纯函数：每一步都带产品编号（不是单据编号）；节点的 actor/docs 必须透传
+  assert.equal(steps[0].productCode, 'A-54-08', '产品信息表那步带产品编号')
+  assert.equal(steps[0].actor, '谢琴', '产品信息表那步带填写人')
+  assert.equal(steps[1].productCode, 'A-54-08', '文件节点同样带产品编号')
+  assert.equal(steps[1].actor, '陈秀丽', '文件节点的 actor 必须透传（上一轮漏映射）')
+  assert.equal(steps[2].actor, '刘磊')
+  assert.deepEqual(steps[2].docs.map((d) => d.no), ['MP-0029', 'MP-0020'], '多张单全部透传')
+  assert.ok(steps[2].docs.every((d) => d.productCode === 'A-54-08'), '多单据清单每行带产品编号')
+  assert.equal(steps[3].docs.length, 0, '没有单就空数组')
+
+  // 页面模板：步骤行读 productCode/actor，绝不能读 st.docNo；多单据清单读 d.no
+  const page = readFileSync(new URL('../../views/rd/ProductFlow.vue', import.meta.url), 'utf8')
+  const stepRow = page.match(/<div class="pfl-step-row">[\s\S]*?<\/div>/)[0]
+  assert.doesNotMatch(stepRow, /st\.docNo/, '步骤行不得再渲染单据编号')
+  assert.match(stepRow, /st\.productCode/, '步骤行要渲染产品编号')
+  assert.match(stepRow, /st\.actor/, '步骤行要渲染填写人')
+  const docList = page.match(/<ul[^>]*class="pfl-docs"[\s\S]*?<\/ul>/)[0]
+  assert.match(docList, /d\.no/, '多单据清单必须保留单据编号（区分多张单必需）')
+  assert.match(docList, /d\.productCode/, '多单据清单每行补产品编号')
+  assert.match(docList, /d\.actor/, '多单据清单每行补填写人')
+  assert.match(docList, /@click\.stop="openDoc\(d\.no\)"/, '点单号跳转的行为不变')
+})
+
+test('⑰ 产品信息表那步：后端 actor 优先，缺失时回落「填写人」', () => {
+  const withFiller = flowStepsOf(row('A-1', '甲', '已归档', FULL, { 填写人: '谢琴' }))
+  assert.equal(withFiller[0].actor, '谢琴', '旧后端没有 actor 时也不能空着')
+  const withActor = flowStepsOf(row('A-1', '甲', '已归档', FULL, { 填写人: '谢琴', actor: '张莉' }))
+  assert.equal(withActor[0].actor, '张莉', '后端 actor 已解析成姓名时优先用它')
+})
+
+test('⑱ 后端产品信息表行也下发 actor；姓名解析走 displayName，兜底列必须真实存在', () => {
+  const svc = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/service/RdDevProductService.java', import.meta.url), 'utf8')
+  assert.match(svc, /one\.put\("actor", lastActorOf\("RD_PROD_INFO", no\)\)/,
+    '产品信息表行必须下发 actor（上一轮只给 nodeOf 加了）')
+  assert.match(svc, /displayName\(str\(/, 'actor 要解析成姓名（取不到姓名回落账号）')
+  assert.doesNotMatch(svc, /SELECT shr, archived_by/, 'yj_doc_status 没有 archived_by 列（实测 207），不能再查')
+  assert.match(svc, /SELECT shr, pending_by, modify_appr_by FROM yj_doc_status/,
+    '第二级兜底改查真实列：shr / pending_by / modify_appr_by')
+})

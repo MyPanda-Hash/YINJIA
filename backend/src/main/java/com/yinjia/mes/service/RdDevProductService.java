@@ -122,6 +122,10 @@ public class RdDevProductService {
             one.put("二级负责人", l2Owner == null ? "" : l2Owner);
             // 产品信息表这一步的最后操作时间(与 4 个文件节点同一口径,见 lastActionAt)
             one.put("at", lastActionAt("RD_PROD_INFO", no));
+            // 2026-11-20：产品信息表这一步也要下发 actor。
+            //   ⚠ 上一轮(2026-11-19)只给 nodeOf 的 4 个文件节点加了 actor，头表这行漏了 ⇒
+            //   前端 flowStepsOf 读 row.actor 恒为空，步骤 ① 永远不显示填写人(生产实测复现)。
+            one.put("actor", lastActorOf("RD_PROD_INFO", no));
             Map<String, String> owners = devTaskOwners();
             List<Map<String, Object>> nodes = new ArrayList<>();
             int done = 0;
@@ -249,9 +253,17 @@ public class RdDevProductService {
      * <p>取数顺序与 {@link #lastActionAt} 同源、取到就返回：</p>
      * <ol>
      *   <li>{@code yj_form_approval} 最后一条的 operator —— 提交/审批/弃审的人最准；</li>
-     *   <li>退回 {@code yj_doc_status}：审核人 shr > 归档人 archived_by；</li>
+     *   <li>退回 {@code yj_doc_status}：审核人 shr > 提交人 pending_by > 修改审批人 modify_appr_by；</li>
      *   <li>再退回单据头的 {@code asp_user2 / asp_user1}（最近修改/创建人）。</li>
      * </ol>
+     *
+     * <p>返回**姓名**：账号经 {@code yj_user.real_name} 解析；历史/外部账号查不到姓名时原样返回账号
+     * （2026-11-20 用户口径「名字显示成姓名优先，取不到姓名时回落账号」）。</p>
+     *
+     * <p>⚠ 2026-11-20 实测修正：第二级原来查 {@code archived_by}，而 {@code yj_doc_status}
+     * **没有这一列**（生产库列清单里只有 {@code archived} 标志和 {@code archived_at}），
+     * 整条 SELECT 报 207 后被 catch 吞掉 ⇒ 这一级永远不生效、直接掉到第三级。
+     * 改为查真实存在的列，避免"看着有三档、实际只有两档"。</p>
      */
     private String lastActorOf(String panelCode, String no) {
         if (panelCode == null || no == null || no.isBlank()) return "";
@@ -259,15 +271,19 @@ public class RdDevProductService {
             List<Map<String, Object>> rows = jdbc.queryForList(
                     "SELECT TOP 1 operator FROM yj_form_approval WHERE panel_code = ? AND form_no = ?"
                             + " AND ISNULL(operator,'') <> '' ORDER BY create_time DESC", panelCode, no);
-            if (!rows.isEmpty() && rows.get(0).get("operator") != null) return str(rows.get(0).get("operator"));
+            if (!rows.isEmpty()) {
+                String name = displayName(str(rows.get(0).get("operator")));
+                if (name != null) return name;
+            }
         } catch (Exception ignore) { /* 留痕表缺 ⇒ 退回状态表 */ }
         try {
             List<Map<String, Object>> rs = jdbc.queryForList(
-                    "SELECT shr, archived_by FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?", panelCode, no);
+                    "SELECT shr, pending_by, modify_appr_by FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
+                    panelCode, no);
             if (!rs.isEmpty()) {
-                for (String k : new String[]{"shr", "archived_by"}) {
-                    Object v = rs.get(0).get(k);
-                    if (v != null && !String.valueOf(v).isBlank()) return String.valueOf(v);
+                for (String k : new String[]{"shr", "pending_by", "modify_appr_by"}) {
+                    String name = displayName(str(rs.get(0).get(k)));
+                    if (name != null) return name;
                 }
             }
         } catch (Exception ignore) { /* 列缺失 ⇒ 下一档 */ }
@@ -278,8 +294,8 @@ public class RdDevProductService {
                         "SELECT TOP 1 asp_user2, asp_user1 FROM " + def.headTable() + " WHERE [单据编号] = ?", no);
                 if (!h.isEmpty()) {
                     for (String k : new String[]{"asp_user2", "asp_user1"}) {
-                        Object v = h.get(0).get(k);
-                        if (v != null && !String.valueOf(v).isBlank()) return String.valueOf(v);
+                        String name = displayName(str(h.get(0).get(k)));
+                        if (name != null) return name;
                     }
                 }
             }
