@@ -8,7 +8,11 @@
     </header>
 
     <div class="smq-bar">
-      <el-input v-model="q.name" class="smq-in" clearable :placeholder="tt('材料名（支持片段）')" />
+      <!-- 字段查询（2026-11-19 用户口径）：「查询可以根据字段内容进行查询，字段加入主批次、材料名」 -->
+      <el-select v-model="q.field" class="smq-in-sm2" size="default" :placeholder="tt('字段')">
+        <el-option v-for="f in FIELDS" :key="f" :label="tt(f)" :value="f" />
+      </el-select>
+      <el-input v-model="q.keyword" class="smq-in" clearable :placeholder="tt('关键字（片段）')" />
       <span class="smq-label">{{ tt('批次起止') }}</span>
       <el-input v-model="q.batchFrom" class="smq-in smq-in-sm" clearable :placeholder="tt('起')" />
       <span class="smq-dash">~</span>
@@ -67,7 +71,8 @@ import QRCode from 'qrcode'
 const rows = ref([])
 const loading = ref(false)
 const denied = ref(false)
-const q = reactive({ name: '', batchFrom: '', batchTo: '' })
+const FIELDS = ['主批次', '材料名', '子批次', '异常情况描述', '录入人', '单据日期']
+const q = reactive({ name: '', batchFrom: '', batchTo: '', field: '主批次', keyword: '' })
 const qr = reactive({ open: false, dataUrl: '', text: '' })
 
 const fileText = (v) => (String(v || '').trim() ? tt('已上传') : '—')
@@ -99,7 +104,7 @@ async function load() {
   loading.value = true
   denied.value = false
   try {
-    const res = await request.get('/px/selfmadeQuery', { params: { name: q.name, batchFrom: q.batchFrom, batchTo: q.batchTo } })
+    const res = await request.get('/px/selfmadeQuery', { params: { name: q.name, batchFrom: q.batchFrom, batchTo: q.batchTo, field: q.field, keyword: q.keyword } })
     rows.value = Array.isArray(res?.data) ? res.data : []
   } catch (e) {
     denied.value = true
@@ -150,6 +155,7 @@ onMounted(load)
 .smq-label { font-size: 13px; color: #606266; }
 .smq-in { width: 200px; }
 .smq-in-sm { width: 110px; }
+.smq-in-sm2 { width: 130px; }
 .smq-dash { color: #909399; }
 .smq-card { border: 1px solid #f0f0f0; border-radius: 6px; padding: 12px; }
 .smq-denied { padding: 24px; text-align: center; color: #909399; }

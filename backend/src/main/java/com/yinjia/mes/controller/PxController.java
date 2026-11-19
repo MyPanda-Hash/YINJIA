@@ -1348,9 +1348,11 @@ public class PxController {
     public ApiResult<List<Map<String, Object>>> selfmadeQuery(
             @org.springframework.web.bind.annotation.RequestParam(required = false) String name,
             @org.springframework.web.bind.annotation.RequestParam(required = false) String batchFrom,
-            @org.springframework.web.bind.annotation.RequestParam(required = false) String batchTo) {
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String batchTo,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String field,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String keyword) {
         perm.requirePanelView("RD_SELFMADE");
-        return ApiResult.ok(queryService.selfmadeRows(name, batchFrom, batchTo));
+        return ApiResult.ok(queryService.selfmadeRows(name, batchFrom, batchTo, field, keyword));
     }
 
     @GetMapping("/sampleFlow")

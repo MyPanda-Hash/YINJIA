@@ -192,7 +192,7 @@ public class QueryService {
      * 返回列与 Excel《记录查询界面》一致：主批次 / 子批次 / 流程卡 / 配料表 / 异常情况描述 /
      * 录入人 / **录入日期**（用户补充要求显示这一列）。
      */
-    public List<java.util.Map<String, Object>> selfmadeRows(String name, String batchFrom, String batchTo) {
+    public List<java.util.Map<String, Object>> selfmadeRows(String name, String batchFrom, String batchTo, String field, String keyword) {
         StringBuilder sql = new StringBuilder(
                 "SELECT h.[单据编号], ISNULL(h.[材料名], N'') AS 材料名, ISNULL(h.[主批次], N'') AS 主批次, "
               + "ISNULL(d.[子批次], N'') AS 子批次, ISNULL(d.[流程卡], N'') AS 流程卡, "
@@ -202,6 +202,20 @@ public class QueryService {
               + "WHERE ISNULL(h.asp_cancel, 'N') <> 'Y' AND ISNULL(d.asp_cancel, 'N') <> 'Y'");
         java.util.List<Object> args = new java.util.ArrayList<>();
         if (name != null && !name.isBlank()) { sql.append(" AND h.[材料名] LIKE ?"); args.add("%" + name.trim() + "%"); }
+        // 2026-11-19 用户口径：「查询可以根据字段内容进行查询，字段加入主批次、材料名」
+        //   字段白名单（列名写死、绝不拼外部输入）→ 该字段 LIKE 关键字；field 为空则忽略。
+        if (keyword != null && !keyword.isBlank()) {
+            String col = switch (field == null ? "" : field.trim()) {
+                case "主批次" -> "h.[主批次]";
+                case "材料名" -> "h.[材料名]";
+                case "子批次" -> "d.[子批次]";
+                case "异常情况描述" -> "d.[异常情况描述]";
+                case "录入人" -> "h.[录入人]";
+                case "单据日期" -> "CONVERT(varchar(10), h.[单据日期], 23)";
+                default -> null;
+            };
+            if (col != null) { sql.append(" AND ISNULL(" + col + ", '') LIKE ?"); args.add("%" + keyword.trim() + "%"); }
+        }
         if (batchFrom != null && !batchFrom.isBlank()) { sql.append(" AND ISNULL(h.[主批次],'') >= ?"); args.add(batchFrom.trim()); }
         if (batchTo != null && !batchTo.isBlank()) { sql.append(" AND ISNULL(h.[主批次],'') <= ?"); args.add(batchTo.trim()); }
         sql.append(" ORDER BY h.[主批次] DESC, h.[单据编号] DESC, TRY_CAST(d.[序号] AS int)");

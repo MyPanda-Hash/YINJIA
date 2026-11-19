@@ -10,6 +10,11 @@
         <el-input v-model="head['单据编号']" class="sme-no" readonly size="small" placeholder="单据编号" />
         <el-date-picker v-model="head['单据日期']" type="date" value-format="YYYY-MM-DD" size="small" class="sme-date" :clearable="false" />
         <el-button size="small" @click="createNew">{{ tt('新增') }}</el-button>
+        <!-- 打开已有单据改（2026-11-19 用户口径：「录入是可以新增单据的，就是不同材料不同单据」）：
+             进入页面**默认是空白新单**，不会误改上一张；要改旧单从这里选。 -->
+        <el-select v-model="openNo" class="sme-open" size="small" clearable filterable :placeholder="tt('打开已有单据')" @change="openDoc">
+          <el-option v-for="d in docList" :key="d.单据编号" :label="`${d.单据编号}${d['材料名'] ? ' · ' + d['材料名'] : ''}`" :value="d.单据编号" />
+        </el-select>
         <el-button size="small" type="primary" :loading="saving" @click="save">{{ tt('保存') }}</el-button>
         <el-button size="small" :disabled="!head['单据编号']" @click="removeDoc">{{ tt('删除') }}</el-button>
         <span class="sme-tip">{{ tt('子批次自动生成，最少 1 行最多 10 行') }}</span>
@@ -91,6 +96,8 @@ import QRCode from 'qrcode'
 
 const head = reactive({ 单据编号: '', 单据日期: new Date().toISOString().slice(0, 10), 材料名: '', 主批次: '', 录入人: '练庆文' })
 const rows = ref([])
+const docList = ref([])
+const openNo = ref('')
 const saving = ref(false)
 const qr = reactive({ dataUrl: '', text: '' })
 let seq = 0
@@ -142,6 +149,7 @@ async function save() {
     const res = await request.post('/px/callButton', { panelCode: 'RD_SELFMADE', buttonName: '保存', formData: payload, buttonParam: {} })
     const no = res?.data?.编号 || head['单据编号']
     await load(no)   // 重新拉取拿回行 id（附件格要靠 id 做锚点）
+    await fetchDocs()
     ElMessage.success(tt('已保存'))
   } catch (e) {
     ElMessage.error(tt('保存失败：') + (e?.response?.data?.message || e?.message || ''))
@@ -175,10 +183,24 @@ function printQr() {
   w.document.close(); w.focus(); w.print()
 }
 
+/** 读最近单据列表（供「打开已有单据」下拉；不改当前编辑中的单） */
+async function fetchDocs() {
+  try {
+    const res = await request.post('/px/queryFormDataList', { panelCode: 'RD_SELFMADE', pageNo: 1, pageSize: 50 })
+    docList.value = ((res?.data?.list) || []).map((r) => ({ 单据编号: r['单据编号'], 材料名: r['材料名'] }))
+  } catch (e) { docList.value = [] }
+}
+
+async function openDoc(no) {
+  if (!no) return
+  await load(no)
+}
+
 onMounted(async () => {
-  const any = await load('')
-  if (!any) rows.value = [newRow()]
+  // 2026-11-19 用户口径「不同材料不同单据」：进页面**空白新单**，不再自动打开上一张（避免误改）
+  rows.value = [newRow()]
   renumber()
+  await fetchDocs()
 })
 </script>
 
@@ -192,7 +214,8 @@ onMounted(async () => {
 .sme-qr-text { font-size: 12px; color: #222; margin-top: 4px; word-break: break-all; }
 .sme-qr-ops { margin-top: 2px; }
 .sme-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
-.sme-no { width: 190px; } .sme-date { width: 150px; }
+.sme-no { width: 190px; }
+.sme-open { width: 220px; } .sme-date { width: 150px; }
 .sme-tip { font-size: 12px; color: #909399; }
 .sme-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .sme-table th, .sme-table td { border: 1px solid #8a8a8a; padding: 4px 6px; font-size: 13px; vertical-align: middle; }
