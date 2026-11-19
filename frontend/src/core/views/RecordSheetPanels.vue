@@ -159,7 +159,6 @@
                现在只是直接引用编号但是没有前缀标识」—— 只有声明了 dualDocNo 的记录表才加，
                且是**标签前缀**（不写进数据），其它面板/单据纸面一个字不动。 -->
           <td v-if="docnoSpan > 0" class="rs-td rs-docno" :colspan="docnoSpan">
-            <span v-if="cfg.dualDocNo" class="rs-docno-pre">{{ tt('项目编号') }}：</span>
             <!-- ⚠ 同格版式的排排坐必须落在**内层 div** 上:给 <td> 加 display:flex 会让它不再是
                  table-cell(浏览器另生匿名格包住它,colspan 随之失效 —— 实测 colspan=10 的格子只剩
                  一列宽、公司名与编号挤成两行)。缺省(非 rs-onecell)时这层 div 就是普通块级,
@@ -168,45 +167,54 @@
                  :style="sameCellDocno && oneCellDocnoW ? { '--docno-w': oneCellDocnoW + 'px' } : null">
               <!-- 同格版式:公司名与编号同处一格(设计一格含两段文字),公司名内联在编号左边 -->
               <span v-if="sameCellDocno" class="rs-company-inline">{{ COMPANY_NAME }}</span>
-              <!-- 文档编号(纸张右上角那一格)。前置标识「编号：」**由 head.docnoPrefix 决定**:
-                   设计原表的原值都是裸编号(碱性 N2=" YJ-PD-01"、功能性滤效 K2="YJ-PD-01"…),
-                   故缺省 false = 按设计显示裸值;哪个面板要标识(或非纸面场景要提示)就在它的 head 里写 true。 -->
-              <!-- 受控表单编号(逐页常量 YJ-RIR001 / YJ-XS002)—— **2026-10-29 起停用**
-                   (用户口径:「这个应该是显示表格编号,不应该是 YJ-RIR001,这个改为单据编号,
-                    自动生成,内容就是表格编号」)。
-                   现在这一格统一显示**后端「新增」时自动生成的单据编号**(DT-…),
-                   与汇总表「表格编号」列同一份值;docNoStatic 配置保留但不再优先渲染 ——
-                   留它是因为打印空白模板/设计对照还可能引用,删掉会让文档失据。 -->
-              <!-- ⚠ 2026-11-06 起 docNoStatic 优先级最高：声明了受控表单编号的面板，编辑态也不出
-                   参照控件/输入框（否则点开还能改，与"固定"自相矛盾）。 -->
-              <template v-if="docNoStatic"><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span><span class="rs-docno-static">{{ docNoStatic }}</span></template>
-              <div v-else-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
-                <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>
-                <span class="rs-ref-text" :class="{ 'rs-docno-empty': !head['文档编号'] }">{{ head['文档编号'] || tt('点击选择') }}</span>
-                <el-icon class="rs-ref-ico"><Search /></el-icon>
+              <!-- 编号行（2026-11-20 用户报障「前缀和编号叠成上下两行」）：前缀与编号/控件收进
+                   同一层单行弹性行（flex 只加这层 div，**不加 <td>** —— 会丢 colspan，见上）。
+                   值过长时朝**左**溢出到公司名右侧的留白，不换行、不省略，也不把前缀挤到上一行。 -->
+              <div class="rs-docno-line" :class="{ 'rs-docno-line--pre': !!cfg.dualDocNo }">
+                <!-- 2026-11-19 用户口径：「所有数据记录表右上角加一个项目编号前缀，
+                     现在只是直接引用编号但是没有前缀标识」—— 只有声明了 dualDocNo 的记录表才加，
+                     且是**标签前缀**（不写进数据），其它面板/单据纸面一个字不动。 -->
+                <span v-if="cfg.dualDocNo" class="rs-docno-pre">{{ tt('项目编号') }}：</span>
+                <!-- 文档编号(纸张右上角那一格)。前置标识「编号：」**由 head.docnoPrefix 决定**:
+                     设计原表的原值都是裸编号(碱性 N2=" YJ-PD-01"、功能性滤效 K2="YJ-PD-01"…),
+                     故缺省 false = 按设计显示裸值;哪个面板要标识(或非纸面场景要提示)就在它的 head 里写 true。 -->
+                <!-- 受控表单编号(逐页常量 YJ-RIR001 / YJ-XS002)—— **2026-10-29 起停用**
+                     (用户口径:「这个应该是显示表格编号,不应该是 YJ-RIR001,这个改为单据编号,
+                      自动生成,内容就是表格编号」)。
+                     现在这一格统一显示**后端「新增」时自动生成的单据编号**(DT-…),
+                     与汇总表「表格编号」列同一份值;docNoStatic 配置保留但不再优先渲染 ——
+                     留它是因为打印空白模板/设计对照还可能引用,删掉会让文档失据。 -->
+                <!-- ⚠ 2026-11-06 起 docNoStatic 优先级最高：声明了受控表单编号的面板，编辑态也不出
+                     参照控件/输入框（否则点开还能改，与"固定"自相矛盾）。 -->
+                <template v-if="docNoStatic"><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span><span class="rs-docno-static">{{ docNoStatic }}</span></template>
+                <div v-else-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
+                  <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>
+                  <span class="rs-ref-text" :class="{ 'rs-docno-empty': !head['文档编号'] }">{{ head['文档编号'] || tt('点击选择') }}</span>
+                  <el-icon class="rs-ref-ico"><Search /></el-icon>
+                </div>
+                <!-- 文档类面板(编号字段=文档编号):编号由人填,给输入框 -->
+                <div v-else-if="editable && docNoKey === '文档编号'" class="rs-docno-wrap">
+                  <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>
+                  <!-- 提示词口径(2026-10-28 用户口径「编号的占位背景提示词会让人误会是固定的一个编号」):
+                       带前缀时原先写的是**前缀本身**(`'编号：'`)⇒ 左侧黑字「编号：」与框里灰字一模一样,
+                       读起来像"这里已经印好一个编号了"。改成「请输入编号」= 明确这是**要你填**的空格;
+                       不带前缀的 7 张裸编号设计表仍用字段名(docNoKey)做提示,它们没有前缀可重复。 -->
+                  <el-input v-model="head[docNoKey]" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt(docnoPrefix ? '请输入编号' : docNoKey)" @input="emit('dirty')" />
+                </div>
+                <!-- 单据类面板(编号字段=单据编号):号是后端「新增」时自动生成的,只读显示 ——
+                     给输入框既没意义又会被误改(打印/预览还必须看得见号) -->
+                <!-- 只读兜底口径(2026-10-28 用户口径「会让人误会是固定的一个编号在这边」):
+                     原先末尾还挂着写死的 'YJ-PD-01' —— 一张**还没发号**的单在屏幕上印出假编号。
+                     cfg.docNoDefault 保留(那是设计纸面的样板号,打印空白模板要用),
+                     两者都取不到时显示「—」= 明确"这里还没有号",不再编造。 -->
+                <!-- 受控表单编号(2026-11-06 用户口径 A)：「产品文件右上角全部是文件编号，固定的」
+                     —— 产品信息表 YJ-QR-152 / 烧结工艺清单 YJ-QR-146-1 / X烧结工艺清单 YJ-QR-146-1 /
+                     规格书 YJ-QR-153。声明了 pages[i].docNoStatic 的面板，这一格印常量文本（编辑态与
+                     只读态一致、不出输入框、不可改）；单据自身编号（SD-…/MP-…）仍在左侧选单栏与
+                     产品文件列表里，两张单靠「产品编号」关联（用户口径：「单据之间就通过产品编号来关联」）。
+                     未声明 docNoStatic 的面板逐字不变。 -->
+                <template v-else><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>{{ head[docNoKey] || cfg.docNoDefault || '—' }}</template>
               </div>
-              <!-- 文档类面板(编号字段=文档编号):编号由人填,给输入框 -->
-              <div v-else-if="editable && docNoKey === '文档编号'" class="rs-docno-wrap">
-                <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>
-                <!-- 提示词口径(2026-10-28 用户口径「编号的占位背景提示词会让人误会是固定的一个编号」):
-                     带前缀时原先写的是**前缀本身**(`'编号：'`)⇒ 左侧黑字「编号：」与框里灰字一模一样,
-                     读起来像"这里已经印好一个编号了"。改成「请输入编号」= 明确这是**要你填**的空格;
-                     不带前缀的 7 张裸编号设计表仍用字段名(docNoKey)做提示,它们没有前缀可重复。 -->
-                <el-input v-model="head[docNoKey]" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt(docnoPrefix ? '请输入编号' : docNoKey)" @input="emit('dirty')" />
-              </div>
-              <!-- 单据类面板(编号字段=单据编号):号是后端「新增」时自动生成的,只读显示 ——
-                   给输入框既没意义又会被误改(打印/预览还必须看得见号) -->
-              <!-- 只读兜底口径(2026-10-28 用户口径「会让人误会是固定的一个编号在这边」):
-                   原先末尾还挂着写死的 'YJ-PD-01' —— 一张**还没发号**的单在屏幕上印出假编号。
-                   cfg.docNoDefault 保留(那是设计纸面的样板号,打印空白模板要用),
-                   两者都取不到时显示「—」= 明确"这里还没有号",不再编造。 -->
-              <!-- 受控表单编号(2026-11-06 用户口径 A)：「产品文件右上角全部是文件编号，固定的」
-                   —— 产品信息表 YJ-QR-152 / 烧结工艺清单 YJ-QR-146-1 / X烧结工艺清单 YJ-QR-146-1 /
-                   规格书 YJ-QR-153。声明了 pages[i].docNoStatic 的面板，这一格印常量文本（编辑态与
-                   只读态一致、不出输入框、不可改）；单据自身编号（SD-…/MP-…）仍在左侧选单栏与
-                   产品文件列表里，两张单靠「产品编号」关联（用户口径：「单据之间就通过产品编号来关联」）。
-                   未声明 docNoStatic 的面板逐字不变。 -->
-              <template v-else><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>{{ head[docNoKey] || cfg.docNoDefault || '—' }}</template>
             </div>
           </td>
           <td v-if="gapRightSpan > 0" class="rs-td" :colspan="gapRightSpan"></td>
@@ -5903,8 +5911,6 @@ body.approval-printing .rs-mold-pick { display: none !important; }
 .rs-td :deep(.rs-range-in .el-range__icon) {
   display: none;
 }
-/* 纸面格内控件一律铺满格子(文本/下拉/自动完成) */
-.rs-docno-pre { font-size: 12px; color: #595959; margin-right: 2px; }
 /* 值格居中（2026-11-19，烧结/X烧结两张工艺清单）：
    只居中**数据格**（.rs-td 里非标签的 td）与其中的输入控件，标签列与栏目带不动。 */
 .rs-align-center .rs-td:not(.rs-label):not(.rs-company-cell):not(.rs-topic-cell):not(.rs-info-label) {
@@ -5996,6 +6002,46 @@ body.approval-printing .rs-mold-pick { display: none !important; }
   padding: 6px 14px !important;
   vertical-align: middle;
 }
+/* 编号格标签前缀（2026-11-19 用户口径；2026-11-20 修排版）：
+   与 DataRecordSheet.vue 的 .rs-docno-pre **同款**（两处值不许各自漂）；纯展示，打印态照常显示。
+   间距不写 margin，统一由 .rs-docno-line--pre 的 gap 给。 */
+.rs-docno-pre {
+  flex: none;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #595959;
+}
+/* 编号行（2026-11-20 用户报障「前缀与编号叠成上下两行」）：
+   前缀是行内 span、编号值/控件是块级 div ⇒ 原样排必然分成两行。
+   改法：外层一行 flex + nowrap；值区不缩（flex:0 0 auto），值过长时靠 flex-end 的负剩余
+   空间朝**左**溢出到左侧留白 —— 不换行、不省略号、不截断，也不把前缀挤到上一行。
+   ⚠ flex 只加在这层内层 div，**不加 <td>**：td 脱离 table-cell 会另生匿名格、colspan 失效
+      （见模板同处注释，2026-11-11 实测）。 */
+.rs-docno-line--pre {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+/* 值区不缩：否则 flex 会把编号压窄，nowrap 的文字溢到相邻格/页边 */
+.rs-docno-line--pre > * {
+  flex: 0 0 auto;
+}
+/* 参照框：有富余时铺满剩余宽度；格子窄时保持整串编号宽度（min-content=max-content）⇒ 整行朝左溢出 */
+.rs-docno-line--pre > .rs-ref-ctl {
+  flex: 1 1 auto;
+  min-width: max-content;
+}
+/* 参照文本默认允许折行（供别的格子），编号格里必须单行 */
+.rs-docno-line--pre .rs-ref-text {
+  white-space: nowrap;
+}
+/* 编号格输入框：与 DataRecordSheet 同宽（160px），不再按百分比跟着窄格子压到 90% */
+.rs-docno-line--pre .rs-docno-input {
+  width: 160px;
+}
 .rs-docno-input {
   width: 90%;
 }
@@ -6036,12 +6082,18 @@ body.approval-printing .rs-mold-pick { display: none !important; }
 }
 /* 同格版式：编号控件**固定为下方信息块的那几列宽**（--docno-w），不再吃满整格剩余宽度。
    2026-11-11 用户口径「选择框应该收短与下边平齐」——原来 flex:1 1 auto 会让它左缘压到
-   信息块中段，与下面 5 行不齐。未声明 --docno-w 时退回原弹性行为。 */
-.rs-onecell > .rs-docno-wrap,
-.rs-onecell > .rs-ref-ctl {
+   信息块中段，与下面 5 行不齐。未声明 --docno-w 时退回原弹性行为。
+   2026-11-20：前缀移进编号行后，宽度仍钉在**编号控件**上（前缀落在它左边的留白），
+   控件左缘继续与下方信息块对齐，这条口径不变。 */
+.rs-onecell > .rs-docno-line > .rs-docno-wrap,
+.rs-onecell > .rs-docno-line > .rs-ref-ctl {
   flex: 0 0 var(--docno-w, auto);
   min-width: 0;
   max-width: 100%;
+}
+/* 同格版式的输入框仍按控件原口径（90% 铺满 --docno-w 的编号块），不套用上面 160px 单列口径 */
+.rs-onecell > .rs-docno-line > .rs-docno-wrap > .rs-docno-input {
+  width: 90%;
 }
 .rs-docno-empty {
   color: #b6bcc6;
@@ -7347,5 +7399,23 @@ body.approval-printing .rsp-sheet .el-input__clear {
   .rs-dev-badge {
     display: none !important;
   }
+}
+/* ═══ 编号格：打印态保持「前缀 + 编号」同一行（2026-11-20 用户报障）═══
+   上面的打印规则会把 `.rsp-sheet .rs-td` 的 white-space 改成 normal（那是给长文本折行用的），
+   编号行必须反向钉回 nowrap；值长时仍按屏幕口径朝左溢出，不换行、不省略、不截断。
+   两条打印路径各一条（@media print / 侧栏「打印」按钮 body.approval-printing）。 */
+@media print {
+  .rsp-sheet .rs-docno-line--pre,
+  .rsp-sheet .rs-docno-line--pre * {
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+}
+body.approval-printing .rsp-sheet .rs-docno-line--pre,
+body.approval-printing .rsp-sheet .rs-docno-line--pre * {
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
 }
 </style>

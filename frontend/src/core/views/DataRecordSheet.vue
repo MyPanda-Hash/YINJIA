@@ -22,18 +22,24 @@
             <!-- 文档编号:配置为参照时(数据记录表→立项申请右上角编号)点击弹参照;否则保持纯输入。
                  2026-10-29 用户口径「选择编号的弹窗改为左右两边,左边还是立项申请的项目编号关联,
                  右边加入测试申请单的单据编号」⇒ 数据记录表这格走**左右双源**弹窗。 -->
-            <!-- 2026-11-20 用户口径：前缀是**展示标签**，与其它 8 张数据记录表同款；
-                 打印态照常显示（不要加 .no-print、也不要进 @media print 的隐藏名单）。 -->
-            <span class="rs-docno-pre">{{ tt('项目编号') }}：</span>
-            <div v-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openDocNoPick">
-              <span class="rs-ref-text">{{ head['文档编号'] || tt('点击选择') }}</span>
-              <el-icon class="rs-ref-ico"><Search /></el-icon>
+            <!-- 2026-11-20 用户报障「『项目编号：』和编号叠成了上下两行」：前缀是行内 span、
+                 值/参照框是块级 div，原样排就是两行。这里把两者收进一层**单行弹性行**
+                 .rs-docno-line--pre（与 RecordSheetPanels 同一套 class/规则，两处口径不许漂）：
+                 同一行、右对齐、不换行；值过长时朝**左**溢出到公司名右侧的留白，不截断、不省略。 -->
+            <div class="rs-docno-line rs-docno-line--pre">
+              <!-- 2026-11-20 用户口径：前缀是**展示标签**，与其它 7 张数据记录表同款；
+                   打印态照常显示（不要加 .no-print、也不要进 @media print 的隐藏名单）。 -->
+              <span class="rs-docno-pre">{{ tt('项目编号') }}：</span>
+              <div v-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openDocNoPick">
+                <span class="rs-ref-text">{{ head['文档编号'] || tt('点击选择') }}</span>
+                <el-icon class="rs-ref-ico"><Search /></el-icon>
+              </div>
+              <el-input v-else-if="editable" v-model="head['文档编号']" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt('请输入编号')" @input="emit('dirty')" />
+              <!-- 只读兜底:原先写死 'YJ-PD-01'(设计纸面样板号)—— 在线看一张**还没发号**的单时
+                   屏幕上印出假编号,容易被当成"这张单的编号就是它"(2026-10-28 用户口径)。
+                   取不到号就显示「—」,不再编造。 -->
+              <span v-else class="rs-docno-text">{{ head['文档编号'] || head['单据编号'] || '—' }}</span>
             </div>
-            <el-input v-else-if="editable" v-model="head['文档编号']" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt('请输入编号')" @input="emit('dirty')" />
-            <!-- 只读兜底:原先写死 'YJ-PD-01'(设计纸面样板号)—— 在线看一张**还没发号**的单时
-                 屏幕上印出假编号,容易被当成"这张单的编号就是它"(2026-10-28 用户口径)。
-                 取不到号就显示「—」,不再编造。 -->
-            <span v-else class="rs-docno-text">{{ head['文档编号'] || head['单据编号'] || '—' }}</span>
           </td>
         </tr>
         <tr>
@@ -840,12 +846,56 @@ function removeRow(i) {
   padding: 6px 14px !important;
   vertical-align: middle;
 }
+/* ═══ 编号格：前缀 + 编号同一行（2026-11-20 用户报障「叠成上下两行」）═══
+   与 RecordSheetPanels 的 .rs-docno-line--pre / .rs-docno-pre **同一套规则**（两处不许漂）。
+   根因：前缀是行内 span、编号值/参照框是块级 div ⇒ 原样排必然分成两行。
+   改法：外层一行 flex + nowrap；值区不缩（flex:0 0 auto），值过长时靠 flex-end 的负剩余
+   空间朝**左**溢出到公司名右侧的留白 —— 不换行、不省略、不截断，也不把前缀挤到上一行。
+   ⚠ flex 只加在这层内层 div，**不加 <td>**：td 一旦不再是 table-cell 会另生匿名格。 */
+.rs-docno-line--pre {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+/* 值区不缩：否则 flex 会把编号压窄，nowrap 的文字溢到相邻格/页边 */
+.rs-docno-line--pre > * {
+  flex: 0 0 auto;
+}
+/* 参照框：有富余时铺满剩余宽度；格子窄时保持整串编号宽度（min-content=max-content）⇒ 整行朝左溢出 */
+.rs-docno-line--pre > .rs-ref-ctl {
+  flex: 1 1 auto;
+  min-width: max-content;
+}
+/* 参照文本默认允许折行（供别的格子），编号格里必须单行 */
+.rs-docno-line--pre .rs-ref-text {
+  white-space: nowrap;
+}
 /* 编号格标签前缀(2026-11-20 用户口径「所有数据记录表右上角加一个项目编号前缀」):
-   与 RecordSheetPanels 的 .rs-docno-pre **同款**(两处值不许各自漂);纯展示,打印态照常显示。 */
+   与 RecordSheetPanels 的 .rs-docno-pre **同款**(两处值不许各自漂);纯展示,打印态照常显示。
+   间距不写 margin，统一由 .rs-docno-line--pre 的 gap 给。 */
 .rs-docno-pre {
+  flex: none;
+  white-space: nowrap;
   font-size: 12px;
   color: #595959;
-  margin-right: 2px;
+}
+/* 打印两条路径（浏览器打印 / 侧栏「打印」按钮）都保持编号单行，不换行、不截断 */
+@media print {
+  .rs-docno-line--pre,
+  .rs-docno-line--pre * {
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+}
+body.approval-printing .rs-docno-line--pre,
+body.approval-printing .rs-docno-line--pre * {
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
 }
 .rs-docno-text {
   display: inline-block;

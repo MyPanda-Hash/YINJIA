@@ -42,14 +42,14 @@ test('编号格在编号前渲染「项目编号：」前缀（三个分支都�
   }
 })
 
-test('前缀样式与 RecordSheetPanels 那条完全同款（12px / #595959 / margin-right 2px）', () => {
+test('前缀样式与 RecordSheetPanels 那条完全同款（12px / #595959 / nowrap，间距交给行 gap）', () => {
   const ruleOf = (src, file) => {
     const m = src.match(/\.rs-docno-pre\s*\{([^}]*)\}/)
     assert.ok(m, `${file} 缺少 .rs-docno-pre 规则`)
     return m[1].replace(/\s+/g, '').replace(/;$/, '')
   }
   const own = ruleOf(sheet, 'DataRecordSheet.vue')
-  assert.equal(own, 'font-size:12px;color:#595959;margin-right:2px')
+  assert.equal(own, 'flex:none;white-space:nowrap;font-size:12px;color:#595959')
   assert.equal(own, ruleOf(panels, 'RecordSheetPanels.vue'), '两处样式要一致，别各自漂移')
 })
 
