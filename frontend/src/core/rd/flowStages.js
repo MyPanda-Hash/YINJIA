@@ -114,7 +114,9 @@ export function buildFlow(p, names = {}, now = '') {
   // ① 立项申请填写:有这张单就算(它存在才查得到)
   put('applyFill', !!s(ap.approvalNo), {
     at: ap.createdAt,
-    actor: person(ap.createdBy, names),
+    // 2026-11-19 用户口径（销售问题汇总 P18）：「立项申请填写要显示**申请立项人**（业务填写人）」，
+    //   不是建单账号 —— 销售用管理员账号代录时，建单人是 admin，业务上写单人却是销售。
+    actor: s(ap.initiator) || person(ap.createdBy, names),
     detail: [s(ap.customer) && `客户：${s(ap.customer)}`, s(ap.projectName) && `机型：${s(ap.projectName)}`]
       .filter(Boolean).join(' / '),
   })

@@ -5074,3 +5074,5 @@ migrate-selfmade-20261119.sql
 migrate-approval-customer-code-20261119.sql
 # 2026-11-19 非开发样品单明细：加 产品编码/产品名称（销售问题 P5）
 migrate-sample-nd-columns-20261119.sql
+# 2026-11-19 立项申请「申请立项人」必填（销售问题 P18）
+migrate-approval-initiator-required-20261119.sql
