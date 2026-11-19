@@ -48,10 +48,10 @@ test('样品组：三张单 + 一个只读进度页（外部-开发 / 内部-开
  * 2026-10-20 用户口径:「填完立项申请提交审批后不知道文件到哪个流程了……在项目管理里面加上一个项目流程管控,
  *   通过立项申请表的编号查流程走到哪里」。⇒ 项目管理组多一张只读盯单页 PROJECT_FLOW(排最后)。
  */
-test('项目管理组:立项申请 → 项目实施计划 → 项目进度查询 → 项目流程管控', () => {
+test('项目管理组:立项申请 → 项目实施计划 → 项目控制列表 → 项目进度查询（2026-11-19 改名）', () => {
   assert.deepEqual(leafCodes(group('rdProject')), ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'PROJECT_FLOW'])
   const flow = group('rdProject').children.find((c) => c.panelCode === 'PROJECT_FLOW')
-  assert.equal(flow.title, '项目流程管控')
+  assert.equal(flow.title, '项目进度查询')   // 2026-11-19 销售问题汇总 P13：项目流程管控 → 项目进度查询
   assert.equal(flow.path, '/rd/projectFlow', '页面级虚拟面板走专用路由,不是 /panelx/list')
   // 2026-11-11 用户口径「新的流程管控面板应该放在产品文件列表」⇒ 产品文件流程管控**不占菜单**:
   // 入口是产品文件列表侧栏那颗「流程管控」按钮(PanelxList),路由 /rd/productFlow 仍存在。

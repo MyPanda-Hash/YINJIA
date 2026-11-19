@@ -478,7 +478,7 @@
               <!-- 2026-11-13 用户口径：「把侧边栏换成右边展开，使用的时候替换右边栏，要有返回按钮」。
                    ⇒ 产品信息表 / 立项申请：点本按钮把**右侧操作栏整体换成预览面板**（带返回）；
                      其余面板仍走原来的窄侧栏卡片预览（openDocPreview），行为逐字不变。 -->
-              <div class="as-side-btn" @click="canPreviewSide ? openSidePreview() : openDocPreview()">{{ tt(isProdDocMatrix ? '产品预览' : '单据预览') }}</div>
+              <div class="as-side-btn" @click="canPreviewSide ? openSidePreview() : openDocPreview()">{{ tt(isProdDocMatrix ? '产品预览' : previewBtnLabel) }}</div>
               <!-- 流程管控(2026-11-11 用户口径:「新的流程管控面板应该放在产品文件列表」)——
                    入口就放在这张表的侧栏,点开是**独立页面** /rd/productFlow(版式照项目流程管控:
                    KPI + 检索 + 5 步时间轴),不再是本页里的内嵌切换。 -->
@@ -2559,6 +2559,7 @@
       :owner-key="previewOwnerKey"
       :subject="previewSubject"
       :panel-code="String(panelCode || '')"
+      :title-text="previewOverlayTitle"
       @close="closeApprovalPreview"
       @jump="jumpToApprovalDoc"
     />
@@ -5068,6 +5069,25 @@ const canPreviewSide = computed(() => PREVIEW_SIDE_PANELS.has(String(panelCode.v
  */
 // 2026-11-17 用户口径：立项申请 + 产品信息表共用同一套「全屏单据预览」（左状态树 + 多条件查询栏）
 const FULL_PREVIEW_PANELS = new Set(['RD_APPROVAL', 'RD_PROD_INFO'])
+/**
+ * 「单据预览」按钮/浮层的**按面板命名**（2026-11-19 销售问题汇总）：
+ *   产品信息表 P11「改为：产品搜索」、P12 预览页标题「改为：产品信息查询」；
+ *   立项申请  P16/P17「改为：立项查询」（按钮与标题同名）。
+ * 未登记的面板仍叫「单据预览」—— 其它 20 多个面板的文案一个字不动。
+ */
+const previewBtnLabel = computed(() => {
+  const p = String(panelCode.value)
+  if (p === 'RD_PROD_INFO') return '产品搜索'
+  if (p === 'RD_APPROVAL') return '立项查询'
+  return '单据预览'
+})
+/** 全屏预览浮层的标题（产品信息查询 / 立项查询 / 单据预览） */
+const previewOverlayTitle = computed(() => {
+  const p = String(panelCode.value)
+  if (p === 'RD_PROD_INFO') return '产品信息查询'
+  if (p === 'RD_APPROVAL') return '立项查询'
+  return '单据预览'
+})
 const canFullPreview = computed(() => FULL_PREVIEW_PANELS.has(String(panelCode.value)))
 /** 全屏预览浮层是否打开 */
 const approvalPreviewOpen = ref(false)

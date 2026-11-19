@@ -27,7 +27,7 @@
               <span aria-hidden="true">←</span> {{ tt('返回') }}
             </button>
             <div class="apv-titles">
-              <h1 class="apv-title">{{ tt('单据预览') }}</h1>
+              <h1 class="apv-title">{{ tt(titleText || '单据预览') }}</h1>
               <p class="apv-sub">
                 {{ props.subject ? tt(props.subject) + ' · ' : '' }}{{ tt('按归属人筛选') }}
               </p>
@@ -189,6 +189,8 @@ const props = defineProps({
   subject: { type: String, default: '' },
   /** 面板码：决定表格出哪些业务列（见 docPreview.PREVIEW_TABLE_COLUMNS） */
   panelCode: { type: String, default: '' },
+  /** 浮层标题：产品信息表=产品信息查询 / 立项申请=立项查询 / 其余=单据预览（2026-11-19） */
+  titleText: { type: String, default: '' },
 });
 const emit = defineEmits(['close', 'jump'])
 
