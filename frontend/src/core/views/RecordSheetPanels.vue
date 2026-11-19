@@ -1442,7 +1442,7 @@
             <td :colspan="ledgerCfg.cols.length" class="rs-empty">{{ tt('加载中…') }}</td>
           </tr>
           <tr v-else-if="!ledgerRows.length">
-            <td :colspan="ledgerCfg.cols.length" class="rs-empty">{{ tt('暂无申请单') }}</td>
+            <td :colspan="ledgerCfg.cols.length" class="rs-empty">{{ tt(ledgerCfg.emptyText || '暂无申请单') }}</td>
           </tr>
         </tbody>
       </table>
@@ -2693,12 +2693,17 @@ async function loadLedger() {
   if (!lg) return
   ledgerLoading.value = true
   try {
-    const res = await request.post('/px/queryFormDataList', {
-      panelCode: props.panelCode,
-      condition: {},
-      pageNo: 1,
-      pageSize: lg.pageSize || 200,
-    })
+    // 台账数据源(2026-11-19):声明了 endpoint 的台账走**专属只读接口**
+    // (现役 = 仪器使用记录汇总 /px/instrUseSummary,行源是头表×行表,不是表头摘要);
+    // 未声明 endpoint 的仍走面板列表接口(测试申请单「委托测试汇总表」原口径不变)。
+    const res = lg.endpoint
+      ? await request.post(lg.endpoint, lg.params || {})
+      : await request.post('/px/queryFormDataList', {
+          panelCode: props.panelCode,
+          condition: {},
+          pageNo: 1,
+          pageSize: lg.pageSize || 200,
+        })
     const data = res?.data || res || {}
     ledgerRows.value = Array.isArray(data.list) ? data.list : []
     // 关联记录表数量:台账里那列要显示"几张"(2026-10-29)。并行取,单张失败不影响台账本身。

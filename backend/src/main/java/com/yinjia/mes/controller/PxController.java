@@ -1389,6 +1389,30 @@ public class PxController {
                 Boolean.parseBoolean(String.valueOf(body.getOrDefault("countOnly", "false")))));
     }
 
+    /**
+     * 实验室仪器使用记录汇总（2026-11-19 用户口径）。
+     *
+     * <p>「为当前的实验室使用记录表增加一个汇总表格」——只读派生表：一行 = 一条使用记录，
+     * 列 = 仪器名称/型号 · 日期 · 起止时间 · 仪器状态 · 是否内校 · 项目名称/内容 · 数量 · 使用人 · 备注。
+     * 数据来自 {@code rd_instr_use_head × rd_instr_use_detail}（见 QueryService#instrUseSummary），
+     * 不落库、不建表；权限沿用 RD_INSTR_USE 的查看权。</p>
+     *
+     * @param body 可选过滤 {dateFrom, dateTo, instrument}；当前页面不填 = 全量
+     */
+    @PostMapping("/instrUseSummary")
+    public ApiResult<Map<String, Object>> instrUseSummary(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView("RD_INSTR_USE");
+        Map<String, Object> req = body == null ? Map.of() : body;
+        String dateFrom = req.get("dateFrom") == null ? null : String.valueOf(req.get("dateFrom")).trim();
+        String dateTo = req.get("dateTo") == null ? null : String.valueOf(req.get("dateTo")).trim();
+        String instrument = req.get("instrument") == null ? null : String.valueOf(req.get("instrument")).trim();
+        List<Map<String, Object>> rows = queryService.instrUseSummary(dateFrom, dateTo, instrument);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("list", rows);
+        out.put("totalSize", rows.size());
+        return ApiResult.ok(out);
+    }
+
     @GetMapping("/getApprovalHistory")
     public ApiResult<List<Map<String, Object>>> getApprovalHistory(@RequestParam String panelCode,
                                                                    @RequestParam String code) {

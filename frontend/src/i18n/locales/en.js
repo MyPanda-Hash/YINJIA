@@ -3363,6 +3363,10 @@ export default {
     /* ── 实验室使用记录表 4 面板(RecordSheetPanels plain 版式)静态词条 ── */
     '测试设备使用登记表': 'Test Equipment Usage Log',
     '实验室仪器使用记录表': 'Lab Instrument Usage Log',
+    // 2026-11-19 新增「使用记录汇总」页签(仪器使用记录表内的只读汇总页)
+    '仪器使用记录': 'Instrument Usage Records',
+    '使用记录汇总': 'Usage Summary',
+    '暂无使用记录': 'No usage records',
     '试剂用量（g）': 'Reagents (g)',
     '试剂用量': 'Reagents',
     '加标水水质指标': 'Spike Water Quality',
