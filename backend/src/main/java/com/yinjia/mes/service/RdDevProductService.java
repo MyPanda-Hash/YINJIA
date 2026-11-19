@@ -216,10 +216,57 @@ public class RdDevProductService {
             n.put("done", "已归档".equals(st) || "已审核".equals(st) || "已生效".equals(st));
             n.put("reaudited", !Boolean.TRUE.equals(n.get("done")) && hasUnaudit(panelCode, no));
             n.put("at", lastActionAt(panelCode, no));
+            // 2026-11-19 销售问题汇总 P14：「要跟项目查询一样，增加填写人名字」
+            n.put("actor", lastActorOf(panelCode, no));
         } catch (Exception ignore) {
             // 面板/表缺失等一律退化成「未开始」,不因一个节点把整份概览打挂
         }
         return n;
+    }
+
+    /**
+     * 该单**最后一次操作的人**（2026-11-19 销售问题汇总 P14：
+     *  「产品文件流程管控要跟项目查询一样，增加填写人名字」）。
+     *
+     * <p>取数顺序与 {@link #lastActionAt} 同源、取到就返回：</p>
+     * <ol>
+     *   <li>{@code yj_form_approval} 最后一条的 operator —— 提交/审批/弃审的人最准；</li>
+     *   <li>退回 {@code yj_doc_status}：审核人 shr > 归档人 archived_by；</li>
+     *   <li>再退回单据头的 {@code asp_user2 / asp_user1}（最近修改/创建人）。</li>
+     * </ol>
+     */
+    private String lastActorOf(String panelCode, String no) {
+        if (panelCode == null || no == null || no.isBlank()) return "";
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT TOP 1 operator FROM yj_form_approval WHERE panel_code = ? AND form_no = ?"
+                            + " AND ISNULL(operator,'') <> '' ORDER BY create_time DESC", panelCode, no);
+            if (!rows.isEmpty() && rows.get(0).get("operator") != null) return str(rows.get(0).get("operator"));
+        } catch (Exception ignore) { /* 留痕表缺 ⇒ 退回状态表 */ }
+        try {
+            List<Map<String, Object>> rs = jdbc.queryForList(
+                    "SELECT shr, archived_by FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?", panelCode, no);
+            if (!rs.isEmpty()) {
+                for (String k : new String[]{"shr", "archived_by"}) {
+                    Object v = rs.get(0).get(k);
+                    if (v != null && !String.valueOf(v).isBlank()) return String.valueOf(v);
+                }
+            }
+        } catch (Exception ignore) { /* 列缺失 ⇒ 下一档 */ }
+        try {
+            PanelRegistry.PanelDef def = registry.panel(panelCode);
+            if (def != null) {
+                List<Map<String, Object>> h = jdbc.queryForList(
+                        "SELECT TOP 1 asp_user2, asp_user1 FROM " + def.headTable() + " WHERE [单据编号] = ?", no);
+                if (!h.isEmpty()) {
+                    for (String k : new String[]{"asp_user2", "asp_user1"}) {
+                        Object v = h.get(0).get(k);
+                        if (v != null && !String.valueOf(v).isBlank()) return String.valueOf(v);
+                    }
+                }
+            }
+        } catch (Exception ignore) { /* 最后兜底也失败 ⇒ 空串 */ }
+        return "";
     }
 
     /**

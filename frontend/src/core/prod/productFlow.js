@@ -48,6 +48,8 @@ export function flowStepsOf(row) {
     // 最后操作时间（2026-11-17 用户口径「每个都显示处理的日期」）：后端 yyyy-MM-dd HH:mm，
     // 取不到就是空串 ⇒ 界面显示「—」，不编造。
     at: String(row.at || ''),
+    // 2026-11-19 销售问题汇总 P14：每个步骤显示填写人
+    actor: String(row.actor || ''),
     state: String(row.state || ''),
     tone: String(row.state || '') === '已归档' ? STEP_STATE.done
       : (String(row.state || '').trim() && String(row.state) !== '草稿' ? STEP_STATE.doing : STEP_STATE.none),

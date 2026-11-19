@@ -80,6 +80,8 @@
                       <!-- 状态标签:与项目流程管控的 el-tag 同款(三档统一说法,不再吐「草稿」原文) -->
                       <el-tag size="small" :type="tagTypeOf(st.tone)" effect="plain">{{ tt(stateLabel(st)) }}</el-tag>
                       <span v-if="st.docNo" class="pfl-step-no">{{ st.docNo }}</span>
+                      <!-- 填写人（2026-11-19 销售问题汇总 P14：「要跟项目查询一样，增加填写人名字」） -->
+                      <span v-if="st.actor" class="pfl-step-actor" :title="tt('填写人')">{{ st.actor }}</span>
                       <!-- 最后操作时间(2026-11-17 取代原来的「处理人」;取不到显示「-」,不编造) -->
                       <span class="pfl-step-at" :title="tt('最后操作时间')">{{ st.at || '-' }}</span>
                     </div>
@@ -364,4 +366,5 @@ onBeforeUnmount(() => window.removeEventListener('resize', syncWidth))
   .pfl-flow { padding-left: 8px; max-width: calc(100vw - 56px); }
   .pfl-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+.pfl-step-actor { margin-left: 8px; font-size: 12px; color: #595959; }
 </style>
