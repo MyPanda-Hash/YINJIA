@@ -141,6 +141,7 @@
                   :title="tt('点击选择')" @click="openProdRef(f.key)"
                 >
                   <span class="as-ref-text">{{ head[f.key] || tt('点击选择') }}</span>
+                  <span v-if="custCodeOf(f.key)" class="as-ref-code">{{ custCodeOf(f.key) }}</span>
                   <el-icon class="as-ref-ico"><Search /></el-icon>
                 </div>
                 <!-- 手填新客户（2026-11-18，Excel #10）：参照选择之外再给一条"档案里没有"的路 -->
@@ -363,6 +364,7 @@
                   </template>
                   <div v-else-if="editable && isRefKey(c.key)" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
                     <span class="as-ref-text">{{ head[c.key] || tt('点击选择') }}</span>
+                    <span v-if="custCodeOf(c.key)" class="as-ref-code">{{ custCodeOf(c.key) }}</span>
                     <el-icon class="as-ref-ico"><Search /></el-icon>
                   </div>
                   <el-date-picker
@@ -1604,6 +1606,17 @@ const prodRefVisible = ref(false)
 const prodRefKey = ref('')
 const prodRefSkipAudit = ref(false)
 const prodRefField = computed(() => fieldMap.value.get(prodRefKey.value) || null)
+/**
+ * 客户编号后缀显示（2026-11-19 用户口径）：
+ *   立项申请表选完客户，纸面在客户名后以灰色小字显示「客户编号」。
+ *   只对 RD_APPROVAL 的「客户名」格生效，其余面板/字段一律返回空串（不改其它单据）。
+ */
+function custCodeOf(key) {
+  if (String(props.panelCode || '') !== 'RD_APPROVAL') return ''
+  if (String(key || '') !== '客户名') return ''
+  return String(props.head?.['客户编号'] || '').trim()
+}
+
 function openProdRef(key) {
   if (!props.editable || !isRefKey(key)) return
   prodRefKey.value = key
@@ -1669,6 +1682,9 @@ function applyApprovalDocNo(source) {
     + String(d.getDate()).padStart(2, '0')
   // 规则：客户编码 + 日期（2026-11-06 用户口径，日期形如 20261106）
   props.head['文档编号'] = code + ymd
+  // 2026-11-19 用户口径：「选取客户之后要显示客户名称和客户编号」
+  //   编码就是上面这段（KHDA 行的编码，抠不到时从名字里提取），一并写进头表供纸面显示。
+  props.head['客户编号'] = code
   emit('dirty')
 }
 
@@ -2085,6 +2101,7 @@ defineExpose({ focusField })
   color: #333;
   text-align: right;
 }
+.as-ref-code { margin-left: 6px; font-size: 12px; color: #8c8c8c; font-variant-numeric: tabular-nums; }
 .as-ref-text.is-empty { color: #a8b6c4; }   /* 空值时的背景提示词,与 input placeholder 同观感 */
 .as-ref-ico {
   flex-shrink: 0;

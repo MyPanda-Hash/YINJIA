@@ -5070,3 +5070,5 @@ migrate-sample-catalog-rev-20261119.sql
 migrate-sample-reg-detail-tab-20261119.sql
 # 2026-11-19 研发管理·自制料（制程记录录入面板 + 头/明细表 + 字段 + 权限骨架）
 migrate-selfmade-20261119.sql
+# 2026-11-19 立项申请表：选客户后带出并显示客户编号（头表加列 + 字段行）
+migrate-approval-customer-code-20261119.sql
