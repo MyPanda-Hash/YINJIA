@@ -67,14 +67,26 @@ export function sampleKpisOf(rows) {
  * 关键字过滤：样品单编号 / 客户名称 / 审核人 / 确认人 / 进度描述，忽略大小写、支持片段。
  * 空关键字 = 不过滤（与产品文件流程管控同口径）。
  */
-export function filterSampleRows(rows, keyword) {
+/** 可查询字段（2026-11-19 用户口径：「做一个根据下面信息的字段内容进行查询的功能」） */
+export const SAMPLE_FLOW_FIELDS = ['样品单编号', '客户名称', '审核人', '确认人', '当前节点', '进度描述', '下单日期']
+
+/**
+ * 样品进度跟踪筛选。
+ * @param {Array} rows /px/sampleFlow 的行
+ * @param {{field?: string, keyword?: string}|string} opt 传字符串时按**全部字段**模糊匹配（兼容旧调用）
+ */
+export function filterSampleRows(rows, opt) {
   const list = Array.isArray(rows) ? rows : []
-  const k = String(keyword == null ? '' : keyword).trim().toLowerCase()
+  const o = typeof opt === 'string' ? { field: '', keyword: opt } : (opt || {})
+  const k = String(o.keyword == null ? '' : o.keyword).trim().toLowerCase()
   if (!k) return list
-  return list.filter((r) => {
-    const hay = [
-      r?.['单据编号'], r?.['客户名称'], r?.['审核人'], r?.['确认人'], r?.['进度描述'],
-    ].map((v) => String(v == null ? '' : v)).join(' ').toLowerCase()
-    return hay.includes(k)
-  })
+  const field = String(o.field || '').trim()
+  // 字段名 → 行里的键（单号列在服务端叫「单据编号」，界面显示「样品单编号」）
+  const KEY = { '样品单编号': '单据编号' }
+  const read = (r, f) => String(r?.[KEY[f] || f] == null ? '' : r[KEY[f] || f])
+  if (field && field !== '全部字段') {
+    return list.filter((r) => read(r, field).toLowerCase().includes(k))
+  }
+  const fields = ['单据编号', '客户名称', '审核人', '确认人', '当前节点', '进度描述', '下单日期']
+  return list.filter((r) => fields.some((f) => read(r, f).toLowerCase().includes(k)))
 }

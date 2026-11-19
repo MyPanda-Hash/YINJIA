@@ -30,7 +30,10 @@
     </section>
 
     <div class="sfl-bar">
-      <el-input
+      <el-select v-model="field" class="sfl-field" :placeholder="tt('字段')">
+          <el-option v-for="f in SAMPLE_FLOW_FIELDS" :key="f" :label="tt(f)" :value="f" />
+        </el-select>
+        <el-input
         v-model="keyword"
         class="sfl-search"
         clearable
@@ -74,6 +77,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { tt } from '@/i18n'
+import { SAMPLE_FLOW_FIELDS } from '@/core/progress/sampleFlow'
 import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import { useRouter } from 'vue-router'
@@ -84,8 +88,10 @@ const router = useRouter()
 const loading = ref(false)
 const denied = ref(false)
 const keyword = ref('')
+/** 字段查询（2026-11-19 用户口径） */
+const field = ref('全部字段')
 
-const shown = computed(() => filterSampleRows(rows.value, keyword.value))
+const shown = computed(() => filterSampleRows(rows.value, { field: field.value, keyword: keyword.value }))
 
 const kpiCards = computed(() => {
   const k = sampleKpisOf(rows.value)
@@ -159,4 +165,5 @@ onMounted(load)
   .sfl-source { white-space: normal; }
 }
 .sf-row-click { cursor: pointer; }
+.sfl-field { width: 130px; margin-right: 8px; }
 </style>
