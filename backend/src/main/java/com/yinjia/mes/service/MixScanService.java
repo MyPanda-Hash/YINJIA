@@ -421,7 +421,11 @@ public class MixScanService {
     // ═══════════════════════ 确认一笔(写入,标记 N) ═══════════════════════
 
     /**
-     * **确认一笔**:把「扫到的物料 + 电子秤/手输的实际用量」**写入**该物料那一行混料记录。
+     * **确认一笔**:把「扫到的物料 + 电子秤读数」**写入**该物料那一行混料记录。
+     *
+     * <p>🔴 2026-11-19 口径:实投量**只认电子秤**(页面已无手输入口,见 MobileMixDoc.vue
+     * 的 {@code liveQty} / {@code canConfirm}) ⇒ 这里只有"没读到稳定秤值"一种失败,
+     * 提示也说清是秤的问题,不再引导人抄一个数进来。
      *
      * <p>🔴 2026-11-18 第四轮改口径(与「生产领料」的 {@code setQty} 完全对齐):
      * <b>覆盖写入</b>,不再累加。上一版同一物料重复扫就相加,现场"扫一次看一眼再确认一次"
@@ -444,7 +448,8 @@ public class MixScanService {
         String materialCode = trim(body.get("物料编号"));
         if (materialCode.isEmpty()) throw new IllegalArgumentException("请先扫物料码");
         BigDecimal qty = round4(body.get("实际用量"));
-        if (qty.signum() <= 0) throw new IllegalArgumentException("实际用量要大于 0(电子秤没取到读数时请手输)");
+        if (qty.signum() <= 0) throw new IllegalArgumentException(
+                "实际用量要大于 0:请确认电子秤已连接并有稳定读数(页面不支持手动填写数量)");
 
         Map<String, Object> exists = first(jdbc.queryForList(
                 "SELECT TOP 1 id, 实际用量 FROM dbo.wo_mixing_list"
