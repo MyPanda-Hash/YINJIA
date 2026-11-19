@@ -314,7 +314,7 @@
               <template v-if="pair.cells">
                 <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
                   <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" :placeholder="c.ph ? tt(c.ph) : emptyMark" @input="emit('dirty')" />
-                  <AnnotatedText v-else class="rs-txt" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
+                  <AnnotatedText v-else class="rs-txt" :text="paperCellText(c.key, head[c.key])" :field-key="String(c.key || '')" />
                 </td>
               </template>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(pair.key) }" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
@@ -360,7 +360,7 @@
                      值仍照常渲染(落到下面的 AnnotatedText),只是不给输入框 ⇒ "只读但看得到回填值"。 -->
                 <el-input v-else-if="editable && !pair.ro && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : emptyMark" @input="emit('dirty')" />
                 <el-input v-else-if="editable && !pair.ro" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
-                <AnnotatedText v-else class="rs-txt" :text="head[pair.key] || ''" :field-key="String(pair.key || '')" />
+                <AnnotatedText v-else class="rs-txt" :text="paperCellText(pair.key, head[pair.key])" :field-key="String(pair.key || '')" />
               </td>
             </template>
           </tr>
@@ -504,7 +504,7 @@
             <template v-if="row.cells">
               <td v-for="c in row.cells" :key="c.key" class="rs-td" :colspan="c.span || 1">
                 <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="100" class="rs-t-in" :placeholder="c.ph || ''" @input="emit('dirty')" />
-                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
+                <AnnotatedText v-else class="rs-txt" :text="paperCellText(c.key, head[c.key])" :field-key="String(c.key || '')" />
               </td>
             </template>
             <td v-else class="rs-td" :colspan="nCols > 1 ? nCols - 1 : 1">
@@ -1050,7 +1050,7 @@
               <template v-if="pair.cells">
                 <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
                   <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" :placeholder="c.ph ? tt(c.ph) : ''" @input="emit('dirty')" />
-                  <AnnotatedText v-else class="rs-txt" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
+                  <AnnotatedText v-else class="rs-txt" :text="paperCellText(c.key, head[c.key])" :field-key="String(c.key || '')" />
                 </td>
               </template>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(pair.key) }" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
@@ -1096,7 +1096,7 @@
                      值仍照常渲染(落到下面的 AnnotatedText),只是不给输入框 ⇒ "只读但看得到回填值"。 -->
                 <el-input v-else-if="editable && !pair.ro && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
                 <el-input v-else-if="editable && !pair.ro" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
-                <AnnotatedText v-else class="rs-txt" :text="head[pair.key] || ''" :field-key="String(pair.key || '')" />
+                <AnnotatedText v-else class="rs-txt" :text="paperCellText(pair.key, head[pair.key])" :field-key="String(pair.key || '')" />
               </td>
             </template>
           </tr>
@@ -1216,7 +1216,7 @@
             <template v-if="row.cells">
               <td v-for="c in row.cells" :key="c.key" class="rs-td" :colspan="c.span || 1">
                 <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="100" class="rs-t-in" :placeholder="c.ph || ''" @input="emit('dirty')" />
-                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
+                <AnnotatedText v-else class="rs-txt" :text="paperCellText(c.key, head[c.key])" :field-key="String(c.key || '')" />
               </td>
             </template>
             <td v-else class="rs-td" :colspan="nCols > 1 ? nCols - 1 : 1">
@@ -1925,6 +1925,7 @@ import request from '@/core/request'
 import { recordSheetConfigs } from './recordSheetConfigs'
 import { buildCoverPatch } from './prodPickCarry.js'
 import { pageOfKeyIn, pageOfLabelIn } from './recordSheetFocus'
+import { signoffPaperText } from '@core/panel/paperSignoff.js'
 import { productCodeWithSuffix, rawProductCode } from '@core/panel/productCodeSuffix.js'
 import { sectionLibText } from './sectionLibText'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry, orderSpecGroups, clusterSpecGroups, SPEC_MOTHERS } from '@/core/panel/testItemLib'
@@ -2099,6 +2100,19 @@ function rowAttachKey(c, row) {
  *   观感一个字不变。放在值格 placeholder 上，而不是往 head 里写值 —— 写值会被当成真实数据保存。
  */
 const emptyMark = computed(() => String(cfg.value?.emptyMark || ''))
+
+/**
+ * 审批人两格的纸面显示门禁（2026-11-20 用户口径「审批之后才有对应审批人的名字」）。
+ *   配置 = 面板级 signoffVisibility（见 core/panel/paperSignoff.js）；状态取**本单当前单据状态**
+ *   （head 由 QueryService 下发，草稿=草稿、一级通过=待二级审批、终审后=已审核/已归档）。
+ *   ⚠ 只拦**显示**：保存报文仍带原值也没关系，后端 ButtonService.save 会把这两格从入参剥掉，
+ *     落库值只由审批动作写 —— 两道闸门缺一不可，前端这道管老单据/旧页面。
+ */
+const docStatusNow = computed(() => String(props.head?.['单据状态'] || ''))
+/** 纸面值格文本：命中 signoffVisibility 且状态未到 ⇒ 空串（不显示历史值） */
+function paperCellText(key, value) {
+  return signoffPaperText(cfg.value, key, value, docStatusNow.value)
+}
 
 const docNoKey = computed(() => docNoKeyFor(props.head, effHead.value))
 // 版式:'report' | 'plain'——面板级值是缺省,多页签面板可按页覆盖(见 effPlain)
@@ -2963,9 +2977,14 @@ let clearFocusOf = null
 function isFocus(key) { return !!key && focusKeys.value.has(String(key)) }
 /** 键值对行的标签格:整对里任意一格(key 或 cells 的某一格)命中即高亮标签 */
 /** 该数据键是否**必填**(yj_field.required 经 fieldSpec 下发为 isRequired)——
- *  纸面标签格据此打星号(2026-11-06 用户口径:「所有的必填项…要打*号」)。 */
+ *  纸面标签格据此打星号(2026-11-06 用户口径:「所有的必填项…要打*号」)。
+ *  ⚠ 2026-11-20 产品信息表用户口径「必填项用 / 占位，不要那个红点了」：
+ *    面板级 cfg.hideRequiredMark=true 时**本函数只影响画星**，直接返回 false；
+ *    保存/提交的必填校验在 PanelxList.validateInlineDraft + 后端 ensureRequiredFilled，
+ *    与这里无关 ⇒ 不画星 ≠ 不拦。别把这条改成全局删 CSS（2026-11-17 刚要求过必填标红）。 */
 function isReq(key) {
   if (!key) return false
+  if (cfg.value?.hideRequiredMark === true) return false
   const f = fieldMap.value.get(String(key))
   return !!(f && (f.isRequired === true || f.isRequired === 1))
 }

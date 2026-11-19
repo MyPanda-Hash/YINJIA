@@ -21,7 +21,7 @@ const mig = readFileSync(
 
 const basic = (cfg.sections || []).find((s) => s.bar === '一、产品基本信息')
 
-test('基本信息区行序与目标版式一致（客户名仍是单格，不拆两列）', () => {
+test('基本信息区行序与目标版式一致（应用场景独占一行、客户料号成对）', () => {
   assert.ok(basic, '缺「一、产品基本信息」')
   const flat = []
   for (const row of basic.rows) {
@@ -30,11 +30,41 @@ test('基本信息区行序与目标版式一致（客户名仍是单格，不�
       else flat.push(pair.key)
     }
   }
-  // 2026-11-18 用户口径：「立项编号和立项名称还没有弄好」⇒ 行1 显示名改为立项编号/立项名称
-  assert.deepEqual(flat.slice(0, 10), ['立项编号', '立项名称', '产品编号', '客户名称',
-    '客户编码', '客户料号', '产品管控等级', '产品功能类别', '产品形态', '应用场景'])
-  assert.ok(!flat.includes('客户编码') || flat.indexOf('客户编码') > flat.indexOf('客户名称'),
-    '客户编码是独立一格（与客户名称并列），不是把客户名称拆成两列')
+  // 2026-11-20 用户口径（截图三处问题之三）：
+  //   「应用场景单独一行」「客户料号不要单独占一行」——目标版式 = 4 行双列 + 1 行整行。
+  assert.deepEqual(flat, ['立项编号', '立项名称', '产品编号', '客户名称',
+    '客户料号', '产品管控等级', '产品功能类别', '产品形态', '应用场景'],
+  '行序 = 立项编号|立项名称 / 产品编号|客户名称 / 客户料号|产品管控等级 / 产品功能类别|产品形态 / 应用场景')
+  assert.ok(!flat.includes('客户编码'), '客户编码 2026-11-19 起不再上纸面')
+
+  // 每行的列占位必须正好等于面板网格列数（grid = 130+260+130+260 = 4 列），
+  // 多一列会串行、少一列会把下一行拽进来。
+  const nCols = (cfg.grid || []).length
+  assert.equal(nCols, 4, 'RD_PROD_INFO 网格 = 4 列')
+  const spans = basic.rows.map((row) => (row.pairs || []).reduce((sum, p) => {
+    const label = p.lspan || 1
+    const value = p.cells ? (p.cells.length - 1) + (p.vspan || 1) : (p.vspan || 1)
+    return sum + label + value
+  }, 0))
+  assert.deepEqual(spans, [4, 4, 4, 4, 4], `每行列占位必须 = ${nCols}（实测 ${spans.join('/')}）`)
+
+  const sceneRow = basic.rows.find((r) => (r.pairs || []).some((p) => p.key === '应用场景'))
+  assert.equal((sceneRow.pairs || []).length, 1, '应用场景必须独占一行')
+  assert.equal(sceneRow.pairs[0].vspan, 3, '应用场景整行值区 vspan:3（标签 1 + 值 3 = 4）')
+
+  const partRow = basic.rows.find((r) => (r.pairs || []).some((p) => p.key === '客户料号'))
+  assert.equal((partRow.pairs || []).length, 2, '客户料号必须与另一格配对，不能单独占一行')
+  assert.deepEqual(partRow.pairs.map((p) => p.key), ['客户料号', '产品管控等级'],
+    '客户料号与产品管控等级配对（不破坏设计纸面线框）')
+})
+
+test('RD_PROD_INFO 纸面不画必填红星（保存校验不受影响）', () => {
+  // 2026-11-20 用户口径：「必填项用 / 占位，不要那个红点了」。
+  // 面板级开关，只影响本面板;全局 .rs-req::after 保留（2026-11-17 用户要求过其它面板必填标红）。
+  assert.equal(cfg.hideRequiredMark, true, 'RD_PROD_INFO 必须声明 hideRequiredMark:true')
+  const others = Object.entries(recordSheetConfigs)
+    .filter(([code, c]) => code !== 'RD_PROD_INFO' && c?.hideRequiredMark === true)
+  assert.deepEqual(others.map(([code]) => code), [], '不得把 hideRequiredMark 扩散到其它面板')
 })
 
 test('应用场景改成标准库（可维护），并种入历史取值', () => {

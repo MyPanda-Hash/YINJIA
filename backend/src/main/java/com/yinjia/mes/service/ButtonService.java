@@ -371,6 +371,15 @@ public class ButtonService {
         //   「这个表单管理员应该是柴善银，是固定的」）—— 覆盖 2026-10-28「=当前编辑人」那条，
         //   服务端强制写死：前端无论是旧缓存、默认值还是绕过保存，落库都只可能是柴善银。
         if ("RD_ASM_PROC".equals(def.code())) body.put("表单管理人", "柴善银");
+        // 产品信息表两级审批人(2026-11-20 用户口径「审批之后才有对应审批人的名字」):
+        //   两格只由**审批动作**写(writeBackL1Approver / writeBackL2Approver 的 raw SQL),
+        //   保存入参一律剥离 —— 否则旧页面/旧缓存里残留的「陈秀丽」会在下一次保存时被回写,
+        //   表现就是「库里清了、重存又回来了」。字段本身 yj_field.editable=0 + 纸面 ro:true,
+        //   这里再剥一次是第三道防线(接口直连也收不到)。
+        if ("RD_PROD_INFO".equals(def.code())) {
+            body.remove("审核人（一级审批人）");
+            body.remove("审核人（二级审批人）");
+        }
         // 立项申请(2026-10-08 研发流程图③④):「对接人/项目责任人」是流程动作写下的只读格
         // (字段在 yj_field 已 editable=0,这里再剥一次 —— 前端题面能改的键,服务端一律不收),
         // 否则绕过按钮直接保存就能"自封责任人"。
@@ -1386,6 +1395,11 @@ public class ButtonService {
             String label = e.getKey();      // 声明用的是**字段标签**(数据键),与 yj_field.label 同名
             String val = e.getValue();
             if (label == null || label.isBlank() || val == null) continue;
+            // 产品信息表两级审批人(2026-11-20):即使 yj_panel.config.headDefaults 里还有历史键
+            //   (migrate-prodinfo-approver-no-default-20261120.sql 清掉之前/旧部署回滚),
+            //   新建也**不许**把姓名写进这两列 —— 名字只能由审批动作写入。
+            if ("RD_PROD_INFO".equals(def.code())
+                    && ("审核人（一级审批人）".equals(label) || "审核人（二级审批人）".equals(label))) continue;
             // 落库要换成物理列名(label 与 col_name 会分叉,如「使用日期」)
             PanelRegistry.FieldDef f = def.byLabel(label);
             String col = f != null ? f.col() : label;
@@ -3299,6 +3313,9 @@ public class ButtonService {
         // 位置在竞态守卫**之后**:被守卫挡下的那次不该留痕。
         // 2026-11-13:带 self_audit 标记(与「审批通过」同口径),审批情况里本人审自己的单会显示「自审」。
         recordApproval(def.code(), no, "AUDIT", "APPROVED", auditOpinionOf(formData), 1, selfAudit);
+        // 2026-11-20 产品信息表：管理员直审（一步到已审核/已归档）同样补「一级审批人」姓名，
+        //   否则纸面门禁放行了状态、格子里却没有名字。普通用户直审本面板仍被上面的两级门禁拦着。
+        if ("RD_PROD_INFO".equals(def.code())) writeBackL1Approver(def.code(), no, auditor);
         // 批次号自洽(2026-10-04 口径:批次号在**生单那一刻**就写在单头+全部明细行,不再有"入库审核取号回填"):
         // 保存后把单头值同步到全部明细行、缺号则按「供应商编码 + 当天」取号、顺批次键补齐历史台账。
         // 位置在库存过账**之前** —— kucun.lot_no 的口径是"批次号优先、批号兜底"(见 StockLedgerService.loadRows)。
@@ -3516,6 +3533,10 @@ public class ButtonService {
         // 2026-10-16 用户口径:产品信息表**被弃审**(退回草稿、重新走审核)同样会让四文件里的数据过期
         // ⇒ 与「申请修改」同一条通知(recordApproval 已写 UNAUDIT 留痕,故放在它之后)。
         if ("RD_PROD_INFO".equals(def.code())) notifyProdInfoChanged(no, currentUserName(), "弃审");
+        // 2026-11-20 用户口径「审批之后才有对应审批人的名字」：弃审回草稿 ⇒ 两级签名作废，
+        //   再走审批时由 writeBackL1Approver / writeBackL2Approver 重新写。
+        //   方法内部只认 RD_PROD_INFO，其它面板调用无副作用。
+        clearProdInfoApprovers(def.code(), no);
         // 2026-10-30 用户口径「要跟着退回草稿」：产品信息表弃审 ⇒ 它那张物料清单也退回**草稿**
         //   （与归档那半对称：归档时物料清单变已归档，弃审就退回草稿，别让它挂着一份"已归档"
         //     的旧 BOM 而产品信息表却是草稿）。只动状态位，不碰 mate 行。
@@ -4137,6 +4158,11 @@ public class ButtonService {
             } else {
                 writeBackL2Approver(def.code(), no, l2);
             }
+            // 2026-11-20 用户口径「审批之后才有对应审批人的名字」:
+            //   产品信息表「审核人（一级审批人）」在一级通过这一刻落**实际审批人姓名**。
+            //   此前这一格只有 2026-11-11 的存量回填/默认值,审批动作从不写它 ——
+            //   清了默认值后就会出现"审批过了反而没名字"。
+            writeBackL1Approver(def.code(), no, operator);
             // 样品申请单(外部单,两级):纸面「审核」格 = 一级审批通过的人(审核人=刘磊)
             writeSampleSign(def.code(), no, SAMPLE_SIGN_AUDIT, operator);
             recordApproval(def.code(), no, "APPROVE_L1", "L1_PASSED", opinion, 1, selfAudit);
@@ -4377,6 +4403,9 @@ public class ButtonService {
                 + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y'", def.code(), no);
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
         recordApproval(def.code(), no, "REJECT", "REJECTED", opinion, node);
+        // 2026-11-20 产品信息表：驳回即回草稿，两级审批人签名随审批作废清空（重审时再由审批动作写）。
+        //   方法内部只认 RD_PROD_INFO，其它面板调用无副作用。
+        clearProdInfoApprovers(def.code(), no);
         // 2026-11-09:单级审批的首件/制程检验单被驳回 ⇒ 纸面「审核人/审核时间」随审批作废清空
         if (SINGLE_LEVEL_INSP_PANELS.contains(def.code())) clearAuditSignCells(def, no);
         String rejectBy = currentUserName();
@@ -4993,6 +5022,45 @@ public class ButtonService {
         Integer n = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM yj_user WHERE username = ? AND ISNULL(enabled,'1') = '1'", Integer.class, username);
         return n != null && n > 0;
+    }
+
+    /**
+     * 产品信息表：**一级审批通过**时把「审核人（一级审批人）」写成实际审批人姓名。
+     *
+     * <p>2026-11-20 用户口径：「审批人没有默认显示名字，在审批之后才填进去」。
+     * 同批把 docDefaults / yj_panel.config.headDefaults 的默认「陈秀丽」清空 ⇒ 必须由审批动作补名，
+     * 否则批准后的纸面反而空白。落点列 = yj_field.col_name「审核人一级」（label 是
+     * 「审核人（一级审批人）」，纸面读 label；raw SQL 这里写物理列，别照抄 label）。</p>
+     *
+     * <p>只在 RD_PROD_INFO 生效；其它面板调用无副作用。写失败不阻断审批（与
+     * {@link #writeBackL2Approver} 同一容错口径），但必须留 warn 四要素。</p>
+     */
+    private void writeBackL1Approver(String panelCode, String no, String operator) {
+        if (!"RD_PROD_INFO".equals(panelCode)) return;
+        try {
+            jdbc.update("UPDATE rd_prod_info_head SET 审核人一级 = ?"
+                            + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    realNameOf(operator), no);
+        } catch (Exception e) {
+            log.warn("[两级审批] 写回审核人一级失败 panel={} no={}: {}", panelCode, no, e.getMessage());
+        }
+    }
+
+    /**
+     * 产品信息表：**未审批/退回草稿**时清掉两级审批人签名（2026-11-20 用户口径）。
+     *
+     * <p>驳回/弃审后单据回到草稿，纸面继续挂着上一轮的审批人名字，与「审批之后才有名字」相悖。
+     * 这里直接置 NULL；纸面另有一层 signoffVisibility 状态门禁（未审批不显示），
+     * 两处一起保证老单据/旧页面也看不到历史签名。</p>
+     */
+    private void clearProdInfoApprovers(String panelCode, String no) {
+        if (!"RD_PROD_INFO".equals(panelCode)) return;
+        try {
+            jdbc.update("UPDATE rd_prod_info_head SET 审核人一级 = NULL, 审核人二级 = NULL"
+                            + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        } catch (Exception e) {
+            log.warn("[两级审批] 清空审批人签名失败 panel={} no={}: {}", panelCode, no, e.getMessage());
+        }
     }
 
     /**
