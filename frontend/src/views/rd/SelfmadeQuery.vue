@@ -30,11 +30,25 @@
              其后是本系统补充的 材料名 / 录入日期 / 二维码 -->
         <el-table-column prop="主批次" :label="tt('主批次')" width="130" />
         <el-table-column prop="子批次" :label="tt('子批次')" width="140" />
-        <el-table-column :label="tt('流程卡')" width="110">
-          <template #default="{ row }"><span class="smq-file">{{ fileText(row['流程卡']) }}</span></template>
+        <!-- 附件格可点开预览（2026-11-19 用户口径）：只读 FileAttachCell，锚点 = 面板+单号+`字段-明细id`；
+             没有附件时显示「—」，与 Excel 一致。 -->
+        <el-table-column :label="tt('流程卡')" width="150">
+          <template #default="{ row }">
+            <FileAttachCell
+              v-if="row['流程卡'] && row['明细id']" :panel-code="'RD_SELFMADE'" :doc-no="row['单据编号']"
+              :field-key="`流程卡-${row['明细id']}`" :model-value="String(row['流程卡'] || '')" :can-edit="false"
+            />
+            <span v-else class="smq-file">—</span>
+          </template>
         </el-table-column>
-        <el-table-column :label="tt('配料表')" width="110">
-          <template #default="{ row }"><span class="smq-file">{{ fileText(row['配料表']) }}</span></template>
+        <el-table-column :label="tt('配料表')" width="150">
+          <template #default="{ row }">
+            <FileAttachCell
+              v-if="row['配料表'] && row['明细id']" :panel-code="'RD_SELFMADE'" :doc-no="row['单据编号']"
+              :field-key="`配料表-${row['明细id']}`" :model-value="String(row['配料表'] || '')" :can-edit="false"
+            />
+            <span v-else class="smq-file">—</span>
+          </template>
         </el-table-column>
         <el-table-column prop="异常情况描述" :label="tt('异常情况描述')" min-width="180" show-overflow-tooltip />
         <el-table-column prop="录入人" :label="tt('录入人')" width="100" />
@@ -67,6 +81,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { tt } from '@/i18n'
 import request from '@/core/request'
 import QRCode from 'qrcode'
+import FileAttachCell from '@/core/views/FileAttachCell.vue'
 
 const rows = ref([])
 const loading = ref(false)

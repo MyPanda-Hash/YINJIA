@@ -194,7 +194,7 @@ public class QueryService {
      */
     public List<java.util.Map<String, Object>> selfmadeRows(String name, String batchFrom, String batchTo, String field, String keyword) {
         StringBuilder sql = new StringBuilder(
-                "SELECT h.[单据编号], ISNULL(h.[材料名], N'') AS 材料名, ISNULL(h.[主批次], N'') AS 主批次, "
+                "SELECT ISNULL(CAST(d.id AS varchar(20)), '') AS 明细id, h.[单据编号], ISNULL(h.[材料名], N'') AS 材料名, ISNULL(h.[主批次], N'') AS 主批次, "
               + "ISNULL(d.[子批次], N'') AS 子批次, ISNULL(d.[流程卡], N'') AS 流程卡, "
               + "ISNULL(d.[配料表], N'') AS 配料表, ISNULL(d.[异常情况描述], N'') AS 异常情况描述, "
               + "ISNULL(h.[录入人], N'') AS 录入人, ISNULL(CONVERT(varchar(10), h.[单据日期], 23), '') AS 录入日期 "
@@ -221,6 +221,7 @@ public class QueryService {
         sql.append(" ORDER BY h.[主批次] DESC, h.[单据编号] DESC, TRY_CAST(d.[序号] AS int)");
         return jdbc.query(sql.toString(), (rs, i) -> {
             java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
+            row.put("明细id", rs.getString("明细id"));
             row.put("单据编号", rs.getString("单据编号"));
             row.put("材料名", rs.getString("材料名"));
             row.put("主批次", rs.getString("主批次"));

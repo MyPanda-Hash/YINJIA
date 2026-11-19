@@ -73,7 +73,7 @@
             <el-input v-model="head['主批次']" size="small" :placeholder="tt('如 261025')" @input="renumber" />
           </td>
           <td class="sme-sub">{{ row['子批次'] }}</td>
-          <td>
+          <td class="sme-file-cell" @click="triggerUpload($event, row, '流程卡')">
             <FileAttachCell
               v-if="row.id && head['单据编号']" :panel-code="'RD_SELFMADE'" :doc-no="head['单据编号']"
               :field-key="`流程卡-${row.id}`" :model-value="String(row['流程卡'] || '')"
@@ -81,7 +81,7 @@
             />
             <span v-else class="sme-hint">{{ tt('保存后可上传') }}</span>
           </td>
-          <td>
+          <td class="sme-file-cell" @click="triggerUpload($event, row, '配料表')">
             <FileAttachCell
               v-if="row.id && head['单据编号']" :panel-code="'RD_SELFMADE'" :doc-no="head['单据编号']"
               :field-key="`配料表-${row.id}`" :model-value="String(row['配料表'] || '')"
@@ -133,6 +133,20 @@ const newRow = () => ({ __k: ++seq, id: null, 序号: '', 子批次: '', 流程�
 function renumber() {
   const base = String(head['主批次'] || '').trim()
   rows.value.forEach((r, i) => { r['序号'] = String(i + 1); r['子批次'] = base ? `${base}-${i + 1}` : String(i + 1) })
+}
+
+/**
+ * 整格可点上传（2026-11-19 用户口径「B：整格可点，点空白处即上传」）：
+ * 点单元格空白处时，代为触发格内 FileAttachCell 的「上传附件」按钮；
+ * 点在附件 chip / 删除 / 上传按钮上时不拦截（交给组件自己处理）。
+ */
+function triggerUpload(ev, row, field) {
+  if (!row.id || !head['单据编号']) return           // 未保存的行没有锚点
+  const t = ev.target
+  if (t && t.closest && t.closest('.fac-chip, .fac-upload-btn, .fac-del')) return
+  const td = ev.currentTarget
+  const btn = td && td.querySelector('.fac-upload-btn')
+  if (btn) btn.click()
 }
 
 function addRow() {
@@ -314,6 +328,8 @@ onMounted(async () => {
 .sme-table :deep(.el-input__inner) { height: 22px; line-height: 22px; }
 .sme-sub { text-align: center; color: #222; }
 .sme-hint { font-size: 12px; color: #bfbfbf; }
+.sme-file-cell { cursor: pointer; }
+.sme-file-cell:hover { background: #fafafa; }
 .sme-op { width: 34px; text-align: center; }
 .sme-del { color: #c45656; cursor: pointer; }
 .sme-add { margin-top: 6px; border: 1px dashed #b7d2ee; background: #fbfdff; color: #2b6cb0; text-align: center; padding: 8px; cursor: pointer; font-size: 13px; }
