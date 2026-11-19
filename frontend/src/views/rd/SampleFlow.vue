@@ -51,7 +51,7 @@
         <h2 class="sfl-card-title">{{ tt('样品单清单') }}</h2>
         <span class="sfl-card-hint">{{ tt('共') }} {{ shown.length }} {{ tt('条') }}</span>
       </div>
-      <el-table :data="shown" row-key="单据编号" size="small" border v-loading="loading" max-height="560">
+      <el-table :data="shown" row-key="单据编号" size="small" border v-loading="loading" max-height="560" @row-click="openDoc" row-class-name="sf-row-click">
         <el-table-column prop="单据编号" :label="tt('样品单编号')" width="170" fixed />
         <el-table-column prop="客户名称" :label="tt('客户名称')" min-width="140" show-overflow-tooltip />
         <el-table-column prop="单据日期" :label="tt('下单日期')" width="110" align="center" />
@@ -76,9 +76,11 @@ import { computed, onMounted, ref } from 'vue'
 import { tt } from '@/i18n'
 import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
+import { useRouter } from 'vue-router'
 import { filterSampleRows, sampleKpisOf, sampleNodeOf, sampleNodeText } from '@/core/progress/sampleFlow'
 
 const rows = ref([])
+const router = useRouter()
 const loading = ref(false)
 const denied = ref(false)
 const keyword = ref('')
@@ -111,6 +113,13 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+/** 整行可点：跳到对应样品单（用户口径：每个样品信息都应该可以查看） */
+function openDoc(row) {
+  const no = String(row?.['样品单编号'] || row?.['单据编号'] || '').trim()
+  if (!no) return
+  router.push({ path: '/panelx/list/RD_SAMPLE_EXT', query: { focus: no } })
 }
 
 onMounted(load)
@@ -149,4 +158,5 @@ onMounted(load)
   .sfl-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sfl-source { white-space: normal; }
 }
+.sf-row-click { cursor: pointer; }
 </style>

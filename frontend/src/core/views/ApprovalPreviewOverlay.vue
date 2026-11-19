@@ -109,6 +109,7 @@
             height="100%"
             class="apv-table"
             @row-dblclick="(row) => emit('jump', row)"
+            @row-click="(row) => emit('jump', row)"
           >
             <el-table-column :label="tt('序号')" width="64" align="right">
               <template #default="{ $index }">
