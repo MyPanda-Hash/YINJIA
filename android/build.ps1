@@ -59,9 +59,13 @@ if (-not $javaHome -or -not (Test-Path (Join-Path $javaHome 'bin\javac.exe'))) {
 }
 if (-not $javaHome) { throw '找不到 JDK 25(设 JAVA_HOME)' }
 
-$version = '1.0.25'
+$version = '1.0.26'
 # ── 版本 —— versionName / versionCode 的**唯一真源**(Manifest 里不写,见 README §0)──
-# 1.0.25 = 本版(2026-11-18:整站前端重打,原生壳未改 —— 合并 origin/main 后的新版前端:
+# 1.0.26 = 本版(2026-11-19:整站前端重打,原生壳未改 —— 合并 origin/main 后的新版前端:
+#           研发样品链(样品进度跟踪只读页、外部开发样品单编号＝账号-年月日-序号 / 加「附件」行、
+#           客户名称手填新客户并建档打标记、样品开发单删除行二次确认)+ 产品信息表新版式
+#           (立项编号/立项名称、产品整体尺寸拆三格、5 标签 10 语种译名)。
+# 1.0.25 = 26(2026-11-18:整站前端重打,原生壳未改 —— 合并 origin/main 后的新版前端:
 #           混料领料/扫码混料改按《混料物料清单》取数、工艺清单归档同步基础数据清单
 #           (组装/混料物料清单)、出货检验表观选单准入改为「进入末道工序」、
 #           排单计划「未完成总数」改为「工序未报工量」)。
@@ -91,7 +95,7 @@ $version = '1.0.25'
 # 1.0.12 = 13 / 1.0.11 = 12 / 1.0.10 = 11 / 1.0.9 = 10 / 1.0.8 = 9 / 1.0.7 = 8(更早)。
 # versionCode 必须**单调递增**:安卓只在它变大时才允许「覆盖安装」;签名还必须与上一版同一把钥匙
 # (debug.keystore 随仓库保留,丢了就只能卸载重装)。
-$versionCode = 26
+$versionCode = 27
 $zxing = Join-Path $proj 'libs\zxing-core-3.5.3.jar'
 if (-not (Test-Path $zxing)) { throw "缺少 ZXing:$zxing(可从 Maven Central 下 core-3.5.3.jar)" }
 
