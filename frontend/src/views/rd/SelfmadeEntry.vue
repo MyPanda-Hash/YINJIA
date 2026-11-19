@@ -199,6 +199,27 @@ onMounted(async () => {
 .sme-table th { background: #f2f4f6; font-weight: 600; }
 .sme-merge { background: #fafafa; vertical-align: top; }
 .sme-merge :deep(.el-input) { width: 100%; }
+/* 2026-11-19 用户口径：「不要填写条目框看起来很割裂」——
+   表格里**不再看到独立输入框**：输入控件透明、无边框、无内边距，直接铺满单元格，
+   由表格自身的线框承担边界（与 Excel 观感一致）。聚焦时也不额外描边（用单元格背景提示）。 */
+.sme-table :deep(.el-input__wrapper),
+.sme-table :deep(.el-textarea__inner) {
+  box-shadow: none !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  padding: 2px 4px !important;
+  min-height: 22px;
+  font-size: 13px;
+  color: #222;
+}
+.sme-table :deep(.el-input__wrapper.is-focus),
+.sme-table :deep(.el-textarea__inner:focus) {
+  box-shadow: none !important;
+  background: #f2f7fd !important;
+}
+.sme-table :deep(.el-textarea__inner) { resize: none; line-height: 20px; }
+.sme-table :deep(.el-input__inner) { height: 22px; line-height: 22px; }
 .sme-sub { text-align: center; color: #222; }
 .sme-hint { font-size: 12px; color: #bfbfbf; }
 .sme-op { width: 34px; text-align: center; }
