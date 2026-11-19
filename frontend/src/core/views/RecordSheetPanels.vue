@@ -473,9 +473,9 @@
                 <span v-else-if="c.userPick" class="rs-userpick-ro">{{ signNamesOf(head[c.key]) }}</span>
                 <span v-else-if="c.pre" class="rs-pre-cell">
                   <span class="rs-pre">{{ tt(c.pre) }}</span>
-                  <AnnotatedText class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
+                  <AnnotatedText class="rs-txt" :text="head[c.key] || tt(c.fixed) || ''" :field-key="String(c.key || '')" />
                 </span>
-                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
+                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || tt(c.fixed) || ''" :field-key="String(c.key || '')" />
               </td>
             </template>
           </tr>
@@ -1185,9 +1185,9 @@
                 </span>
                 <span v-else-if="c.pre" class="rs-pre-cell">
                   <span class="rs-pre">{{ tt(c.pre) }}</span>
-                  <AnnotatedText class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
+                  <AnnotatedText class="rs-txt" :text="head[c.key] || tt(c.fixed) || ''" :field-key="String(c.key || '')" />
                 </span>
-                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
+                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || tt(c.fixed) || ''" :field-key="String(c.key || '')" />
               </td>
             </template>
           </tr>
@@ -1376,7 +1376,7 @@
                   <el-button v-for="o in checkList(head[c.key])" :key="o" link type="primary" size="small"
                              @click.stop="openLinkedFile(c, o)">{{ tt(o) }}</el-button>
                 </span>
-                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
+                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || tt(c.fixed) || ''" :field-key="String(c.key || '')" />
               </td>
             </template>
           </template>
@@ -5746,37 +5746,76 @@ body.approval-printing .rs-mold-pick { display: none !important; }
 }
 .rs-focus :deep(.el-input__wrapper),
 .rs-focus :deep(.el-textarea__inner),
+.rs-focus :deep(.el-select__wrapper) {
+  box-shadow: 0 0 0 1px #f56c6c inset;
+}
 /**
- * 下拉框内容**自动换行**（2026-11-19 用户报障：炭棒工艺管控清单的「烧结炉参数 /
- * 烧结时间·调速器参数 / 冷却参数设置 / 密度管控」这些标准库下拉，选项文字较长，
- * 单行显示会把后半截**盖住**）：
- *   el-select 默认 nowrap + ellipsis；这里把选中项改成可换行、外层高度随内容走。
- * 只作用于纸面内的下拉（.rs-t / .rsp-sheet），不影响表单页与列表页的普通下拉。
+ * 下拉（el-select）长文本**自动折行 + 格子随内容长高**
+ * （2026-11-19 用户报障「烧结炉参数这些被覆盖了」；2026-11-20 二次修复）
+ *
+ * 【根因（2026-11-20 活体实测，Element Plus 2.14.4）】
+ *   单选 el-select 的**选中值**不是普通文本节点，而是
+ *   `<div class="el-select__selected-item el-select__placeholder"><span>值</span></div>`；
+ *   Element 给 `.el-select__placeholder` 的是
+ *     `position: absolute; top: 50%; transform: translateY(-50%); white-space: nowrap;
+ *      width: 100%; overflow: hidden; text-overflow: ellipsis; z-index: -1`
+ *   ⇒ **绝对定位不参与行高**：上一版只把 white-space 改成 normal，多行文字照样从 wrapper
+ *   （小号 24px）里溢出去压住相邻行 —— 实测「烧结炉参数」的选中值 54px 高、wrapper 24px，
+ *   文字上沿超出格子上沿 10.7px，被上一行的白底盖住半截（用户截图就是它）。
+ *
+ * 【修法】（只作用于纸面；表单页、列表页的普通下拉一字不动）
+ *   ① 下拉**收起且已有值**时，把选中值拉回文档流（position: static）⇒ 撑高 wrapper ⇒ 撑高行；
+ *   ② 过滤输入框（filterable + allow-create）在收起态不占位（0×0 绝对定位）——否则 flex
+ *      会先给它一整行，每个下拉格平白高 20px；
+ *   ③ 展开中（`aria-expanded="true"`，正在输入）还原成单行省略号，避免展开瞬间撑高/溢出；
+ *   ④ 高度只用 min-height，**不写死 height**：行高随内容长，打印/导出态同样不截断。
+ *
+ * ⚠ 选择器必须落到 `td.rs-td`：行式 grid（页签「成型工艺清单」的工序块）就是
+ *   `<table class="rs-t"><tr><td class="rs-td">…el-select…</td>`，只写 `.rs-t` 命中整张表，
+ *   `td.rs-td` 才能把“纸面数据格里的下拉”与表外的下拉区分开。
+ * ⚠ `:has()` 是本项目既有用法（OrgAdmin / DocSheet / InspCommissionSheet）；老浏览器整条丢弃时
+ *   退化成单行省略号 —— 仍不会压行。
  */
-.rs-t :deep(.el-select__selected-item),
-.rsp-sheet :deep(.el-select__selected-item) {
+/* 兜底：纸面内下拉的选中值/占位符先按单行省略（展开态与空值态走这条） */
+.rs-t :deep(.el-select__placeholder),
+.rsp-sheet :deep(.el-select__placeholder) {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+/* ① 收起态 + 有值：选中值回到文档流，多行折行，wrapper 与行跟着长高 */
+.rs-t :deep(td.rs-td .el-select__wrapper:not(:has(.el-select__input[aria-expanded='true'])) .el-select__placeholder:not(.is-transparent)),
+.rsp-sheet :deep(td.rs-td .el-select__wrapper:not(:has(.el-select__input[aria-expanded='true'])) .el-select__placeholder:not(.is-transparent)) {
+  position: static;
+  transform: none;
+  z-index: auto;
+  width: auto;
+  min-width: 0;
+  flex: 1 1 auto;
+  display: block;
   white-space: normal !important;
   overflow: visible !important;
   text-overflow: clip !important;
-  line-height: 18px;
   word-break: break-all;
+  overflow-wrap: anywhere;
+  line-height: 18px;
 }
+/* ② 收起态的过滤输入框不占位（仍是可聚焦元素：点格子照样展开、照样能输入筛选） */
+.rs-t :deep(td.rs-td .el-select__wrapper:not(:has(.el-select__input[aria-expanded='true'])) .el-select__input-wrapper),
+.rsp-sheet :deep(td.rs-td .el-select__wrapper:not(:has(.el-select__input[aria-expanded='true'])) .el-select__input-wrapper) {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+/* ③ 高度随内容：min-height 起步，绝不写死 height（写死会把多行选中值裁掉、打印也截断） */
 .rs-t :deep(.el-select__wrapper),
 .rsp-sheet :deep(.el-select__wrapper) {
   height: auto;
   min-height: 28px;
-  align-items: flex-start;
+  align-items: center;
   padding-top: 2px;
   padding-bottom: 2px;
-}
-.rs-t :deep(.el-select__placeholder),
-.rsp-sheet :deep(.el-select__placeholder) {
-  white-space: normal !important;
-  overflow: visible !important;
-  text-overflow: clip !important;
-}
-.rs-focus :deep(.el-select__wrapper) {
-  box-shadow: 0 0 0 1px #f56c6c inset;
 }
 .rs-txt {
   white-space: pre-wrap;
