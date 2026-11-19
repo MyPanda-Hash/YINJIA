@@ -299,6 +299,10 @@ const routes = [
         meta: { title: 'X烧结工艺清单', panelCode: 'RD_X_SINTER' },
       },
       // ── 以上为远端新增(X烧结并入烧结工艺清单为双模板 Tab),与本地「工序流程追踪卡」互不冲突,两条都保留 ──
+      // 自制料制程记录录入：**旧地址也指到新版横行页**（2026-11-19 用户口径：
+      //   「这个先更新一下」——他打开的仍是 /panelx/list/RD_SELFMADE 的引擎版）。
+      //   显式静态路由必须排在下面的参数路由之前，否则又被 PanelxList 接走。
+      { path: 'panelx/list/RD_SELFMADE', component: () => import('@/views/rd/SelfmadeEntry.vue'), meta: { title: '制程记录录入', code: 'rdSelfmadeEntry', panelCode: 'RD_SELFMADE' } },
       { path: 'panelx/list/:panelCode', component: PanelxList, meta: { title: '单据', operationName: '新增流程' } },
       { path: 'panelx/form/:panelCode', component: PanelxForm, meta: { title: '表单' } },
       ...flatMenus()
