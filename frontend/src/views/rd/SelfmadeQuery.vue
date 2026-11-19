@@ -20,9 +20,10 @@
     <section v-if="denied" class="smq-card smq-denied">{{ tt('没有自制料面板的查看权限') }}</section>
     <section v-else class="smq-card">
       <el-table :data="rows" size="small" border max-height="560" v-loading="loading">
+        <!-- 列序照 Excel《记录查询界面》：主批次 | 子批次 | 流程卡 | 配料表 | 异常 | 录入人，
+             其后是本系统补充的 材料名 / 录入日期 / 二维码 -->
         <el-table-column prop="主批次" :label="tt('主批次')" width="130" />
         <el-table-column prop="子批次" :label="tt('子批次')" width="140" />
-        <el-table-column prop="材料名" :label="tt('材料名')" min-width="120" show-overflow-tooltip />
         <el-table-column :label="tt('流程卡')" width="110">
           <template #default="{ row }"><span class="smq-file">{{ fileText(row['流程卡']) }}</span></template>
         </el-table-column>
@@ -31,6 +32,7 @@
         </el-table-column>
         <el-table-column prop="异常情况描述" :label="tt('异常情况描述')" min-width="180" show-overflow-tooltip />
         <el-table-column prop="录入人" :label="tt('录入人')" width="100" />
+        <el-table-column prop="材料名" :label="tt('材料名')" min-width="120" show-overflow-tooltip />
         <el-table-column prop="录入日期" :label="tt('录入日期')" width="110" align="center" />
         <el-table-column :label="tt('二维码')" width="100" align="center">
           <template #default="{ row }">

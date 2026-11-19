@@ -54,7 +54,10 @@ export const menuTree = [
       //   ② 制程记录查询（/rd/selfmadeQuery，只读页，带导出/二维码）
       {
         code: 'rdSelfmade', title: '自制料', icon: 'Box', children: [
-          { code: 'rdSelfmadeEntry', title: '制程记录录入', path: '/panelx/list/RD_SELFMADE', panelCode: 'RD_SELFMADE', icon: 'DocumentAdd', operationName: '录入制程记录' },
+          // 2026-11-19 用户口径：「录入的面板的样式要和 excel 表的一样，横行的样式」
+          //   ⇒ 录入改独立页面（横行表：一行一个子批次，材料名/主批次/录入人纵向合并），
+          //     面板码仍 RD_SELFMADE（表/权限/查询都复用）。
+          { code: 'rdSelfmadeEntry', title: '制程记录录入', path: '/rd/selfmadeEntry', panelCode: 'RD_SELFMADE', icon: 'DocumentAdd' },
           { code: 'rdSelfmadeQuery', title: '制程记录查询', path: '/rd/selfmadeQuery', panelCode: 'RD_SELFMADE', icon: 'Search' },
         ],
       },
