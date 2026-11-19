@@ -1113,6 +1113,8 @@ public class ButtonService {
         if ("已审核".equals(stStatus)) throw new IllegalStateException("已审核单据不可保存，请先弃审");
         if ("审批中".equals(stStatus)) throw new IllegalStateException("审批中单据不可保存，请等待审批完成或驳回");
         if ("待二级审批".equals(stStatus)) throw new IllegalStateException("待二级审批单据不可保存，请等待二级审批完成或驳回");
+        // 产品变更申请表(2026-11-19):会签全过 → 待批准(admin 终审前)也不可改内容。
+        if ("待批准".equals(stStatus)) throw new IllegalStateException("待批准单据不可保存，请等待管理员批准或驳回");
         if ("已中止".equals(stStatus)) throw new IllegalStateException("已中止单据不可保存，请先恢复");
         if ("已终止".equals(stStatus)) throw new IllegalStateException("已终止单据不可保存");
         // 产品变更申请单(2026-09-21):已生效=终态(要改只能再开一张变更单);会签中锁编辑(免得签的和改的不是一版)
@@ -1123,12 +1125,19 @@ public class ButtonService {
         //     · 账号必须有匹配的部门行（changeDeptsOf），否则照旧拒绝；
         //     · 进这个模式后**只写明细、不写表头**（见下面 upsertHeadRow 的 deptFillOnly 判断）；
         //     · 状态不变（不退回草稿、不改 pending）。
+        // 2026-11-19 用户口径追加：会签人**在会签中**就要能填自己的部门评审意见，不再是"签完再补"。
+        //   同一个窄口子的前半段：只放本单待签会签人、只写明细不写表头；签完即关闭。
         boolean deptFillOnly = false;
+        boolean signoffFillOnly = false;
         if ("已生效".equals(stStatus) || "已归档".equals(stStatus)) {
             deptFillOnly = allowChangeDeptFill(def, no, user);
             if (!deptFillOnly) throw new IllegalStateException("已生效单据不可保存，如需再次变更请另开一张变更申请单");
+        } else if ("会签中".equals(stStatus)) {
+            signoffFillOnly = allowChangeSignoffFill(def, no, user);
+            if (!signoffFillOnly)
+                throw new IllegalStateException("会签中单据仅本单待签会签人可填写其所属部门那一行，其余内容均不可修改");
+            deptFillOnly = true;
         }
-        if ("会签中".equals(stStatus)) throw new IllegalStateException("会签中单据不可保存，请等会签完成或由发起人撤回会签");
         if (stStatus.startsWith("终止审批中")) throw new IllegalStateException("终止审批中单据不可保存，请等待审批完成或撤回");
         // 在途申请期间锁定(2026-09-12):删除/修改申请待审批时单据不可保存——此前只拦审批中,
         // 申请期间仍可改数据:改动落在修改快照之后 diff 失真,极端时序还会造出无人能解的死状态
@@ -1152,7 +1161,9 @@ public class ButtonService {
         // 「保存为草稿」「新增」放行 —— 用户口径:草稿不做必填限制,提交审批才做。
         // 补这层的理由:此前必填**只在前端校验**,直连 /px/callButton 就能把缺必填的单提交/归档
         // (实测:文档编号/测试主题为空仍可保存并归档)。前端仍保留校验(即时提示+定位字段),两层各司其职。
-        if (markSaved) {
+        // 会签中填部门意见是"只写明细"的窄口子：文献已经提交过会签，不能因为某个必填
+        // 在历史草稿里漏填就把会签人挡在门外；真正的提交/审批仍走完整必填校验。
+        if (markSaved && !signoffFillOnly) {
             ensureRequiredFilled(def, head, no);
             // 明细行必填(2026-09-20):表头之外还有明细级必填(如 SO_ORDER 的
             // 数量/单价全在明细),只查表头等于这些面板没校验。
@@ -1172,7 +1183,7 @@ public class ButtonService {
         // 产品变更申请单:先保 7 个部门行在册,再按"部门↔账号"过一遍按格门禁(非本部门一律还原)
         if (CHANGE_PANEL.equals(def.code())) {
             ensureChangeDeptRows(def, no, user);
-            gateChangeDetail(def, items, no, user);
+            gateChangeDetail(def, items, no, user, signoffFillOnly);
         }
         // 批号按「日期+3位流水」补号(用户 2026-10-18 口径「后面新加的真实数据就按日期加三位流水来」):
         // 采购入库单 / 产成品入库单的明细批号为空或金蝶默认占位 PC0000 时,保存即取号写入;
@@ -1199,8 +1210,8 @@ public class ButtonService {
         // 紧急放行申请单:保存时补「责任人 / 责任部门」(仅空值,覆盖"带数据一次保存建单"这条路)
         putRespDept(def, head, user);
         if (split) {
-            // 已生效/已归档的"部门填写"模式**只写明细**：表头字段（产品编号/变更事由/会签人…）
-            // 一律不落库，否则会签人顺手就能把这张已生效单的实质内容改掉。
+            // 会签中 / 已生效后的"部门填写"模式**只写明细**：表头字段（产品编号/变更事由/会签人…）
+            // 一律不落库，否则会签人顺手就能把这张单的实质内容改掉。
             if (!deptFillOnly) upsertHeadRow(def, head, no, user);
             upsertLineRows(def, items, no, l2c, user, protectRowIds);
         } else {
@@ -4073,6 +4084,10 @@ public class ButtonService {
         ensureDocRequiredFilled(def, no, "审批通过");
         // 来料检验单的「送检数量 > 0 / 合格数量非空 / 数量守恒」在审批通过前再核一遍(同审核口径)
         if ("QC_INSP".equals(def.code())) ensureInspOkQtyFilledForAudit(def, no);
+        // 产品变更申请表(2026-11-19):会签全过后的第二节点 = 管理员终审（状态「待批准」）。
+        // 与质量单据的「二级审批」共用 approve_node=2，但语义/落点不同 ⇒ 单独分流转发，
+        // 不能落进 approveSecond（那里是质量单据的「批准」回填与通知口径）。
+        if (node == 2 && CHANGE_PANEL.equals(def.code())) return approveChangeFinal(def, no, operator, formData);
         if (node == 2) return approveSecond(def, no, operator, formData);
         Map<String, Object> st = docStatusOf(def.code(), no);
         if (!"审批中".equals(st.get("status"))) throw new IllegalStateException("仅审批中状态可审批通过");
@@ -4163,12 +4178,12 @@ public class ButtonService {
         if ("RD_SPEC_DOC".equals(def.code())) {
             writeSpecSignCell(def.code(), no, SPEC_SIGN_AUDIT, operator);
         }
-        // 产品变更申请表(2026-11-11 用户口径):「审批的时候弹出弹窗，审批人可以进行批准，还有签字，
-        //   把信息回填进这里面，还有日期」—— 纸面「批准 / 签字 / 日期」三格由**这一次审批**回填。
-        //   落点是 rd_change_head 的备用列池(批准人=备用2 / 批准签字=备用3 / 批准日期=备用4,
-        //   见 migrate-rd-change-approval-sign-20261111.sql),三格 yj_field.editable=0 ⇒ 只有这里能写。
+        // 产品变更申请表:纸面「批准 / 签字 / 日期」三格由**审批动作**回填。
+        //   2026-11-19 用户口径更新为「点批准时自动写入 admin 的姓名（系统管理员）+ 当天日期」
+        //   ⇒ 本路径（需会签=否的单节点审批）与「待批准」节点的 approveChangeFinal 共用同一个写入方法，
+        //   三格全部服务端生成，不接受前端载荷。落点仍是 rd_change_head 备用2/3/4（yj_field editable=0）。
         if ("RD_CHANGE".equals(def.code())) {
-            writeChangeApprovalSign(def, no, formData, operator);
+            writeChangeApprovalSign(def, no, operator);
         }
         // 内部开发样品申请单(单节点:提交 → 确认人确认 → 制备):纸面「确认人」= 审批通过的人
         writeSampleSign(def.code(), no, SAMPLE_SIGN_CONFIRM, operator);
@@ -4332,6 +4347,8 @@ public class ButtonService {
     private Map<String, Object> rejectApproval(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String no = requireNo(formData);
         int node = pendingNodeOf(def.code(), no);
+        // 产品变更申请表(2026-11-19):待批准节点的驳回 = 管理员专属，与质量单据二级驳回分开走。
+        if (node == 2 && CHANGE_PANEL.equals(def.code())) return rejectChangeFinal(def, no, formData);
         if (node == 2) {
             // 二级节点:固定二级面板(质量单据一族)= 超级管理员;
             // 其余 = 被选定的二级审核人 ∪ 管理员(不要求角色审批权,选取即授权)
@@ -5016,16 +5033,17 @@ public class ButtonService {
      * <p>三格绑在 rd_change_head 的备用列池（批准人=备用2 / 批准签字=备用3 / 批准日期=备用4），
      * 且这三个 yj_field 是 editable=0 ⇒ **本方法就是唯一真源**；前端保存链写不进这三格。</p>
      *
-     * <p>取值：批准人 = 审批通过的人（姓名，不接受前端传）；签字与日期优先取弹窗载荷，
-     * 没带则兜底为「审批人姓名」与「当天」—— 这样老前端/老的确认框流程也不会留空白。</p>
+     * <p>取值（2026-11-19 用户口径更新）：**批准人 = 当前操作人姓名、签字 = 同姓名、日期 = 当天**，
+     * 三格全部由服务端写入，**不再接受前端载荷**（此前弹窗可手填签字/日期；用户确认
+     * 「点批准时自动写入 admin 的姓名（系统管理员）+ 当天日期」）。</p>
+     *
+     * <p>admin 的 real_name 实测为「系统管理员」⇒ signNameOf(admin) 即用户说的那个名字。</p>
      */
-    private void writeChangeApprovalSign(PanelRegistry.PanelDef def, String no, Map<String, Object> formData, String operator) {
+    private void writeChangeApprovalSign(PanelRegistry.PanelDef def, String no, String operator) {
         String approver = signNameOf(operator);
         if (approver.isEmpty()) return;
-        String sign = pickOf(formData, "批准签字").trim();
-        if (sign.isEmpty()) sign = approver;
-        String date = pickOf(formData, "批准日期").trim();
-        if (date.isEmpty()) date = java.time.LocalDate.now().toString();
+        String sign = approver;
+        String date = java.time.LocalDate.now().toString();
         try {
             jdbc.update("UPDATE rd_change_head SET 备用2 = ?, 备用3 = ?, 备用4 = ?"
                             + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
@@ -5034,6 +5052,73 @@ public class ButtonService {
             // 备用列缺失(未跑迁移)不该阻断审批 —— 与 writeBackSignCell 同一口径,静默降级
             log.warn("[变更审批] 写回批准人/签字/日期失败 no={}: {}", no, e.getMessage());
         }
+    }
+
+    /**
+     * 产品变更申请表：管理员最终批准（2026-11-19 用户口径）。
+     *
+     * <p>用户原话：「所有会签人会签通过之后，由管理员进行一个最终的审批然后归档，
+     * 管理员的签字日期也要显示在这里」。</p>
+     *
+     * <p>门禁：**只有 admin**（本单会签人/发起人/普通审批角色一律拒绝）。
+     * 落点：先回填批准三格（姓名=系统管理员、日期=当天），再
+     * pending='N' + approve_node=NULL + effective='Y'（既有终态「已生效」）→
+     * markArchived 置归档标记 → applyChangeEffect 生成下一版受控文件草稿（沿用 2026-09-21 生效钩子）。</p>
+     */
+    private Map<String, Object> approveChangeFinal(PanelRegistry.PanelDef def, String no, String operator,
+                                                   Map<String, Object> formData) {
+        if (!isAdminUser(operator))
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "产品变更申请单的最终批准（待批准节点）仅管理员（admin）可执行");
+        Map<String, Object> st = docStatusOf(def.code(), no);
+        if (!"待批准".equals(String.valueOf(st.get("status"))))
+            throw new IllegalStateException("仅待批准状态可执行最终批准（当前：" + st.get("status") + "）");
+        String opinion = opinionOf(formData);
+        // 先回填签名再迁移状态：写失败直接抛出，不会留下"已批准但纸面没签名"的半截状态
+        writeChangeApprovalSign(def, no, operator);
+        // 竞态守卫：双击/两个管理员并发只有一次生效
+        int n = jdbc.update("UPDATE yj_doc_status SET pending = 'N', approve_node = NULL, effective = 'Y', update_at = GETDATE()"
+                        + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y' AND approve_node = 2",
+                def.code(), no);
+        if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
+        // 「归档」：RD_CHANGE 的既有终态是 effective='Y'（状态显示「已生效」），但同时置 archived
+        // 标记（markArchived 是唯一归档入口；本面板不触发受控文件/物料清单同步副作用）——
+        // 这样既满足"最终审批然后归档"，也不破坏下游"变更已生效"的口径与弃审/部门补填逻辑。
+        markArchived(def.code(), no, operator);
+        recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion, 2);
+        String made = applyChangeEffect(no, operator);
+        recordApproval(def.code(), no, "EFFECT", "APPLIED", "已生成下一版草稿：" + made);
+        final String madeF = made;
+        final String op = operator;
+        final String opi = opinion == null ? "" : opinion;
+        notify(() -> messageService.sendToAuthor(def.headTable(), def.code(), no, MessageService.APPROVAL_APPROVED,
+                Map.of("docNo", no, "actor", op, "opinion", opi, "effect", madeF), op));
+        return result(no, "已生效");
+    }
+
+    /**
+     * 产品变更申请表：管理员在「待批准」节点驳回（2026-11-19）。
+     *
+     * <p>只有 admin 能驳回；意见必填（与所有审批驳回同口径）。状态回「草稿」，
+     * 通知发起人与已填写的部门（复用 change 的既有驳回通知口径）。</p>
+     */
+    private Map<String, Object> rejectChangeFinal(PanelRegistry.PanelDef def, String no, Map<String, Object> formData) {
+        String who = currentUserName();
+        if (!isAdminUser(who))
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "产品变更申请单的最终驳回（待批准节点）仅管理员（admin）可执行");
+        Map<String, Object> st = docStatusOf(def.code(), no);
+        if (!"待批准".equals(String.valueOf(st.get("status"))))
+            throw new IllegalStateException("仅待批准状态可执行最终驳回（当前：" + st.get("status") + "）");
+        String opinion = opinionOf(formData);
+        if (opinion.isEmpty()) throw new IllegalStateException("最终驳回必须填写审批意见");
+        int n = jdbc.update("UPDATE yj_doc_status SET pending = 'N', approve_node = NULL, shr = NULL, shsj = NULL, update_at = GETDATE()"
+                        + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y' AND approve_node = 2",
+                def.code(), no);
+        if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
+        recordApproval(def.code(), no, "REJECT", "REJECTED", opinion, 2);
+        notifyChangeRejected(def, no, who, opinion);
+        return result(no, "草稿");
     }
 
     // ---- 质量单据纸面「编制 / 审核 / 批准」三格自动落值(2026-10-04) ----
@@ -7864,11 +7949,43 @@ public class ButtonService {
     }
 
     /**
+     * 「会签中」是否允许该会签人填写**本部门**的部门评审意见（2026-11-19 用户口径）。
+     *
+     * <p>用户原话：「现在会签人只能点会签通过，但是不能填对应的部门评审意见」——
+     * 此前会签人在「会签中」既不能保存（saveDoc 整体拒绝会签中单据），纸面也整体只读，
+     * 只能空着意见点通过。本方法给一个**只写明细、只写本部门行**的窄口子。</p>
+     *
+     * <p>判据（四条全过才放行）：
+     * ① 面板是 RD_CHANGE；
+     * ② 单据状态是「会签中」；
+     * ③ 当前账号在本单「会签人」里**且该账号还有 PENDING 待签记录**
+     *    （已经签过的不能再回来改内容，否则签的和最终保存的不是一版）；
+     * ④ 账号在「部门↔账号」映射里有至少一个部门（changeDeptsOf）。</p>
+     *
+     * <p>放行后真正能改到哪些格子仍由 {@link #gateChangeDetail} 兜底：非本部门的行、
+     * 本部门的非 变更后内容/备注 列一律还原成库内现值；表头根本不写（见 saveDoc 的 deptFillOnly）。
+     * 管理员**不豁免**：admin 若也是会签人，同样只能填自己部门那一行。</p>
+     */
+    private boolean allowChangeSignoffFill(PanelRegistry.PanelDef def, String no, String user) {
+        if (def == null || !CHANGE_PANEL.equals(def.code())) return false;
+        if (user == null || user.isBlank()) return false;
+        String st = String.valueOf(docStatusOf(def.code(), no).get("status"));
+        if (!"会签中".equals(st)) return false;
+        if (!"PENDING".equals(signoffResults(no).get(user))) return false;
+        return !changeDeptsOf(user).isEmpty();
+    }
+
+    /**
      * 按格门禁:就地改写 items(调用方随后照常 upsert)。
      * 还原口径 —— 非本部门行(或本部门的非可编辑列)= 库内现值;缺席的部门行 = 原值补回(不软删)。
+     *
+     * @param strictOwnOnly 会签中填意见的窄口子传 true：**连管理员也关掉"代填任何部门行"的豁免**，
+     *                      严格按 yj_user.dept_id → yj_change_dept 只放本人部门行。
+     *                      已生效/归档的部门补填仍按旧口径（管理员豁免）。
      */
-    private void gateChangeDetail(PanelRegistry.PanelDef def, List<Map<String, Object>> items, String no, String user) {
-        boolean admin = isAdminUser(user);
+    private void gateChangeDetail(PanelRegistry.PanelDef def, List<Map<String, Object>> items, String no, String user,
+                                  boolean strictOwnOnly) {
+        boolean admin = !strictOwnOnly && isAdminUser(user);
         java.util.Set<String> mine = admin ? java.util.Set.of() : changeDeptsOf(user);
         List<String> canonical = changeDeptRows();
         List<Map<String, Object>> db = jdbc.queryForList("SELECT id, 部门, 表区, 变更后内容, 签字, 日期, 备注 FROM "
@@ -8005,6 +8122,44 @@ public class ButtonService {
         return !res.isEmpty() && res.values().stream().allMatch("APPROVED"::equals);
     }
 
+    /**
+     * 会签全部通过 → 「待批准」（2026-11-19 用户口径：「所有会签人会签通过之后，
+     * 由管理员进行一个最终的审批然后归档」）。
+     *
+     * <p>**沿用既有状态流转，不自造状态机**：与两级审批同一条落库写法 ——
+     * `yj_doc_status.pending='Y'` + `approve_node=2`；状态推导在两处（ButtonService.docStatusOf /
+     * QueryService.docStatus）把它显示成 RD_CHANGE 专属的「待批准」，其余面板的 node=2 仍是
+     * 「待二级审批」。没有新列、没有新表。</p>
+     *
+     * <p>与 {@link #doSubmitApproval} 的差异：那一步是「发起人 → 一级审批人」，会做编制落值、
+     * 必填校验并按审批权通知；这里最后一位会签人通常不是发起人，也不再有"一级审批人"，
+     * 只做：pending_by 记发起人（列表「提交人」显示正确）→ 通知管理员 → 留一条 SUBMIT 痕。</p>
+     */
+    private Map<String, Object> submitChangeFinalApproval(PanelRegistry.PanelDef def, String no, String opinion) {
+        if (!CHANGE_PANEL.equals(def.code())) throw new IllegalStateException("仅产品变更申请单可提交最终批准");
+        if (!signoffAllApproved(no)) throw new IllegalStateException("会签尚未全部通过，不能提交最终批准");
+        String operator = currentUserName();
+        String author = changeAuthor(no);
+        String pendingBy = author.isBlank() ? operator : author;
+        // 竞态守卫：最后一位会签人双击时只有一次能推进（signoffApprove 的 UPDATE 已限 PENDING，
+        // 这里再保证不会把已生效/已归档的单重新拉回待批准）。
+        jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
+                        + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
+                        + "WHEN MATCHED THEN UPDATE SET pending = 'Y', pending_by = ?, pending_at = GETDATE(), "
+                        + "  shr = NULL, shsj = NULL, canceled = 'N', approve_node = 2, l2_approver = NULL, update_at = GETDATE() "
+                        + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, pending, pending_by, pending_at, canceled, approve_node, update_at) "
+                        + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), 'N', 2, GETDATE());",
+                def.code(), no, pendingBy, pendingBy);
+        recordApproval(def.code(), no, "SUBMIT", "PENDING",
+                opinion == null || opinion.isBlank() ? "会签全部通过，提交管理员批准" : opinion);
+        // 管理员终审：通知 admin 账号。这里不复用 sendToApprovers —— 那套按 can_approve 找审批角色，
+        // RD_CHANGE 在权限矩阵里通常没有审批角色（2026-11-19 口径：终审固定 admin）。
+        notify(() -> messageService.send(messageService.admins(), MessageService.APPROVAL_SUBMITTED,
+                def.code(), no, Map.of("docNo", no, "actor", operator,
+                        "opinion", opinion == null ? "" : opinion, "panelName", def.name()), operator));
+        return result(no, "待批准");
+    }
+
     /** 会签留痕(operator = 会签人本人,不是当前操作者) */
     private void recordSignoff(String no, String signer, String result, String opinion) {
         jdbc.update("INSERT INTO yj_form_approval (panel_code, form_no, action, result, node_no, operator, opinion, create_time) "
@@ -8087,7 +8242,7 @@ public class ButtonService {
         }
     }
 
-    /** 会签通过(仅本单会签人):全部签完 → **自动**转审批中(用户口径:会签通过才进审核) */
+    /** 会签通过(仅本单会签人):全部签完 → **自动**转「待批准」，由 admin 最终批准/驳回（2026-11-19） */
     private Map<String, Object> signoffApprove(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String no = requireNo(formData);
         ensureDocExists(def, no);
@@ -8107,11 +8262,12 @@ public class ButtonService {
         //     尊重实际输入，也让 stampSignature 的"内容变了才盖章"口径不被污染）。
         stampSignoffDeptRow(def, no, user);
         if (signoffPending(no).isEmpty()) {
-            // 全部通过:转审批中(走提交内核——刻意跳过发起人校验,最后一位会签人通常不是发起人)
-            doSubmitApproval(def, no, opinion);
+            // 全部通过：2026-11-19 用户口径改为「待管理员最终批准」——不再直接进「审批中」。
+            // 注意这一步刻意不走 doSubmitApproval：最后一位会签人通常不是发起人，且没有一级审批人。
+            submitChangeFinalApproval(def, no, opinion);
             notify(() -> messageService.sendToAuthor(def.headTable(), def.code(), no, MessageService.SIGNOFF_PASSED,
                     Map.of("docNo", no, "actor", user, "panelName", def.name()), user));
-            return result(no, "审批中");
+            return result(no, "待批准");
         }
         return result(no, "会签中");
     }
@@ -9743,7 +9899,12 @@ public class ButtonService {
             // 产品变更申请单:有 PENDING 签名 = 会签中(排在审批中之前;会签全通过时会自动转审批)
             out.put("status", "会签中");
         } else if ("Y".equals(r.get("pending"))) {
-            out.put("status", nodeOf(r) == 2 ? "待二级审批" : "审批中");
+            // 产品变更申请表(2026-11-19):会签全过后的 node=2 是**管理员终审**，显示「待批准」；
+            // 其余面板的 node=2 仍是质量单据的「待二级审批」。两处状态推导必须同改
+            // （另一处在 QueryService.docStatus，管列表行状态）。
+            out.put("status", nodeOf(r) == 2
+                    ? (CHANGE_PANEL.equals(panelCode) ? "待批准" : "待二级审批")
+                    : "审批中");
         } else if ("Y".equals(r.get("modify_state"))) {
             out.put("status", "修改中");
         } else if ("Y".equals(r.get("effective"))) {

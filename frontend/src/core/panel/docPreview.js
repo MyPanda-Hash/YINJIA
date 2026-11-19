@@ -233,7 +233,7 @@ export function previewColumnsOf(panelCode, ownerKey) {
  *   只返回**有数据**的状态（空节点不画，避免满屏 0）；最前面固定一个「全部」。
  */
 export function approvalStatusTree(rows) {
-  const ORDER = ['草稿', '修改中', '审批中', '待二级审批', '已审核', '已归档', '已作废']
+  const ORDER = ['草稿', '修改中', '会签中', '审批中', '待二级审批', '待批准', '已生效', '已审核', '已归档', '已作废']
   const list = Array.isArray(rows) ? rows : []
   const cnt = new Map()
   for (const r of list) {

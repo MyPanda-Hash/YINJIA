@@ -323,7 +323,7 @@
           <RecordSheetPanels
             ref="approvalSheetRef"
             :head="cur" :fields="sheetAllFields" :detail-fields="sheetDetailFields" :editable="draftEditable && !annOn" :panel-code="panelCode"
-            :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true" :dept-fill-open="changeDeptFillOpen"
+            :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true && !changeSignoffFillOpen" :dept-fill-open="changeRowEditOpen"
             @dirty="markInlineDirty"
             @refresh-config="onFieldEditRefresh"
             @open-file="onOpenLinkedFile"
@@ -582,13 +582,16 @@
                 <div class="as-side-btn" :class="{ disabled: isDisabled('弃审') }" @click="onSideAction('弃审')">{{ tt('弃审') }}</div>
               </template>
               <!-- 产品变更申请单(RD_CHANGE,2026-09-21):会签子流程(审批本身走上面的统一审批块)。
-                   状态链 草稿 →(填写中)→ 会签中(可选)→ 审批中(admin)→ 已生效;驳回回草稿。
+                   状态链 草稿 →(填写中)→ 会签中(可选，会签人可填本部门行)→ 待批准(admin 终审) → 已生效;驳回回草稿。
                    显隐按"状态 × 身份":发起人(∪管理员)才提交/撤回,会签人(∪管理员)才签。服务端每步都再校验一次身份。
                    2026-10-16 侧栏整理:本块的「审批通过/审批驳回/审批情况」删掉 —— 已并入统一审批块,不再重复渲染。 -->
               <template v-if="isChangePanel">
                 <div v-if="['草稿', '修改中'].includes(curDocStatus) && cur['需会签'] === '是' && isChangeInitiator"
                      class="as-side-btn primary" @click="onSideAction('提交会签')">{{ tt('提交会签') }}</div>
                 <template v-if="curDocStatus === '会签中'">
+                  <!-- 2026-11-19 用户口径：「现在会签人只能点会签通过，但是不能填对应的部门评审意见」
+                       ⇒ 会签中只放开「三、部门评审意见」的本部门行；点会签通过前会自动保存一次。 -->
+                  <div v-if="changeSignoffFillOpen" class="as-side-hint">{{ tt('会签人可在「三、部门评审意见」填写本部门那一行，保存后再点「会签通过」') }}</div>
                   <div v-if="iAmChangeSigner" class="as-side-btn primary" @click="onSideAction('会签通过')">{{ tt('会签通过') }}</div>
                   <div v-if="iAmChangeSigner" class="as-side-btn" @click="onSideAction('会签驳回')">{{ tt('会签驳回') }}</div>
                   <div v-if="isChangeInitiator" class="as-side-btn sub" @click="onSideAction('撤回会签')">{{ tt('撤回会签') }}</div>
@@ -2380,17 +2383,16 @@
 
     <!-- 产品变更申请表：审批通过 + 签字/日期（2026-11-11）。
          这三个值通过后写进 rd_change_head 备用2/3/4，纸面「批准 / 签字 / 日期」三格即显示并可打印。 -->
-    <el-dialog v-model="chgApvVisible" :title="tt('审批通过（签字）')" width="460px" append-to-body>
+    <el-dialog v-model="chgApvVisible" :title="tt(changeFinalStage ? '批准（产品变更申请单）' : '审批通过（签字）')" width="460px" append-to-body>
       <div class="dq-form">
-        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('批准后，签字与日期会回填到纸面「批准 / 签字 / 日期」三格，保存与打印都可见。') }}</div>
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('批准后系统自动写入当前登录人的姓名与当天日期，并回填到纸面「批准 / 签字 / 日期」三格，保存与打印都可见。') }}</div>
         <div class="dq-row" style="align-items:center">
-          <span class="dq-label">{{ tt('签字') }}</span>
-          <el-input v-model="chgApvSign" maxlength="30" :placeholder="tt('签字（默认当前登录人姓名）')" />
+          <span class="dq-label">{{ tt('批准') }}</span>
+          <span class="dq-fixed">{{ user?.realName || user?.userName || '' }}<span class="dq-fixed-hint">{{ tt('（系统自动写入）') }}</span></span>
         </div>
         <div class="dq-row" style="align-items:center">
           <span class="dq-label">{{ tt('日期') }}</span>
-          <el-date-picker v-model="chgApvDate" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD"
-                          style="flex:1" :placeholder="tt('日期（默认今天）')" />
+          <span class="dq-fixed">{{ todayStr() }}<span class="dq-fixed-hint">{{ tt('（当天）') }}</span></span>
         </div>
         <div class="dq-row" style="align-items:flex-start">
           <span class="dq-label">{{ tt('审批意见') }}</span>
@@ -2399,7 +2401,7 @@
       </div>
       <template #footer>
         <el-button @click="chgApvVisible = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" :loading="chgApvBusy" @click="confirmChangeApprove">{{ tt('确认审批通过') }}</el-button>
+        <el-button type="primary" :loading="chgApvBusy" @click="confirmChangeApprove">{{ tt(changeFinalStage ? '确认批准' : '确认审批通过') }}</el-button>
       </template>
     </el-dialog>
 
@@ -2914,6 +2916,11 @@ import { recordSheetConfigs } from './recordSheetConfigs'
 // 单据预览卡片的摘要口径（2026-11-11）：按面板挑「最主要的信息」，纯函数 + 单测
 import { previewLineText, previewSummaryOf } from '@core/panel/docPreview.js'
 import { missingKeyFromMessage } from './recordSheetFocus'
+// 产品变更申请表：会签人填本部门行 / 管理员终审的纯判断（单测见 changeCosign.test.js）
+import {
+  canFillOwnDeptRow, changeApproveLabel, changeRejectLabel, changeWaitingTip,
+  isChangeFinalStage as isChangeFinalStageOf, isChangeSigner, splitChangeSigners,
+} from './changeCosign'
 import QcInspReqSheet from './QcInspReqSheet.vue'
 import { isQcInspReqPanel } from './qcInspReqConfig'
 import { approvalSheetCfg, planSheetCfg, qcSheetCfgs, sampleExtSheetCfg, sampleIntSheetCfg, sampleNdSheetCfg } from './docSheetConfigs'
@@ -3034,15 +3041,35 @@ const changeDeptFillOpen = computed(() => String(panelCode.value) === 'RD_CHANGE
   && user?.isAdmin !== true
   && (changeDeptRows.value || []).length > 0)
 
+/**
+ * 会签中「会签人填本部门那一行」模式(2026-11-19 用户口径)。
+ *
+ * <p>用户原话：「现在会签人只能点会签通过，但是不能填对应的部门评审意见」。
+ * 与服务端 ButtonService.allowChangeSignoffFill 同口径：面板 + 会签中 + 本单待签会签人 +
+ * 有部门映射。管理员不豁免（admin 若也是会签人，同样只填自己部门那一行；
+ * 终审走「批准通过」，不靠这个口子）。</p>
+ */
+const changeSignoffFillOpen = computed(() => canFillOwnDeptRow({
+  panelCode: panelCode.value,
+  status: current.value?.['单据状态'],
+  head: cur.value,
+  account: user.account || user.userName,
+  deptRows: changeDeptRows.value,
+}))
+
+/** 两种「只填本部门行」窄口子（会签中 / 已生效后）合成一个纸面行编辑开关 */
+const changeRowEditOpen = computed(() => changeDeptFillOpen.value || changeSignoffFillOpen.value)
+
 // ── 产品变更申请单:会签按钮组的身份判据(2026-09-21)──
 // 会签人 = 头字段「会签人」里的账号(顿号/逗号分隔);发起人 = 纸面「申请人」= 当前用户姓名。
 // 两者只决定**按钮显不显示**:服务端 ButtonService.requireSigner / requireChangeInitiator 才是门禁。
 const isChangePanel = computed(() => String(panelCode.value) === 'RD_CHANGE')
-const changeSigners = computed(() => String(cur.value?.['会签人'] ?? '')
-  .split(/[,，、;；\s]+/).map((s) => s.trim()).filter(Boolean))
-const iAmChangeSigner = computed(() => changeSigners.value.includes(String(user.account || user.userName || '')))
+const changeSigners = computed(() => splitChangeSigners(cur.value?.['会签人']))
+const iAmChangeSigner = computed(() => isChangeSigner(cur.value, user.account || user.userName))
 const isChangeInitiator = computed(() => user.isAdmin === true
   || (!!user.realName && String(cur.value?.['申请人'] ?? '') === String(user.realName)))
+/** 会签全过后的「待批准」最终节点（只有 RD_CHANGE 有这个词，且只有 admin 能批/驳） */
+const changeFinalStage = computed(() => isChangeFinalStageOf(panelCode.value, current.value?.['单据状态']))
 /** 内部样品单的月份标题前缀：`2026年11月内部`（优先单号里的年月，退回当前月） */
 const sampleMonthTitle = computed(() => {
   const no = String(cur.value?.['单据编号'] || curDocNo.value || '')
@@ -5803,7 +5830,7 @@ const approvalSideGroups = computed(() => toolbarGroups.value
  *  这是纯展示层取舍,动作本身没被删:状态回到草稿/修改中时它们自动回来。 */
 const sheetSideGroups = computed(() => approvalSideGroups.value
   .map((g) => ({ ...g, actions: actsOf(g).filter((a) => a !== '字段管理'
-    && !(!draftEditable.value && !changeDeptFillOpen.value && ['保存', '保存为草稿', '保存新增'].includes(a))) }))
+    && !(!draftEditable.value && !changeRowEditOpen.value && ['保存', '保存为草稿', '保存新增'].includes(a))) }))
   .filter((g) => (g.actions || []).length))
 /** 「字段管理」是否可用(有才在 ④ 输出段末尾渲染,不再混在本单操作里)。
  *  ⚠ 2026-10-16 用户口径:「侧边栏的字段管理在研发管理不可用,可以去掉」——
@@ -5836,19 +5863,29 @@ const hasFieldAdmin = computed(() => (!String(panelCode.value).startsWith('RD_')
  *     · 显示 = 有没有**资格**(有审批权 ∪ 被一级选定的二级审核人;QC 两级仍走原口径);
  *     · 能不能点 = 交给 isDisabled(提交人自己的一级「审批通过」仍置灰,悬停给出那句话)。
  */
-const approvalBtnsVisible = computed(() => (isQcL2Panel.value
-  ? canApproveQcL2Here.value
-  : (canApproveHere() || l2ApproverNow.value)))
+const approvalBtnsVisible = computed(() => (
+  // 产品变更申请表「待批准」：只有 admin 看得到「批准通过/批准驳回」——用户口径「只有 admin
+  // 看到批准/驳回按钮」。其他有审批角色的账号即使能通过权限层，也不该看到这个最终节点入口。
+  changeFinalStage.value
+    ? user.isAdmin === true
+    : (isQcL2Panel.value
+      ? canApproveQcL2Here.value
+      : (canApproveHere() || l2ApproverNow.value))))
 /** 轮不到我审批时的侧栏说明(宁可说"在等谁",也别让用户对着空侧栏猜是不是卡住了) */
 const approvalWaitingTip = computed(() => (curDocStatus.value === '待二级审批'
   ? '本单在二级签核：由一级选定的二级审核人（或管理员）签核'
-  : '本单已提交审批，等待一级审批人处理（提交人不能审批自己提交的单）'))
-/** 审批通过按钮文案:QC 两级面板走原「审批通过/批准通过」,RD_PROD_INFO 二级节点明确叫「二级签核」 */
-const approveBtnLabel = computed(() => (isQcL2Panel.value
-  ? qcL2ApproveLabel()
-  : (curDocStatus.value === '待二级审批' ? '二级签核' : '审批通过')))
-/** 审批驳回按钮文案:QC 两级面板「一级驳回/二级驳回」;其余「审批驳回」 */
-const rejectBtnLabel = computed(() => (isQcL2Panel.value ? qcL2RejectLabel() : '审批驳回'))
+  : changeWaitingTip(curDocStatus.value)))
+/** 审批通过按钮文案:产品变更「待批准」= 批准通过;QC 两级面板走原「审批通过/批准通过」;
+ *  RD_PROD_INFO 二级节点明确叫「二级签核」 */
+const approveBtnLabel = computed(() => (changeFinalStage.value
+  ? changeApproveLabel(true)
+  : (isQcL2Panel.value
+    ? qcL2ApproveLabel()
+    : (curDocStatus.value === '待二级审批' ? '二级签核' : '审批通过'))))
+/** 审批驳回按钮文案:产品变更「待批准」= 批准驳回;QC 两级面板「一级驳回/二级驳回」;其余「审批驳回」 */
+const rejectBtnLabel = computed(() => (changeFinalStage.value
+  ? changeRejectLabel(true)
+  : (isQcL2Panel.value ? qcL2RejectLabel() : '审批驳回')))
 const headerFields = computed(() => {
   const fields = (cfgCache.value?.dataSchema?.fields || []).filter((field) => !field.hidden)
   const names = cfgCache.value?.metadata?.panelPageDto?.formPages?.[0]?.fieldNames
@@ -8292,7 +8329,8 @@ function closeCtx() {
 const APPROVE_ACTIONS = ['审批通过', '审批驳回']
 
 /** 处于审批流程中的状态(2026-09-20 两级审批:一级「审批中」/二级「待二级审批」) */
-const IN_APPROVAL = ['审批中', '待二级审批']
+// 2026-11-19：产品变更申请表会签全过后进入「待批准」（admin 终审），同样属于审批在途状态。
+const IN_APPROVAL = ['审批中', '待二级审批', '待批准']
 
 // ---------- 二级审核人选取(2026-09-20 两级审批:一级通过时必须选人) ----------
 const l2PickVisible = ref(false)
@@ -8526,23 +8564,19 @@ async function confirmDomApprove() {
     domApvBusy.value = false
   }
 }
-/* ── 产品变更申请表：审批通过 + 签字/日期回填（2026-11-11 用户口径）───────────────
- * 用户原话：「审批的时候弹出弹窗，审批人可以进行批准，还有签字，把信息回填进这里面，还有日期，
- *   保存之后该单据可见内容，打印出来也是有数据的」。
- * 与立项申请「审批+定级」、测试申请单「审批+分发」同一范式：**专用弹窗**收集本次审批的额外输入，
- * 通过即在同一个 callButton 里提交；后端 ButtonService 的 RD_CHANGE 分支写进
- * rd_change_head 备用2/3/4（那三格 yj_field.editable=0，只有审批动作写得进去）。
- * 默认值：签字 = 当前登录人姓名，日期 = 今天 —— 审批人通常就是签自己名字、签当天。 */
+/* ── 产品变更申请表：审批通过 / 管理员最终批准（2026-11-11 建立，2026-11-19 改口径）──
+ * 2026-11-11 用户口径：「审批的时候弹出弹窗，审批人可以进行批准，还有签字，把信息回填进这里面，
+ *   还有日期」——那时弹窗可手填签字/日期。
+ * 2026-11-19 用户口径更新：「点批准时自动写入 admin 的姓名（系统管理员）+ 当天日期」⇒
+ *   弹窗只展示"将回填的姓名/日期"（不可改）+ 可填审批意见；服务端 writeChangeApprovalSign
+ *   也不再接受「批准签字/批准日期」载荷，三格只有服务端一个真源。
+ * 「待批准」节点只有 admin 能看到该按钮（见 approvalBtnsVisible / canFinalApprove）。 */
 const chgApvVisible = ref(false)
 const chgApvBusy = ref(false)
 const chgApvDocNo = ref('')
-const chgApvSign = ref('')
-const chgApvDate = ref('')
 const chgApvOpinion = ref('')
 function openChangeApprove(no) {
   chgApvDocNo.value = no || ''
-  chgApvSign.value = String(user?.realName || user?.userName || '').trim()
-  chgApvDate.value = todayStr()
   chgApvOpinion.value = ''
   chgApvVisible.value = true
 }
@@ -8554,14 +8588,12 @@ async function confirmChangeApprove() {
       panelCode: 'RD_CHANGE', buttonName: '审批通过',
       formData: {
         编号: chgApvDocNo.value,
-        // 空串不发：后端兜底为「审批人姓名 / 当天」，不会把格子覆盖成空
-        ...(chgApvSign.value ? { 批准签字: chgApvSign.value } : {}),
-        ...(chgApvDate.value ? { 批准日期: chgApvDate.value } : {}),
+        // 签字/日期由服务端固定写入，这里不再传（传了也会被忽略）
         ...(chgApvOpinion.value ? { 审批意见: chgApvOpinion.value } : {}),
       },
       buttonParam: {},
     })
-    ElMessage.success(tt('审批通过'))
+    ElMessage.success(tt(changeFinalStage.value ? '批准通过' : '审批通过'))
     chgApvVisible.value = false
     await load()
   } catch (e) {
@@ -11395,8 +11427,8 @@ function validateInlineDraft() {
  *   用户一眼能看懂「审核前得先把这单存下来,缺的是明细行」。
  */
 async function saveInlineDraft(buttonName = '保存', { silent = false, skipValidation = false, reason = '' } = {}) {
-  // changeDeptFillOpen：已生效后由会签人填本部门行，也要能走保存（服务端只写明细）
-  if ((!draftEditable.value && !changeDeptFillOpen.value) || inlineSaving.value) return false
+  // changeRowEditOpen：会签中 / 已生效后由会签人填本部门行，也要能走保存（服务端只写明细）
+  if ((!draftEditable.value && !changeRowEditOpen.value) || inlineSaving.value) return false
   // 归档单据「修改单据」后的保存 = 保存修改(2026-11-06 用户口径「修改完成点击保存回到归档状态」):
   //   后端 saveDirectModify 落库后立刻做 修改记录 diff 收尾并把状态拨回 已归档 —— 不能走普通「保存」,
   //   那样只会停在 修改中。
@@ -11417,7 +11449,9 @@ async function saveInlineDraft(buttonName = '保存', { silent = false, skipVali
   //   参数早就声明了、调用方也传了(「保存为草稿」传 true),但函数体里**从来没读过它** ——
   //   于是草稿路径照样跑全量必填校验 ⇒ "保存为草稿"做不到"存一半"。
   //   用户口径:保存为草稿不做必填限制;保存/提交才做。
-  const validation = skipValidation ? '' : validateInlineDraft()
+  // 会签中填本部门意见：表头/其他行都不落库，也不该被"提交级"必填挡（历史单据可能本来就有漏填）。
+  const narrowDeptFill = changeSignoffFillOpen.value && !draftEditable.value
+  const validation = (skipValidation || narrowDeptFill) ? '' : validateInlineDraft()
   if (validation) {
     // 2026-11-12 用户口径：未填完就提交审批时**弹窗提示一次**，并高亮未填写内容。
     // 高亮已由 validateInlineDraft 内部对每个缺失点调用 focusMissingFields 完成（翻页 + 闪烁）；
@@ -12041,15 +12075,18 @@ function isDisabled(action) {
     审批通过: !current.value || !IN_APPROVAL.includes(st)
       // 编制与审批分离:提交人不能点**一级**审批通过(后端必拒)。只管「审批中」这一档 ——
       // 「待二级审批」时如果被一级选成了二级审核人,本人签核是允许的(后端 approveSecond 只认 l2_approver)。
-      || (st === '审批中' && iAmCurSubmitter.value),
+      || (st === '审批中' && iAmCurSubmitter.value)
+      // 产品变更申请表「待批准」节点：只有 admin（按钮本身对非 admin 不渲染，这里再兜一道）。
+      || (changeFinalStage.value && user.isAdmin !== true),
     审批驳回: !current.value || !IN_APPROVAL.includes(st),
    驳回审批: !current.value || !IN_APPROVAL.includes(st),
     // 卡死单据出口(2026-09-11):撤回删除/修改申请仅在对应申请态可点
     撤回删除申请: !current.value || st !== '删除申请中',
     撤回修改申请: !current.value || st !== '修改申请中',
     // 2026-11-11：已生效/已归档时，会签人仍可「填本部门那一行」并保存（changeDeptFillOpen）
-    //   —— 只放「保存」这一个动作，保存为草稿/保存新增仍按原口径（草稿才有意义）。
-    保存: (!draftEditable.value && !changeDeptFillOpen.value) || inlineSaving.value,
+    // 2026-11-19：会签中同样放开（changeSignoffFillOpen）—— 只放「保存」这一个动作，
+    //   保存为草稿/保存新增仍按原口径（草稿才有意义）。
+    保存: (!draftEditable.value && !changeRowEditOpen.value) || inlineSaving.value,
     保存为草稿: !draftEditable.value || inlineSaving.value,
     保存新增: !draftEditable.value || inlineSaving.value,
     扫描填单: reportMode.value,
@@ -12125,6 +12162,10 @@ function disabledReason(action) {
     if (IN_APPROVAL.includes(st)) return tt('该单已提交审批：请用「审批通过」完成审批，不能再点「审核」')
     if (iAmDraftAuthor.value) return tt('本单由你填写：按「编制与审批分离」不能自己审核（未授「本人自审」），请用「提交审批」→「审批通过」由他人审批')
     return tt('单据状态') + '：' + stText + '，' + tt('仅草稿可审核')
+  }
+  // 产品变更申请表「待批准」：最终批准/驳回只有 admin
+  if (action === '审批通过' && changeFinalStage.value && user.isAdmin !== true) {
+    return tt('仅管理员可执行最终批准')
   }
   // 编制与审批分离:提交人自己点一级「审批通过」= 后端必拒(实测 403),这里把原因说在他点之前
   if (action === '审批通过' && st === '审批中' && iAmCurSubmitter.value) {
@@ -13333,7 +13374,7 @@ async function onButton(action) {
       if (action === '提交审批') {
         if (!['草稿', '修改中'].includes(current.value['单据状态'])) return ElMessage.warning('仅草稿或修改中状态可提交审批')
       } else if (!IN_APPROVAL.includes(current.value['单据状态'])) {
-        return ElMessage.warning('仅审批中或待二级审批状态可审批通过')
+        return ElMessage.warning('仅审批中、待二级审批或待批准状态可审批通过')
       }
       // 产品信息表一级节点(状态=审批中):走「选取二级审核人」弹窗(二级签核人由一级指定)
       // 外部开发样品申请单（2026-11-06）：同一套「一级选二级(确认)人」弹窗
@@ -13424,7 +13465,7 @@ async function onButton(action) {
       }
     } else if (action === '审批驳回') {
       if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
-      if (!IN_APPROVAL.includes(current.value['单据状态'])) return ElMessage.warning(tt('仅审批中或待二级审批状态可审批驳回'))
+      if (!IN_APPROVAL.includes(current.value['单据状态'])) return ElMessage.warning(tt('仅审批中、待二级审批或待批准状态可审批驳回'))
       const no = current.value['编号'] || current.value['单据编号'] || ''
       try {
         const { value } = await ElMessageBox.prompt(
@@ -13471,7 +13512,11 @@ async function onButton(action) {
     // (提交会签同此:需会签/会签人 是头字段,刚填的必须先生效,否则后端按库里的旧值判"没填会签人")
     // 2026-10-17 用户报障「未保存可以直接审核,出现错误」:保存没过必填校验时,提示必须**归因到这次审批动作**
     // (reason=action ⇒「审核前需先保存：请至少添加一行明细」),否则用户只看到一句与审核无关的校验错误。
-    if (['审核', '提交审批', '提交会签'].includes(action) && draftEditable.value) {
+    // 会签通过(2026-11-19):会签人刚在纸面填的本部门意见必须先落库，否则服务端盖章时读到的还是旧内容。
+    const needsSaveBefore = ['审核', '提交审批', '提交会签'].includes(action)
+      ? draftEditable.value
+      : (action === '会签通过' && (draftEditable.value || changeSignoffFillOpen.value))
+    if (needsSaveBefore) {
       const saved = await saveInlineDraft('保存', { silent: true, reason: action })
       if (!saved) return
     }
@@ -14312,7 +14357,8 @@ onUnmounted(() => {
   background: #fff7ed;
 }
 .doc-status.生产中,
-.doc-status.审批中 {
+.doc-status.审批中,
+.doc-status.待批准 {
   color: #2f4d75;
   border: 1px solid #bcd2f5;
   background: #f0f6ff;

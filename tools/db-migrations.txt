@@ -5076,3 +5076,7 @@ migrate-approval-customer-code-20261119.sql
 migrate-sample-nd-columns-20261119.sql
 # 2026-11-19 立项申请「申请立项人」必填（销售问题 P18）
 migrate-approval-initiator-required-20261119.sql
+# 2026-11-19 产品变更申请表：会签人填本部门评审意见（服务端按部门行强制）+ 会签全过转「待批准」
+#   + 管理员终审（批准/驳回，只读回填批准人/签字/日期并归档）。本脚本补齐 rd_change_detail
+#   部门评审列/字段登记、批准三格只读字段与 en 译名、列注明，均带守卫与自检；幂等。
+migrate-change-cosign-20261119.sql

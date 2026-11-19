@@ -264,7 +264,7 @@ function resetFilter() {
 function statusTone(s) {
   const v = String(s || '')
   if (v === '已归档' || v === '已审核' || v === '已完成') return 'done'
-  if (v === '审批中' || v === '待二级审批' || v === '修改中') return 'doing'
+  if (v === '会签中' || v === '审批中' || v === '待二级审批' || v === '待批准' || v === '修改中') return 'doing'
   return 'none'
 }
 

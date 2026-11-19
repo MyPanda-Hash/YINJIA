@@ -1159,7 +1159,7 @@ public class QueryService {
             }
             doc.put("编号", no);
             Map<String, Object> st = status.get(no);
-            String statusText = docStatus(st);
+            String statusText = docStatus(def.code(), st);
             doc.put("单据状态", statusText);
             doc.put("saved", st != null ? st.get("saved") : null);
             // 「二级审核人」= yj_doc_status.l2_approver（一级审批通过时选定的人）。
@@ -1213,8 +1213,9 @@ public class QueryService {
                     doc.put("审核时间", auditTimeText(st.get("shsj")));
                 }
                 doc.put("审批状态", "已通过");
-            } else if ("审批中".equals(statusText)) {
-                doc.put("审批状态", "审批中");
+            } else if ("审批中".equals(statusText) || "待批准".equals(statusText)) {
+                // 待批准（RD_CHANGE 终审节点）同样是在途状态：提交人/提交时间照常下发，列表可筛。
+                doc.put("审批状态", statusText);
                 doc.put("提交人", st.get("pending_by"));
                 doc.put("提交时间", auditTimeText(st.get("pending_at")));
             }
@@ -1438,8 +1439,10 @@ public class QueryService {
 
     /** 状态推导:已作废 > 已中止 > 金蝶已删除/已作废 > 删除申请中 > 已终止/终止审批中(项目实施计划) > 修改申请中 > 待二级审批/审批中 > 修改中 > 已生效 > 已归档 > 已完成(金蝶自动关单) > 已审核 > 草稿
      *  ⚠ 与 ButtonService.docStatusOf **必须同改**(两处推导,一处管列表行、一处管按钮/保存门禁;
-     *    2026-09-20 两级审批新增「待二级审批」时同改两处)。 */
-    private String docStatus(Map<String, Object> st) {
+     *    2026-09-20 两级审批新增「待二级审批」时同改两处。
+     *    2026-11-19 产品变更申请表会签全过后 approve_node=2 = 管理员终审，显示「待批准」；
+     *    其余面板的 node=2 仍是「待二级审批」——与 ButtonService.docStatusOf 同口径)。 */
+    private String docStatus(String panelCode, Map<String, Object> st) {
         if (st != null && "Y".equals(st.get("canceled"))) return "已作废";
         if (st != null && "Y".equals(st.get("stopped"))) return "已中止";
         // 金蝶「手动关闭」(erp_close_state='H')= 人工终止,与 MES 中止同义(方案 A,2026-09-20)
@@ -1457,7 +1460,10 @@ public class QueryService {
         if (st != null && "R".equals(st.get("modify_state"))) return "修改申请中";
         if (st != null && "Y".equals(st.get("signoff_pending"))) return "会签中";
         if (st != null && "Y".equals(st.get("pending"))) {
-            return l2Node(st) ? "待二级审批" : "审批中";
+            // 产品变更申请表：会签全过后的第二节点 = 管理员最终批准（2026-11-19 用户口径）。
+            // 与 ButtonService.docStatusOf 必须同改；其余面板 node=2 仍是「待二级审批」。
+            if (l2Node(st)) return "RD_CHANGE".equals(panelCode) ? "待批准" : "待二级审批";
+            return "审批中";
         }
         if (st != null && "Y".equals(st.get("modify_state"))) return "修改中";
         if (st != null && "Y".equals(st.get("effective"))) return "已生效";
