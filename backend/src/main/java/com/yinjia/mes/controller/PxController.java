@@ -1359,10 +1359,20 @@ public class PxController {
         return ApiResult.ok(queryService.selfmadeRows(name, batchFrom, batchTo, field, keyword));
     }
 
+    /**
+     * 样品进度跟踪（2026-11-18 Excel #9；2026-11-20 扩为双外部面板）。
+     *
+     * <p>用户口径：「样品追踪应该是追踪外部的两个样品面板，现在只是一个，
+     * 加上在这个界面可以切换分别追踪这两个外部的单据」。</p>
+     *
+     * <p>{@code panel} 只认 {@code RD_SAMPLE_EXT}（默认，兼容旧调用）与 {@code RD_SAMPLE_ND}；
+     * 权限**按所选面板**校验（看非开发单要非开发单的查看权，不能借开发单的权越看）。</p>
+     */
     @GetMapping("/sampleFlow")
-    public ApiResult<List<Map<String, Object>>> sampleFlow() {
-        perm.requirePanelView("RD_SAMPLE_EXT");
-        return ApiResult.ok(queryService.sampleFlowRows());
+    public ApiResult<List<Map<String, Object>>> sampleFlow(@RequestParam(required = false) String panel) {
+        String code = com.yinjia.mes.service.QueryService.normalizeSampleFlowPanel(panel);
+        perm.requirePanelView(code);
+        return ApiResult.ok(queryService.sampleFlowRows(code));
     }
 
     @PostMapping("/queryFormDataList")

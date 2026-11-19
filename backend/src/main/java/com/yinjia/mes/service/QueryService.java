@@ -388,21 +388,81 @@ public class QueryService {
         return out;
     }
 
+    /** 样品进度跟踪认的两个外部样品面板（2026-11-20 用户口径：「追踪外部的两个样品面板」） */
+    public static final String SAMPLE_FLOW_PANEL_EXT = "RD_SAMPLE_EXT";
+    public static final String SAMPLE_FLOW_PANEL_ND = "RD_SAMPLE_ND";
+
+    /**
+     * 面板码归一（接口 {@code GET /px/sampleFlow?panel=}）：
+     * 只认 {@link #SAMPLE_FLOW_PANEL_ND}，其余一律落回 {@link #SAMPLE_FLOW_PANEL_EXT}
+     * —— 不传（旧调用/旧前端）与脏值都保持原有行为，不会把页面打死。
+     */
+    public static String normalizeSampleFlowPanel(String panel) {
+        String p = panel == null ? "" : panel.trim();
+        return SAMPLE_FLOW_PANEL_ND.equalsIgnoreCase(p) ? SAMPLE_FLOW_PANEL_ND : SAMPLE_FLOW_PANEL_EXT;
+    }
+
+    /** 兼容旧调用：不传面板 = 外部-开发样品单（原行为一字不变） */
     public List<java.util.Map<String, Object>> sampleFlowRows() {
-        String sql = "SELECT h.[单据编号], "
-                + "ISNULL(h.[客户名称], N'') AS 客户名称, "
-                + "ISNULL(CONVERT(varchar(10), h.[单据日期], 23), '') AS 单据日期, "
-                + "ISNULL(h.[审核], N'') AS 审核人, "
-                + "ISNULL(h.[确认], N'') AS 确认人, "
-                + "ISNULL(h.[进度描述], N'') AS 进度描述, "
-                + "ISNULL(s.pending, 'N') AS pending, "
-                + "ISNULL(s.approve_node, 0) AS approve_node, "
-                + "ISNULL(s.archived, 'N') AS archived, "
-                + "ISNULL(s.canceled, 'N') AS canceled "
-                + "FROM rd_sample_ext_head h "
-                + "LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SAMPLE_EXT' AND s.doc_no = h.[单据编号] "
-                + "WHERE ISNULL(h.asp_cancel, 'N') <> 'Y' "
-                + "ORDER BY h.[单据日期] DESC, h.[单据编号] DESC";
+        return sampleFlowRows(SAMPLE_FLOW_PANEL_EXT);
+    }
+
+    /**
+     * 样品进度跟踪 · 双外部面板（2026-11-20 用户口径：
+     * 「样品追踪应该是追踪外部的两个样品面板，现在只是一个，加上在这个界面可以切换分别追踪这两个外部的单据」）。
+     *
+     * <p>两种面板返回**同一套行契约**（前端只有一份渲染/筛选逻辑）：
+     * 单据编号 / 客户名称 / 单据日期 / 审核人 / 确认人 / 进度描述 /
+     * pending / approve_node / archived / canceled。差异只在数据源与单级审批的映射：</p>
+     * <ul>
+     *   <li>{@link #SAMPLE_FLOW_PANEL_EXT} 外部-开发样品单：头表 {@code rd_sample_ext_head}，
+     *       两级审批（提交 → 一级审核 → 二级确认 → 归档），原样下发标记；</li>
+     *   <li>{@link #SAMPLE_FLOW_PANEL_ND} 外部-非开发样品单：头表 {@code rd_sample_nondev_head}，
+     *       **一级审批**（ButtonService.SAMPLE_SIGN_COLUMNS 把「确认」槽位指向「审核」列）。
+     *       ① 确认人恒空（纸面/审批流都没有这一格）；
+     *       ② approve_node 按一级口径收口（≥2 也只算 1），前端不会出现「待二级确认」；
+     *       ③ 本单不在 DOC_ARCHIVE_PANELS，通过后是「已审核」而非归档 ⇒ 用
+     *          {@code pending='N' 且 shr 非空} 映射成契约里的 archived 完成标记，
+     *          节点推导与 KPI 不必为 ND 分叉。</li>
+     * </ul>
+     *
+     * <p>权限由 Controller 按所选面板 {@code requirePanelView} 校验 —— 这里不重复判权。</p>
+     */
+    public List<java.util.Map<String, Object>> sampleFlowRows(String panel) {
+        String code = normalizeSampleFlowPanel(panel);
+        boolean nonDev = SAMPLE_FLOW_PANEL_ND.equals(code);
+        String sql = nonDev
+                ? "SELECT h.[单据编号], "
+                    + "ISNULL(h.[客户名称], N'') AS 客户名称, "
+                    + "ISNULL(CONVERT(varchar(10), h.[单据日期], 23), '') AS 单据日期, "
+                    + "ISNULL(h.[审核], N'') AS 审核人, "
+                    // 非开发样品单纸面只有「申请 / 审核」两格 ⇒ 确认人恒空（列仍下发，契约统一）
+                    + "CAST(N'' AS nvarchar(200)) AS 确认人, "
+                    + "ISNULL(h.[进度描述], N'') AS 进度描述, "
+                    + "ISNULL(s.pending, 'N') AS pending, "
+                    // 一级审批：节点只可能是 1；脏数据里的 2 也收口成 1（不产生"待二级"）
+                    + "CASE WHEN ISNULL(s.approve_node, 0) >= 2 THEN 1 ELSE ISNULL(s.approve_node, 0) END AS approve_node, "
+                    // 单级通过 ⇒ pending='N' + shr 有值（「已审核」）；契约里用 archived 表达"完成"
+                    + "CASE WHEN ISNULL(s.pending, 'N') = 'N' AND s.shr IS NOT NULL THEN 'Y' ELSE 'N' END AS archived, "
+                    + "ISNULL(s.canceled, 'N') AS canceled "
+                    + "FROM rd_sample_nondev_head h "
+                    + "LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SAMPLE_ND' AND s.doc_no = h.[单据编号] "
+                    + "WHERE ISNULL(h.asp_cancel, 'N') <> 'Y' "
+                    + "ORDER BY h.[单据日期] DESC, h.[单据编号] DESC"
+                : "SELECT h.[单据编号], "
+                    + "ISNULL(h.[客户名称], N'') AS 客户名称, "
+                    + "ISNULL(CONVERT(varchar(10), h.[单据日期], 23), '') AS 单据日期, "
+                    + "ISNULL(h.[审核], N'') AS 审核人, "
+                    + "ISNULL(h.[确认], N'') AS 确认人, "
+                    + "ISNULL(h.[进度描述], N'') AS 进度描述, "
+                    + "ISNULL(s.pending, 'N') AS pending, "
+                    + "ISNULL(s.approve_node, 0) AS approve_node, "
+                    + "ISNULL(s.archived, 'N') AS archived, "
+                    + "ISNULL(s.canceled, 'N') AS canceled "
+                    + "FROM rd_sample_ext_head h "
+                    + "LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SAMPLE_EXT' AND s.doc_no = h.[单据编号] "
+                    + "WHERE ISNULL(h.asp_cancel, 'N') <> 'Y' "
+                    + "ORDER BY h.[单据日期] DESC, h.[单据编号] DESC";
         return jdbc.query(sql, (rs, i) -> {
             java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
             row.put("单据编号", rs.getString("单据编号"));

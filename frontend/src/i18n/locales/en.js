@@ -5507,6 +5507,14 @@ export default {
     '没有查看样品进度数据的权限（需要「外部-开发样品」的查看权）': 'No permission to view sample progress (requires view access to "External - Development Sample")',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
     '输入样品单编号 / 客户名称 / 审核人 / 进度描述（支持片段）': 'Search by request no. / customer / reviewer / progress note (partial match)',
+    /* ── 研发管理·样品 → 样品进度跟踪双外部面板(2026-11-20 新增) ── */
+    '外部-开发样品单': 'External - Development Sample Request',
+    '外部-非开发样品单': 'External - Non-Development Sample Request',
+    '按外部非开发样品单看进展：谁提交、谁审核，一屏看完（本单只有一级审批）': 'Follow each external non-development sample request: who submitted it and who reviews it (single-level approval)',
+    '没有查看样品进度数据的权限（需要「外部-非开发样品」的查看权）': 'No permission to view sample progress (requires view access to "External - Non-Development Sample")',
+    '暂无样品单；在「外部-非开发样品」新增后会出现在这里': 'No sample requests yet. They appear here once created under "External - Non-Development Sample"',
+    '本单只有一级审批': 'This document uses single-level approval',
+    '没有查看该面板的权限': 'No permission to view that panel',
     /* ── 研发管理·项目管理 → 产品文件流程管控 /rd/productFlow(2026-11-11 新增) ── */
     '产品文件流程管控': 'Product File Flow Control',
     '按产品看这份开发包走到哪一步：产品信息表 + 4 张受控文件，哪一步还没建单、哪一步卡在开发中':
