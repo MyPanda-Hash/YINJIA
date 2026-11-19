@@ -2325,6 +2325,7 @@ export default {
     /* ── 功能性滤效:字段编辑 ── */
     '可改列名(别名)与显隐,全用户共享': 'Rename columns (alias) and toggle visibility; shared by all users',
     '不勾选=该列不显示/不导出': 'Unchecked = the column is hidden and not exported',
+    '动态样品列随「样品数」增删，不可隐藏': 'Dynamic sample columns follow Sample Count and cannot be hidden',
     '留空=沿用原名;修改全局生效(所有用户共享)': 'Leave blank to keep the original name; changes apply globally (shared by all users)',
     '字段编辑已保存': 'Column settings saved',
     '点击排序：升序 → 降序 → 取消': 'Click to sort: ascending → descending → clear',

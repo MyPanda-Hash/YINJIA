@@ -5080,3 +5080,18 @@ migrate-approval-initiator-required-20261119.sql
 #   + 管理员终审（批准/驳回，只读回填批准人/签字/日期并归档）。本脚本补齐 rd_change_detail
 #   部门评审列/字段登记、批准三格只读字段与 en 译名、列注明，均带守卫与自检；幂等。
 migrate-change-cosign-20261119.sql
+
+# 2026-11-20 功能性滤效(RD_FILTER_EFF)动态样品列：清除把「出水含量（ug/L）样品2..6」
+#   「去除率%样品2..6」共 10 行置成 hidden=1/visible=0 的历史脏偏好。
+#   生产实测：这两组被藏后，点「样品列 ＋/－」只有「取样前样品」跟着增删（用户连报两次）；
+#   本地库同 10 行 visible=1 ⇒ 本地复现不了。同批前端加护栏（动态样品列不可被隐藏）。
+#   幂等：只归位这 10 个 label，重复执行影响 0 行；脚本自带 before/after 行数与越界自检。
+#   执行：正式库 HSDZ_MES 已于 2026-11-20 执行（归位 10 行）；测试库 HSDZ_MES_TEST
+#   在本机/生产服务器均不存在（登录工厂 enable-test-ledger=false），无库可跑。
+migrate-filter-eff-dyncols-visible-20261120.sql
+# 2026-11-20 产品信息表：两级审批人改为「审批之后才有名字」
+#   ① 清 yj_panel.config.headDefaults 里 审核人（一级审批人）/（二级审批人） 两个默认值键
+#      （前端 docDefaults.js 2026-11-19 已清空，但后端下发的 headDefaults 仍会把草稿空格补成陈秀丽）；
+#   ② 清空未审批（shr 空且未归档）单据的 审核人一级/审核人二级 存量签名（2026-11-11 的 l1 回填把草稿也写了）；
+#   ③ 改前/改后行数 + 自检；幂等（重复执行 0 行、键不存在为 0）。两账套（HSDZ_MES / HSDZ_MES_TEST）都要执行。
+migrate-prodinfo-approver-no-default-20261120.sql

@@ -369,7 +369,8 @@
             clearable
             class="fe-alias"
           />
-          <el-checkbox :model-value="row.visible" @update:model-value="(v) => { row.visible = v }" class="fe-vis" :title="tt('不勾选=该列不显示/不导出')" />
+          <!-- 动态样品列(样品N)的显隐开关禁用:列数只跟「样品数」走,不许被字段编辑隐藏 -->
+          <el-checkbox :model-value="row.visible" :disabled="row.dynamic" @update:model-value="(v) => { row.visible = v }" class="fe-vis" :title="row.dynamic ? tt('动态样品列随「样品数」增删，不可隐藏') : tt('不勾选=该列不显示/不导出')" />
         </div>
       </div>
       <div style="margin-top:8px;color:#909399;font-size:12px">{{ tt('留空=沿用原名;修改全局生效(所有用户共享)') }}</div>
@@ -389,11 +390,11 @@ import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import RefPickDialog from './RefPickDialog.vue'
 import DocNoPickDialog from './DocNoPickDialog.vue'
-import { buildColumnPrefsPayload, isColumnHidden, resolveColumnLabel } from '@core/sheet/columnPrefs'
+import { buildColumnPrefsPayload, isColumnHiddenFor, resolveColumnLabel } from '@core/sheet/columnPrefs'
 import { pickExtFields } from '@core/panel/extCols.js'
 // 按样品铺开的字段名单(样品信息/测试装置及编号/样品配方 + 明细三组)—— 减列清空走它,
 // 漏登记一处就只在"减列"时才暴露(2026-09-30 样品配方即因此漏掉),故集中成单一真源
-import { clearSampleColumn } from '@core/sheet/sampleCols'
+import { clearSampleColumn, isDynamicSampleKey, sampleDetailKeys, SAMPLE_SHEET_GROUPS } from '@core/sheet/sampleCols'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -523,15 +524,14 @@ const extColW = (e) => Math.max(64, Math.round((Number(e.w) || 120) * dtScale.va
 /** 样品组列宽:组总宽÷当前列数(再乘压缩系数;下限防过窄) */
 const pressColW = computed(() => Math.max(34, Math.floor((220 * dtScale.value) / sampleCount.value)))
 const outColW = computed(() => Math.max(30, Math.floor((192 * dtScale.value) / sampleCount.value)))
-/** 某样品组的物理列键(1..样品数) */
+/** 某样品组的物理列键(1..样品数);列数恒等于样品数,见 sampleCols.sampleDetailKeys */
 function sampleKeys(prefix) {
-  return Array.from({ length: sampleCount.value }, (_, i) => `${prefix}${i + 1}`)
+  return sampleDetailKeys(prefix, sampleCount.value)
 }
-const DT_GROUPS = {
-  压力: { label: '取样前样品：压力（PSI)/流速（L/min）', prefix: '压力（PSI)样品' },
-  出水: { label: '出水含量（ug/L）', prefix: '出水含量（ug/L）样品' },
-  去除率: { label: '去除率%', prefix: '去除率%样品' },
-}
+/** 组名 → 字段前缀(与 sampleCols.SAMPLE_SHEET_GROUPS 同源;分组标题仍走 i18n) */
+const DT_GROUPS = Object.fromEntries(
+  SAMPLE_SHEET_GROUPS.map((g) => [g.name, { label: g.label, prefix: g.prefix }]),
+)
 /** 数据记录表全部物理列(键=数据键,label=纸面默认表头;样品列到 6,字段编辑可管全部) */
 const DT_COLUMNS = (() => {
   const cols = [
@@ -561,7 +561,9 @@ function dtFieldOf(key) {
   return fieldMap.value.get(key)
 }
 function dtHidden(key) {
-  return isColumnHidden(dtFieldOf(key))
+  // 动态样品列(压力/流速/出水/去除率 样品N)恒显示:必须随样品数增删,
+  // 不受 yj_field.visible / 角色字段视图的隐藏偏好影响(2026-11-20 生产事故,见 columnPrefs.isColumnHiddenFor)
+  return isColumnHiddenFor(key, dtFieldOf(key))
 }
 
 // ── 原水水质条件:指标列清单 + 显示名覆盖(2026-10-29) ──
@@ -636,6 +638,7 @@ function dtLabel(key, fallback) {
   return resolveColumnLabel(dtFieldOf(key), fallback || key)
 }
 function dtGroupSpan(name) {
+  // 分组 colspan = 该组实际渲染列数;动态样品列恒显示 ⇒ 恒等于样品数
   return sampleKeys(DT_GROUPS[name]?.prefix || '').filter((k) => !dtHidden(k)).length
 }
 function dtGroupLabel(name) {
@@ -681,8 +684,11 @@ function openFieldEdit() {
   fieldEditRows.value = DT_COLUMNS.map((col) => {
     const f = dtFieldOf(col.key)
     const alias = f && f.displayName && f.displayName !== f.dataName ? String(f.displayName) : ''
-    const visible = !dtHidden(col.key)
-    return { key: col.key, label: col.label, alias, originalAlias: alias, visible, originalVisible: visible }
+    // 动态样品列(样品N)的显隐开关禁用且恒为勾选:列数只由「样品数」决定,
+    // 历史上把它们勾掉会把加列后的新列永久藏起来(2026-11-20 生产事故)
+    const dynamic = isDynamicSampleKey(col.key)
+    const visible = dynamic ? true : !dtHidden(col.key)
+    return { key: col.key, label: col.label, alias, originalAlias: alias, visible, originalVisible: visible, dynamic }
   })
   fieldEditVisible.value = true
 }
