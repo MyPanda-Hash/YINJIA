@@ -130,10 +130,16 @@ test('load() 里既有的 ?focus= 深链消费保持原样（外部带 focus 进
   assert.match(list, /loadedPanelCode = loadCode/, 'load 成功要把「当前 list 属于哪个面板」落账（focus 消费的时序闸门）')
 })
 
-test('产品信息表/立项申请共用同一处跳转与 focus 消费（不按面板分叉）', () => {
-  // 两个全屏预览面板仍然只有登记表这一处，跳转函数里不许出现面板分支
-  assert.match(list, /const FULL_PREVIEW_PANELS = new Set\(\['RD_APPROVAL', 'RD_PROD_INFO'\]\)/,
-    '全屏预览面板登记不能被改（产品信息表与立项申请共用）')
+test('全屏预览面板共用同一处跳转与 focus 消费（不按面板分叉）', () => {
+  // 2026-11-20：全屏预览从"两个面板的白名单"改成规则（研发管理全部面板），
+  // 跳转函数仍不许按面板分叉 —— 规则在 docPreview.isFullPreviewPanel 一处，
+  // 这里钉住"没有退回白名单"与"用的是同一条规则"。
+  assert.match(list, /const canFullPreview = computed\(\(\) => isFullPreviewPanel\(panelCode\.value\)\)/,
+    '全屏判定必须走统一规则 isFullPreviewPanel（不要退回 RD_APPROVAL/RD_PROD_INFO 白名单）')
+  assert.ok(!list.includes('FULL_PREVIEW_PANELS = new Set'),
+    '白名单已改规则：不能再出现硬编码的 FULL_PREVIEW_PANELS 集合')
+  assert.match(list, /const previewOwnerKey = computed\(\(\) => resolvePreviewOwnerKey\(/,
+    '归属人字段必须按面板探测（不能写死"立项=申请立项人/其余=编辑人"）')
   assert.ok(!/panelCode\.value === 'RD_PROD_INFO'[\s\S]{0,200}jumpToApprovalDoc/.test(jumpSrc),
     'jumpToApprovalDoc 不能按面板分叉（修一处两处都生效）')
   // 预览浮层的列配置仍按面板登记（本次不动列/页签）

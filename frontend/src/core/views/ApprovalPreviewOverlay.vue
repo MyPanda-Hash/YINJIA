@@ -62,7 +62,16 @@
           <el-select v-model="status" clearable class="apv-sel apv-bar-item" :placeholder="tt('单据状态')">
             <el-option v-for="n in treeNodes.slice(1)" :key="n.key" :label="tt(n.label)" :value="n.key" />
           </el-select>
-          <el-select v-model="grade" clearable class="apv-sel apv-bar-item" :placeholder="tt('项目等级')">
+          <!-- 项目等级：**只有数据里真有这一列**才显示（2026-11-20 用户口径）。
+               研发管理 32 张里只有立项申请/产品信息表这一族带「项目等级」，
+               其余面板整列都是空 ⇒ 摆一个永远没候选的下拉只会让人以为筛选坏了。 -->
+          <el-select
+            v-if="gradeOptions.length"
+            v-model="grade"
+            clearable
+            class="apv-sel apv-bar-item"
+            :placeholder="tt('项目等级')"
+          >
             <el-option v-for="g in gradeOptions" :key="g" :label="g" :value="g" />
           </el-select>
           <el-date-picker
@@ -103,7 +112,7 @@
           <el-table
             v-if="filtered.length"
             :data="filtered"
-            row-key="单据编号"
+            :row-key="previewRowKey"
             size="small"
             border
             height="100%"
@@ -129,8 +138,8 @@
               show-overflow-tooltip
             >
               <template #default="{ row }">
-                <span :class="c.kind === 'num' ? 'apv-num' : (row[c.key] ? '' : 'apv-muted')">
-                  {{ row[c.key] || '—' }}
+                <span :class="c.kind === 'num' ? 'apv-num' : (previewCellText(row, c.key) ? '' : 'apv-muted')">
+                  {{ previewCellText(row, c.key) || '—' }}
                 </span>
               </template>
             </el-table-column>
@@ -152,13 +161,15 @@
           </el-table>
           <!-- 空态：必须给下一步动作，不写裸的「暂无数据」 -->
           <div v-else class="apv-empty">
+            <!-- 空态：必须给下一步动作。文案按面板分档 —— 立项保留 2026-11-17 的原话，
+                 其余研发面板用通用文案（「你还没有申请过立项」挂在工艺清单上只会让人困惑）。 -->
             <p class="apv-empty-t">
-              {{ scope === 'mine' ? tt('你还没有申请过立项') : tt('没有符合条件的单据') }}
-            </p>
-            <p class="apv-empty-d">
               {{ scope === 'mine'
-                ? tt('单据的「{f}」要填你本人姓名，才会出现在这里').replace('{f}', tt(props.ownerKey || '申请立项人'))
-                : tt('换个关键字，或切到「全部」看看') }}
+                ? (props.panelCode === 'RD_APPROVAL' ? tt('你还没有申请过立项') : tt('没有符合条件的单据'))
+                : tt('没有符合条件的单据') }}
+            </p>
+            <p v-if="scope === 'mine'" class="apv-empty-d">
+              {{ tt('单据的「{f}」要填你本人姓名，才会出现在这里').replace('{f}', tt(props.ownerKey || '申请立项人')) }}
             </p>
             <el-button v-if="scope === 'mine'" @click="scope = 'all'">
               {{ tt('查看全部单据') }}
@@ -176,7 +187,10 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { Search } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
-import { approvalStatusTree, filterApprovalPreview, previewColumnsOf } from '@/core/panel/docPreview'
+import {
+  approvalStatusTree, defaultPreviewScope, filterApprovalPreview, previewCellText,
+  previewColumnsOf,
+} from '@/core/panel/docPreview'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -184,7 +198,9 @@ const props = defineProps({
   rows: { type: Array, default: () => [] },
   /** 当前登录人姓名（= 表头「申请立项人」/「编辑人」里的值，用来判「我申请的」） */
   me: { type: String, default: '' },
-  /** 归属人字段名：立项申请=申请立项人（缺省）；产品信息表=编辑人 */
+  /** 归属人字段名（按面板探测，2026-11-20）：立项=申请立项人 / 产品信息=编辑人 /
+   *  样品单=申请 / 记录表=测试负责人 / 工艺清单=表单管理人…；探不到时=发起人。
+   *  由父组件 resolvePreviewOwnerKey 统一算出，本组件只按这个键判「我的」。 */
   ownerKey: { type: String, default: '' },
   /** 副标题里的面板名（如「项目立项申请」「产品信息表」） */
   subject: { type: String, default: '' },
@@ -195,7 +211,13 @@ const props = defineProps({
 });
 const emit = defineEmits(['close', 'jump'])
 
-/** 'mine' = 只看我申请的（默认，用户口径的正面需求）；'all' = 代查/管理员 */
+/**
+ * 'mine' = 只看我申请的（用户口径的正面需求）；'all' = 代查/管理员。
+ *
+ * <p>2026-11-20：默认值改为按数据判定 —— 归属人字段在数据里有值 ⇒ mine（沿用立项口径）；
+ * 没有值（如数据记录表的「测试负责人」整列为空）⇒ all，避免一打开就是空表。
+ * 判据在 core/panel/docPreview.defaultPreviewScope（纯函数 + 单测），这里只取结果。</p>
+ */
 const scope = ref('mine')
 const keyword = ref('')
 // 2026-11-17 新增：左侧分类树 + 三个查询条件（参考金蝶「商品列表」）
@@ -206,10 +228,17 @@ const dateRange = ref([])        // ['2026-11-01','2026-11-17'] 或 []
 const meName = computed(() => String(props.me || '').trim())
 
 /** 表格业务列（按面板配置；未登记的退回最小集） */
-/** 搜索提示按面板给（2026-11-19：产品信息表按产品编号找单，立项按单号/客户找单） */
-const searchHint = computed(() => (String(props.panelCode || '') === 'RD_PROD_INFO'
-  ? '搜索产品编号 / 产品名称 / 客户名称'
-  : '搜索单据编号 / 客户名 / 申请立项人'))
+/**
+ * 搜索提示按面板给（2026-11-19 产品信息表/立项申请各有专名；
+ * 2026-11-20 其余研发面板统一用通用提示 —— 关键字本来就是**整行字段匹配**，
+ * 写死「单据编号 / 客户名 / 申请立项人」会让人以为只能搜这三样）。
+ */
+const searchHint = computed(() => {
+  const p = String(props.panelCode || '')
+  if (p === 'RD_PROD_INFO') return '搜索产品编号 / 产品名称 / 客户名称'
+  if (p === 'RD_APPROVAL') return '搜索单据编号 / 客户名 / 申请立项人'
+  return '输入编号或任意内容快速筛选'
+})
 
 const cols = computed(() => previewColumnsOf(props.panelCode, props.ownerKey))
 
@@ -251,13 +280,27 @@ function pickTree(key) {
   status.value = key || ''
 }
 
+/** 打开/重置时的默认范围：有「我的」单据 ⇒ 我的；否则全部（见 defaultPreviewScope） */
+function defaultScope() {
+  return defaultPreviewScope(props.rows, props.ownerKey, props.me)
+}
+
 function resetFilter() {
   keyword.value = ''
-  scope.value = 'mine'
+  scope.value = defaultScope()
   treeKey.value = ''
   status.value = ''
   grade.value = ''
   dateRange.value = []
+}
+
+/**
+ * 行键：单号键序走 previewCellText（单据编号 → 编号）。
+ * X烧结工艺清单/共享文件库的表头没有「单据编号」，写死 row-key="单据编号" 会让多行同键
+ * （Vue 只警告、表格高亮/滚动会错位）。
+ */
+function previewRowKey(row) {
+  return previewCellText(row, '单据编号') || String(row?.id || '')
 }
 
 /** 状态胶囊配色：完成=绿 / 进行中=蓝 / 草稿等=灰（与列表页同一套语义） */
@@ -268,7 +311,7 @@ function statusTone(s) {
   return 'none'
 }
 
-/** 每次打开都回到默认态（「只看我申请的」），避免上次的筛选残留让人误以为没数据 */
+/** 每次打开都回到默认态（默认范围见 defaultScope），避免上次的筛选残留让人误以为没数据 */
 watch(() => props.visible, (v) => { if (v) resetFilter() })
 /** 状态下拉与左树是同一真源，任一侧变化都要同步另一侧的高亮 */
 watch(status, (v) => { treeKey.value = v || '' })

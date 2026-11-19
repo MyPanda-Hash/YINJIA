@@ -478,7 +478,7 @@
               <!-- 2026-11-13 用户口径：「把侧边栏换成右边展开，使用的时候替换右边栏，要有返回按钮」。
                    ⇒ 产品信息表 / 立项申请：点本按钮把**右侧操作栏整体换成预览面板**（带返回）；
                      其余面板仍走原来的窄侧栏卡片预览（openDocPreview），行为逐字不变。 -->
-              <div class="as-side-btn" @click="canPreviewSide ? openSidePreview() : openDocPreview()">{{ tt(isProdDocMatrix ? '产品预览' : previewBtnLabel) }}</div>
+              <div class="as-side-btn" @click="openPreviewEntry()">{{ tt(isProdDocMatrix ? '产品预览' : previewBtnLabel) }}</div>
               <!-- 流程管控(2026-11-11 用户口径:「新的流程管控面板应该放在产品文件列表」)——
                    入口就放在这张表的侧栏,点开是**独立页面** /rd/productFlow(版式照项目流程管控:
                    KPI + 检索 + 5 步时间轴),不再是本页里的内嵌切换。 -->
@@ -2914,7 +2914,9 @@ import DataRecordSheet from './DataRecordSheet.vue'
 import RecordSheetPanels from './RecordSheetPanels.vue'
 import { recordSheetConfigs } from './recordSheetConfigs'
 // 单据预览卡片的摘要口径（2026-11-11）：按面板挑「最主要的信息」，纯函数 + 单测
-import { previewLineText, previewSummaryOf } from '@core/panel/docPreview.js'
+import {
+  isFullPreviewPanel, previewLineText, previewSummaryOf, resolvePreviewOwnerKey,
+} from '@core/panel/docPreview.js'
 // 列表按单号定位的公共口径（2026-11-20）：单号键序 编号→单据编号→锭号、预览下标换页码。
 // load() 的 ?focus= 深链与「预览点跳转」的 focus 消费共用，纯函数 + 单测见 docFocus.test.js
 import { docNoOf, findDocIndex, pageOfPreviewIndex } from '@core/panel/docFocus.js'
@@ -5085,20 +5087,26 @@ const previewKw = ref('')
  *    点返回或再点「单据预览」→ 恢复原来的操作按钮栏。两者**互斥替换**，不叠在一起。</p>
  */
 const PREVIEW_SIDE_PANELS = new Set(['RD_PROD_INFO', 'RD_APPROVAL'])
-const canPreviewSide = computed(() => PREVIEW_SIDE_PANELS.has(String(panelCode.value)))
 /**
- * 走**全屏**单据预览的面板（2026-11-17 用户口径，目前只有立项申请）。
+ * 走**全屏**单据预览的面板（2026-11-20 用户口径：研发管理**全部面板**统一）。
  *
- * <p>用户原话：「点击单据预览就根据申请立项人进行一个筛选全屏展示这些属于自己申请的单据的明细，
- * 设计要好看，使用设计库进行设计，要留一个返回按钮，点击对应单据要有一个跳转按钮，
- * 可以直接跳转到对应单据」。</p>
+ * <p>用户原话：「现在所有的研发模块的单据预览全部做成和立项申请和产品信息表类似的单据查询界面」。</p>
  *
- * <p>与右栏那个 176px 的窄预览是**两回事**：立项申请的字段多（背景/机型/规格/目标/等级…），
- * 挤在侧栏里根本看不清，所以单独开全屏浮层（组件 ApprovalPreviewOverlay）。
- * 其余面板（RD_PROD_INFO 等）继续走原来的右栏 DocSelectRail，行为逐字不变。</p>
+ * <p>判定规则 = {@link isFullPreviewPanel}（core/panel/docPreview）：panelCode 以 RD_ 开头。
+ * 为什么不用后端 yj_panel.module_group：它确实存在且研发管理 32 张全是 RD_ 前缀（2026-11-20 查库核对），
+ * 但前端面板配置 metadata **不下发 moduleGroup**（只有 panelCode/panelName/panelCategory…），
+ * 要用它得先改后端契约；RD_ 前缀在本库与 module_group 一一对应 ⇒ 取零后端改动、更可靠的那条。
+ * 详细证据与唯一例外（RD_PROD_DOCLIST 是产品矩阵预览，不是单据）见 docPreview.js 同名函数注释。</p>
  */
-// 2026-11-17 用户口径：立项申请 + 产品信息表共用同一套「全屏单据预览」（左状态树 + 多条件查询栏）
-const FULL_PREVIEW_PANELS = new Set(['RD_APPROVAL', 'RD_PROD_INFO'])
+const canFullPreview = computed(() => isFullPreviewPanel(panelCode.value))
+/**
+ * 右栏窄预览（2026-11-13 的形态）：只在**非全屏**面板上生效。
+ *
+ * <p>2026-11-20 起 RD_* 一律走全屏 —— RD_PROD_INFO/RD_APPROVAL 也包含在内，
+ * 若这里不排除它们，同一颗按钮就会在"全屏 / 右栏"两套预览之间并存（用户口径要求避免）。
+ * 其它模块（品质/供应链/WMS）本来就不在这个登记表里，行为一个字不动。</p>
+ */
+const canPreviewSide = computed(() => !canFullPreview.value && PREVIEW_SIDE_PANELS.has(String(panelCode.value)))
 /**
  * 「单据预览」按钮/浮层的**按面板命名**（2026-11-19 销售问题汇总）：
  *   产品信息表 P11「改为：产品搜索」、P12 预览页标题「改为：产品信息查询」；
@@ -5118,24 +5126,42 @@ const previewOverlayTitle = computed(() => {
   if (p === 'RD_APPROVAL') return '立项查询'
   return '单据预览'
 })
-const canFullPreview = computed(() => FULL_PREVIEW_PANELS.has(String(panelCode.value)))
 /** 全屏预览浮层是否打开 */
 const approvalPreviewOpen = ref(false)
 /** 当前登录人姓名（用于「只看我申请的」判据） */
 const myApplicantName = computed(() => String(user.realName || '').trim())
-/** 全屏预览的「归属人」字段：立项申请看申请立项人；产品信息表没有该列，看编辑人（=制单人姓名） */
-const previewOwnerKey = computed(() => (String(panelCode.value) === 'RD_APPROVAL' ? '申请立项人' : '编辑人'))
+/**
+ * 全屏预览的「归属人」字段（2026-11-20 改为**按面板探测**，不再按面板写死）。
+ *
+ * <p>候选顺序见 core/panel/docPreview.PREVIEW_OWNER_CANDIDATES：立项=申请立项人、
+ * 产品信息表=编辑人、样品单=申请、产品变更=申请人、实施计划=负责人、数据记录表=测试负责人、
+ * 工艺清单=表单管理人…；一个都没有 ⇒ 创建人（列表行的「发起人」，见 PREVIEW_OWNER_FALLBACK）。</p>
+ *
+ * <p>字段来源 = 面板配置的 dataSchema.fields（后端按 yj_field 的**表头行**下发，含隐藏列）——
+ * 不能用 list 行反推：行里只带非空值，某张单没填就探测不到那一步。</p>
+ */
+const previewOwnerKey = computed(() => resolvePreviewOwnerKey(cfgCache.value?.dataSchema?.fields || []))
 /** 全屏预览副标题里的面板名 */
 const previewSubject = computed(() => tt(String(panelName.value || '')))
 /** 右栏是否处于「单据预览」态 */
 const previewInSide = ref(false)
 /**
+ * 「单据预览」入口的**唯一分派**（2026-11-20）：
+ *   全屏（RD_*）→ 右栏窄预览（历史形态，当前只有非 RD 面板会命中）→ 老卡片预览。
+ *
+ * <p>为什么全屏必须排在最前：RD_PROD_INFO/RD_APPROVAL 同时登记在 PREVIEW_SIDE_PANELS 里，
+ * 不先判就会两套预览并存（用户口径「避免两套并存」）。</p>
+ */
+async function openPreviewEntry() {
+  if (canFullPreview.value) { await openApprovalPreview(); return }
+  if (canPreviewSide.value) { await openSidePreview(); return }
+  await openDocPreview()
+}
+/**
  * 打开右栏预览。取数口径与 openDocPreview 一致（pageSize 拉到 200 一次取全、客户端筛选），
  * 但**不走 previewMode** —— previewMode 是"把左栏/整页切走"的老预览态，这里只替换右栏内容。
  */
 async function openSidePreview() {
-  // 2026-11-17：立项申请走**全屏浮层**（按申请立项人筛选 + 可跳转），不进右栏窄预览。
-  if (canFullPreview.value) { await openApprovalPreview(); return }
   if (canPreviewSide.value && previewInSide.value) { closeSidePreview(); return }
   previewKw.value = ''
   previewInSide.value = true
@@ -5147,8 +5173,9 @@ async function openSidePreview() {
   await load()
 }
 /**
- * 打开立项申请的全屏单据预览（2026-11-17）。
+ * 打开**全屏**单据预览（2026-11-17 立项申请 → 2026-11-20 研发管理全部面板）。
  * 取数：与右栏预览同一口径 —— pageSize 拉到 200 一次取全、客户端筛选（不额外造接口）。
+ * 面板数量不增加取数次数：一次 load() 取当前面板最多 200 张，打开浮层只是本地筛选。
  */
 async function openApprovalPreview() {
   if (previewPrevPageSize === null) previewPrevPageSize = query.pageSize

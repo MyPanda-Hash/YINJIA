@@ -2,8 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
-  PREVIEW_COMPACT_CAP, PREVIEW_FIELDS, PREVIEW_SKIP, PREVIEW_VALUE_CAP,
-  approvalStatusTree, filterApprovalPreview, previewColumnsOf, previewLineText, previewSummaryOf,
+  FULL_PREVIEW_EXCLUDED, PREVIEW_COMPACT_CAP, PREVIEW_FIELDS, PREVIEW_SKIP,
+  PREVIEW_TABLE_COLUMNS, PREVIEW_VALUE_CAP,
+  approvalStatusTree, defaultPreviewScope, filterApprovalPreview, isFullPreviewPanel,
+  previewCellText, previewColumnsOf, previewLineText, previewSummaryOf, resolvePreviewOwnerKey,
 } from './docPreview.js'
 
 /**
@@ -147,8 +149,14 @@ test('预览态必须替换操作栏（按钮不渲染），返回后恢复', ()
   const vue = readFileSync(new URL('../views/PanelxList.vue', import.meta.url), 'utf8')
   assert.match(vue, /<template v-if="!sideCollapsed && !previewInSide">/,
     '预览态要把原操作栏一起关掉（替换而不是叠加）')
-  assert.match(vue, /canPreviewSide \? openSidePreview\(\) : openDocPreview\(\)/,
-    '按钮要按面板分派：这两个面板走右栏预览，其余走原逻辑')
+  // 2026-11-20：入口改为 openPreviewEntry()，全屏优先于右栏（研发面板不再两套并存）
+  assert.match(vue, /@click="openPreviewEntry\(\)"/, '按钮必须走统一分派入口')
+  const fnAt = vue.indexOf('async function openPreviewEntry()')
+  assert.ok(fnAt > 0, '缺 openPreviewEntry')
+  const fnSrc = vue.slice(fnAt, fnAt + 420)
+  assert.ok(fnSrc.indexOf('canFullPreview.value') < fnSrc.indexOf('canPreviewSide.value'),
+    '全屏必须排在右栏之前（否则 RD_PROD_INFO/RD_APPROVAL 两套预览并存）')
+  assert.match(fnSrc, /await openDocPreview\(\)/, '非全屏非右栏面板仍走原卡片预览（行为不变）')
   assert.ok(vue.includes('closeSidePreview'), '缺返回函数')
 })
 
@@ -267,4 +275,186 @@ test('未登记的面板退回最小集（单号/日期/归属人），不会渲
   const cols = previewColumnsOf('SOME_UNKNOWN', '编辑人')
   assert.deepEqual(cols.map((c) => c.key), ['单据编号', '单据日期', '编辑人'])
   assert.ok(cols.length > 0)
+})
+
+/* ═══ 2026-11-20 用户口径：研发管理**全部面板**的单据预览统一成「单据查询界面」═══
+ *
+ * 用户原话：「现在所有的研发模块的单据预览全部做成和立项申请和产品信息表类似的单据查询界面」。
+ * 下面是这次新增的三块纯口径（页面只负责画，判定全在这里，便于单测钉住）：
+ *   ① 哪些面板走全屏：研发管理 = panelCode 以 RD_ 开头（module_group 前端拿不到，见实现注释）；
+ *   ② 归属人字段探测：不同面板归属人不同，按候选表取该面板 yj_field 里存在的第一个；
+ *   ③ 列配置补齐 + 兜底不变。
+ */
+
+test('㉒ 研发面板判定：RD_ 前缀一律走全屏（含样品/记录表/工艺/规格书/计划/变更）', () => {
+  for (const p of ['RD_APPROVAL', 'RD_PROD_INFO', 'RD_SAMPLE_EXT', 'RD_SAMPLE_INT', 'RD_SAMPLE_ND',
+    'RD_FILTER_EFF', 'RD_ALKALINE', 'RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_X_SINTER', 'RD_SPEC_DOC',
+    'RD_PLAN', 'RD_CHANGE', 'RD_INSP_PLAN', 'RD_SELFMADE', 'RD_SPIKE_WATER']) {
+    assert.equal(isFullPreviewPanel(p), true, `${p} 属于研发管理，必须走全屏单据预览`)
+  }
+})
+
+test('㉓ 非研发面板不受影响：品质/供应链/WMS/库存仍是原行为', () => {
+  for (const p of ['QC_RECV', 'QC_INSP', 'QC_PROC_INSP', 'PU_ORDER', 'PURCHASE_IN', 'SALE_OUT',
+    'WO_MIXING_LIST', 'INV', 'STOCK_STATUS', 'MOBILE_LAB_SPIKE_WATER', '']) {
+    assert.equal(isFullPreviewPanel(p), false, `${p || '(空)'} 不是研发面板，不能改成全屏`)
+  }
+  assert.equal(isFullPreviewPanel(null), false)
+  assert.equal(isFullPreviewPanel('rd_approval'), false, '大小写不同不算（面板码全大写是元数据约定）')
+  assert.equal(isFullPreviewPanel('RD'), false, '只有前缀没下划线的不算')
+})
+
+test('㉔ 产品文件列表是「产品预览」（矩阵行），不能当单据全屏', () => {
+  // RD_PROD_DOCLIST 库里只有 1 张单，真正内容是产品行 × 4 文件状态；
+  // 全屏单据表格会退化成只有 PDL-0001 一行 —— 保留它的产品矩阵预览。
+  assert.equal(isFullPreviewPanel('RD_PROD_DOCLIST'), false)
+  assert.ok(FULL_PREVIEW_EXCLUDED.has('RD_PROD_DOCLIST'))
+})
+
+/* ── ② 归属人字段探测 ───────────────────────────────────────── */
+const fn = (...names) => names.map((dataName) => ({ dataName }))
+const ownerOf = (...names) => resolvePreviewOwnerKey(fn(...names))
+
+test('㉕ 归属人探测：按候选顺序取该面板存在的第一个（立项/产品信息不再写死）', () => {
+  assert.equal(ownerOf('单据编号', '客户名', '申请立项人', '编辑人'), '申请立项人', '立项申请 = 申请立项人')
+  assert.equal(ownerOf('产品编号', '编辑人', '产品负责人'), '编辑人', '产品信息表 = 编辑人（不是产品负责人）')
+  assert.equal(ownerOf('客户名称', '申请', '审核'), '申请', '样品单 = 申请')
+  assert.equal(ownerOf('产品编号', '申请人', '申请日期'), '申请人', '产品变更 = 申请人')
+  assert.equal(ownerOf('项目名称', '负责人', '项目定级'), '负责人', '实施计划 = 负责人')
+})
+
+test('㉖ 数据记录表/工艺清单等研发面板：用实测存在的同类字段（不是硬编码单一字段）', () => {
+  // 库里的真实字段（2026-11-20 查 yj_field 取证）：
+  //   8 张数据记录表 = 测试负责人；烧结/组装工艺清单 = 表单管理人；
+  //   出货检验计划表 = 编写人（优先于表单管理人）; 自制料 = 录入人。
+  assert.equal(ownerOf('单据编号', '测试负责人', '报告编号'), '测试负责人')
+  assert.equal(ownerOf('单据编号', '表单管理人', '审核人'), '表单管理人')
+  assert.equal(ownerOf('单据编号', '表单管理人', '编写人'), '编写人', '有编写人时优先编写人')
+  assert.equal(ownerOf('单据编号', '录入人', '材料名'), '录入人')
+})
+
+test('㉗ 一个归属人字段都没有时退回创建人（发起人），并忽略空/无效字段', () => {
+  assert.equal(resolvePreviewOwnerKey(fn('单据编号', '产品编号', '名称')), '发起人')
+  assert.equal(resolvePreviewOwnerKey([]), '发起人')
+  assert.equal(resolvePreviewOwnerKey(null), '发起人')
+  // 字段定义两种形态（dataSchema 用 dataName；其它调用方可能传 code）
+  assert.equal(resolvePreviewOwnerKey([{ code: '编辑人' }]), '编辑人')
+  assert.equal(resolvePreviewOwnerKey([{ dataName: '' }, { dataName: '申请人' }]), '申请人')
+})
+
+test('㉘ 默认范围：有「我的」单据才是我的，否则全部（避免一开就是空表）', () => {
+  const rows = [{ 单据编号: 'A', 编辑人: '张三' }, { 单据编号: 'B', 编辑人: '' }]
+  assert.equal(defaultPreviewScope(rows, '编辑人', '张三'), 'mine')
+  assert.equal(defaultPreviewScope(rows, '编辑人', '李四'), 'all',
+    '归属人字段有值但都不是我（实测烧结工艺清单的表单管理人=柴善银）⇒ 默认全部，不能一开就空')
+  assert.equal(defaultPreviewScope(rows, '测试负责人', '张三'), 'all', '字段不存在 ⇒ 我的永远为空 ⇒ 默认全部')
+  assert.equal(defaultPreviewScope(rows, '发起人', '张三'), 'all')
+  assert.equal(defaultPreviewScope([], '编辑人', '张三'), 'all')
+  assert.equal(defaultPreviewScope(rows, '', '张三'), 'all')
+  assert.equal(defaultPreviewScope(rows, '编辑人', ''), 'all', '拿不到登录人 ⇒ 全部')
+  // 全空值也算没有我的单据
+  assert.equal(defaultPreviewScope([{ 编辑人: '  ' }], '编辑人', '张三'), 'all')
+  // 样品单的「姓名/日期」签署格也能判出"是我的"
+  assert.equal(defaultPreviewScope([{ 申请: '张三/2026.11.6' }], '申请', '张三'), 'mine')
+})
+
+/* ── ③ 列配置 ───────────────────────────────────────────────── */
+const colKeys = (p, owner = '发起人') => previewColumnsOf(p, owner).map((c) => c.key)
+
+test('㉙ 样品单列：客户/交期/费用/申请（费用是金额列，右对齐）', () => {
+  for (const p of ['RD_SAMPLE_EXT', 'RD_SAMPLE_ND']) {
+    const keys = colKeys(p)
+    assert.equal(keys[0], '单据编号')
+    for (const k of ['客户名称', '期望交期', '费用', '申请']) assert.ok(keys.includes(k), `${p} 缺 ${k}`)
+    const fee = previewColumnsOf(p).find((c) => c.key === '费用')
+    assert.equal(fee.kind, 'num', '费用是金额列 → kind=num（右对齐 + 等宽）')
+  }
+})
+
+test('㉚ 数据记录表列：单号/日期/报告号/测试主题/测试负责人', () => {
+  const keys = colKeys('RD_ALKALINE')
+  for (const k of ['单据编号', '单据日期', '报告编号', '测试主题', '测试负责人']) assert.ok(keys.includes(k), `缺 ${k}`)
+  // 功能性滤效的编号字段叫「测试编号」（不是报告编号）—— 按面板真实字段登记
+  assert.ok(colKeys('RD_FILTER_EFF').includes('测试编号'))
+  // 8 张数据记录表都登记（不要漏成兜底）
+  for (const p of ['RD_FILTER_EFF', 'RD_ALKALINE', 'RD_MINERAL', 'RD_ANTIBACT', 'RD_SCALE',
+    'RD_RO_PROTECT', 'RD_SOAK', 'RD_DROP_PREC']) {
+    assert.ok(PREVIEW_TABLE_COLUMNS[p], `${p} 缺预览列登记`)
+    assert.ok(colKeys(p).includes('测试主题'), `${p} 要有测试主题`)
+  }
+})
+
+test('㉛ 工艺清单列：版本号 + 产品编号/名称（烧结/组装/X烧结各自真实字段）', () => {
+  assert.ok(colKeys('RD_MOLD_PROC').includes('版本号'))
+  for (const k of ['产品编号', '产品名称', '表单管理人']) assert.ok(colKeys('RD_MOLD_PROC').includes(k))
+  for (const p of ['RD_ASM_PROC']) {
+    for (const k of ['版本号', '产品编号', '产品名称', '表单管理人']) assert.ok(colKeys(p).includes(k), `${p} 缺 ${k}`)
+  }
+  // X烧结工艺清单没有「单据编号」字段，单号就存在「编号」列上（列 key 必须跟着真实键走）
+  assert.ok(colKeys('RD_X_SINTER').includes('编号'), 'X烧结要用 编号 作为单号列，否则整列是 —')
+})
+
+test('㉜ 规格书/实施计划/产品变更列：按各自的找单线索登记', () => {
+  for (const k of ['单据编号', '产品编号', '名称', '客户名称', '版本']) assert.ok(colKeys('RD_SPEC_DOC').includes(k), `规格书缺 ${k}`)
+  for (const k of ['单据编号', '项目名称', '项目定级', '负责人']) assert.ok(colKeys('RD_PLAN').includes(k), `实施计划缺 ${k}`)
+  assert.equal(previewColumnsOf('RD_PLAN').find((c) => c.key === '项目定级').kind, 'num', '项目定级是数字列')
+  for (const k of ['单据编号', '标题', '产品编号', '产品名称', '申请人']) assert.ok(colKeys('RD_CHANGE').includes(k), `变更单缺 ${k}`)
+})
+
+test('㉝ 未登记的面板仍走兜底（单号/日期/归属人）—— 不因为这次改动被扩大', () => {
+  // 内部样品单表头只有 单据编号/单据日期/备注（申请人存在明细行里），兜底更诚实
+  assert.deepEqual(colKeys('RD_SAMPLE_INT', '发起人'), ['单据编号', '单据日期', '发起人'])
+  assert.deepEqual(colKeys('RD_EQUIP_USE', '发起人'), ['单据编号', '单据日期', '发起人'])
+})
+
+test('㉞ 单号列取值：有「单据编号」用它，没有就退回「编号」（X烧结/共享文件库这类）', () => {
+  assert.equal(previewCellText({ 单据编号: 'MP-1', 编号: 'MP-1' }, '单据编号'), 'MP-1')
+  assert.equal(previewCellText({ 编号: 'XS-1' }, '单据编号'), 'XS-1')
+  assert.equal(previewCellText({ 单据编号: 'A', 编号: 'B' }, '单据编号'), 'A')
+  assert.equal(previewCellText({}, '单据编号'), '')
+  assert.equal(previewCellText({ 编号: 'X' }, '产品名称'), '', '只有单号列有别名兜底')
+  assert.equal(previewCellText({ 版本号: 'V1' }, '版本号'), 'V1')
+})
+
+test('㉟ 全屏浮层：项目等级按数据显隐、默认范围按数据判定、列按面板登记', () => {
+  const overlay = readFileSync(new URL('../views/ApprovalPreviewOverlay.vue', import.meta.url), 'utf8')
+  // 用户口径：「『项目等级』只有数据里有该字段时才显示」—— 空候选的下拉不许画出来
+  assert.match(overlay, /v-if="gradeOptions\.length"/,
+    '项目等级下拉必须按数据显隐（研发 32 张里只有立项/产品信息这一族有这列）')
+  // 默认范围：有我的单据 ⇒ 我的；否则全部（否则数据记录表一打开就是空表）
+  assert.match(overlay, /defaultPreviewScope\(props\.rows, props\.ownerKey, props\.me\)/,
+    '默认范围必须走 defaultPreviewScope（纯函数，有单测）')
+  // 列配置跟随面板（未登记走兜底）
+  assert.match(overlay, /previewColumnsOf\(props\.panelCode, props\.ownerKey\)/)
+  // 单号列别名兜底（X烧结/共享文件库没有「单据编号」字段）
+  assert.match(overlay, /previewCellText\(row, c\.key\)/)
+  // 全屏表格的行键不能写死「单据编号」（注释里可以提到，属性上不许）
+  assert.match(overlay, /:row-key="previewRowKey"/, '行键要走单号键序兜底')
+  assert.ok(!/\n\s+row-key="单据编号"/.test(overlay),
+    '行键写死会让没有单据编号列的面板出现重复 key')
+})
+
+test('㊱ 样品单的「申请」格是「姓名/日期」：只看我申请的也要能命中（实测 SPW-2026-11-0011）', () => {
+  // 2026-11-20 实测：外部开发样品申请单的「申请」= 系统管理员/2026.11.6，
+  // 登录人姓名 = 系统管理员 ⇒ 只做全等比较永远 0 条（ego 实测「共 0 条（全部 11）」）。
+  const rows = [
+    { 单据编号: 'SPW-1', 申请: '系统管理员/2026.11.6' },
+    { 单据编号: 'SPW-2', 申请: '张莉/2026.11.7' },
+    { 单据编号: 'SPW-3', 申请: '' },
+  ]
+  assert.deepEqual(
+    filterApprovalPreview(rows, { me: '系统管理员', scope: 'mine', ownerKey: '申请' }).map((r) => r.单据编号),
+    ['SPW-1'],
+  )
+  // 其它面板的普通姓名列不受影响
+  const plain = [{ 单据编号: 'A', 编辑人: '系统管理员' }, { 单据编号: 'B', 编辑人: '张莉' }]
+  assert.deepEqual(
+    filterApprovalPreview(plain, { me: '系统管理员', scope: 'mine', ownerKey: '编辑人' }).map((r) => r.单据编号),
+    ['A'],
+  )
+  // 「张/李」这种前缀不能被误判成同一个人
+  assert.deepEqual(
+    filterApprovalPreview([{ 单据编号: 'C', 申请: '张莉/2026.11.7' }], { me: '张', scope: 'mine', ownerKey: '申请' }).map((r) => r.单据编号),
+    [],
+  )
 })
