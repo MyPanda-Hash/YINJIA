@@ -309,7 +309,7 @@
               <td class="rs-td rs-label" :class="{ 'rs-focus': isPairFocus(pair), 'rs-req': isPairReq(pair) }" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
               <template v-if="pair.cells">
                 <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
-                  <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" :placeholder="c.ph ? tt(c.ph) : ''" @input="emit('dirty')" />
+                  <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" :placeholder="c.ph ? tt(c.ph) : emptyMark" @input="emit('dirty')" />
                   <AnnotatedText v-else class="rs-txt" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
                 </td>
               </template>
@@ -354,7 +354,7 @@
                      ⚠ 此前 pairs 分支**完全没有读 ro** —— c.ro 只对 row.grid 分支生效,
                        所以只写配置里的 ro:true 界面照旧能改(实测 hasInput=true)。这里补齐两条输入分支的判断。
                      值仍照常渲染(落到下面的 AnnotatedText),只是不给输入框 ⇒ "只读但看得到回填值"。 -->
-                <el-input v-else-if="editable && !pair.ro && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
+                <el-input v-else-if="editable && !pair.ro && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : emptyMark" @input="emit('dirty')" />
                 <el-input v-else-if="editable && !pair.ro" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
                 <AnnotatedText v-else class="rs-txt" :text="head[pair.key] || ''" :field-key="String(pair.key || '')" />
               </td>
@@ -2089,6 +2089,13 @@ function rowAttachKey(c, row) {
 //   文档编号」这一条,撞上"文档编号是隐藏物理列但仍在 head 里"的面板(出货检验计划表 RD_INSP_PLAN)
 //   就会把 YJ-RD001 印到右上角,而这张单自己的 IP-2026-10-00xx 一个字看不到(实测探针证实)。
 //   未声明的面板仍走原推断,逐字不变。
+/**
+ * 纸面空格的默认占位（2026-11-19 销售问题汇总 P9「没内容的默认 “/”」）：
+ *   面板级 cfg.emptyMark 有值时才生效（目前只有 产品信息表 = '/'），其余面板仍为空占位，
+ *   观感一个字不变。放在值格 placeholder 上，而不是往 head 里写值 —— 写值会被当成真实数据保存。
+ */
+const emptyMark = computed(() => String(cfg.value?.emptyMark || ''))
+
 const docNoKey = computed(() => docNoKeyFor(props.head, effHead.value))
 // 版式:'report' | 'plain'——面板级值是缺省,多页签面板可按页覆盖(见 effPlain)
 
