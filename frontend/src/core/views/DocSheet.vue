@@ -63,6 +63,16 @@
           <span class="as-info-label">{{ tt(info.label) }}</span>
           <span class="as-info-value">
             <template v-if="info.kind === 'static'">{{ tt(info.text || '') }}</template>
+            <!-- 2026-11-19 销售问题汇总 P4/P6：「这里无法输入客户」——
+                 样品单的客户名称既要是参照（点放大镜选档案），也要能**直接打字**（新客户/临时客户）。
+                 故 manualRef 的格子改成输入框 + 放大镜：打字即手填，点放大镜仍走客户参照弹窗。 -->
+            <div v-else-if="editable && !infoLocked(info) && info.manualRef && isRefKey(info.key)" class="as-ref-input">
+              <el-input
+                v-model="head[info.key]" size="small" class="as-ref-in"
+                :placeholder="tt('输入客户名称，或点放大镜选择')" @input="emit('dirty')"
+              />
+              <el-icon class="as-ref-ico" :title="tt('点击选择')" @click.stop="openProdRef(info.key)"><Search /></el-icon>
+            </div>
             <div v-else-if="editable && !infoLocked(info) && isRefKey(info.key)" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef(info.key)">
               <span class="as-ref-text">{{ head[info.key] || tt('点击选择') }}</span>
               <el-icon class="as-ref-ico"><Search /></el-icon>
@@ -2105,6 +2115,10 @@ defineExpose({ focusField })
 /* 2026-11-19 销售问题汇总 P16：「增加客户编码，所以就是客户编码+客户名字」⇒ 编号放**前面**，
    与客户名同一行显示成「A-60 欧科塑胶制品(深圳)有限公司」 */
 .as-ref-code.is-prefix { margin-left: 0; margin-right: 6px; color: #595959; }
+/* manualRef 客户格：输入框 + 放大镜（2026-11-19） */
+.as-ref-input { display: flex; align-items: center; gap: 4px; width: 100%; }
+.as-ref-in { flex: 1; }
+.as-ref-input .as-ref-ico { cursor: pointer; color: #8c8c8c; flex: none; }
 .as-ref-text.is-empty { color: #a8b6c4; }   /* 空值时的背景提示词,与 input placeholder 同观感 */
 .as-ref-ico {
   flex-shrink: 0;

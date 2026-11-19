@@ -5204,7 +5204,14 @@ const previewCards = computed(() => {
     const no = String(row['单据编号'] || row['编号'] || '')
     const sum = previewSummaryFor(row)
     const kw = previewKw.value.trim().toLowerCase()
-    const hit = !kw || no.toLowerCase().includes(kw) || sum.items.some((x) => x.value.toLowerCase().includes(kw))
+    // 2026-11-19 销售问题汇总 P7：「搜索还是一样的问题，要跟产品信息和立项申请一样的搜索」——
+    //   侧栏「单据预览查找」原来只匹配**单号 + 摘要里的几个字段**，样品单想按客户/规格找单就搜不到。
+    //   改成整行字段一起匹配（与列表页模糊搜索、全屏预览搜索同一口径）。
+    const rowHay = Object.keys(row || {})
+      .filter((k) => k !== 'detail')
+      .map((k) => { const v = row[k]; return v === null || v === undefined ? '' : String(v).toLowerCase() })
+      .join(' ')
+    const hit = !kw || no.toLowerCase().includes(kw) || rowHay.includes(kw)
     return {
       no,
       date: String(row['单据日期'] || ''),
