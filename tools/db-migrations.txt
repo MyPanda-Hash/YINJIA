@@ -5072,3 +5072,5 @@ migrate-sample-reg-detail-tab-20261119.sql
 migrate-selfmade-20261119.sql
 # 2026-11-19 立项申请表：选客户后带出并显示客户编号（头表加列 + 字段行）
 migrate-approval-customer-code-20261119.sql
+# 2026-11-19 非开发样品单明细：加 产品编码/产品名称（销售问题 P5）
+migrate-sample-nd-columns-20261119.sql

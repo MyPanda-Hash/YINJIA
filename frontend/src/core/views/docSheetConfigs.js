@@ -648,8 +648,24 @@ export const sampleNdSheetCfg = {
   // 删除确认同理：用户只点了「内部开发 + 开发外部」两张单，非开发单不开。
   confirmDeleteRow: false,
   titlePart2: '非开发样品申请单',
+  // 2026-11-19 销售问题汇总 P5：「这几个去掉（产品整体规格/产品功能/性能要求），
+  //   前面增加：产品编码、产品名称」——只改**本单**的纸面列（开发样品单与原模板不动），
+  //   三列数据仍留在库里（历史单照常可读）；新两列见 migrate-sample-nd-columns-20261119.sql。
+  grid: {
+    ...sampleExtSheetCfg.grid,
+    cols: [
+      { key: '产品编码', label: '产品编码', w: 200, hint: '产品信息表里的产品编号' },
+      { key: '产品名称', label: '产品名称', w: 240 },
+      { key: '炭棒规格', label: '炭棒规格', w: 136, hint: '注明公差，如 34*16*100（外径±0.5/内径±0.5/长度±0.5）' },
+      { key: '样品数量', label: '样品数量', w: 136 },
+      { key: '组装要求', label: '组装要求', w: 140, hint: '耗材给物料编码；库存没有的给尺寸与性能需求' },
+      { key: '背景', label: '背景', w: 150, hint: '打样背景（如：客户因***事项需求样品）' },
+      { key: '配方及工艺要求', label: '配方及工艺要求', w: 186, hint: '审核人根据相关信息确认配方和实现工艺' },
+    ],
+  },
+  // 签字行跨列按**新列数 7** 归并（1 + 6）
   signCells: [
-    { label: '申请', key: '申请', span: 2, type: 'text' },
+    { label: '申请', key: '申请', span: 1, type: 'text' },
     { label: '审核', key: '审核', span: 6, type: 'text' },
   ],
 }
