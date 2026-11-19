@@ -22,10 +22,10 @@
  *   → 1#..8# 八个样品行:**按纸面黄格定可填范围**(第十一轮 2026-11-15 口径,判据 sampleRowsOf:
  *     表观/脱粉 1#/2#、尺寸四项 3#/4#、跌落+挤压强度 5#/6#、压降/浊度 7#/8#),
  *     可填格落值、其余格照纸面写 `/`
- *   → 相关要求 6 条
- *   → 表尾:检验结果 | 检验人 | 审核人 | 批准(四段等分)
- *          审核人 2026-10-18 随「首件检验单开直接审核」补;**批准 2026-11-06 随并入质量单据两级审批补**
- *          (检验人=编制 / 审核=一级审批人 / 批准=超级管理员,取值 head['审批人']),
+ *   → 相关要求 十条(受控表单原文,与面板 REQUIREMENTS / 服务端报表逐字同源)
+ *   → 表尾:检验结果 | 检验人 | 审核人(三段等分)
+ *          审核人 2026-10-18 补;**批准 2026-11-19 删除** —— 本单 2026-11-09 起是单级审批
+ *          (提交审批 → 审批通过 → 已审核),纸面不再有二级「批准」格,
  *          与服务端报表 reports/qc_first_insp.jrxml 的表尾同口径
  */
 import {
@@ -47,11 +47,10 @@ const LABEL_COL_WCH = 14
  * @param {Array<Array<{label:string,value:string}>>} p.headPairs 抬头:每行最多 2 组(与纸面同一分行口径)
  * @param {Array<object>} p.columns 测试项目列(**已按分组排好**,与纸面列序一致)
  * @param {Array<object>} p.items   明细行(长表:行类型/样品序号/检验列/标准/实测数值)
- * @param {string[]} p.requirements 纸面《相关要求》6 条(已翻译的文本)
+ * @param {string[]} p.requirements 纸面《相关要求》十条(已翻译的文本)
  * @param {{resultLabel?:string,result?:string,byLabel?:string,by?:string,
- *          auditorLabel?:string,auditor?:string,
- *          approverLabel?:string,approver?:string}} p.foot 表尾
- *          (检验结果 | 检验人 | 审核人 | 批准;审核人 2026-10-18 补、批准 2026-11-06 补)
+ *          auditorLabel?:string,auditor?:string}} p.foot 表尾
+ *          (检验结果 | 检验人 | 审核人;审核人 2026-10-18 补、批准 2026-11-19 删)
  * @returns {{aoa:Array<Array<any>>, cols:Array<{wch:number}>, merges:Array<object>, marks:object}}
  */
 export function buildFirstInspExport({
@@ -146,31 +145,29 @@ export function buildFirstInspExport({
     reqRows.push(row)
   }
 
-  // ── 表尾:检验结果 | 检验人 | 审核人 | 批准 ──
-  //    ⚠ 2026-10-18 补「审核人」:首件检验单与制程检验单同批开了**直接审核**(见 PanelxList 的
-  //      DIRECT_AUDIT_PANELS),制程那张纸的表尾就是「检验人 | 审核人」——首件这张纸要同口径,
-  //      否则审完打印出来看不出谁审的(值取 head.审核人,后端取自 yj_doc_status.shr)。
-  //    ⚠ 2026-11-06 再补「批准」:两张工序检验单**并入质量单据两级审批**(撤直审),
-  //      检验人=编制 / 审核=一级审批人 / 批准=超级管理员(值取 head.审批人)⇒ 表尾四段。
-  //      四段等分(每段至少 2 列 = 标签+值);N 太小时顺延,不覆盖前一段(极端情况行会比 N 略长,不影响 xlsx)。
+  // ── 表尾:检验结果 | 检验人 | 审核人(三段) ──
+  //    ⚠ 2026-10-18 补「审核人」(值取 head.审核人,后端取自 yj_doc_status.shr);
+  //    ⚠ 2026-11-19 **删「批准」**:用户口径「没有二级审核,只需要审核人就行,去掉批准人」——
+  //      本单 2026-11-09 起就是单级审批(提交审批 → 审批通过 → 已审核),那一格永远没人落值。
+  //      三段等分(每段至少 2 列 = 标签+值);N 太小时顺延,不覆盖前一段
+  //      (极端情况行会比 N 略长,不影响 xlsx)。
   push([])
   const footRow = aoa.length
   const footPairs = [
     [text(foot.resultLabel) || '检验结果', text(foot.result)],
     [text(foot.byLabel) || '检验人', text(foot.by)],
     [text(foot.auditorLabel) || '审核人', text(foot.auditor)],
-    [text(foot.approverLabel) || '批准', text(foot.approver)],
   ]
-  // 段首列:前 rem 段各多分 1 列(N ≥ 8 时可用);N < 8 放不下四段 ⇒ 按最小 2 列顺延
+  // 段首列:前 rem 段各多分 1 列(N ≥ 6 时可用);N < 6 放不下三段 ⇒ 按最小 2 列顺延
   const bounds = []
-  if (N >= 8) {
-    const base = Math.floor(N / 4)
-    const rem = N % 4
+  if (N >= 6) {
+    const base = Math.floor(N / 3)
+    const rem = N % 3
     bounds.push(0)
-    for (let i = 0; i < 3; i++) bounds.push(bounds[i] + base + (i < rem ? 1 : 0))
+    for (let i = 0; i < 2; i++) bounds.push(bounds[i] + base + (i < rem ? 1 : 0))
   } else {
-    const step = Math.max(2, Math.round(N / 4))
-    bounds.push(0, step, step * 2, step * 3)
+    const step = Math.max(2, Math.round(N / 3))
+    bounds.push(0, step, step * 2)
   }
   const footLine = new Array(N).fill('')
   footPairs.forEach(([label, value], i) => {

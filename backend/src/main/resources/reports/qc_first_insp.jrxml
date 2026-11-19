@@ -17,23 +17,27 @@
   段位(严格按 XSD 顺序 title → columnHeader → detail → pageFooter → summary):
     <title>     公司抬头 + 大标题 + 抬头四对(产品编号/产品型号/生产日期/组别,值走 $P{})
     (生成段)    <columnHeader> 两级表头   <detail> 标准行 + 1#..8# 样品行
-    <summary>   《相关要求》6 条(纸面固定文案) + 表尾(检验结果/检验人/审核人/批准,值走 $P{})
+    <summary>   《相关要求》十条(纸面固定文案) + 表尾(检验结果/检验人/审核人,值走 $P{})
     <pageFooter> 页码 + 打印时间
 
-  ⚠ 2026-11-06 两级审批口径(用户需求 3):QC_FIRST_INSP 由「管理员直接审核」改为
-    「提交审批 → 一级审批 → 超级管理员批准」⇒ 表尾 3 段改 **4 段**:
-      检验结果($P{总结论})| 检验人($P{检验员})| 审核人($P{审核人},一级审批人)|
-      批准($P{审批人},超级管理员,二级通过才落值)
-    审核人/审批人在两级口径下都是**表内真值**(一级通过写「审核人」、二级批准写「审批人」;
-    存量单表内为空时 QueryService 退回 yj_doc_status.shr 兜底),由 ReportService.headParams
-    按 yj_field.label **自动下发** ⇒ 模板只取值,不必改 ReportService。
+  ⚠ 2026-11-09 起本单是**单级审批**(用户口径「这两个只需要实现一级审批,和当前的来料检验一样」):
+    草稿 → 提交审批 → 审批通过(一次) → 已审核 → 弃审 → 草稿。
+    ⇒ 表尾只有 **3 段**:检验结果($P{总结论})| 检验人($P{检验员})| 审核人($P{审核人})。
+    ⚠ 2026-11-19 用户口径(截图红字「没有二级审核,去掉批准流程」):删掉 2026-11-06 补的第四格
+    「批准」($P{审批人}) —— 单级审批下那一格永远不落值,留着只会印出空格;
+    参数 审批人 同步从 QcFirstInspReportSupport 的参数清单移除(模板不声明 <parameter>,见下)。
+    审核人 = 审批通过的人(表内真值 qc_first_insp_head.审核人,存量单为空时 QueryService 退回
+    yj_doc_status.shr 兜底),由 ReportService.headParams 按 yj_field.label **自动下发**。
+
+  ⚠ 2026-11-19 另一处:summary 的《相关要求》按**受控表单原文**换成十条(旧六条是照早期截图誊的)。
+    文案唯一真源 = 面板 QcFirstInspSheet.vue 的 REQUIREMENTS 常量,本文件与 Excel 导出逐字同源。
 
   ⚠ 2026-11-14 第十轮「纸面黄格」(用户口径:「没有黄色的格子就打上斜杠、不可填写;对应格子改黄色」):
     明细**可填**样品格黄底 #FFF3CA、标准行的「表观/脱粉」两格灰底 #D9D9D9 —— 就是 styles 里的
     cellY / smallG,由生成器按列选样式;可填矩阵的唯一真源 = docs/design/首件检验单-可填范围.md。
 
   参数契约(由生成器 QcFirstInspReportSupport 在 <title> 前插入,本骨架**不声明** <parameter>):
-    产品编号 / 产品型号 / 生产日期 / 组别 / 总结论 / 检验员 / 审核人 / 审批人 / 打印时间
+    产品编号 / 产品型号 / 生产日期 / 组别 / 总结论 / 检验员 / 审核人 / 打印时间
     + 生成的:表头列名 N1..Nn、标准 STD1..STDn、每格 V{样品}_{列}
     ⚠ 别在本骨架里补 <parameter> —— 会与生成段重复声明,JR 6.21.3 解析即报
       "Duplicate declaration of parameter: xxx",整张报表编译失败(2026-11-06 实测)。
@@ -120,39 +124,40 @@
     </band>
   </pageFooter>
 
-  <!-- ======================= 相关要求 6 条(纸面固定文案)+ 表尾 =======================
+  <!-- ======================= 相关要求 十条(纸面固定文案)+ 表尾 =======================
        ⚠ 文案与面板 QcFirstInspSheet.vue 的 REQUIREMENTS 常量**逐字一致**(改一处必须同步另一处)。
-       8pt 下 782pt 宽一行约容 97 个汉字,这 6 条最长的一条约 66 字 ⇒ 各占一行不折行(已核)。 -->
+       8pt 下 782pt 宽一行约容 97 个汉字,这十条最长的一条(第 10 条)约 53 字 ⇒ 各占一行不折行(已核)。
+       ⚠ 2026-11-19:六条换十条 —— 行数从 6 变 10,条高仍 14pt,表尾整体下移到 y=154、band 高 176
+         (title 86 + 表头 40 + 明细 ~180 + summary 176 + 页脚 18 < 可用高 547,A4 横向仍一页)。 -->
   <summary>
-    <band height="126">
+    <band height="176">
       <staticText><reportElement style="req" x="0" y="0" width="782" height="14"/><text><![CDATA[相关要求：]]></text></staticText>
-      <staticText><reportElement style="req" x="0" y="14" width="782" height="14"/><text><![CDATA[1. 表观及脱粉项目测试后记录2支样品数据，炭棒尺寸及重量相关项目测试后记录2支样品数据，炭棒强度测试2支样品，浊度及压降测试记录2支样品。]]></text></staticText>
-      <staticText><reportElement style="req" x="0" y="28" width="782" height="14"/><text><![CDATA[2. 鉴于胚棒为初步测量确认，测试数据记录精度规定如下：炭棒内外径、长度及重量保留小数点后1位；挤压强度及压降按表显数据记录。]]></text></staticText>
-      <staticText><reportElement style="req" x="0" y="42" width="782" height="14"/><text><![CDATA[3. 检测标准依据炭棒工艺配方管控清单（如产品同时有要求浊度和压降两项测试，可先测试初始浊度后再进行压降测试）。]]></text></staticText>
-      <staticText><reportElement style="req" x="0" y="56" width="782" height="14"/><text><![CDATA[4. 炭棒表观出现严重粘模或明显脱粉情况，需马上停止生产，已生产的产品暂时隔离标示（红色）。]]></text></staticText>
-      <staticText><reportElement style="req" x="0" y="70" width="782" height="14"/><text><![CDATA[5. 测试样品需保留至本班次生产完成。]]></text></staticText>
-      <staticText><reportElement style="req" x="0" y="84" width="782" height="14"/><text><![CDATA[6. C-95客户相关产品脱模后立马进行首件检验。]]></text></staticText>
-      <!-- 表尾:检验结果 | 检验人 | 审核人 | 批准(与面板表尾、Excel 导出同口径)
-           ⚠ 2026-10-18 补第三组「审核人」(当时首件/制程同批开了**直接审核**);
-             ⚠ 2026-11-06 起两单改为**两级审批**(提交审批 → 一级审批 → 超级管理员批准)⇒
-             再补第四组「批准」:审核人 = $P{审核人}(一级审批人)、批准 = $P{审批人}(超级管理员,
-             二级通过才落值;审批中/未批准为空串 ⇒ isBlankWhenNull 印空白)。
-             两值在两级口径下都是**表内真值**,由 ReportService.headParams 按 yj_field.label 自动下发
-             (参数在本骨架不声明,由 QcFirstInspReportSupport 的生成段统一声明)。
-             四段精确铺满 782(标签 70 + 值 125/125/125/127):
-               x = 0 / 195 / 390 / 585,段末 = 195 / 390 / 585 / 782,不重叠、末段不越界。 -->
-      <staticText><reportElement style="metaL" x="0" y="102" width="70" height="20"/><text><![CDATA[检验结果]]></text></staticText>
-      <textField isBlankWhenNull="true"><reportElement style="metaV" x="70" y="102" width="125" height="20"/>
+      <staticText><reportElement style="req" x="0" y="14" width="782" height="14"/><text><![CDATA[1. 首件在脱模时取前2架模具内炭棒8支测试数据，并进行判定。]]></text></staticText>
+      <staticText><reportElement style="req" x="0" y="28" width="782" height="14"/><text><![CDATA[2. 测试判定标准依据工艺管控清单。]]></text></staticText>
+      <staticText><reportElement style="req" x="0" y="42" width="782" height="14"/><text><![CDATA[3. 表观及脱粉8支全检，记录2支数据。]]></text></staticText>
+      <staticText><reportElement style="req" x="0" y="56" width="782" height="14"/><text><![CDATA[4. 尺寸及重量8支全检，取炭棒最长和最短的记录数据。]]></text></staticText>
+      <staticText><reportElement style="req" x="0" y="70" width="782" height="14"/><text><![CDATA[5. 跌落强度测试2支，抗压强度工序单有要求才测，没有要求则只测跌落强度。]]></text></staticText>
+      <staticText><reportElement style="req" x="0" y="84" width="782" height="14"/><text><![CDATA[6. 压降测试：依照工艺管控清单，明确测试方法并要求测试压降的才进行测试。]]></text></staticText>
+      <staticText><reportElement style="req" x="0" y="98" width="782" height="14"/><text><![CDATA[7. 所有测试均按照检测设备的实际读数进行记录数据。]]></text></staticText>
+      <staticText><reportElement style="req" x="0" y="112" width="782" height="14"/><text><![CDATA[8. 炭棒表现出现严重粘模或明显脱粉情况，需马上停止生产，已生产的产品暂时隔离标示（红色）]]></text></staticText>
+      <staticText><reportElement style="req" x="0" y="126" width="782" height="14"/><text><![CDATA[9. 测试样品需保留至本班次生产完成。]]></text></staticText>
+      <staticText><reportElement style="req" x="0" y="140" width="782" height="14"/><text><![CDATA[10. C-95客户相关产品脱模后立马进行首件检验，压降测试数据需要在3个小时内出结果，合格后方可进行生产作业。]]></text></staticText>
+      <!-- 表尾:检验结果 | 检验人 | 审核人(与面板表尾、Excel 导出同口径)
+           ⚠ 2026-10-18 补第三组「审核人」;
+             ⚠ 2026-11-19 **删第四组「批准」**:本单 2026-11-09 起单级审批
+             (草稿 → 提交审批 → 审批通过 → 已审核),没有二级 ⇒ 不再有 $P{审批人} 这一格。
+             审核人 = $P{审核人}(审批通过的人),表内为空时由 QueryService 退回 yj_doc_status.shr。
+             三段精确铺满 782(标签 70 + 值 190/190/192):
+               x = 0 / 260 / 520,段末 = 260 / 520 / 782,不重叠、末段不越界。 -->
+      <staticText><reportElement style="metaL" x="0" y="154" width="70" height="20"/><text><![CDATA[检验结果]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="metaV" x="70" y="154" width="190" height="20"/>
         <textFieldExpression><![CDATA[$P{总结论}]]></textFieldExpression></textField>
-      <staticText><reportElement style="metaL" x="195" y="102" width="70" height="20"/><text><![CDATA[检验人]]></text></staticText>
-      <textField isBlankWhenNull="true"><reportElement style="metaV" x="265" y="102" width="125" height="20"/>
+      <staticText><reportElement style="metaL" x="260" y="154" width="70" height="20"/><text><![CDATA[检验人]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="metaV" x="330" y="154" width="190" height="20"/>
         <textFieldExpression><![CDATA[$P{检验员}]]></textFieldExpression></textField>
-      <staticText><reportElement style="metaL" x="390" y="102" width="70" height="20"/><text><![CDATA[审核人]]></text></staticText>
-      <textField isBlankWhenNull="true"><reportElement style="metaV" x="460" y="102" width="125" height="20"/>
+      <staticText><reportElement style="metaL" x="520" y="154" width="70" height="20"/><text><![CDATA[审核人]]></text></staticText>
+      <textField isBlankWhenNull="true"><reportElement style="metaV" x="590" y="154" width="192" height="20"/>
         <textFieldExpression><![CDATA[$P{审核人}]]></textFieldExpression></textField>
-      <staticText><reportElement style="metaL" x="585" y="102" width="70" height="20"/><text><![CDATA[批准]]></text></staticText>
-      <textField isBlankWhenNull="true"><reportElement style="metaV" x="655" y="102" width="127" height="20"/>
-        <textFieldExpression><![CDATA[$P{审批人}]]></textFieldExpression></textField>
     </band>
   </summary>
 </jasperReport>

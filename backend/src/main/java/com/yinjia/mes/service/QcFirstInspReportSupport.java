@@ -55,10 +55,10 @@ import java.util.concurrent.ConcurrentHashMap;
  *   │   1#   │无粘模…│无明显…│  /   │  /   │  /   │  /   │  /   │  /   │  /   │  /   │
  *   │  …8#   │  …                                                                  │
  *   └────────┴──────────────────────────────────────────────────────────────────────┘
- *   相关要求 6 条 + 检验结果 / 检验人 / 审核人 / 批准                ← 骨架 summary
- *   (审核人 2026-10-18 补;批准 2026-11-06 补 —— 两级审批:审核人 = 一级审批人、
- *    审批人 = 超级管理员,两者在两级口径下都是**表内真值**,由 ReportService.headParams 按
- *    yj_field.label 自动下发)
+ *   相关要求 十条 + 检验结果 / 检验人 / 审核人                        ← 骨架 summary
+ *   (审核人 2026-10-18 补;**批准 2026-11-19 删** —— 本单 2026-11-09 起是单级审批
+ *    「提交审批 → 审批通过 → 已审核」,纸面没有二级「批准」格;
+ *    相关要求十条 = 受控表单原文,与面板 REQUIREMENTS、Excel 导出逐字同源)
  * </pre>
  *
  * <h3>可填格口径(2026-11-14 第十轮 · 纸面黄格;与面板、Excel 导出**逐字同源**)</h3>
@@ -275,7 +275,7 @@ public final class QcFirstInspReportSupport {
         //   "Duplicate declaration of parameter: xxx",整张报表编译失败)。
         StringBuilder params = new StringBuilder();
         for (String p : new String[]{"产品编号", "产品型号", "生产日期", "组别", "总结论", "检验员",
-                "审核人", "审批人", "打印时间"}) {
+                "审核人", "打印时间"}) {
             params.append(param(p, "java.lang.String"));
         }
         for (int c = 1; c <= n; c++) {
@@ -433,20 +433,18 @@ public final class QcFirstInspReportSupport {
 
     // ============================================================ 填充参数
 
-    /** 报表参数(ReportService 填充用):抬头四对 + 总结论/检验员/审核人/审批人 + 列名/标准/每格格值 + 打印时间 */
+    /** 报表参数(ReportService 填充用):抬头四对 + 总结论/检验员/审核人 + 列名/标准/每格格值 + 打印时间 */
     public static Map<String, Object> params(Matrix m, Map<String, Object> head) {
         Map<String, Object> p = new LinkedHashMap<>();
         for (HeadPair hp : m.headPairs()) p.put(hp.label(), hp.value());
         p.put("总结论", m.result());
         p.put("检验员", m.inspector());
-        // 审核人 / 审批人(2026-11-06 两级审批口径):
-        //   审核人 = 一级审批人、审批人 = 超级管理员(二级「批准」)—— 两级口径下都是**表内真值列**
-        //   (qc_first_insp_head.审核人 / 审批人,审批人列由本次元数据迁移新增);
-        //   存量单(两级口径上线前审的)审核人为空时 QueryService 退回 yj_doc_status.shr 兜底。
-        //   两值均由 ReportService.headParams 按 yj_field.label 自动下发,取不到 / 未审批时给空串
-        //   ⇒ 骨架 summary 的 isBlankWhenNull 印空白。
+        // 审核人(单级审批的「审批通过」人):
+        //   真值列 = qc_first_insp_head.审核人(ButtonService.writeBackSignCell 在审批通过时写);
+        //   存量/未审单据表内为空时 QueryService 退回 yj_doc_status.shr 兜底。
+        //   取不到 / 未审批时给空串 ⇒ 骨架 summary 的 isBlankWhenNull 印空白。
+        //   ⚠ 2026-11-19 去掉「审批人」(批准):本单 2026-11-09 起单级审批,那一格永远不落值。
         p.put("审核人", head == null ? "" : text(head.get("审核人")));
-        p.put("审批人", head == null ? "" : text(head.get("审批人")));
         p.put("打印时间", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
         List<Col> cols = m.flatCols();
         for (int c = 1; c <= cols.size(); c++) {

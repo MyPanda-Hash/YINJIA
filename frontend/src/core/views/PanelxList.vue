@@ -5260,6 +5260,12 @@ const isStandardFlowSheet = computed(() => Object.prototype.hasOwnProperty.call(
  *   由「检验人|审核人」扩成「检验人|审核人|批准」⇒ 侧栏必须给出「提交审批/审批通过/审批驳回/审批情况」
  *   (此前这两张单只有管理员直审入口,没有提交审批这一步)。后端权威清单 = ButtonService.QC_DOC_PREPARER
  *   (= ADMIN_L2_PANELS);**两处必须同步**,否则会出现"前端给了按钮、后端按直审/非两级审批拒掉"的错位。
+ *
+ * ⚠ 2026-11-19(取代上面 11-06 段):用户口径「没有二级审核,只需要审核人就行,去掉批准人」——
+ *   首件检验单纸面表尾去掉 2026-11-06 补的第四格「批准」(QcFirstInspSheet.vue / firstInspExport.js /
+ *   reports/qc_first_insp.jrxml 三处同步),表尾回到「检验结果|检验人|审核人」。
+ *   审批形态本身 2026-11-09 起就是**单级**(SINGLE_LEVEL_INSP_PANELS:提交审批 → 审批通过 → 已审核),
+ *   L2_DOC_PANELS 里早已不含这两张单 ⇒ 这里只改注释,按钮组不变。
  */
 const hasApprovalBtns = computed(() => isStandardFlowSheet.value
   || String(panelCode.value) === 'QC_INSP_REC'
@@ -5325,6 +5331,12 @@ const hasApprovalBtns = computed(() => isStandardFlowSheet.value
  *   ⇒ 本名单清空,**不再给管理员直审入口**;提交审批/审批通过/审批驳回/弃审/审批情况
  *   全部由上面的统一审批组与危险操作段承担(弃审在⑤危险操作,仅已审核可点)。
  *   保留本常量与 canDirectAuditHere 计算:将来若某个工序检验单确要走直审,只把面板码加回来即可。
+ *
+ * ⚠ 2026-11-19(用户口径「没有二级审核,只需要审核人就行,去掉批准人」,**再次取代** 10-18 / 11-06 段):
+ *   首件检验单纸面表尾的第四格「批准」删除(三处同源:QcFirstInspSheet.vue / firstInspExport.js /
+ *   reports/qc_first_insp.jrxml);审批仍走 2026-11-09 起的**单级**形态(提交审批 → 审批通过 → 已审核),
+ *   侧栏按钮组不变。保留本段只为记录历史,别再照 11-06 段把批准格加回来。
+ *
  */
 const DIRECT_AUDIT_PANELS = []
 const canDirectAuditHere = computed(() => DIRECT_AUDIT_PANELS.includes(String(panelCode.value)) && user.isAdmin)

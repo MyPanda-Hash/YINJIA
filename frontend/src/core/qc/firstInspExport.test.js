@@ -8,8 +8,8 @@
  *   ④ 1#..8# 八个样品行,**可填范围按纸面黄格**(第十轮 2026-11-14:表观/脱粉 1#/2#、尺寸四项 3#/4#、
  *      跌落+挤压强度 5#/6#、压降/浊度 7#/8#),可填格落值、其余格写 `/`(与纸面同源);
  *      10 列 × 8 行 = 落值格最多 20 个、`/` 恰 60 个;
- *   ⑤ 相关要求逐条一行、横向合并;表尾 检验结果|检验人|审核人|批准 四组都在(审核人 2026-10-18 补、
- *      批准 2026-11-06 随并入质量单据两级审批补);
+ *   ⑤ 相关要求逐条一行、横向合并;表尾 检验结果|检验人|审核人 **三段**都在
+ *      (审核人 2026-10-18 补;**批准 2026-11-19 删** —— 本单 2026-11-09 起单级审批,纸面没有二级);
  *   ⑥ 所有合并区**都不越界**(行列号都在 aoa 范围内)。
  */
 import { test } from 'node:test'
@@ -50,8 +50,7 @@ const build = (over = {}) => {
         resultLabel: '检验结果', result: '合格',
         byLabel: '检验人', by: '张三',
         auditorLabel: '审核人', auditor: '李四',
-        // 2026-11-06 两级审批:批准 = 超级管理员(二级审批通过写 head['审批人'])
-        approverLabel: '批准', approver: '王五',
+        // 2026-11-19:纸面不再有「批准」格(单级审批),这里刻意不再传 approver
       },
       ...over,
     }),
@@ -154,28 +153,27 @@ test('④ 八个样品行:可填范围与纸面同源(黄格 20 / `/` 60)', () =
   assert.equal(rowOf(1)[idx('outer')], BLANK, '外径 1# 是白格 ⇒ `/`(不吃历史值)')
 })
 
-test('⑤ 相关要求逐条一行且横向合并;表尾四组(检验结果|检验人|审核人|批准)都在', () => {
+test('⑤ 相关要求逐条一行且横向合并;表尾三段(检验结果|检验人|审核人),不再有「批准」', () => {
   const { aoa, merges, marks } = build()
   assert.equal(aoa[marks.reqTitleRow][0], '相关要求：')
-  assert.equal(marks.reqRows.length, 6)
+  assert.equal(marks.reqRows.length, 6, '条数由入参决定(面板传什么就印几条)')
   assert.equal(aoa[marks.reqRows[0]][0], '要求一')
   assert.equal(aoa[marks.reqRows[5]][0], '要求六')
   for (const r of marks.reqRows) {
     assert.ok(merges.some((m) => m.s.r === r && m.s.c === 0 && m.e.c === marks.colCount - 1), `第 ${r} 行要合并全宽`)
   }
-  // 表尾四段(2026-11-06 起四段:N=11 ⇒ 段宽 3/3/3/2,标签列 0/3/6/9)
-  const N = marks.colCount
+  // 表尾三段(2026-11-19 起三段:N=11 ⇒ base=3/rem=2,标签列 0/4/8,值格并到下一段之前)
   const foot = aoa[marks.footRow]
   assert.equal(foot[0], '检验结果')
   assert.equal(foot[1], '合格')
-  assert.equal(foot[3], '检验人')
-  assert.equal(foot[4], '张三')
-  assert.equal(foot[6], '审核人')
-  assert.equal(foot[7], '李四')
-  assert.equal(foot[9], '批准')
-  assert.equal(foot[10], '王五')
-  // 前三段的值各跨 2 列(1-2 / 4-5 / 7-8),末段单列
-  for (const [s, e] of [[1, 2], [4, 5], [7, 8]]) {
+  assert.equal(foot[4], '检验人')
+  assert.equal(foot[5], '张三')
+  assert.equal(foot[8], '审核人')
+  assert.equal(foot[9], '李四')
+  // 旧第四格「批准」必须彻底消失(连标签都不许出现)
+  assert.ok(!foot.some((v) => String(v).includes('批准')), '表尾不该再出现「批准」')
+  // 三段的值格:1-3 / 5-7 / 9-10(段间不重叠)
+  for (const [s, e] of [[1, 3], [5, 7], [9, 10]]) {
     assert.ok(merges.some((m) => m.s.r === marks.footRow && m.s.c === s && m.e.c === e), `值格合并 ${s}-${e}`)
   }
 })
