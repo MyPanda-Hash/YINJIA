@@ -162,7 +162,15 @@ export function filterApprovalPreview(rows, opts) {
       if (to && d > to) return false
     }
     if (!kw) return true
-    const hay = [r && r['单据编号'], r && r['客户名'], r && r[ownerKey], r && r['产品名称']].map(norm).join(' ')
+    // 2026-11-19 销售问题汇总 P12：「需要能正常搜索查询」。
+    //   原来只拼 4 个键（单据编号/客户名/归属人/产品名称）——
+    //   产品信息表的**产品编号**、立项的**立项名称**这些真正用来找单的字段搜不到 ⇒ 用户以为搜索坏了。
+    //   现改为**整行所有字段值一起匹配**（与列表页「模糊搜索」同一口径）：
+    //   不论哪张面板、哪一列，只要这一行有该文案就能命中；字段增删也不用再同步白名单。
+    const hay = Object.keys(r || {})
+      .filter(function (k) { return k !== 'detail' })
+      .map(function (k) { const v = r[k]; return v === null || v === undefined ? '' : norm(v) })
+      .join(' ')
     return hay.indexOf(kw) >= 0
   })
 }

@@ -55,7 +55,7 @@
             v-model="keyword"
             class="apv-search apv-bar-item"
             clearable
-            :placeholder="tt('搜索单据编号 / 客户名 / 申请立项人')"
+            :placeholder="tt(searchHint)"
           >
             <template #prefix><el-icon><Search /></el-icon></template>
           </el-input>
@@ -206,6 +206,11 @@ const dateRange = ref([])        // ['2026-11-01','2026-11-17'] 或 []
 const meName = computed(() => String(props.me || '').trim())
 
 /** 表格业务列（按面板配置；未登记的退回最小集） */
+/** 搜索提示按面板给（2026-11-19：产品信息表按产品编号找单，立项按单号/客户找单） */
+const searchHint = computed(() => (String(props.panelCode || '') === 'RD_PROD_INFO'
+  ? '搜索产品编号 / 产品名称 / 客户名称'
+  : '搜索单据编号 / 客户名 / 申请立项人'))
+
 const cols = computed(() => previewColumnsOf(props.panelCode, props.ownerKey))
 
 /** 左树节点 = 数据里出现过的单据状态（空节点不画） */
