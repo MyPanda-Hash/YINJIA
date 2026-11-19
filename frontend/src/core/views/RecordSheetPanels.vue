@@ -4969,6 +4969,21 @@ watch([matPickKeyword, () => GOODS_FACETS.map((k) => matPickFilters[k]).join('\u
 const hasMaterialPickTable = computed(() =>
   (cfg.value?.dataTables || []).some((d) => d && d.materialPick && !d.bar)
   || (cfg.value?.sections || []).some((sec) => !!materialPickAt(sec)))
+/**
+ * 「直接导入采购物料清单」要**只显示采购物料**（2026-11-19 销售问题汇总 P10）：
+ *   用户口径「这里只显示采购物料，所以去掉 裸棒、成品、滤芯」。
+ * 为什么按类别过滤而不是按面板：商品档案(INV)里这四类是同一张表，
+ *   而 BOM 要引用的只有**采购进来的物料**；裸棒/成品/滤芯是自制或成品口径，选进来就是错数据。
+ * 只作用于**本次弹窗的候选行**（matPickRows），不动档案本身、也不影响其它面板引用商品档案。
+ */
+const MAT_PICK_EXCLUDE_CATS = new Set(['裸棒', '成品', '滤芯'])
+
+/** 过滤掉自制/成品类别（空类别保留 —— 历史档案有脏值为空的物料，不能因过滤把它们藏掉） */
+function isPurchasableMaterial(r) {
+  const cat = String(r && r['所属类别'] || '').trim()
+  return !cat || !MAT_PICK_EXCLUDE_CATS.has(cat)
+}
+
 /** 每栏的候选值 —— 按**其它三栏**的当前条件收窄(用户要的"范围缩小"),capped 见 goodsPick.FACET_CAP */
 const matPickFacets = computed(() => GOODS_FACETS.map((k) => ({ key: k, ...facetValues(matPickRows.value, k, matPickFilters) })))
 /** 表格数据 = 四栏 AND 之后的结果 */
@@ -5032,12 +5047,12 @@ async function openMaterialPick(dt) {
     // 不带 keyword ⇒ 一次拿全,级联筛选全在本地做(打开弹窗一次,之后零请求)。
     // 2026-11-13:先看预取缓存 —— 命中就**零请求秒开**（进面板时已经拉过了，见 prefetchMatPickRows）
     if (matPickCache.value.length) {
-      matPickRows.value = matPickCache.value.slice()
+      matPickRows.value = matPickCache.value.filter(isPurchasableMaterial)
       return
     }
     const res = await request.post('/px/queryFormDataList', { panelCode: INV_PANEL, condition: {}, pageNo: 1, pageSize: 20 })
     const rows = invRowsOf(res?.data ?? res)
-    matPickRows.value = rows.map((r, i) => ({ ...r, __k: `${r?.['存货编码'] || ''}#${i}` }))
+    matPickRows.value = rows.filter(isPurchasableMaterial).map((r, i) => ({ ...r, __k: `${r?.['存货编码'] || ''}#${i}` }))
     // 首次（没预取到）也顺手填缓存，这一轮会话里再打开就不用再拉了
     if (matPickRows.value.length) matPickCache.value = matPickRows.value.slice()
   } catch (e) {
