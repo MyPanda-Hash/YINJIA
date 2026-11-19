@@ -1,0 +1,18 @@
+const task = await taskSpace('plan-board-20261119')
+const page = task.page('p1')
+await page.goto('http://localhost:5173/#/panelx/list/ROUTE', { timeout: 30000 })
+await page.waitForTimeout(3500)
+await page.evaluate(() => {
+  const tools = document.querySelector('.tools')
+  const main = [...(tools?.querySelectorAll('.tb-main') || [])].find((e) => (e.textContent || '').trim() === '更多')
+  const g = main?.closest('.tb-group')
+  ;(g?.querySelector('.tb-caret') || main)?.click()
+})
+await page.waitForTimeout(500)
+await page.evaluate(() => {
+  const el = [...document.querySelectorAll('.tb-menu .ctx-item, .tb-menu div')].find((x) => (x.textContent || '').trim() === '表格调整')
+  if (el) el.click()
+})
+await page.waitForTimeout(1200)
+await page.screenshot({ path: 'D:/workspace/yinjia/_scratch/ego-plan-board-20261119/route-no-required.png' })
+console.log('saved')

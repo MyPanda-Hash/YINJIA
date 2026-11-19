@@ -1,0 +1,7 @@
+const task = await taskSpace('plan-board-20261119')
+const page = task.page('p1')
+await page.goto('file:///D:/workspace/yinjia/_scratch/ego-plan-board-20261119/plan-sheet.html', { timeout: 30000 })
+await page.waitForTimeout(1500)
+await page.screenshot({ path: 'D:/workspace/yinjia/_scratch/ego-plan-board-20261119/plan-sheet.png', fullPage: true })
+const heads = await page.evaluate(() => [...document.querySelectorAll('th')].map((th) => th.innerText.replace(/\s+/g, '')))
+console.log(JSON.stringify(heads))

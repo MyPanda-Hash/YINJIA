@@ -6774,6 +6774,26 @@ export default {
     '单': 'orders',
     '项': 'items',
 
+    // ---- 2026-11-19 工单排产·未完成数量框 + 报工记录勾选行导出 Excel ----
+    '未完成数量': 'Unfinished quantity',
+    '勾选车间查看所选车间合计；不勾选显示当前车间': 'Check workshops to total them; leave unchecked to show the current workshop',
+    '请先勾选要导出的行': 'Select the rows to export first',
+    '没有可导出的数据': 'No data to export',
+    '没有可导出的列': 'No columns to export',
+    '导出 Excel（勾选行）': 'Export Excel (selected rows)',
+    '导出 Excel（全部当前结果）': 'Export Excel (all current results)',
+    '按勾选行导出 Excel（明细表）': 'Export Excel for the selected rows (detail list)',
+    '只导出当前勾选的': 'Export only the selected',
+    '按当前查询条件与列设置导出全部行': 'Export every row under the current query and column settings',
+    '报工记录为明细表：勾选行后导出所选行；也可导出当前查询结果全部行':
+      'Job report log is a detail list: export the selected rows, or every row of the current query result',
+    '报工记录为明细表：勾选行后导出 Excel；不勾选则导出当前查询结果':
+      'Job report log is a detail list: select rows to export Excel, or export the current query result',
+    '未完成数量 = 已排未结案 Σ(排产数量 − 入库数量)，按车间合计':
+      'Unfinished quantity = Σ(scheduled qty − received qty) of scheduled, unclosed orders, totalled by workshop',
+    '勾选车间 = 所选车间合计；不勾选 = 当前选中产线所属车间；未选产线 = 全部车间':
+      'Checked workshops = their total; none checked = the workshop of the selected line; no line selected = all workshops',
+
   },
 
 }

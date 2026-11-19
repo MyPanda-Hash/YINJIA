@@ -43,21 +43,9 @@
       </span>
     </div>
 
-    <!-- 历史欠产汇总条(2026-11-13 用户口径「当天结束后未完成会进行提示」)───────────────
-         口径 = 当前选线「未完工/已完工/全部」页签明细里,日期 < 今天 且 报工 < 原计划 的格子合计;
-         不弹窗:一条红色汇总 + 悬停看逐条明细(:title,最多 15 行)。后端没返回「原计划」时
-         shortInfo.count = 0 ⇒ 整条不渲染(老后端/老数据自然降级,不出假提示)。
-         ⚠ 2026-11-13 用户反馈「两天的计划量是 1067…应该是计划量-实际报工数量」—— 用户把单个
-         欠产数误读成了计划合计(实际两天原计划 834+833=1667、报工 600、欠产 1067)⇒
-         提示改成**三数并列**:`原计划 1667 − 报工数 600 = 欠产 1067`,算式自证,不再只放一个数。 -->
-    <div v-if="shortInfo.count" class="wb-short-bar" :title="shortTitle">
-      <span class="wb-short-main">
-        {{ tt('历史未完成') }} {{ shortInfo.count }} {{ tt('处') }} ·
-        {{ tt('原计划') }} {{ num(shortInfo.plan) }} − {{ tt('报工数') }} {{ num(shortInfo.actual) }}
-        = {{ tt('欠产') }} {{ num(shortInfo.qty) }}
-      </span>
-      <span class="wb-short-hint">{{ tt('标红格 = 当天已结束但报工未达原计划(汇总含未显示为列的日期)') }}</span>
-    </div>
+    <!-- 历史欠产(2026-11-13 用户口径「当天结束后未完成会进行提示」)──────────────────
+         2026-11-19 用户口径:原来这条通栏红条占一整行,而「未完成数量」要放到**右下角蓝色框**里
+         ⇒ 红条内容并进下面 .wb-unf 框(处数 + 原计划 − 报工 = 欠产 的算式照旧,明细在 :title 里)。 -->
 
     <div class="wb-body">
       <!-- 左:各线「本线排产数量」+「已报/未完工」次行(2026-11-12 用户报障)───────────────────────
@@ -227,13 +215,15 @@
                 <!-- ① 日排产日期格(数据驱动,整组显隐由列设置里的伪列「日排产日期列」控制):
                      区间外画「/」;点了就地改当天数量(双击/单击皆可);格内 `原计划/报工` 两数。 -->
                 <template v-if="col.date">
-                  <el-input-number v-if="qtyEdit === qtyKey(row, col.date)" v-model="qtyDraft" size="small"
-                                   :controls="false" :min="0" class="dp-input" autofocus
+                  <el-input-number v-if="qtyEdit === qtyKey(row, col.date)" ref="qtyInputRef" v-model="qtyDraft" size="small"
+                                   :controls="false" :min="0" class="dp-input"
                                    @blur="commitQty(row, col.date)" @keyup.enter="commitQty(row, col.date)" @keyup.esc="cancelQtyEdit" />
                   <!-- 区间外(开工日~计划完工日之外)且当天无计划/原计划/实报:画「/」——这一天不归本行排
                        (2026-11-01 用户口径;例:开工日改成 11-02 后,11-01 的格子要画斜杠)。
                        2026-11-18 用户口径「不可填写的日期列能被填写,填写后修改原来的预计完工时间到这列」
-                       ⇒ 斜杠格也可点开编辑;保存后后端把该行预计完工日期扩到这一天。 -->
+                       ⇒ 斜杠格也可点开编辑;保存后后端把该行预计完工日期扩到这一天。
+                       2026-11-19 用户口径「点击修改日期数量」:整个格子都是点击热区(span 撑满单元格),
+                       点开后输入框自动聚焦 —— 不再需要去点那个数字/斜杠本身。 -->
                   <span v-else-if="isOutCell(row, col.date)" class="dp-out dp-out-fill"
                         :title="outCellFillTitle" @click="startQtyEdit(row, col.date)">/</span>
                   <span v-else class="dp-plan"
@@ -263,6 +253,31 @@
             </el-table-column>
             <el-table-column :label="tt('生产状态')" prop="生产状态" width="90" fixed="right" />
           </el-table>
+        </div>
+
+        <!-- 未完成数量(2026-11-19 用户口径「增加一个未完成数量的查看实现。勾选车间查看当前勾选车间的
+             未完成数量在右下方蓝色边框内;不勾选时右下方显示当前车间未完成量」)──────────────
+             口径 = 已排未结案 Σ(排产数量 − 入库数量)(= 顶部「总未完成量」同一把尺,逐车间接线
+             linesSummary.未交量 相加;实测 30 条线合计 = /stats 的 29449 完全一致)。
+             · 勾车间复选框 ⇒ 勾中的几个车间合计;一个都不勾 ⇒ 当前选中产线所属车间;
+             · 原来顶部那条通栏「历史未完成」红条按用户口径并进本框底部(算式不变、悬停看明细)。 -->
+        <div class="wb-unf" :class="{ 'is-picked': pickedShops.length > 0 }">
+          <div class="wb-unf-head">
+            <span class="wb-unf-title">{{ tt('未完成数量') }}</span>
+            <span class="wb-unf-scope" :title="unfScopeTitle">{{ unfScopeText }}</span>
+          </div>
+          <div class="wb-unf-shops" :title="tt('勾选车间查看所选车间合计；不勾选显示当前车间')">
+            <el-checkbox v-for="s in shopOptions" :key="s" size="small"
+                         :model-value="pickedShops.includes(s)"
+                         @change="(v) => toggleShop(s, v)">{{ tt(s) }}</el-checkbox>
+          </div>
+          <div class="wb-unf-qty">{{ num(unfQty) }}<span class="wb-unf-unit">{{ tt('件') }}</span></div>
+          <div v-if="shortInfo.count" class="wb-unf-short" :title="shortTitle">
+            {{ tt('历史未完成') }} {{ shortInfo.count }} {{ tt('处') }} ·
+            {{ tt('原计划') }} {{ num(shortInfo.plan) }} − {{ tt('报工数') }} {{ num(shortInfo.actual) }}
+            = {{ tt('欠产') }} {{ num(shortInfo.qty) }}
+          </div>
+          <div v-else class="wb-unf-tip">{{ tt('勾选车间查看所选车间合计；不勾选显示当前车间') }}</div>
         </div>
       </div>
     </div>
@@ -483,6 +498,46 @@ const shop = computed(() => {
   const set = [...new Set(lineSummary.value.map((l) => l.生产车间).filter(Boolean))]
   return set.length === 1 ? set[0] : ''
 })
+
+// ───────── 未完成数量框(2026-11-19 用户口径)────────────────────────────────────
+//   用户口径:「增加一个未完成数量的查看实现。勾选车间查看当前勾选车间的未完成数量在右下方蓝色边框内;
+//   不勾选时右下方显示当前车间未完成量。当前存在的应该是在图中存在一个历史未完成量,
+//   需要修改为右下方的蓝色框内,当前只实现了单个车间当前查看的情况。」
+//   口径 = 已排未结案 Σ(排产 − 入库),与顶部「总未完成量」同源 ⇒ 逐车间把 linesSummary.未交量 相加
+//   (实测全部产线合计 29449 = /stats 的总未完成量,不另造口径)。勾多个车间 = 多车间合计;
+//   不勾 = 当前选中产线所属车间;一条线都没选 = 全部车间(等价总未完成量)。
+const pickedShops = ref([])
+/** 可选车间(随 linesSummary 动态来;停用线也有车间,合计口径与顶部一致) */
+const shopOptions = computed(() => [...new Set(lineSummary.value
+  .map((l) => String(l['生产车间'] || '').trim()).filter(Boolean))])
+/** 当前车间 = 选中产线所属车间;没选线时退回账号唯一车间(linesSummary 多车间时为空) */
+const currentShop = computed(() => {
+  const line = lineSummary.value.find((l) => l['生产线'] === sel.line)
+  return String(line?.['生产车间'] || shop.value || '').trim()
+})
+/** 实际参与合计的车间:勾选优先;不勾选 = 当前车间;都没有 = 空数组(= 全部车间) */
+const unfShops = computed(() => pickedShops.value.length
+  ? pickedShops.value
+  : (currentShop.value ? [currentShop.value] : []))
+const unfQty = computed(() => lineSummary.value
+  .filter((l) => !unfShops.value.length || unfShops.value.includes(String(l['生产车间'] || '').trim()))
+  .reduce((a, l) => a + Number(l['未交量'] || 0), 0))
+const unfScopeText = computed(() => (unfShops.value.length
+  ? unfShops.value.map((s) => tt(s)).join('、')
+  : tt('全部车间')))
+const unfScopeTitle = computed(() => [
+  tt('未完成数量 = 已排未结案 Σ(排产数量 − 入库数量)，按车间合计'),
+  tt('勾选车间 = 所选车间合计；不勾选 = 当前选中产线所属车间；未选产线 = 全部车间'),
+].join('\\n'))
+/** 勾/取消勾一个车间(与框内复选框同源;不传 v 时按当前状态取反) */
+function toggleShop(name, checked) {
+  const s = new Set(pickedShops.value)
+  const on = checked === undefined ? !s.has(name) : !!checked
+  if (on) s.add(name)
+  else s.delete(name)
+  pickedShops.value = [...s]
+}
+
 // 未交量合计 = Σ未交量(**成品口径**:排产−入库,2026-10-07 起);旧数据无未交量字段时回退余量。
 //   ⚠ 2026-11-12 口径纠偏:它**不再**充当顶部「未完工量」—— 顶部「未完工量」改按工序口径(selRemaining,
 //     与右侧明细/左侧每线同源);本值只进顶部统计的 tooltip,用来对账"成品口径还欠多少"。
@@ -512,6 +567,9 @@ async function loadSummary() {
   try {
     const res = await request.post('/px/scheduleBoard/linesSummary', { 开工日期: day.value })
     lineSummary.value = res.data || []
+    // 车间集合可能随筛选/权限变化 ⇒ 丢掉已不存在的勾选,避免右下角一直显示一个查不到的车间
+    const names = new Set(lineSummary.value.map((l) => String(l['生产车间'] || '').trim()).filter(Boolean))
+    pickedShops.value = pickedShops.value.filter((s) => names.has(s))
     if (sel.line && !lineSummary.value.some((x) => x.生产线 === sel.line)) {
       sel.line = ''; schedRows.value = []
     }
@@ -720,14 +778,43 @@ function planEditValue(row, d) {
   return Number(v || 0)
 }
 
-/** 格内直接填(2026-10-31 用户口径「直接填写这个就行」):双击变输入框,回车/失焦保存,Esc 取消 */
+/** 格内直接填(2026-10-31 用户口径「直接填写这个就行」):点一下日期格变输入框,回车/失焦保存,Esc 取消 */
 const qtyEdit = ref('')
 const qtyDraft = ref(0)
+/**
+ * 编辑框组件引用(2026-11-19 用户口径「点击修改排产各个日期数量」):
+ * 此前模板给 el-input-number 写了 `autofocus` —— 但 Element Plus 的 el-input-number **没有这个 prop**,
+ * 它只会作为普通 attr 落在根 div 上(浏览器不会去聚焦里面的 input)⇒ 点格子只是"冒出输入框"、
+ * 不聚焦、直接打字没反应;用户只能再点一次输入框,体感就是"点数字改不了、只有斜杠格能改"。
+ * 现在改为点开格后 nextTick 手动 focus + 选中原值(整个格都是点击热区,见模板/CSS)。
+ */
+const qtyInputRef = ref(null)
+/** 聚焦编辑框;返回是否真的聚焦成功(输入框可能还没挂载 ⇒ 调用方短轮询重试) */
+function focusQtyInput() {
+  // 组件 ref 在 el-table 的 scoped slot 里可能拿不到实例(表格按列/行渲染 slot) ⇒ 以 DOM 为准:
+  // 同一时刻页面上只有一个 .dp-input(正在编辑的那格),直接找它的 input 聚焦最稳。
+  const root = Array.isArray(qtyInputRef.value) ? qtyInputRef.value[0] : qtyInputRef.value
+  const input = root?.$el?.querySelector?.('input') || root?.querySelector?.('input')
+    || document.querySelector('.dp-input input')
+  if (!input) return false
+  try { input.focus({ preventScroll: true }) } catch { input.focus() }
+  try { input.select() } catch { /* number 输入框在部分浏览器不支持 select,忽略 */ }
+  return document.activeElement === input
+}
 function qtyKey(row, d) { return `${row.行id}|${d}` }
-function startQtyEdit(row, d) {
+async function startQtyEdit(row, d) {
   if (!canDayPlan.value) return
   qtyEdit.value = qtyKey(row, d)
   qtyDraft.value = planEditValue(row, d) || undefined
+  await nextTick()
+  // el-input-number 内部 input 在个别机器/首次渲染时会晚一两帧挂载;点点击的默认聚焦动作也可能
+  // 在微任务之后落回 td/body ⇒ 短轮询(最多 ~300ms)到输入框真的拿到焦点为止。
+  let tries = 0
+  const tryFocus = () => {
+    if (focusQtyInput()) return
+    if (tries++ < 10) setTimeout(tryFocus, 30)
+  }
+  tryFocus()
 }
 function cancelQtyEdit() { qtyEdit.value = ''; qtyDraft.value = 0 }
 async function commitQty(row, d) {
@@ -1253,14 +1340,20 @@ watch(() => route.query, () => {
 .wb-title { font-weight: 600; }
 .wb-top .wb-stats { margin-left: auto; font-weight: 600; }
 .wb-p { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #606266; }
-/* 历史欠产汇总条(2026-11-13 用户口径「当天结束后未完成会进行提示」):浅红底/红边/红字,
-   与页面现有块(4px 圆角、8px 行距)同风格;只占一行、放不下时整块换行,不横向撑破版面。
-   hint 灰字说明「标红格」的含义;明细在 :title 里(悬停看,不弹窗)。 */
-.wb-short-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 14px;
-  padding: 6px 12px; background: #fef0f0; border: 1px solid #fbc4c4; border-radius: 4px;
-  color: #f56c6c; font-size: 12px; line-height: 1.5; cursor: help; }
-.wb-short-main { font-weight: 700; }
-.wb-short-hint { color: #909399; }
+/* 未完成数量框(2026-11-19 用户口径「右下方蓝色边框内」):贴在右侧明细区右下角,蓝框白底;
+   车间复选框 + 大数字 + 历史未完成算式。宽 330px,窄屏 max-width 收住不横向撑破。 */
+.wb-unf { align-self: flex-end; width: 330px; max-width: 100%; flex: none; box-sizing: border-box;
+  background: #fff; border: 2px solid #409eff; border-radius: 4px; padding: 7px 10px 8px;
+  display: flex; flex-direction: column; gap: 3px; }
+.wb-unf-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.wb-unf-title { font-size: 13px; font-weight: 700; color: #1e6fb8; white-space: nowrap; }
+.wb-unf-scope { margin-left: auto; font-size: 12px; color: #909399; max-width: 190px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: help; }
+.wb-unf-shops { display: flex; align-items: center; flex-wrap: wrap; gap: 0 10px; }
+.wb-unf-qty { font-size: 22px; font-weight: 700; line-height: 1.15; color: #1e6fb8; font-variant-numeric: tabular-nums; }
+.wb-unf-unit { margin-left: 4px; font-size: 12px; font-weight: 400; color: #909399; }
+.wb-unf-short { font-size: 12px; font-weight: 600; line-height: 1.4; color: #f56c6c; cursor: help; }
+.wb-unf-tip { font-size: 11px; line-height: 1.4; color: #c0c4cc; }
 .wb-body { display: flex; gap: 8px; flex: 1; min-height: 0; }
 .wb-left { width: 210px; flex: none; background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; overflow: auto; }
 .wb-left-head { padding: 8px 10px; font-weight: 600; font-size: 13px; color: #116a5b; border-bottom: 1px solid #e4e7ed; }
@@ -1306,8 +1399,10 @@ watch(() => route.query, () => {
 .wb-ctx-stats { margin-left: auto; font-size: 12px; color: #1e6fb8; font-weight: 600; white-space: nowrap;
   cursor: help; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .wb-block { background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
-/* 日排产日期列(2026-10-29;2026-10-31:自动均摊 + 双击就地改):上=当天计划,下=当天已审核报工量 */
-.dp-plan { color: #303133; font-weight: 600; line-height: 1.2; cursor: text; }
+/* 日排产日期列(2026-10-29;2026-10-31:自动均摊 + 点格就地改):上=当天计划,下=当天已审核报工量。
+   2026-11-19 用户口径「点击修改日期数量」:计划格/斜杠格都撑满整个单元格 ⇒ 点格子任意位置都能进编辑,
+   不用精确点到数字或那个「/」。 */
+.dp-plan { display: block; width: 100%; min-height: 18px; color: #303133; font-weight: 600; line-height: 18px; cursor: text; }
 /* 2026-10-31 融合显示:当天有报工 ⇒ 绿色(2026-11-13 起格内是 `原计划/报工` 两数,整格标绿);
    没报工显示计划(深色) */
 .dp-plan.actual { color: #529b2e; }
@@ -1315,7 +1410,7 @@ watch(() => route.query, () => {
    一眼看出那一天**不归本行排**(例:开工日改成 11-02 后,11-01 就是斜杠,而不是空着像漏排) */
 .dp-out { color: #c0c4cc; font-weight: 400; line-height: 1.2; user-select: none; }
 /* 2026-11-18:区间外的斜杠格也能填 —— 给可编辑手型 + 悬停变色,别让人以为它还是死的 */
-.dp-out-fill { cursor: text; }
+.dp-out-fill { display: block; width: 100%; min-height: 18px; line-height: 18px; cursor: text; }
 .dp-out-fill:hover { color: #1e6fb8; background: #eef6ff; }
 .dp-input { width: 66px; }
 /* 人工指定过的格子加粗变色 + 「手」角标;超分配时角标标红(只提示,不拦保存) */

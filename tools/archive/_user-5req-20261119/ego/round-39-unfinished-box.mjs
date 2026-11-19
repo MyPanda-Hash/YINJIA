@@ -1,0 +1,11 @@
+const task = await taskSpace('plan-board-20261119')
+const page = task.page('p1')
+await page.goto('http://localhost:5173/#/prod/plan/workOrderBoard', { timeout: 30000 })
+await page.waitForTimeout(3000)
+console.log('no line:', JSON.stringify(await page.evaluate(() => document.querySelector('.wb-unf')?.innerText.replace(/\s+/g, ' ').trim())))
+await page.evaluate(() => {
+  const el = [...document.querySelectorAll('.wb-line')].find((x) => (x.querySelector('.wb-line-name')?.textContent || '').trim() === '2号车间')
+  if (el) el.click()
+})
+await page.waitForTimeout(2500)
+console.log('line 2:', JSON.stringify(await page.evaluate(() => document.querySelector('.wb-unf')?.innerText.replace(/\s+/g, ' ').trim())))

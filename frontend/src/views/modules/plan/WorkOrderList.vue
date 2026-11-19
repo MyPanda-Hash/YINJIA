@@ -210,13 +210,14 @@
           </div>
         </template>
         <template #default="{ row }">
-          <el-input-number v-if="qtyEdit === qtyKey(row, c.d)" v-model="qtyDraft" size="small"
-                           :controls="false" :min="0" class="dp-input" autofocus
+          <el-input-number v-if="qtyEdit === qtyKey(row, c.d)" ref="qtyInputRef" v-model="qtyDraft" size="small"
+                           :controls="false" :min="0" class="dp-input"
                            @blur="commitQty(row, c.d)" @keyup.enter="commitQty(row, c.d)" @keyup.esc="cancelQtyEdit" />
           <!-- 区间外(开工日~计划完工日之外)且当天无计划/实报:画「/」——
                这一天不归本行排(2026-11-01 用户口径;例:开工日改成 11-02 后,11-01 的格子要画斜杠)。
                2026-11-18 用户口径:「不可填写的日期列能被填写,填写后修改原来的预计完工时间到这列」
-               ⇒ 斜杠格也可点开编辑;保存后后端把该行计划完工日期扩到这一天(见 dayPlanApi / WorkOrderDayPlanService.save)。 -->
+               ⇒ 斜杠格也可点开编辑;保存后后端把该行计划完工日期扩到这一天(见 dayPlanApi / WorkOrderDayPlanService.save)。
+               2026-11-19 用户口径「点击修改日期数量」:整格都是点击热区 + 点开自动聚焦输入框。 -->
           <span v-else-if="row.__dp[c.i].out" class="dp-out dp-out-fill"
                 :title="outCellFillTitle" @click="startQtyEdit(row, c.d)">/</span>
           <span v-else class="dp-plan" :class="row.__dp[c.i].cls"
@@ -1031,15 +1032,43 @@ function buildRowDayCells(row) {
   return cells
 }
 
-/** 格内直接填(2026-10-31 用户口径「直接填写这个就行」):双击变输入框,回车/失焦保存,Esc 取消 */
+/** 格内直接填(2026-10-31 用户口径「直接填写这个就行」):点一下日期格变输入框,回车/失焦保存,Esc 取消 */
 const qtyEdit = ref('')
 const qtyDraft = ref(0)
+/**
+ * 编辑框组件引用(2026-11-19 用户口径「点击修改排产各个日期数量」):
+ * el-input-number 没有 autofocus prop(写 `autofocus` 只会落成根 div 的普通 attr,不会聚焦内部 input)
+ * ⇒ 此前点格子只"冒出输入框"、不能直接打字,体感是"点数字改不了、只有斜杠格能改"。
+ * 现在点开格后 nextTick 手动 focus + 选中原值;整个日期格都是点击热区(模板/CSS 同批改)。
+ */
+const qtyInputRef = ref(null)
+/** 聚焦编辑框;返回是否真的聚焦成功(输入框可能还没挂载 ⇒ 调用方短轮询重试) */
+function focusQtyInput() {
+  // 组件 ref 在 el-table 的 scoped slot 里可能拿不到实例 ⇒ 以 DOM 为准:
+  // 同一时刻页面上只有一个 .dp-input(正在编辑的那格),直接找它的 input 聚焦最稳。
+  const root = Array.isArray(qtyInputRef.value) ? qtyInputRef.value[0] : qtyInputRef.value
+  const input = root?.$el?.querySelector?.('input') || root?.querySelector?.('input')
+    || document.querySelector('.dp-input input')
+  if (!input) return false
+  try { input.focus({ preventScroll: true }) } catch { input.focus() }
+  try { input.select() } catch { /* number 输入框在部分浏览器不支持 select,忽略 */ }
+  return document.activeElement === input
+}
 function qtyKey(row, d) { return `${row.行id}|${d}` }
-function startQtyEdit(row, d) {
+async function startQtyEdit(row, d) {
   if (!canDayPlan.value) return
   qtyEdit.value = qtyKey(row, d)
   // 预填 = **计划值**(2026-11-13):格内显示的是「原计划/报工」,不能拿显示数/报工数当预填
   qtyDraft.value = planEditValue(row, d) || undefined
+  await nextTick()
+  // el-input-number 内部 input 在个别机器/首次渲染时会晚一两帧挂载;点点击的默认聚焦动作也可能
+  // 在微任务之后落回 td/body ⇒ 短轮询(最多 ~300ms)到输入框真的拿到焦点为止。
+  let tries = 0
+  const tryFocus = () => {
+    if (focusQtyInput()) return
+    if (tries++ < 10) setTimeout(tryFocus, 30)
+  }
+  tryFocus()
 }
 function cancelQtyEdit() { qtyEdit.value = ''; qtyDraft.value = 0 }
 async function commitQty(row, d) {
@@ -1573,15 +1602,17 @@ onBeforeUnmount(() => unbindTableScroll())
 /* 草稿箱角标(2026-11-13 方案 A):按钮内右侧红点数字,= 草稿态数量;0 不显示 */
 .wol-draft-cnt { margin-left: 5px; padding: 0 5px; font-size: 11px; line-height: 16px; color: #fff;
   background: #f56c6c; border-radius: 8px; display: inline-block; vertical-align: 1px; }
-/* 日排产日期列(2026-10-29;2026-10-31:自动均摊 + 双击就地改):上=当天计划,下=当天已审核报工量 */
-.dp-plan { color: #303133; font-weight: 600; line-height: 1.2; cursor: text; }
+/* 日排产日期列(2026-10-29;2026-10-31:自动均摊 + 点格就地改):上=当天计划,下=当天已审核报工量。
+   2026-11-19 用户口径「点击修改日期数量」:计划格/斜杠格都撑满整个单元格 ⇒ 点格子任意位置都能进编辑,
+   不用精确点到数字或那个「/」。 */
+.dp-plan { display: block; width: 100%; min-height: 18px; color: #303133; font-weight: 600; line-height: 18px; cursor: text; }
 /* 2026-10-31 融合显示:当天有报工 ⇒ 格子里显示的是**实际完成数**(绿色);没报工显示计划(深色) */
 .dp-plan.actual { color: #529b2e; }
 /* 2026-11-01:本行排产区间(开工日~计划完工日)之外的空白格画「/」——
    一眼看出那一天**不归本行排**(例:开工日改成 11-02 后,11-01 就是斜杠,而不是空着像漏排) */
 .dp-out { color: #c0c4cc; font-weight: 400; line-height: 1.2; user-select: none; }
 /* 2026-11-18:区间外的斜杠格也能填 —— 给可编辑手型 + 悬停变色,别让人以为它还是死的 */
-.dp-out-fill { cursor: text; }
+.dp-out-fill { display: block; width: 100%; min-height: 18px; line-height: 18px; cursor: text; }
 .dp-out-fill:hover { color: #1e6fb8; background: #eef6ff; }
 .dp-input { width: 66px; }
 /* 人工指定过的格子加粗变色 + 「手」角标;超分配时角标标红(只提示,不拦保存) */

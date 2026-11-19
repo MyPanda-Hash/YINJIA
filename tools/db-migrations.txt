@@ -5070,3 +5070,8 @@ migrate-sample-catalog-rev-20261119.sql
 migrate-sample-reg-detail-tab-20261119.sql
 # 2026-11-19 研发管理·自制料（制程记录录入面板 + 头/明细表 + 字段 + 权限骨架）
 migrate-selfmade-20261119.sql
+
+# 2026-11-19 工艺路线(ROUTE)明细字段「工序控制」(物理列 加工方式)取消必填:
+#   用户口径「工艺路线中工序控制不需要必填」;必填真源 = yj_field.required(角色字段视图只管显隐),
+#   只 UPDATE 这一格 required → 0 + 末尾自检 required=1 残留必须为 0。幂等;两账套均执行。
+migrate-route-process-control-optional-20261119.sql

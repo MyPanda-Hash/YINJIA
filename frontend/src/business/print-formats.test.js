@@ -224,8 +224,9 @@ test('打印采购订单/无金额版:返回 true = 已交给页面内打印层(
 
 // ── 成型车间排单计划(2026-10-31) ────────────────────────────────────────────
 // 用户口径「需要能打出这样的报表形式,就在当前工单排产处实现,不需要根据产线处理」⇒
-//   版式照纸表:客户等级/客户名称/产品编号/型号/成型车间/工序未报工量/订单数量/生产计划数量/实际完成数量/
+//   版式照纸表:客户等级/客户名称/产品编号/型号/成型车间/订单数量/生产计划数量/工序未报工量/实际完成数量/
 //   成型交期/成型交期紧迫度/7天/15天/大于15/日期列(=日计划)。纯函数 schedPlanSheetHtml 可直接断言。
+//   2026-11-19 用户口径「顺序按照订单数量,生产计划数量,未完成总数,实际完成数量」⇒ 四列按此固定顺序。
 
 test('planSheetDates:从今天起取 5 天(纸表也就 3~5 天);今天以后没有就退化取最后几天', () => {
   const dates = ['2026-10-20', '2026-10-31', '2026-11-01', '2026-11-02', '2026-11-03',
@@ -294,13 +295,15 @@ test('schedPlanSheetHtml:纸表列齐全 + 日期列 = 各行日计划', async (
     '生产计划<br>数量', '实际完成<br>数量', '成型交期', '成型交期<br>紧迫度', '7天', '15天', '大于15']) {
     assert.ok(html.includes('>' + h + '</th>'), '表头应含 ' + h)
   }
-  // 2026-11-13 用户口径「所有生产工单排单计划增加订单数量这个字段」:
-  //   列头单行(订单数量),位置在「工序未报工量」之后、「生产计划数量」之前;值取 订单数量 ?? 需求数量。
+  // 2026-11-13 用户口径「所有生产工单排单计划增加订单数量这个字段」;
+  //   2026-11-19 用户口径固定四列顺序:订单数量 → 生产计划数量 → 工序未报工量 → 实际完成数量。
   assert.ok(html.includes('>订单数量</th>'), '表头应含 订单数量')
-  const iDone = html.indexOf('>工序<br>未报工量</th>')
   const iOrder = html.indexOf('>订单数量</th>')
   const iPlan = html.indexOf('>生产计划<br>数量</th>')
-  assert.ok(iDone >= 0 && iDone < iOrder && iOrder < iPlan, '列顺序:工序未报工量 → 订单数量 → 生产计划数量')
+  const iUnreported = html.indexOf('>工序<br>未报工量</th>')
+  const iActual = html.indexOf('>实际完成<br>数量</th>')
+  assert.ok(iOrder >= 0 && iOrder < iPlan && iPlan < iUnreported && iUnreported < iActual,
+    '列顺序:订单数量 → 生产计划数量 → 工序未报工量 → 实际完成数量')
   assert.ok(html.includes('<td class="r">200</td>'), '订单数量为空时退回 需求数量(200)照印,不是空列')
   // 2026-11-04 用户口径「客户等级这个列下不存在数据就默认隐藏了」:该行客户等级为空 ⇒ 不印这一列
   assert.ok(!html.includes('>客户等级</th>'), '客户等级全空 ⇒ 默认隐藏该列')
@@ -672,6 +675,9 @@ test('schedPlanSheetHtml:工序未报工量/生产计划数量都走当前工序
   const iU = heads.findIndex((h) => h === '工序未报工量')
   const iPlan = heads.findIndex((h) => h === '生产计划数量')
   const iDone = heads.findIndex((h) => h === '实际完成数量')
+  const iOrder = heads.findIndex((h) => h === '订单数量')
+  assert.ok(iOrder >= 0 && iOrder < iPlan && iPlan < iU && iU < iDone,
+    '2026-11-19 列顺序:订单数量 → 生产计划数量 → 工序未报工量 → 实际完成数量')
   assert.ok(iU >= 0, '纸面应有「工序未报工量」列')
   assert.equal(cells[iU], '200', '工序未报工量 = 当前工序计划量 480 − 报工 280 = 200')
   assert.equal(cells[iPlan], '480', '生产计划数量 = 当前工序计划量 480(不是 成型 240)')

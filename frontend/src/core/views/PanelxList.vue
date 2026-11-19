@@ -35,11 +35,13 @@
         </div>
       </div>
       <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
-           该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
+           该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感。
+           2026-11-19 报工记录(WO_REPORT_LIST)例外:它是平表,「导出报表」改为**按勾选行导出 Excel**
+           (无 .jrxml 模板;权限=面板可见,不再要求管理员)。 -->
       <span
-        v-if="(reportTemplates.length || user.isAdmin) && !docOutputHiddenSet.has('导出报表')"
+        v-if="(reportListSelectable || reportTemplates.length || user.isAdmin) && !docOutputHiddenSet.has('导出报表')"
         class="tb-main"
-        :title="tt('服务端正式报表：含公司抬头、页眉页脚与页码')"
+        :title="reportListSelectable ? tt('按勾选行导出 Excel（明细表）') : tt('服务端正式报表：含公司抬头、页眉页脚与页码')"
         @click.stop="reportVisible = true"
       >
         <span class="act-name">{{ tt('导出报表') }}</span>
@@ -694,7 +696,7 @@
               <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
                    该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感。
                    2026-10-28:特采单(QC_TC_IN)按用户口径隐藏本按钮,见 DOC_OUTPUT_HIDDEN -->
-              <div v-if="(reportTemplates.length || user.isAdmin) && !docOutputHiddenSet.has('导出报表')" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
+              <div v-if="(reportListSelectable || reportTemplates.length || user.isAdmin) && !docOutputHiddenSet.has('导出报表')" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
               <!-- 导出 / 扫描填单(2026-10-09 用户口径「导出和扫描填单放到下边」):
                    原混在「单据操作」的工具栏动作组里(见 APPROVAL_SIDE_EXCLUDE 已把它们排除),
                    现显式放在侧栏末尾的「文档输出」下,与 打印/导出报表 同组。
@@ -861,8 +863,13 @@
         :summary-method="sumMethod"
         empty-text="暂无符合条件的数据"
         @row-click="(row) => (current = row)"
+        @selection-change="(rows) => (reportChecked = rows)"
         @expand-change="onMcExpand"
       >
+        <!-- 报工记录勾选行(2026-11-19 用户口径「可以选择出所选行导出 Excel」):
+             勾选列只在 WO_REPORT_LIST 出;勾选后「导出报表 → 导出 Excel（勾选行）」按这些行出表。
+             其它报表/条码面板不受影响(qrKey 的勾选列是另一套)。 -->
+        <el-table-column v-if="reportListSelectable" type="selection" width="42" fixed="left" />
         <el-table-column type="index" :label="tt('序号')" width="58" fixed="left" :index="(i) => (query.pageNo - 1) * query.pageSize + i + 1" />
         <!-- 报表面板的勾选列(2026-10-18,条码管理三面板):报表模式走的是这张表,不经过 blocks,
              所以勾选列必须在这里单独出一列 —— 行键 = metadata.qrLabelKey(条码面板=「码内容」,一批一码),
@@ -2004,8 +2011,30 @@
       </template>
     </el-dialog>
 
-    <!-- ═══ 对外正式报表(后端 JasperReports 模板):业务只选格式,版式由 IT 的 .jrxml 决定 ═══ -->
+    <!-- ═══ 对外正式报表(后端 JasperReports 模板):业务只选格式,版式由 IT 的 .jrxml 决定 ═══
+         2026-11-19 报工记录(WO_REPORT_LIST):平表没有 .jrxml,导出改为**前端按勾选行生成 Excel**
+         (当前列设置 + 当前排序/筛选结果),两个入口:勾选行 / 全部当前结果。 -->
     <el-dialog v-model="reportVisible" :title="tt('导出报表')" width="460px" append-to-body>
+      <template v-if="reportListSelectable">
+        <div class="rpt-tpl-empty">{{ tt('报工记录为明细表：勾选行后导出所选行；也可导出当前查询结果全部行') }}</div>
+        <div class="efmt-list">
+          <div class="efmt-item" @click="exportReportExcel(true)">
+            <span class="efmt-ico">📋</span>
+            <div class="efmt-txt">
+              <div class="efmt-name">{{ tt('导出 Excel（勾选行）') }}</div>
+              <div class="efmt-desc">{{ tt('只导出当前勾选的') }} {{ reportCheckedRows.length }} {{ tt('行') }}</div>
+            </div>
+          </div>
+          <div class="efmt-item" @click="exportReportExcel(false)">
+            <span class="efmt-ico">📊</span>
+            <div class="efmt-txt">
+              <div class="efmt-name">{{ tt('导出 Excel（全部当前结果）') }}</div>
+              <div class="efmt-desc">{{ tt('按当前查询条件与列设置导出全部行') }}</div>
+            </div>
+          </div>
+        </div>
+      </template>
+      <template v-else>
       <div v-if="reportTemplates.length" class="rpt-tpl-row">
         <span class="rpt-tpl-label">{{ tt('报表模板') }}</span>
         <el-select v-model="selectedReportCode" size="default" style="flex:1" :placeholder="tt('选择报表模板')">
@@ -2040,8 +2069,9 @@
           </div>
         </div>
       </div>
+      </template>
       <template #footer>
-        <el-button v-if="user.isAdmin" type="primary" link @click="openManage">{{ tt('模板管理') }}</el-button>
+        <el-button v-if="user.isAdmin && !reportListSelectable" type="primary" link @click="openManage">{{ tt('模板管理') }}</el-button>
         <el-button @click="reportVisible = false">{{ tt('取消') }}</el-button>
       </template>
     </el-dialog>
@@ -4048,6 +4078,11 @@ function onHeaderRefSelectChange(field, v) {
 }
 
 const reportMode = computed(() => cfgCache.value?.metadata?.report === true || cfgCache.value?.metadata?.panelCategory === '报表')
+/**
+ * 报工记录(WO_REPORT_LIST)专属:平表勾选行 + 导出 Excel(2026-11-19 用户口径)。
+ * 只给它开勾选列/报表式导出弹窗,其它报表面板(库存台账/收发存汇总…)行为零变化。
+ */
+const reportListSelectable = computed(() => String(panelCode.value || '') === 'WO_REPORT_LIST')
 // ── 报表查询弹窗(T+ 同款,收发存汇总/库存台账):与「查询」按钮共用同一个弹窗 ──
 // 字段:单据日期(区间控件,必填) + 仓库/存货(参照;台账必填单一仓库+单一存货,汇总选填)
 // 进入态差异:①未完成过查询就关闭(✕/取消)=退出页面 ②必填项校验(applyHeaderQuery)。
@@ -4296,6 +4331,11 @@ const reportColumns = computed(() => gridTabs.value[0]?.columns || [])
 // ── 报表表头筛选与排序补丁:栏目显隐 / 表头筛选 / 升降序 / 后端持久化 ──
 const reportCols = useReportColumns(panelCode, reportColumns, list)
 const reportList = reportCols.sortedRows          // 排序+筛选后的报表数据(模板顶层引用以自动解包)
+/** 报工记录当前页勾选行(2026-11-19:导出报表 → 导出 Excel（勾选行）的数据源) */
+const reportChecked = ref([])
+/** 勾选行里仍属于当前结果的那些:切页/改筛选后 el-table 可能留着旧对象,导出与计数都以本列表为准 */
+const reportCheckedRows = computed(() => (reportChecked.value || [])
+  .filter((r) => r && !r._placeholder && (reportList.value || []).includes(r)))
 const reportFilterVisible = ref(false)             // 筛选面板显示状态(本地驱动,配合 teleport 定位)
 const reportFilterProp = ref('')                   // 当前筛选的字段名
 const reportFilterX = ref(0)
@@ -10133,6 +10173,64 @@ async function downloadReport(fmt) {
     ElMessage.error(tt('报表生成失败'))
   } finally {
     loading.close()
+  }
+}
+
+/**
+ * 报工记录「导出报表 → 导出 Excel」(2026-11-19 用户口径)。
+ *
+ * <p>用户口径:「报工记录需要可以选择出所选行导出 Excel,就是当前的导出报表需要实现,
+ * 但是需要增加勾选行。」⇒ 平表没有 .jrxml 模板,导出走前端 xlsx:</p>
+ * <ul>
+ *   <li>列 = **当前列设置后的可见列**(reportColumnTree 的叶子,与屏幕表头同源);</li>
+ *   <li>行 = 当前排序/筛选后的 reportList(勾选行模式只取勾中的行,且必须仍在本页结果里);</li>
+ *   <li>勾 0 行走「全部当前结果」入口;勾选行入口勾 0 行时给提示,不静默导全部。</li>
+ * </ul>
+ * 文件名带面板名 + 范围 + 日期;导出成功后才关弹窗,失败保留弹窗可重试。
+ *
+ * @param {boolean} onlyChecked true=只导勾选行;false=导出当前查询结果全部行
+ */
+async function exportReportExcel(onlyChecked) {
+  const pool = (reportList.value || []).filter((r) => r && !r._placeholder)
+  // 双保险:勾选行必须是「当前结果里的行」(切页/筛选后旧对象不参与导出)
+  const rows = onlyChecked ? reportCheckedRows.value.filter((r) => pool.includes(r)) : pool
+  if (!rows.length) {
+    ElMessage.warning(onlyChecked ? tt('请先勾选要导出的行') : tt('没有可导出的数据'))
+    return
+  }
+  // 当前可见列(列设置/表头筛选后的那套);分组表头摊平成叶子列,一个字段一列
+  const leaves = []
+  for (const c of reportColumnTree.value || []) {
+    if (Array.isArray(c.children)) leaves.push(...c.children)
+    else leaves.push(c)
+  }
+  if (!leaves.length) { ElMessage.warning(tt('没有可导出的列')); return }
+  try {
+    const XLSX = await import('xlsx')
+    const aoa = [
+      [String(panelName.value || '报工记录')],
+      [`惠州市银嘉环保科技有限公司　　${tt('单据日期')} ${reportPeriod.value}`],
+      [],
+      leaves.map((c) => tt(c.label || c.prop)),
+    ]
+    for (const r of rows) {
+      aoa.push(leaves.map((c) => {
+        const v = r[c.prop]
+        return v === null || v === undefined ? '' : String(v)
+      }))
+    }
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    ws['!cols'] = leaves.map((c) => ({ wch: c.align === 'right' ? 12 : 16 }))
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, String(panelName.value || '报工记录').slice(0, 28))
+    const d = new Date()
+    const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+    XLSX.writeFile(wb, `${panelName.value || '报工记录'}-${onlyChecked ? '勾选行' : '全部'}-${stamp}.xlsx`)
+    ElMessage.success(tt('已导出') + ' Excel')
+    reportVisible.value = false
+  } catch (e) {
+    console.error('report-list-excel-export failed', e)
+    ElMessage.error(tt('导出失败'))
   }
 }
 
