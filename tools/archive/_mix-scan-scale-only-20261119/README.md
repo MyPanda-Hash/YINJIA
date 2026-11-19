@@ -52,12 +52,43 @@ D. 点确认    提示="已确认 AGC-80250 · 超出应投 12.239";该行 实�
 | 模拟秤 | 后台每 3 秒往 `bs_dc_sample` 插一条 12.345kg(`asp_user1='mixscan-probe'`,设备 `DZ-001`) |
 | 清理后 | 草稿行 `wo_mixing_list` 1 → **0**;`mixscan-probe` 采样 **0**;演示网关 `GW-READY.api_key` 曾临时置值,已复原 **NULL** |
 
-## 六、未做 / 限制
+## 六、打包(2026-11-19 12:35,`build-appjar.ps1` 全流程)
 
-1. **后端 jar 未重建**:本机没有 `mvn`(PATH/常见目录/`.m2/wrapper` 全无),
-   `backend/target/*.jar` 仍是 2026-11-18 16:42 的旧包 ⇒ 本次验证用的是
-   **5173 新前端 + 8090 旧 jar 的既有接口**(接口形状未变,只改了一句报错文案)。
-   要上服务器验证新口径,需要先 `mvn package`(或走 `deploy_src.py` 让服务器自建)。
-2. 旧 jar 仍按遗留 `mate` 取 BOM(新口径 `bs_mix_bom` 在合并后的源码里),所以本地
-   「混料物料清单」还是空的 —— 与本改动无关,见 `tools/archive/_pull-mixbom-20261119/README.md`。
+```text
+[1/4] npm run build        51.2s
+[2/4] robocopy dist → backend/src/main/resources/static /MIR   OK
+[3/4] tools/apache-maven-3.9.9: mvn -q -s tools/settings.xml -f backend/pom.xml -DskipTests clean package
+[4/4] 产出 backend/target/app.jar
+```
+
+| 项 | 值 |
+|---|---|
+| 产物 | `backend/target/app.jar` = `yinjia-mes-backend-0.1.0.jar`(同一文件) |
+| 大小 / 时间 | **93.9 MB** / 2026-11-19 12:35:50 |
+| SHA256 | `F2F550626624FEECCD20678C042631A2A8906DAE2C0B79AAA89A333138DA6DF4` |
+| fat jar 自检 | `BOOT-INF/lib/` **129** 条、`com/yinjia` class **263** 个(不是瘦 jar) |
+| 新代码在包内 | `MixBomService.class` / `MixBomService$Doc.class` / `MobileMixDoc-B41xvz7B.js` |
+| 前端入口 | jar 内 `index.html` → `assets/index-B2zPqiAZ.js` |
+
+**顺序**(脚本头部 2026-09-21 事故口径):先 `start-prod.ps1 -Stop` → 再打包 → 再起服务;
+否则 Windows 占着 jar 会让 `repackage` 改名失败、磁盘上留瘦 jar。
+
+**打包版实测(8090,round-03)**:8090 现在服务的入口 chunk = `assets/index-B2zPqiAZ.js`(新前端),
+且**已是新后端**:
+
+```text
+打开 GD-2026-11-0007 #5 → 明细 0 行 + 空态"该产品在「混料物料清单」里还没有维护用料…"
+扫 AGC-80250 → 被拒:"该物料不在本工单行的混料物料清单里…(…还没有维护用料,请先归档烧结工艺清单…)"
+qtyInputs=0                              ← 新前端(数量只读)
+```
+
+旧口径(mate)在这种情况下会带出 6 行 BOM —— 现在没有,说明 `MixBomService` 生效。
+截图:`round-03a-8090-empty.png` / `round-03b-8090-reject.png`。
+
+## 七、未做 / 限制
+
+1. 本地正式库 `bs_mix_bom` **0 行**(没有已归档的烧结单),所以本地扫码混料只能看到上面的空态;
+   真实混料清单在服务器(台账 #56 已部署并跑过同一批迁移)。
+2. 本次未 push、未上服务器:两个 commit(`df384fbe2` 功能 + `3df78728b` 静态产物)还在本地,
+   服务端部署要 `git push` 后按 `deploy_src.py --ref <已推送SHA>` 走,并记账 `deploy/部署台账.md`。
 3. 1 秒轮询对 `/dc/monitor` 是只读请求(不写流水),不影响数采侧 1 秒/条的写入节流。
