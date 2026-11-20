@@ -18,9 +18,15 @@
  * 【节点口径】与审批流一一对应（RD_SAMPLE_EXT：提交 → 一级审核 → 二级确认 → 已审核）：
  *   已作废 canceled='Y'            → 已作废（优先判，作废单不该显示成"进行中"）
  *   已归档 archived='Y'            → 已完成（ND 的"已审核"由后端映射成该标记）
+ *   已签 signed='Y' 且未归档        → 已审核（2026-11-20 报障根因：EXT 二级通过后是
+ *                                    pending='N' + shr 有值 + archived 通常仍为 'N'，此前落到"草稿"）
  *   pending='Y' 且 approve_node≥2  → 待二级确认（一级已过，等二级签核；**ND 没有二级**）
  *   pending='Y' 且 approve_node<2  → 待一级审核
  *   其余                            → 草稿
+ *
+ * signed 由后端按 {@code pending='N' AND shr IS NOT NULL} 下发（见 QueryService.sampleFlowRows），
+ * 不用纸面「审核人/确认人」判断：弃审只清 yj_doc_status，不清纸面落款（ButtonService.unaudit），
+ * 拿头表签名会直接把弃审单误判成"已审核"。
  */
 
 /** 外部-开发样品单（两级审批；不传 panel 时的默认面板，保持旧链接/旧调用兼容） */
@@ -72,13 +78,14 @@ export function sampleDocRoute(panel, docNo) {
 export const SAMPLE_NODE_TEXT = {
   void: '已作废',
   done: '已完成',
+  signed: '已审核',
   l2: '待二级确认',
   l1: '待一级审核',
   draft: '草稿',
 }
 
 /** 节点键 → 序号（用于排序/着色；作废排最后） */
-export const SAMPLE_NODE_ORDER = { draft: 1, l1: 2, l2: 3, done: 4, void: 9 }
+export const SAMPLE_NODE_ORDER = { draft: 1, l1: 2, l2: 3, signed: 4, done: 5, void: 9 }
 
 /** 由一行原始数据推出节点键（panel 省略 = EXT 两级口径，兼容旧调用） */
 export function sampleNodeOf(row, panel) {
@@ -90,6 +97,10 @@ export function sampleNodeOf(row, panel) {
     if (isSingleLevelPanel(panel)) return 'l1'
     return Number(r.approve_node || 0) >= 2 ? 'l2' : 'l1'
   }
+  // pending 已结束 + 审批人已签（yj_doc_status.shr 有值）但 archived 未置
+  // ⇒ 已审核（EXT 不在 DOC_ARCHIVE_PANELS，二级通过后 archived 通常仍为 'N'；
+  //   只有「修改并保存」等闭环才会置 'Y'，那种单由上面的 done 分支优先处理）。
+  if (String(r.signed == null ? '' : r.signed).toUpperCase() === 'Y' || r.signed === true) return 'signed'
   return 'draft'
 }
 
@@ -98,7 +109,11 @@ export function sampleNodeText(row, panel) {
   return SAMPLE_NODE_TEXT[sampleNodeOf(row, panel)] || SAMPLE_NODE_TEXT.draft
 }
 
-/** 顶部四个计数：全部 / 待一级 / 待二级 / 已完成（作废单不计入"全部"；ND 待二级恒 0） */
+/**
+ * 顶部四个计数：全部 / 待一级 / 待二级 / 已完成（作废单不计入"全部"；ND 待二级恒 0）。
+ * 「已完成」= 已归档 done + 已审核 signed（审批已走完、只是 archived 未置）——
+ * 否则列里显示「已审核」的单不进已完成，KPI 与列就对不上（2026-11-20 报障）。
+ */
 export function sampleKpisOf(rows, panel) {
   const list = Array.isArray(rows) ? rows : []
   let l1 = 0
@@ -111,7 +126,7 @@ export function sampleKpisOf(rows, panel) {
     total += 1
     if (node === 'l1') l1 += 1
     else if (node === 'l2') l2 += 1
-    else if (node === 'done') done += 1
+    else if (node === 'done' || node === 'signed') done += 1
   }
   return { total, l1, l2, done }
 }

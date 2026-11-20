@@ -14,7 +14,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import {
-  SAMPLE_FLOW_FIELDS, SAMPLE_PANEL_EXT, SAMPLE_PANEL_ND, SAMPLE_PANELS,
+  SAMPLE_FLOW_FIELDS, SAMPLE_NODE_ORDER, SAMPLE_PANEL_EXT, SAMPLE_PANEL_ND, SAMPLE_PANELS,
   filterSampleRows, normalizeSamplePanel, sampleDocRoute, sampleKpisOf, sampleNodeOf, sampleNodeText,
 } from './sampleFlow.js'
 
@@ -32,6 +32,39 @@ test('节点推导：草稿 / 待一级 / 待二级 / 已完成 / 已作废', ()
   assert.equal(sampleNodeOf({ pending: 'Y', canceled: 'Y' }), 'void', '作废优先级最高')
   assert.equal(sampleNodeText({ pending: 'Y', approve_node: 2 }), '待二级确认')
 })
+
+test('已签未归档 → 已审核（生产 xieqin-2026-11-19-01 回归）', () => {
+  // 生产实测（yj_doc_status）：pending='N' / approve_node=NULL / archived='N' / shr='admin' /
+  // shsj='2026-11-19 14:55:36'；头表 审核='刘磊/2026.11.19'、确认='系统管理员/2026.11.19'。
+  // 此前 sampleNodeOf 只认 pending/archived ⇒ 二级已通的单落进 draft，用户看到「草稿」。
+  const row = {
+    单据编号: 'xieqin-2026-11-19-01', 审核人: '刘磊/2026.11.19', 确认人: '系统管理员/2026.11.19',
+    pending: 'N', approve_node: 0, archived: 'N', canceled: 'N', signed: 'Y',
+  }
+  assert.equal(sampleNodeOf(row, SAMPLE_PANEL_EXT), 'signed')
+  assert.equal(sampleNodeText(row, SAMPLE_PANEL_EXT), '已审核')
+  assert.equal(SAMPLE_NODE_ORDER.signed > SAMPLE_NODE_ORDER.l2, true, '排序上已审核在待二级之后')
+  assert.equal(SAMPLE_NODE_ORDER.signed < SAMPLE_NODE_ORDER.done, true, '归档仍是更高的完成态')
+  // 作废仍最高优先（即便 signed/archived 都有值）
+  assert.equal(sampleNodeOf({ ...row, canceled: 'Y' }), 'void', '作废优先')
+  assert.equal(sampleNodeOf({ ...row, archived: 'Y' }), 'done', '已归档优先于已签')
+  // 审批中（pending='Y'）不能被 signed 抢走：节点仍按一级/二级显示
+  assert.equal(sampleNodeOf({ ...row, pending: 'Y', approve_node: 1 }), 'l1')
+  assert.equal(sampleNodeOf({ ...row, pending: 'Y', approve_node: 2 }), 'l2')
+  // 没有 signed（旧后端/真草稿）仍是草稿
+  assert.equal(sampleNodeOf({ pending: 'N', archived: 'N', canceled: 'N' }), 'draft')
+})
+
+test('KPI 把「已审核」算进已完成（与列显示一致），作废仍不计', () => {
+  const signed = { pending: 'N', archived: 'N', canceled: 'N', signed: 'Y' } // 已审核
+  const archived = { pending: 'N', archived: 'Y', canceled: 'N', signed: 'Y' } // 已完成
+  const draft = { pending: 'N', archived: 'N', canceled: 'N' }
+  const k = sampleKpisOf([signed, archived, draft, { canceled: 'Y' }], SAMPLE_PANEL_EXT)
+  assert.deepEqual(k, { total: 3, l1: 0, l2: 0, done: 2 }, '已审核 + 已归档都计入已完成，不落到待一级/待二级')
+  // ND 口径：后端把单级通过映射成 archived='Y'，仍是最高的已完成
+  assert.deepEqual(sampleKpisOf([signed, archived], SAMPLE_PANEL_ND), { total: 2, l1: 0, l2: 0, done: 2 })
+})
+
 
 test('KPI 不计作废单', () => {
   const k = sampleKpisOf([
@@ -127,9 +160,9 @@ test('接口契约：按 panel 取不同表 + 按对应面板校验权限，ND �
   assert.ok(!/requirePanelView\("RD_SAMPLE_EXT"\)/.test(seg), '不能写死 RD_SAMPLE_EXT')
   assert.match(seg, /sampleFlowRows\(/, '要把面板码传给查询层')
 
-  const qAt = querySvc.indexOf('public List<java.util.Map<String, Object>> sampleFlowRows()')
-  const qSeg = querySvc.slice(Math.max(0, qAt - 1200), qAt + 700)
+  const qAt = querySvc.indexOf('public List<java.util.Map<String, Object>> sampleFlowRows(String panel)')
   assert.ok(qAt > 0, '缺 sampleFlowRows')
+  const qSeg = querySvc.slice(Math.max(0, qAt - 3000), qAt + 7000)
   assert.match(qSeg, /normalizeSampleFlowPanel|SAMPLE_FLOW_PANEL_ND|"RD_SAMPLE_ND"/, '后端要认面板码')
   assert.match(qSeg, /rd_sample_ext_head/, 'EXT 读 rd_sample_ext_head')
   assert.match(qSeg, /rd_sample_nondev_head/, 'ND 读 rd_sample_nondev_head')
@@ -143,12 +176,16 @@ test('接口契约：进度页可见范围必须与目标单据列表同口径�
   // 所以进度页的取数必须复用列表的可见范围口径，否则「能看到的单」≠「点得开的单」。
   const at = querySvc.indexOf('public List<java.util.Map<String, Object>> sampleFlowRows(String panel)')
   assert.ok(at > 0, '缺 sampleFlowRows(String panel)')
-  const seg = querySvc.slice(at, at + 5000)
+  const seg = querySvc.slice(at, at + 7000)
   assert.match(seg, /ISNULL\(s\.canceled, ?'N'\) ?<> ?'Y'/, '作废单必须从进度页排除（与 queryDocs 的 canceled 过滤同口径）')
   assert.match(seg, /OWN_DOCS_PANELS/, '本人归属面板要复用同一份登记（RD_SAMPLE_EXT）')
   assert.match(seg, /canViewAllOf\(/, '有 view_all 的角色看全部（刘磊口径）')
   assert.match(seg, /asp_user1/, '没有 view_all 的账号按 asp_user1 = 当前账号收口')
   assert.match(seg, /currentLogin\(/, '取当前登录账号')
+  // 已签未归档（2026-11-20 报障）：两面板都要下发同一列 signed，真源是 yj_doc_status.shr。
+  assert.equal((seg.match(/AS \[signed\]/g) || []).length, 2, 'EXT/ND 两面板都要下发 signed（契约一致）')
+  assert.match(seg, /s\.shr IS NOT NULL/, 'signed 必须读 yj_doc_status.shr，不能拿头表落款推断（弃审不清落款）')
+  assert.match(seg, /row\.put\("signed"/, '行契约要带 signed')
 })
 
 test('页面接线：顶部面板切换、切换重拉、行点击按当前面板跳转', () => {

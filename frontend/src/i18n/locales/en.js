@@ -5494,7 +5494,7 @@ export default {
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
     '等确认人签核': 'Waiting for confirmer',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
-    '已审核归档': 'Reviewed and archived',
+    '审批已通过（已审核/已归档）': 'Approved (audited/archived)',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
     '样品单清单': 'Sample requests',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */

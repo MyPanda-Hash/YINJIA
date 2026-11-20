@@ -118,7 +118,8 @@ const panel = ref(SAMPLE_PANEL_EXT)
 
 /**
  * 面板文案（走 tt()）。两个面板只有「谁能看印什么/空态去哪新增/待二级说明」不同：
- *   · EXT 两级审批 ⇒「待二级确认」等确认人签核、完成后是「已审核归档」；
+ *   · EXT 两级审批 ⇒「待二级确认」等确认人签核、完成后是「已审核」（本单不走归档，
+ *     archived 通常仍为 'N'，不能因为没归档就退回「草稿」）；
  *   · ND 一级审批 ⇒ 没有二级节点，该卡恒 0（提示说明原因）、完成后是「已审核」。
  */
 const PANEL_META = {
@@ -127,7 +128,7 @@ const PANEL_META = {
     denied: '没有查看样品进度数据的权限（需要「外部-开发样品」的查看权）',
     empty: '暂无样品单；在「外部-开发样品」新增后会出现在这里',
     l2Hint: '等确认人签核',
-    doneHint: '已审核归档',
+    doneHint: '审批已通过（已审核/已归档）',
   },
   [SAMPLE_PANEL_ND]: {
     sub: '按外部非开发样品单看进展：谁提交、谁审核，一屏看完（本单只有一级审批）',
@@ -233,6 +234,7 @@ onMounted(load)
 .sfl-node { display: inline-block; padding: 0 8px; border-radius: 10px; font-size: 12px; line-height: 20px; background: #f5f5f5; color: #595959; }
 .sfl-node.node-l1 { background: #fff7e6; color: #d46b08; }
 .sfl-node.node-l2 { background: #e6f4ff; color: #0958d9; }
+.sfl-node.node-signed { background: #f6ffed; color: #237804; }
 .sfl-node.node-done { background: #f6ffed; color: #389e0d; }
 .sfl-node.node-void { background: #f5f5f5; color: #bfbfbf; }
 .sfl-no { font-variant-numeric: tabular-nums; }

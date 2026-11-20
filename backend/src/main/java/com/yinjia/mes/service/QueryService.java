@@ -413,18 +413,24 @@ public class QueryService {
      *
      * <p>两种面板返回**同一套行契约**（前端只有一份渲染/筛选逻辑）：
      * 单据编号 / 客户名称 / 单据日期 / 审核人 / 确认人 / 进度描述 /
-     * pending / approve_node / archived / canceled。差异只在数据源与单级审批的映射：</p>
+     * pending / approve_node / archived / canceled / signed。差异只在数据源与单级审批的映射：</p>
      * <ul>
      *   <li>{@link #SAMPLE_FLOW_PANEL_EXT} 外部-开发样品单：头表 {@code rd_sample_ext_head}，
-     *       两级审批（提交 → 一级审核 → 二级确认 → 归档），原样下发标记；</li>
+     *       两级审批（提交 → 一级审核 → 二级确认 → 已审核）。**本单不在 DOC_ARCHIVE_PANELS**，
+     *       二级通过后 {@code pending='N' + shr 有值 + archived 通常仍为 'N'} 是常态（只有修改保存
+     *       等闭环才置 archived）⇒ 由 {@code signed} 表达「已审核」（2026-11-20 报障：此前节点推导
+     *       只认 archived，整批已审单显示草稿）；</li>
      *   <li>{@link #SAMPLE_FLOW_PANEL_ND} 外部-非开发样品单：头表 {@code rd_sample_nondev_head}，
      *       **一级审批**（ButtonService.SAMPLE_SIGN_COLUMNS 把「确认」槽位指向「审核」列）。
      *       ① 确认人恒空（纸面/审批流都没有这一格）；
      *       ② approve_node 按一级口径收口（≥2 也只算 1），前端不会出现「待二级确认」；
      *       ③ 本单不在 DOC_ARCHIVE_PANELS，通过后是「已审核」而非归档 ⇒ 用
      *          {@code pending='N' 且 shr 非空} 映射成契约里的 archived 完成标记，
-     *          节点推导与 KPI 不必为 ND 分叉。</li>
+     *          signed 同口径下发（两面板契约一致，前端按同一套顺序判节点）。</li>
      * </ul>
+     *
+     * <p>签名真源是 {@code yj_doc_status.shr}，不是头表「审核/确认」落款：弃审
+     * （ButtonService.unaudit）只清 shr/archived，不清样品单纸面落款，拿纸面判断会把弃审单误判成已审核。</p>
      *
      * <p>权限由 Controller 按所选面板 {@code requirePanelView} 校验 —— 这里不重复判权。</p>
      */
@@ -463,6 +469,9 @@ public class QueryService {
                     + "CASE WHEN ISNULL(s.approve_node, 0) >= 2 THEN 1 ELSE ISNULL(s.approve_node, 0) END AS approve_node, "
                     // 单级通过 ⇒ pending='N' + shr 有值（「已审核」）；契约里用 archived 表达"完成"
                     + "CASE WHEN ISNULL(s.pending, 'N') = 'N' AND s.shr IS NOT NULL THEN 'Y' ELSE 'N' END AS archived, "
+                    // 已签：pending 已结束且审批人已落库（shr 有值）⇒ 前端「已审核」中间态。
+                    // archived 是本单的完成标记映射，signed 保留原始签名事实，两面板契约一致。
+                    + "CASE WHEN ISNULL(s.pending, 'N') = 'N' AND s.shr IS NOT NULL THEN 'Y' ELSE 'N' END AS [signed], "
                     + "ISNULL(s.canceled, 'N') AS canceled "
                     + "FROM rd_sample_nondev_head h "
                     + "LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SAMPLE_ND' AND s.doc_no = h.[单据编号] "
@@ -479,6 +488,9 @@ public class QueryService {
                     + "ISNULL(s.pending, 'N') AS pending, "
                     + "ISNULL(s.approve_node, 0) AS approve_node, "
                     + "ISNULL(s.archived, 'N') AS archived, "
+                    // 已签：pending 已结束且 shr 有值（二级/一级审批通过），但 EXT 不是归档面板
+                    // ⇒ archived 恒 'N'。下发该事实让前端显示「已审核」而不是「草稿」。
+                    + "CASE WHEN ISNULL(s.pending, 'N') = 'N' AND s.shr IS NOT NULL THEN 'Y' ELSE 'N' END AS [signed], "
                     + "ISNULL(s.canceled, 'N') AS canceled "
                     + "FROM rd_sample_ext_head h "
                     + "LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SAMPLE_EXT' AND s.doc_no = h.[单据编号] "
@@ -497,6 +509,7 @@ public class QueryService {
             row.put("pending", rs.getString("pending"));
             row.put("approve_node", rs.getInt("approve_node"));
             row.put("archived", rs.getString("archived"));
+            row.put("signed", rs.getString("signed"));
             row.put("canceled", rs.getString("canceled"));
             return row;
         }, args.toArray());
