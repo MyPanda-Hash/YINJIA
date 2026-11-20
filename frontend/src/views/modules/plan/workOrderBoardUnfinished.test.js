@@ -24,7 +24,7 @@ const read = (path) => readFileSync(resolve(root, path), 'utf8')
 const board = read('frontend/src/views/modules/plan/WorkOrderBoard.vue')
 const list = read('frontend/src/views/modules/plan/WorkOrderList.vue')
 
-test('未完成数量框在右下角:勾左侧每条车间=合计,不勾=当前车间', () => {
+test('未完成数量框在右下角:勾左侧每条车间=合计,不勾=当前车间,口径是当前工序', () => {
   assert.match(board, /<div class="wb-unf"/, '必须有蓝框容器 .wb-unf')
   // 2026-11-20 用户口径:勾的是「对应车间」(左侧每条生产线),不是成型/切炭/组装这种类型
   const lineRow = board.slice(board.indexOf('v-for="l in g.lines"'), board.indexOf('v-for="l in g.lines"') + 900)
@@ -36,8 +36,14 @@ test('未完成数量框在右下角:勾左侧每条车间=合计,不勾=当前�
   assert.match(board, /const currentLine = computed\(/, '不勾选时要取当前选中车间')
   assert.match(board, /sel\.line/, '当前车间 = 当前选中的生产线')
   assert.match(board, /const unfQty = computed\(/, '未完成数量必须由 computed 汇总')
-  assert.match(board, /Number\(l\['未交量'\] \|\| 0\)/, '口径必须是 linesSummary.未交量(与顶部总未完成量同源)')
-  assert.match(board, /unfLines\.value\.length/, '不勾选时退回当前车间(不能永远按全部合计)')
+  // 2026-11-20 第三轮:大数字 = 当前工序未完成数量,不是未交量(订单口径)
+  const fn = board.slice(board.indexOf('function lineUndone'), board.indexOf('function lineUndone') + 700)
+  assert.match(fn, /本线未完工量/, '口径优先取 linesSummary.本线未完工量(工序口径)')
+  assert.match(fn, /本线排产数量/, '老接口兜底 = 本线排产数量 − 本线已报完工量')
+  assert.match(fn, /本线已报完工量/, '老接口兜底要扣本线已报完工量')
+  assert.doesNotMatch(fn, /未交量/, '不能拿成品口径的未交量冒充当前工序未完成数')
+  assert.match(board, /reduce\(\(a, l\) => a \+ lineUndone\(l\), 0\)/, '合计必须逐线累加 lineUndone')
+  assert.match(board, /const unfBreakdown = computed\(/, '勾多个车间时要逐个列出各车间的当前工序未完成数')
   assert.match(board, /unfLines\.value\.includes\(String\(l\['生产线'\]/, '合计必须按生产线(车间)逐条区分')
 })
 
@@ -61,7 +67,7 @@ test('日期数量格:整格可点 + 点开自动聚焦(两页同改)', () => {
 
 test('新 UI 文案有多语言(en)', () => {
   const en = read('frontend/src/i18n/locales/en.js')
-  for (const phrase of ['未完成数量', '勾选左侧车间查看所选车间合计；不勾选显示当前车间',
+  for (const phrase of ['未完成数量', '勾选左侧车间查看各车间的当前工序未完成数；不勾选显示当前车间',
     '勾选该车间（左侧生产线），右下角按勾选车间合计未完成数量',
     '导出 Excel（勾选行）', '导出 Excel（全部当前结果）', '请先勾选要导出的行']) {
     assert.ok(en.includes(`'${phrase}'`), `en.js 缺译名:${phrase}`)

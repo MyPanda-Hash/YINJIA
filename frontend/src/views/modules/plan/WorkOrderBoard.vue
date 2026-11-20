@@ -263,15 +263,14 @@
           </el-table>
         </div>
 
-        <!-- 未完成数量(2026-11-19 用户口径;2026-11-20 按反馈修正)──────────────────────
-             用户口径第一版:「勾选车间查看当前勾选车间的未完成数量在右下方蓝色边框内;不勾选时右下方
-             显示当前车间未完成量。」第二版反馈:「没有完成勾选对应车间,当前实现的是选择的对应**类型**的
-             车间(成型/切炭/组装)而不是选择车间;但数量需要区分车间这一点没问题。」
-             ⇒ 勾选框改到**左侧每条生产线(用户口中的「车间」:1号车间/成型1线/…)**上;
-                勾选 = 所选生产线(车间)合计;不勾选 = 当前选中生产线(车间);未选线 = 全部。
-             口径 = 已排未结案 Σ(排产数量 − 入库数量)(= 顶部「总未完成量」同一把尺,逐线
-             linesSummary.未交量 相加;实测全部产线合计 = /stats 的 29449 完全一致)。
-             原来顶部那条通栏「历史未完成」红条按用户口径并进本框底部(算式不变、悬停看明细)。 -->
+        <!-- 未完成数量(2026-11-19 用户口径;2026-11-20 两轮反馈)──────────────────────────
+             第一轮:勾选车间看当前车间未完成量,历史未完成移入右下蓝框。
+             第二轮:勾选的是**左侧每条车间(生产线:1号车间/成型1线/…)**,不是成型/切炭/组装这种类型。
+             第三轮:「最明显的数量应该为**当前工序的未完成的数量**而不是订单未能提交的数量,
+             应该只显示各个工序的未完成数」⇒ 大数字 = 本线未完工量(工序口径),不是未交量(成品口径);
+             勾多个车间时下面逐个列出「车间 = 该工序未完成数」。
+             · 不勾选 = 当前选中车间;勾选 = 所选车间合计;未选线 = 全部车间;
+             · 原来顶部那条通栏「历史未完成」红条按用户口径并进本框底部(算式不变、悬停看明细)。 -->
         <div class="wb-unf" :class="{ 'is-picked': pickedLines.length > 0 }">
           <div class="wb-unf-head">
             <span class="wb-unf-title">{{ tt('未完成数量') }}</span>
@@ -279,12 +278,13 @@
             <span v-if="pickedLines.length" class="wb-unf-clear" @click="pickedLines = []">{{ tt('清空') }}</span>
           </div>
           <div class="wb-unf-qty">{{ num(unfQty) }}<span class="wb-unf-unit">{{ tt('件') }}</span></div>
+          <div v-if="unfBreakdown" class="wb-unf-break">{{ unfBreakdown }}</div>
           <div v-if="shortInfo.count" class="wb-unf-short" :title="shortTitle">
             {{ tt('历史未完成') }} {{ shortInfo.count }} {{ tt('处') }} ·
             {{ tt('原计划') }} {{ num(shortInfo.plan) }} − {{ tt('报工数') }} {{ num(shortInfo.actual) }}
             = {{ tt('欠产') }} {{ num(shortInfo.qty) }}
           </div>
-          <div class="wb-unf-tip">{{ tt('勾选左侧车间查看所选车间合计；不勾选显示当前车间') }}</div>
+          <div class="wb-unf-tip">{{ tt('勾选左侧车间查看各车间的当前工序未完成数；不勾选显示当前车间') }}</div>
         </div>
       </div>
     </div>
@@ -506,13 +506,15 @@ const shop = computed(() => {
   return set.length === 1 ? set[0] : ''
 })
 
-// ───────── 未完成数量框(2026-11-19;2026-11-20 按反馈改为「勾选车间」)────────────────
-//   用户口径:「增加一个未完成数量的查看实现。勾选车间查看当前勾选车间的未完成数量在右下方蓝色边框内;
-//   不勾选时右下方显示当前车间未完成量。当前存在的应该是在图中存在一个历史未完成量,
-//   需要修改为右下方的蓝色框内,当前只实现了单个车间当前查看的情况。」
-//   2026-11-20 反馈:「当前实现的是选择的对应**类型**的车间(成型/切炭/组装),而不是选择车间;
-//   但数量需要区分车间这一点没问题。」⇒ 勾选项改为左侧每条生产线(用户称「车间」:1号车间/成型1线/…),
-//   勾几条就合计几条线的 未交量;不勾 = 当前选中线;没选线 = 全部线(等价总未完成量)。
+// ───────── 未完成数量框(2026-11-19;2026-11-20 两轮反馈)────────────────────────────
+//   用户口径第一版:「增加一个未完成数量的查看实现。勾选车间查看当前勾选车间的未完成数量在右下方
+//   蓝色边框内;不勾选时右下方显示当前车间未完成量……原来顶部有历史未完成量,需要移到右下蓝框。」
+//   第二轮:「实现的是选择的对应**类型**的车间(成型/切炭/组装)而不是选择车间;但数量需要区分车间
+//   这一点没问题。」⇒ 勾选项改到左侧每条生产线(用户称「车间」:1号车间/成型1线/…)。
+//   第三轮(2026-11-20):「这个显示的最明显的数量应该为**当前工序的未完成的数量**而不是订单未能
+//   提交的数量,应该只显示各个工序的未完成数。」⇒ 大数字改用**工序口径**:
+//     = linesSummary.本线未完工量 = Σ max(本线排产数量 − 本线已报完工量, 0)(逐行截断);
+//   不再用未交量(成品口径 = 排产 − 入库,那是订单还欠多少,不是当前工序还差多少)。
 const pickedLines = ref([])
 /** 当前车间 = 当前选中的那条生产线(用户口径里的「车间」);没选线时为空 */
 const currentLine = computed(() => String(sel.line || '').trim())
@@ -520,14 +522,37 @@ const currentLine = computed(() => String(sel.line || '').trim())
 const unfLines = computed(() => pickedLines.value.length
   ? pickedLines.value
   : (currentLine.value ? [currentLine.value] : []))
+/**
+ * 单条线的**当前工序未完成数**(工序口径):
+ * 优先用后端 linesSummary.本线未完工量(= Σ max(本线排产 − 本线已报, 0),逐行截断);
+ * 老后端没这个键时按 本线排产数量 − 本线已报完工量 兜底,不拿成品口径的 未交量 冒充。
+ */
+function lineUndone(l) {
+  const v = l?.['本线未完工量']
+  if (v !== undefined && v !== null && v !== '') return Number(v) || 0
+  const plan = Number(l?.['本线排产数量'] ?? l?.['当前工序计划量'] ?? 0) || 0
+  const done = Number(l?.['本线已报完工量'] ?? l?.['当前工序完工量'] ?? 0) || 0
+  return Math.max(plan - done, 0)
+}
 const unfQty = computed(() => lineSummary.value
   .filter((l) => !unfLines.value.length || unfLines.value.includes(String(l['生产线'] || '').trim()))
-  .reduce((a, l) => a + Number(l['未交量'] || 0), 0))
+  .reduce((a, l) => a + lineUndone(l), 0))
+/** 勾选多个车间时逐个列出「车间 = 当前工序未完成数」,让用户看到各工序各自的数,而不只是一个合计 */
+const unfBreakdown = computed(() => {
+  if (!pickedLines.value.length) return ''
+  return pickedLines.value
+    .map((name) => {
+      const l = lineSummary.value.find((x) => String(x['生产线'] || '').trim() === name)
+      return l ? `${tt(name)} ${num(lineUndone(l))}` : ''
+    })
+    .filter(Boolean)
+    .join(' · ')
+})
 const unfScopeText = computed(() => (unfLines.value.length
   ? unfLines.value.map((s) => tt(s)).join('、')
   : tt('全部车间')))
 const unfScopeTitle = computed(() => [
-  tt('未完成数量 = 已排未结案 Σ(排产数量 − 入库数量)，按车间合计'),
+  tt('未完成数量 = 当前工序未完成数量 = Σ max(本线排产数量 − 本线已报完工量, 0)，按车间合计'),
   tt('勾选车间 = 所选车间合计；不勾选 = 当前选中车间；未选车间 = 全部车间'),
 ].join('\\n'))
 /** 勾/取消勾一条生产线(用户口径的「车间」);不传 v 时按当前状态取反 */
@@ -1352,6 +1377,7 @@ watch(() => route.query, () => {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: help; }
 .wb-unf-clear { flex: none; font-size: 11px; color: #1e6fb8; cursor: pointer; text-decoration: underline dotted; }
 .wb-unf-qty { font-size: 22px; font-weight: 700; line-height: 1.15; color: #1e6fb8; font-variant-numeric: tabular-nums; }
+.wb-unf-break { font-size: 11px; line-height: 1.4; color: #606266; word-break: break-all; }
 .wb-unf-unit { margin-left: 4px; font-size: 12px; font-weight: 400; color: #909399; }
 .wb-unf-short { font-size: 12px; font-weight: 600; line-height: 1.4; color: #f56c6c; cursor: help; }
 .wb-unf-tip { font-size: 11px; line-height: 1.4; color: #c0c4cc; }

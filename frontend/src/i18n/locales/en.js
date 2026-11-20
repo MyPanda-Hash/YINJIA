@@ -81,6 +81,7 @@ export default {
     '该批次还没有采购入库单：在送料暂收单上点「生成检验或入库单」即可直达入库（免检物料不需要检验）': 'This batch has no purchase receipt yet: open the receiving note and click "Generate inspection / receipt" to create the receipt directly (inspection-exempt items skip inspection)',
     '还没有送料暂收单': 'No receiving note yet',
     '还没有来料检验单': 'No incoming inspection yet',
+    '还没有检验数据记录：来料检验单生单时会按物料各建一张（在来料检验单上生单后回来刷新即可）': "No inspection data record yet: one is created per material when the incoming inspection sheet is created (create it on the inspection sheet, then refresh here)",
     '还没有暂收退回单': 'No return note yet',
     '还没有特采单': 'No concession yet',
 
@@ -114,7 +115,7 @@ export default {
 
 
     // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
-    '品质流程监控': 'Quality Process Monitor',
+    '来料品质流程监控': 'Incoming Quality Process Monitor',
     '物料批号': 'Material lot no.',
     '物料批号与物料编码': 'Lot no. & item code',
     '供应商与采购订单': 'Supplier & PO',
@@ -6797,6 +6798,10 @@ export default {
       'Check this workshop (left production line); the bottom-right total sums the checked workshops',
     '勾选左侧车间查看所选车间合计；不勾选显示当前车间':
       'Check workshops on the left to total them; leave unchecked to show the current workshop',
+    '勾选左侧车间查看各车间的当前工序未完成数；不勾选显示当前车间':
+      'Check workshops on the left to see each one’s unfinished quantity for the current process; leave unchecked to show the current workshop',
+    '未完成数量 = 当前工序未完成数量 = Σ max(本线排产数量 − 本线已报完工量, 0)，按车间合计':
+      'Unfinished quantity = unfinished quantity of the current process = Σ max(line scheduled qty − line reported qty, 0), totalled by workshop',
     '勾选车间 = 所选车间合计；不勾选 = 当前选中车间；未选车间 = 全部车间':
       'Checked workshops = their total; none checked = the current workshop; no workshop selected = all workshops',
     '勾选车间查看所选车间合计；不勾选显示当前车间': 'Check workshops to total them; leave unchecked to show the current workshop',
