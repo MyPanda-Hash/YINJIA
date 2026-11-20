@@ -3374,10 +3374,27 @@ export default {
     /* ── 实验室使用记录表 4 面板(RecordSheetPanels plain 版式)静态词条 ── */
     '测试设备使用登记表': 'Test Equipment Usage Log',
     '实验室仪器使用记录表': 'Lab Instrument Usage Log',
-    // 2026-11-19 新增「使用记录汇总」页签(仪器使用记录表内的只读汇总页)
-    '仪器使用记录': 'Instrument Usage Records',
-    '使用记录汇总': 'Usage Summary',
+    // 2026-11-19「使用记录汇总」页签已撤除(2026-11-20 用户「不要这个页签」)⇒ 改为**独立页面**
+    //   「仪器使用汇总表」(views/modules/rd/InstrSummary.vue,页面级面板 INSTR_SUMMARY),
+    //   与样品检验汇总表同构:时间区间 + 统计条 + 记录表(可勾选)+ 导出 Excel。
+    '仪器使用汇总表': 'Instrument Usage Summary',
     '暂无使用记录': 'No usage records',
+    '记录条数': 'Records',
+    '涉及仪器': 'Instruments',
+    '使用人数': 'Users',
+    '涉及项目': 'Projects',
+    '清除选择': 'Clear selection',
+    '导出所选 Excel': 'Export selected to Excel',
+    '张委托单': 'commission(s)',
+    '当前时间范围内没有使用记录': 'No usage records in the current range',
+    '统计口径：仪器使用记录的「使用日期」（为空时用单据日期）；默认不含已作废记录': 'Basis: the record\'s "usage date" (falls back to document date when empty); voided records are excluded',
+    '数据量超过单页上限，已只显示最近 5000 条，请缩小时间范围': 'Too many records; only the latest 5000 are shown. Please narrow the date range',
+    '仪器名称/型号': 'Instrument / Model',
+    '起止时间': 'Start–End Time',
+    '仪器状态': 'Instrument Status',
+    '是否内校': 'Internal Cal.',
+    '项目名称/内容': 'Project / Content',
+    '使用人': 'Operator',
     '试剂用量（g）': 'Reagents (g)',
     '试剂用量': 'Reagents',
     '加标水水质指标': 'Spike Water Quality',
@@ -6776,6 +6793,12 @@ export default {
 
     // ---- 2026-11-19 工单排产·未完成数量框 + 报工记录勾选行导出 Excel ----
     '未完成数量': 'Unfinished quantity',
+    '勾选该车间（左侧生产线），右下角按勾选车间合计未完成数量':
+      'Check this workshop (left production line); the bottom-right total sums the checked workshops',
+    '勾选左侧车间查看所选车间合计；不勾选显示当前车间':
+      'Check workshops on the left to total them; leave unchecked to show the current workshop',
+    '勾选车间 = 所选车间合计；不勾选 = 当前选中车间；未选车间 = 全部车间':
+      'Checked workshops = their total; none checked = the current workshop; no workshop selected = all workshops',
     '勾选车间查看所选车间合计；不勾选显示当前车间': 'Check workshops to total them; leave unchecked to show the current workshop',
     '请先勾选要导出的行': 'Select the rows to export first',
     '没有可导出的数据': 'No data to export',

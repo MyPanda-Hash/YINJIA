@@ -24,16 +24,21 @@ const read = (path) => readFileSync(resolve(root, path), 'utf8')
 const board = read('frontend/src/views/modules/plan/WorkOrderBoard.vue')
 const list = read('frontend/src/views/modules/plan/WorkOrderList.vue')
 
-test('未完成数量框在右下角:勾车间=合计,不勾=当前车间', () => {
+test('未完成数量框在右下角:勾左侧每条车间=合计,不勾=当前车间', () => {
   assert.match(board, /<div class="wb-unf"/, '必须有蓝框容器 .wb-unf')
-  assert.match(board, /wb-unf-shops/, '框内必须有车间勾选行')
-  assert.match(board, /v-for="s in shopOptions"/, '车间复选框要按当前可见车间动态渲染')
-  assert.match(board, /@change="\(v\) => toggleShop\(s, v\)"/, '勾选要驱动 toggleShop')
-  assert.match(board, /const pickedShops = ref\(\[\]\)/, '勾选车间状态必须独立保存')
-  assert.match(board, /const currentShop = computed\(/, '不勾选时要取当前车间')
+  // 2026-11-20 用户口径:勾的是「对应车间」(左侧每条生产线),不是成型/切炭/组装这种类型
+  const lineRow = board.slice(board.indexOf('v-for="l in g.lines"'), board.indexOf('v-for="l in g.lines"') + 900)
+  assert.match(lineRow, /:model-value="pickedLines.includes\(l\.生产线\)"/, '左侧每条车间行上要有勾选框(绑定生产线)')
+  assert.match(lineRow, /@change="\(v\) => toggleLine\(l\.生产线, v\)"/, '勾选要驱动 toggleLine(按生产线)')
+  assert.doesNotMatch(board, /shopOptions/, '不能再按「车间类型」(成型/切炭/组装)出勾选框')
+  assert.doesNotMatch(board, /toggleShop/, '旧的按类型勾选函数必须移除')
+  assert.match(board, /const pickedLines = ref\(\[\]\)/, '勾选车间(生产线)状态必须独立保存')
+  assert.match(board, /const currentLine = computed\(/, '不勾选时要取当前选中车间')
+  assert.match(board, /sel\.line/, '当前车间 = 当前选中的生产线')
   assert.match(board, /const unfQty = computed\(/, '未完成数量必须由 computed 汇总')
   assert.match(board, /Number\(l\['未交量'\] \|\| 0\)/, '口径必须是 linesSummary.未交量(与顶部总未完成量同源)')
-  assert.match(board, /unfShops\.value\.length/, '不勾选时退回当前车间(不能永远按全部合计)')
+  assert.match(board, /unfLines\.value\.length/, '不勾选时退回当前车间(不能永远按全部合计)')
+  assert.match(board, /unfLines\.value\.includes\(String\(l\['生产线'\]/, '合计必须按生产线(车间)逐条区分')
 })
 
 test('历史未完成量已并入右下角蓝框,顶部通栏红条不再存在', () => {
@@ -56,7 +61,8 @@ test('日期数量格:整格可点 + 点开自动聚焦(两页同改)', () => {
 
 test('新 UI 文案有多语言(en)', () => {
   const en = read('frontend/src/i18n/locales/en.js')
-  for (const phrase of ['未完成数量', '勾选车间查看所选车间合计；不勾选显示当前车间',
+  for (const phrase of ['未完成数量', '勾选左侧车间查看所选车间合计；不勾选显示当前车间',
+    '勾选该车间（左侧生产线），右下角按勾选车间合计未完成数量',
     '导出 Excel（勾选行）', '导出 Excel（全部当前结果）', '请先勾选要导出的行']) {
     assert.ok(en.includes(`'${phrase}'`), `en.js 缺译名:${phrase}`)
   }
