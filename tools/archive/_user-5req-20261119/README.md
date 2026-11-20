@@ -73,6 +73,7 @@
 | `ego/round-51-line-checkboxes.mjs` | 勾选不切换右侧明细；勾 1号+3号 ⇒ 逐条显示各车间数 |
 | `ego/round-52-line-checkboxes-8090.mjs` | 打包版 8090 复核(30 个车间勾选框，默认当前车间) |
 | `ego/round-53-process-unfinished.mjs` | 口径复核：选中 2号车间 ⇒ `10700`(不是未交量 11000)；勾 1号+3号 ⇒ `3100`(2400+700) |
+| `ego/round-56-process-unfinished-8090.mjs` | 打包版 8090 复核同一口径(2号车间 10700；勾 1号+3号 ⇒ 3100/2400+700) |
 | `ego/round-41-route-dialog.mjs` | 打开工艺路线表格调整并截图 |
 
 导出内容另做了字节级复核：勾 2 行导出的 xlsx 解析后 = 标题 + 公司抬头 + 表头 13 列 + **2 行数据**；
