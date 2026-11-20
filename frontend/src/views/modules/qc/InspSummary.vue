@@ -64,8 +64,8 @@
         <el-button size="small" :disabled="loading" @click="reset">{{ tt('重置') }}</el-button>
         <!-- 2026-11-20 用户口径:「能够勾选检验委托单行,导出 Excel 时能够选择所需的行」。
              勾选状态在工具条回显条数,并提供一键清除(只导所选时按钮文案同步变成「导出所选」)。 -->
-        <span v-if="selectedDocs.length" class="iss-picked">
-          {{ tt('已选') }} <b>{{ selectedDocs.length }}</b> {{ tt('张委托单') }}
+        <span v-if="selectedNos.length" class="iss-picked">
+          {{ tt('已选') }} <b>{{ selectedNos.length }}</b> {{ tt('张委托单') }}
           <el-button link type="primary" size="small" class="iss-picked-clear" @click="clearSelection">
             {{ tt('清除选择') }}
           </el-button>
@@ -98,13 +98,22 @@
           <template #label>
             <span>{{ tt('按送样人') }}<em v-if="senders.length"> ({{ senders.length }})</em></span>
           </template>
-          <el-table :data="senders" v-loading="loading" border stripe size="small" row-key="送样人"
-                    class="iss-table" :empty-text="emptyText">
+          <!-- 2026-11-20 第二轮用户口径「按送样人也要能勾选」:
+               勾一个送样人 = 该送样人的全部委托单进导出;展开后的委托单还能逐张勾/取消。
+               两张表与展开子表共用同一份勾选真源 selectedNos,换页签不会"看起来丢了勾选"。 -->
+          <el-table ref="senderTableRef" :data="senders" v-loading="loading" border stripe size="small" row-key="送样人"
+                    class="iss-table" :empty-text="emptyText" @selection-change="onSenderSelection">
+            <el-table-column type="selection" width="44" fixed :label="tt('选择')" />
             <el-table-column type="expand" width="56" :label="tt('展开')">
               <template #default="{ row }">
                 <div class="iss-expand">
                   <div class="iss-expand-title">{{ tt('该送样人的委托单') }}</div>
-                  <el-table :data="docsOfSender(row['送样人'])" border size="small" class="iss-subtable">
+                  <el-table :ref="(el) => bindSubTable(row['送样人'], el)"
+                            :data="docsOfSender(row['送样人'])" border size="small" class="iss-subtable"
+                            row-key="单据编号"
+                            @select="(sel) => onSubSelection(row['送样人'], sel)"
+                            @select-all="(sel) => onSubSelection(row['送样人'], sel)">
+                    <el-table-column type="selection" width="40" :label="tt('选择')" />
                     <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" />
                     <el-table-column :label="tt('单据编号')" width="150">
                       <template #default="{ row: d }">
@@ -201,7 +210,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Download, Search } from '@element-plus/icons-vue'
@@ -242,8 +251,22 @@ const stat = ref({})
 const senders = ref([])
 const docs = ref([])
 const docTableRef = ref(null)
-/** 「按委托单/样品」表勾中的行(2026-11-20 用户口径):导出时只导这些单;不勾 = 全部 */
-const selectedDocs = ref([])
+const senderTableRef = ref(null)
+/** 展开行里的委托单子表:按送样人登记 table 实例(勾选同步用,不参与渲染) */
+const subTables = new Map()
+/**
+ * 导出用的**唯一勾选真源**(2026-11-20 第二轮用户口径「按送样人也要能勾选」)。
+ *
+ * 三处入口最终都归一到这一份「单据编号」集合:
+ *   · 「按送样人」表勾一个送样人 = 他的全部委托单;
+ *   · 展开后的「该送样人的委托单」子表还能逐张勾/取消;
+ *   · 「按委托单/样品」表照旧逐张勾。
+ * 换页签/展开别的送样人时,三张表的勾选框都由 syncTables() 按真源重画 —— 不会出现
+ * "在这边勾了、切过去又看不到"的假象。不勾 = 全部(原行为)。
+ */
+const selectedNos = ref([])
+/** 程序化 toggleRowSelection 也会触发 selection-change ⇒ 同步期间必须静默,否则递归 */
+let syncing = false
 
 const hasData = computed(() => senders.value.length > 0 || docs.value.length > 0)
 const emptyText = computed(() => {
@@ -253,9 +276,9 @@ const emptyText = computed(() => {
   return s && e ? `${tt('当前时间范围内没有送样记录')}（${s} ~ ${e}）` : tt('暂无数据')
 })
 const canExport = computed(() => canDo({ isAdmin: user.isAdmin, pagePerms: user.pagePerms }, PANEL, 'export'))
-/** 导出按钮文案:勾了行就说清「只导所选」,避免用户以为还是导全部 */
-const exportLabel = computed(() => (selectedDocs.value.length
-  ? `${tt('导出所选 Excel')} (${selectedDocs.value.length})`
+/** 导出按钮文案:勾了单就说清「只导所选」,避免用户以为还是导全部 */
+const exportLabel = computed(() => (selectedNos.value.length
+  ? `${tt('导出所选 Excel')} (${selectedNos.value.length})`
   : tt('导出 Excel')))
 
 function pad(n) {
@@ -339,15 +362,116 @@ function reset() {
   load()
 }
 
-/** 勾选变化(Element Plus 直接给整批选中行) */
+/** 「按委托单/样品」表勾选变化:它是全量视角 ⇒ 直接以它为准 */
 function onDocSelection(rows) {
-  selectedDocs.value = Array.isArray(rows) ? rows : []
+  if (syncing) return
+  applySelection((rows || []).map((r) => r['单据编号']), { type: 'doc' })
+}
+
+/**
+ * 「按送样人」表勾选变化:把"送样人整体状态"对齐到表上 —— 勾了 = 他名下单全进,取消 = 全出。
+ *
+ * <p>不用"上一次勾选"做增量(2026-11-20 实测表头取消全选时增量会算空),而是逐送样人比
+ * **真源现状**:这次勾了他但没全进 ⇒ 补齐;**取消了他且当前是全进** ⇒ 全出;
+ * 只勾了部分单的送样人(在展开子表里单独勾的)不动 —— 这样"取消全选"永远能把全进的清掉。</p>
+ */
+function onSenderSelection(rows) {
+  if (syncing) return
+  const pickedNames = new Set((rows || []).map((r) => r['送样人']))
+  const next = new Set(selectedNos.value)
+  for (const s of senders.value) {
+    const name = s['送样人']
+    const nos = nosOfSender(name)
+    if (!nos.length) continue
+    const fullyOn = nos.every((n) => next.has(n))
+    if (pickedNames.has(name) && !fullyOn) nos.forEach((n) => next.add(n))
+    else if (!pickedNames.has(name) && fullyOn) nos.forEach((n) => next.delete(n))
+  }
+  applySelection([...next], { type: 'sender' })
+}
+
+/** 展开子表勾选变化:该送样人的单整体换成本次子表的选择,不影响别的送样人 */
+function onSubSelection(name, rows) {
+  if (syncing) return
+  const next = new Set(selectedNos.value)
+  nosOfSender(name).forEach((n) => next.delete(n))
+  for (const r of rows || []) if (r['单据编号']) next.add(r['单据编号'])
+  applySelection([...next], { type: 'sub', name })
+}
+
+/** 子表实例登记(展开时绑定 / 收起时解除);展开那一拍表格还没挂完,下一帧再回显勾选 */
+function bindSubTable(name, el) {
+  if (!el) {
+    subTables.delete(name)
+    return
+  }
+  subTables.set(name, el)
+  nextTick(() => {
+    const set = new Set(selectedNos.value)
+    syncing = true
+    try {
+      for (const d of docsOfSender(name)) if (set.has(d['单据编号'])) el.toggleRowSelection?.(d, true)
+    } finally {
+      syncing = false
+    }
+  })
+}
+
+/**
+ * 把勾选真源重画到三张表(程序化 toggle ⇒ 期间 syncing=true 屏蔽各自的 change 事件)。
+ *
+ * @param origin 本次用户操作来源({type:'doc'|'sender'|'sub', name?}):
+ *               来源表**自己**不动 —— 它已经被用户点过、状态是对的;再 clear+toggle 一遍会把
+ *               Element 内部的表头全选态搞乱(实测"取消全选"点不动,2026-11-20)。
+ */
+function syncTables(origin = null) {
+  const set = new Set(selectedNos.value)
+  syncing = true
+  try {
+    if (!origin || origin.type !== 'doc') {
+      const dT = docTableRef.value
+      if (dT) {
+        dT.clearSelection?.()
+        for (const d of docs.value) if (set.has(d['单据编号'])) dT.toggleRowSelection?.(d, true)
+      }
+    }
+    const sT = senderTableRef.value
+    if (sT) {
+      if (!origin || origin.type !== 'sender') {
+        sT.clearSelection?.()
+        for (const s of senders.value) {
+          const nos = nosOfSender(s['送样人'])
+          if (nos.length && nos.every((n) => set.has(n))) sT.toggleRowSelection?.(s, true)
+        }
+      }
+    }
+    for (const [name, t] of subTables) {
+      if (origin && origin.type === 'sub' && origin.name === name) continue
+      t.clearSelection?.()
+      for (const d of docsOfSender(name)) if (set.has(d['单据编号'])) t.toggleRowSelection?.(d, true)
+    }
+  } finally {
+    syncing = false
+  }
+}
+
+/** 设定勾选真源并同步三张表 */
+function applySelection(nos, origin = null) {
+  selectedNos.value = [...new Set((nos || []).filter(Boolean))]
+  syncTables(origin)
 }
 
 /** 清除勾选(工具条与查询前置都调它;表实例不在时只清状态) */
 function clearSelection() {
-  docTableRef.value?.clearSelection?.()
-  selectedDocs.value = []
+  selectedNos.value = []
+  syncing = true
+  try {
+    docTableRef.value?.clearSelection?.()
+    senderTableRef.value?.clearSelection?.()
+    for (const t of subTables.values()) t.clearSelection?.()
+  } finally {
+    syncing = false
+  }
 }
 
 function money(v) {
@@ -357,6 +481,11 @@ function money(v) {
 
 function docsOfSender(name) {
   return docs.value.filter((d) => d['送样人'] === name)
+}
+
+/** 某送样人名下的委托单号(勾送样人 = 勾他这些单) */
+function nosOfSender(name) {
+  return docsOfSender(name).map((d) => d['单据编号']).filter(Boolean)
 }
 
 function statusTag(s) {
@@ -387,8 +516,8 @@ function openDoc(no) {
 async function exportExcel() {
   if (!hasData.value) return
   const loading = ElMessage({ message: tt('正在生成 Excel…'), duration: 0 })
-  // 勾了行 ⇒ 只导所选(后端按「单据编号」精确过滤);没勾 ⇒ 导当前查询结果全部(原行为不变)
-  const picked = selectedDocs.value.map((d) => d['单据编号']).filter(Boolean)
+  // 勾了单 ⇒ 只导所选(后端按「单据编号」精确过滤);没勾 ⇒ 导当前查询结果全部(原行为不变)
+  const picked = selectedNos.value.slice()
   const body = {
     日期起: range.value[0],
     日期止: range.value[1],
