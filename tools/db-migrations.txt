@@ -5096,3 +5096,10 @@ migrate-qc-ship-insp-rename-20261120.sql
 #   +「工单号」,并把两格补进纸面(QC_BHC 第 1/3 行各补一格,不加行)。配合「判定不合格 →
 #   去开不合格处理单」按钮(POST /api/qc/shipInsp/ng 幂等取/建)。幂等;两账套均执行。
 migrate-qc-bhc-ship-insp-link-20261120.sql
+
+# 2026-11-20 仪器使用汇总表(页面级面板 INSTR_SUMMARY,页面 /rd/instrSummary):
+#   用户口径「为当前的试验仪器记录表创建一个汇总表…参考样品检验汇总表」+「不要这个页签」
+#   ⇒ 2026-11-19 仪器使用记录表内的「使用记录汇总」页签撤除,汇总改独立页面。
+#   本脚本只补授权(能看 RD_INSTR_USE 的角色 + 管理员 → view,query,export)+ 面板名译名;
+#   不建表、不碰单据数据。幂等;两账套均执行。
+migrate-instr-summary-page-20261120.sql

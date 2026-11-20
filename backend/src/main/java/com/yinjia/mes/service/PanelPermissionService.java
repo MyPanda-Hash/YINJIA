@@ -215,6 +215,10 @@ public class PanelPermissionService {
         // 两个按钮名都登记:前端文案是「导出 Excel」,接口闸门按「导出」调用。
         m.put(PagePanelRegistry.INSP_SUMMARY + "|导出", new String[]{"export"});
         m.put(PagePanelRegistry.INSP_SUMMARY + "|导出 Excel", new String[]{"export"});
+        // 仪器使用汇总表(2026-11-20):与样品检验汇总表同构 —— 页面是新的独立汇总页,
+        // 「导出 Excel」按钮与 POST /px/instrSummary/export 共用 export 词。
+        m.put(PagePanelRegistry.INSTR_SUMMARY + "|导出", new String[]{"export"});
+        m.put(PagePanelRegistry.INSTR_SUMMARY + "|导出 Excel", new String[]{"export"});
         // ERP 集成配置清单(2026-10-18 用户口径「除管理员只可看不可编辑」):写配置**不挂权限词**,
         // 由 ErpIntegController 直接 requireAdmin();同时登记进 ADMIN_ONLY_PANELS 做纵深防御
         // (将来若给该页加按钮,非管理员的写动作仍会被 requireButton 的 admin 闸门拦住)。

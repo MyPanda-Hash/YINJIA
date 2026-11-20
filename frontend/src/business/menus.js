@@ -90,6 +90,11 @@ export const menuTree = [
               { code: 'rdDomTest', title: '测试申请单', path: '/panelx/list/RD_DOM_TEST', panelCode: 'RD_DOM_TEST', icon: 'DocumentAdd' },
               { code: 'rdEquipUse', title: '设备使用登记表', path: '/panelx/list/RD_EQUIP_USE', panelCode: 'RD_EQUIP_USE', icon: 'Monitor' },
               { code: 'rdInstrUse', title: '仪器使用记录表', path: '/panelx/list/RD_INSTR_USE', panelCode: 'RD_INSTR_USE', icon: 'Odometer' },
+              // 2026-11-20 用户口径:「为当前的试验仪器记录表创建一个汇总表,汇总表需要查看的内容如图1所示。
+              //   汇总表实现可以参考样品检验汇总表」。仪器使用记录表面板内的「使用记录汇总」页签同日撤除
+              //   (用户「不要这个页签」)⇒ 汇总只在这里:独立汇总页,可筛选/勾选/导出 Excel。
+              //   页面级虚拟面板 INSTR_SUMMARY(定义见后端 PagePanelRegistry)⇒ 专用路由 /rd/instrSummary。
+              { code: 'rdInstrSummary', title: '仪器使用汇总表', path: '/rd/instrSummary', panelCode: 'INSTR_SUMMARY', icon: 'DataAnalysis' },
             ],
           },
         ],

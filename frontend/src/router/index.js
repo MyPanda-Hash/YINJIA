@@ -146,6 +146,11 @@ const routes = [
       //   按送样人 / 按委托单两个视角 + 今日/本周/本月快捷区间 + 导出 Excel(前端 xlsx 现生成)。
       //   页面级虚拟面板 INSP_SUMMARY(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由,显式注册。
       { path: 'qc/inspSummary', component: () => import('@/views/modules/qc/InspSummary.vue'), meta: { title: '样品检验汇总表', code: 'qcInspSummary', panelCode: 'INSP_SUMMARY' } },
+      // 仪器使用汇总表(2026-11-20 用户口径:「为当前的试验仪器记录表创建一个汇总表……参考样品检验汇总表」):
+      //   时间区间筛选 + 统计条 + 记录表(**可勾选**)+ 导出「实验室仪器使用记录表」(只导所选)。
+      //   页面级虚拟面板 INSTR_SUMMARY(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由,显式注册。
+      //   同日撤除 RD_INSTR_USE 面板内的「使用记录汇总」页签(用户「不要这个页签」),汇总只留本页。
+      { path: 'rd/instrSummary', component: () => import('@/views/modules/rd/InstrSummary.vue'), meta: { title: '仪器使用汇总表', code: 'rdInstrSummary', panelCode: 'INSTR_SUMMARY' } },
       // ══════════ 手机扫码(2026-10-30 新增一级目录)══════════
       // 用户口径:「把生产领料和工序报工这两个 app 的面版重新放在一个新的『手机扫码』(和生产计划平级)
       //   导航下。工序报工不变。生产领料重写。」

@@ -1,0 +1,14 @@
+const task = await taskSpace('instr-summary-page-1120');
+const page = task.page('p1');
+await page.goto('http://localhost:5173/#/qc/inspSummary', { timeout: 30000 });
+await page.waitForTimeout(3000);
+await page.cdp('Network.enable');
+await page.cdp('Runtime.enable');
+await page.reload();
+await page.waitForTimeout(6000);
+const ev = await page.events();
+const resp = ev.filter((e) => e.method === 'Network.responseReceived').map((e) => ({ url: e.params?.response?.url, status: e.params?.response?.status }));
+console.log('inspSummary 相关响应:', JSON.stringify(resp.filter((r) => (r.url || '').includes('Summary') || (r.url || '').includes('summary')), null, 2));
+console.log('非 200 响应:', JSON.stringify(resp.filter((r) => (r.status || 200) >= 400), null, 2));
+const consoleMsgs = ev.filter((e) => e.method === 'Runtime.consoleAPICalled').map((e) => (e.params?.args || []).map((a) => a.value || a.description).join(' '));
+console.log('console:', JSON.stringify(consoleMsgs.slice(-10), null, 2));

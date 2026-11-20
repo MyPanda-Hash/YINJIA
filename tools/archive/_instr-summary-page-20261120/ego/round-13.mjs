@@ -1,0 +1,20 @@
+const task = await taskSpace('instr-summary-page-1120');
+const page = task.page('p1');
+await page.goto('http://localhost:5173/#/rd/instrSummary', { timeout: 30000 });
+await page.waitForTimeout(2500);
+await page.click('loc=css:.nav-group:has-text("研发管理")', { label: '打开研发管理' });
+await page.waitForTimeout(900);
+await page.click('loc=css:.nav-module:has-text("测试记录")', { label: '打开测试记录' });
+await page.waitForTimeout(1000);
+const level2 = await page.evaluate(() => [...document.querySelectorAll('.nav-module')].map((el) => (el.textContent || '').replace(/\s+/g, ' ').trim()));
+console.log('二级:', JSON.stringify(level2));
+await page.click('loc=css:.nav-module:has-text("实验室使用记录表")', { label: '打开实验室使用记录表' });
+await page.waitForTimeout(1200);
+const items = await page.evaluate(() => {
+  const t = (el) => (el.textContent || '').replace(/\s+/g, ' ').trim();
+  const nodes = [...document.querySelectorAll('.nav-item, .nav-link, .nav-leaf, [class*="nav-item"], [class*="nav-link"]')].map(t).filter(Boolean);
+  return { items: [...new Set(nodes)].slice(0, 30), hit: nodes.some((s) => s.includes('仪器使用汇总表')) };
+});
+console.log('实验室使用记录表下:', JSON.stringify(items, null, 2));
+const shot = await page.screenshot({ path: 'D:/workspace/yinjia/_scratch/ego-instr-summary-1120/round-13-menu.png' });
+console.log({ screenshot: shot });

@@ -58,7 +58,7 @@ test('项目管理组:立项申请 → 项目实施计划 → 项目进度查询
   assert.ok(!group('rdProject').children.some((c) => c.code === 'rdProductFlow'), '不挂菜单项')
 })
 
-test('测试记录组下挂数据记录表 9 张（8 张记录表 + 特殊数据记录表）与实验室使用记录表 4 张', () => {
+test('测试记录组下挂数据记录表 9 张（8 张记录表 + 特殊数据记录表）与实验室使用记录表 5 张', () => {
   const test1 = group('rdTest')
   assert.deepEqual((test1.children || []).map((c) => c.code), ['rdData', 'rdLab'])
   const data = test1.children.find((c) => c.code === 'rdData')
@@ -68,11 +68,14 @@ test('测试记录组下挂数据记录表 9 张（8 张记录表 + 特殊数据
   assert.equal((data.children || []).length, 9)
   assert.ok((data.children || []).some((c) => c.code === 'rdExtraRecFile'), '特殊数据记录表必须挂在数据记录表下')
   assert.equal((data.children || []).filter((c) => c.code !== 'rdExtraRecFile').length, 8, '原有 8 张记录表一个不少')
-  assert.equal((lab.children || []).length, 4)
+  // 2026-11-20 用户口径:「为当前的试验仪器记录表创建一个汇总表……汇总表实现可以参考样品检验汇总表」
+  //   +「不要这个页签」⇒ 实验室使用记录表组 4 → 5（新增「仪器使用汇总表」/rd/instrSummary，
+  //   页面级虚拟面板 INSTR_SUMMARY；仪器使用记录表内的「使用记录汇总」页签同日撤除）。
+  assert.equal((lab.children || []).length, 5)
   // 2026-09-30:RD_DOM_TEST 由「内部委托测试申请单」升级为**一张单三个页签**的「测试申请单」
   // (面板编码不变 ⇒ 权限行/单据表/单据编号前缀全沿用);菜单名必须跟着改,否则用户找不到。
   assert.deepEqual((lab.children || []).map((c) => c.title), [
-    '加标水配置记录表', '测试申请单', '设备使用登记表', '仪器使用记录表',
+    '加标水配置记录表', '测试申请单', '设备使用登记表', '仪器使用记录表', '仪器使用汇总表',
   ])
   assert.ok(!JSON.stringify(menuTree).includes('内部委托测试申请单'), '旧菜单名不应残留')
 })
@@ -253,8 +256,10 @@ test('研发管理 26 个面板一个不少(含新增 项目流程管控 与两�
   // 2026-11-17 Excel #14：再 +1（新增「外部-非开发样品 RD_SAMPLE_ND」，独立面板 + 独立入口）
   // 2026-11-18 Excel #9：样品组多一个「样品进度跟踪」页面入口（panelCode 复用 RD_SAMPLE_EXT）
   //   ⇒ 叶子项 29 → 30，**去重后面板数不变（仍 28 张）**。
-  assert.equal(codes.length, 32, '叶子项 32 个（+ 自制料：录入 + 查询）')
-  assert.equal(new Set(codes).size, 29, '去重后 29 张面板（+ RD_SELFMADE）')
+  // 2026-11-20：实验室使用记录表下新增「仪器使用汇总表」INSTR_SUMMARY（页面级虚拟面板，
+  //   与样品检验汇总表同构）⇒ 叶子项 30 → 31…累计到 33，去重面板 29 → 30。
+  assert.equal(codes.length, 33, '叶子项 33 个（+ 自制料：录入 + 查询）')
+  assert.equal(new Set(codes).size, 30, '去重后 30 张面板（+ RD_SELFMADE + INSTR_SUMMARY）')
   assert.ok(codes.includes('RD_SELFMADE'), '自制料面板必须登记面板码（权限矩阵同源）')
   assert.ok(codes.includes('RD_SAMPLE_EXT'), '样品进度跟踪复用 RD_SAMPLE_EXT 的权限')
   assert.ok(codes.includes('RD_EXTRA_REC_FILE'), '特殊数据记录表必须登记面板码（权限矩阵同源）')
@@ -367,7 +372,11 @@ test('手机扫码:二级 = 生产扫码登记(原 4 项)+ 实验室记录手机
   assert.ok(!(lab.children || []).some((c) => c.panelCode === 'RD_DOM_TEST'))
   // 三张记录表在研发管理里**仍保留电脑端入口**(手机端是并列入口,不是搬家)
   const rdLab = (rd.children || []).find((c) => c.code === 'rdTest').children.find((c) => c.code === 'rdLab')
-  assert.deepEqual(leafCodes(rdLab), ['RD_SPIKE_WATER', 'RD_DOM_TEST', 'RD_EQUIP_USE', 'RD_INSTR_USE'])
+  // 2026-11-20:仪器使用汇总表(INSTR_SUMMARY)紧跟仪器使用记录表挂在本组,手机端不含它(手机只做登记)
+  assert.deepEqual(leafCodes(rdLab),
+    ['RD_SPIKE_WATER', 'RD_DOM_TEST', 'RD_EQUIP_USE', 'RD_INSTR_USE', 'INSTR_SUMMARY'])
+  assert.ok(!(lab.children || []).some((c) => c.panelCode === 'INSTR_SUMMARY'),
+    '手机端「实验室记录手机登记」只做登记,不放汇总页')
 
   // 旧位置不得再残留(生产计划组里) —— 否则侧栏两个「生产领料」入口
   const plan = menuTree.find((n) => n.code === 'plan')

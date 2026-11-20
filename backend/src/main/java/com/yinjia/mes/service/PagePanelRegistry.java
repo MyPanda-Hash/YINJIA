@@ -87,6 +87,22 @@ public final class PagePanelRegistry {
      */
     public static final String INSP_SUMMARY = "INSP_SUMMARY";
     /**
+     * 仪器使用汇总表(2026-11-20,用户口径:「为当前的试验仪器记录表创建一个汇总表,汇总表需要查看的内容
+     *   如图1所示。汇总表实现可以参考样品检验汇总表」)。
+     *
+     * <p>一行 = 一条仪器使用记录(跨全部单据/仪器),列按用户表样:仪器名称/型号 | 日期 | 起止时间 |
+     * 仪器状态 | 是否内校 | 项目名称/内容 | 数量 | 使用人 | 备注。
+     * 取数 = {@code rd_instr_use_detail × rd_instr_use_head} 现算,见 {@link InstrSummaryService}。
+     *
+     * <p>页面 = {@code views/modules/rd/InstrSummary.vue},**不是** yj_panel 单据面板
+     * ⇒ 页面级虚拟面板,授权落 {@code yj_role_panel};动作 = 可见 / 查询 / 导出
+     * (导出由后端 POI 生成「实验室仪器使用记录表」,支持只导勾选行)。
+     * 2026-11-19 曾做过仪器使用记录表面板内的「使用记录汇总」页签,同日用户口径「不要这个页签」
+     * ⇒ 页签已撤除,改为本独立页面。
+     * 迁移:{@code tools/migrate-instr-summary-page-20261120.sql}(授权 + 面板名译名)。
+     */
+    public static final String INSTR_SUMMARY = "INSTR_SUMMARY";
+    /**
      * ERP 集成配置清单(2026-10-18):导入 / 转出两向 × 分类的接口、设备、字段映射统一配置页。
      * 数据源是三张配置表(erp_integ_api / _field / _device),**不是** yj_panel 单据面板,
      * 故同样按页面级虚拟面板登记 —— 授权落 yj_role_panel,页面菜单按 panelCode 显隐。
@@ -364,6 +380,18 @@ public final class PagePanelRegistry {
     };
 
     /**
+     * 仪器使用汇总表(2026-11-20):与样品检验汇总表同构的**只读**汇总页 —— 按时间范围看
+     * 实验室内每台仪器都被谁、在什么时间、做了什么项目地使用,并把表样导出 Excel。
+     *
+     * <p>动作同样只有三个:可见 / 查询 / 导出。本页不写任何业务数据(要登记/改记录回仪器使用记录表面板)。
+     */
+    private static final String[][] INSTR_SUMMARY_ACTIONS = {
+            {"view",   "可见"},
+            {"query",  "查询"},
+            {"export", "导出"},
+    };
+
+    /**
      * ERP 集成配置清单:只有「可见」一个授权词。
      *
      * <p>2026-10-18 用户口径「保证这个面板除管理员只可看不可编辑」——
@@ -591,7 +619,10 @@ public final class PagePanelRegistry {
             new PagePanelDef(QC_FLOW, "品质流程监控", "品质管理", QC_FLOW_ACTIONS),
             // 2026-11-17 样品检验汇总表:按时间范围汇总「谁送了什么样品、要测什么」并可导出,
             //   归「样品检验」组(与两张单据同一一级模块;ReportService.NAV_GROUP_ORDER 已有该组)
-            new PagePanelDef(INSP_SUMMARY, "样品检验汇总表", "样品检验", INSP_SUMMARY_ACTIONS));
+            new PagePanelDef(INSP_SUMMARY, "样品检验汇总表", "样品检验", INSP_SUMMARY_ACTIONS),
+            // 2026-11-20 仪器使用汇总表:实验室仪器的使用记录总表(与样品检验汇总表同构的独立页面),
+            //   归「研发管理」组 —— 菜单挂在 研发管理 › 测试记录 › 实验室使用记录表 下,与之一致
+            new PagePanelDef(INSTR_SUMMARY, "仪器使用汇总表", "研发管理", INSTR_SUMMARY_ACTIONS));
 
     private static final Map<String, PagePanelDef> BY_CODE = buildIndex();
 

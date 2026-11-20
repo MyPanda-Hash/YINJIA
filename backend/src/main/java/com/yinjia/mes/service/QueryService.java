@@ -481,64 +481,6 @@ public class QueryService {
      */
     public static final String SUPPLIER_PANEL_CODE = "SUPPLIER_PU_ORDER";
 
-    /**
-     * 实验室仪器使用记录汇总（2026-11-19 用户口径）。
-     *
-     * <p>用户原话：「为当前的实验室使用记录表增加一个汇总表格。汇总表需要查看的内容就这样查看吧。」
-     * 并给了表样：仪器名称/型号 | 日期 | 起止时间 | 仪器状态 | 是否内校 | 项目名称/内容 | 数量 | 使用人 | 备注。</p>
-     *
-     * <p>行源 = {@code rd_instr_use_head} × {@code rd_instr_use_detail}，**一行 = 一条使用记录**
-     * （不是一张单一行：同一天可以登记多台仪器/多个项目）。仪器名称优先取明细行上由
-     * 「一台仪器一组」写下的 {@code [仪器名称/型号]}，为空再退回表头同名列；日期优先取
-     * 明细 {@code [使用日期]}，为空再退回表头 {@code [单据日期]}。头/行任一
-     * {@code asp_cancel='Y'} 的记录都不进汇总（与列表页删除口径一致）。</p>
-     *
-     * <p>只读派生视图，不落库、不产生新表；权限由调用端
-     * {@code PanelPermissionService.requirePanelView("RD_INSTR_USE")} 兜底。</p>
-     *
-     * @param dateFrom   可选：日期起（yyyy-MM-dd，按明细使用日期/表头单据日期归一到 date 比较）
-     * @param dateTo     可选：日期止（含当天）
-     * @param instrument 可选：仪器名称/型号模糊过滤
-     */
-    public List<Map<String, Object>> instrUseSummary(String dateFrom, String dateTo, String instrument) {
-        // 日期列是 nvarchar(源表按纸样填 yyyy-MM-dd),仍用 ISDATE 兜底:脏值不参与排序/过滤,不整条报错。
-        // 不用 TRY_CONVERT —— 本机 SQL Server 的兼容级别不认它(实测消息 195:TRY_CONVERT 不是内置函数)。
-        String dateText = "ISNULL(NULLIF(LTRIM(RTRIM(d.[使用日期])), N''), h.[单据日期])";
-        String dateExpr = "CASE WHEN ISDATE(" + dateText + ") = 1 THEN CONVERT(date, " + dateText + ") END";
-        StringBuilder sql = new StringBuilder("""
-                SELECT h.[单据编号] AS [单据编号],
-                       ISNULL(NULLIF(LTRIM(RTRIM(d.[仪器名称/型号])), N''), ISNULL(h.[仪器名称/型号], N'')) AS [仪器名称/型号],
-                       ISNULL(NULLIF(LTRIM(RTRIM(d.[使用日期])), N''), ISNULL(h.[单据日期], N'')) AS [日期],
-                       ISNULL(d.[起止时间], N'') AS [起止时间],
-                       ISNULL(d.[仪器状态], N'') AS [仪器状态],
-                       ISNULL(d.[是否内校], N'') AS [是否内校],
-                       ISNULL(d.[项目名称/内容], N'') AS [项目名称/内容],
-                       ISNULL(d.[样品数量], N'') AS [数量],
-                       ISNULL(d.[使用人], N'') AS [使用人],
-                       ISNULL(d.[备注], N'') AS [备注]
-                  FROM dbo.rd_instr_use_detail d
-                  JOIN dbo.rd_instr_use_head h ON h.[单据编号] = d.[单据编号]
-                 WHERE ISNULL(d.asp_cancel, N'N') <> N'Y'
-                   AND ISNULL(h.asp_cancel, N'N') <> N'Y'
-                """);
-        List<Object> args = new ArrayList<>();
-        if (dateFrom != null && !dateFrom.isBlank()) {
-            sql.append("   AND ").append(dateExpr).append(" >= CONVERT(date, ?) ");
-            args.add(dateFrom);
-        }
-        if (dateTo != null && !dateTo.isBlank()) {
-            sql.append("   AND ").append(dateExpr).append(" <= CONVERT(date, ?) ");
-            args.add(dateTo);
-        }
-        if (instrument != null && !instrument.isBlank()) {
-            sql.append("   AND ISNULL(NULLIF(LTRIM(RTRIM(d.[仪器名称/型号])), N''), ISNULL(h.[仪器名称/型号], N''))"
-                    + " LIKE N'%' + ? + N'%' ");
-            args.add(instrument);
-        }
-        sql.append(" ORDER BY ").append(dateExpr).append(" DESC, d.[使用日期] DESC, d.id DESC");
-        return jdbc.queryForList(sql.toString(), args.toArray());
-    }
-
     public Map<String, Object> queryFormDataList(String panelCode, String keyword,
                                                  Map<String, Object> condition, int pageNo, int pageSize) {
         return queryFormDataList(panelCode, keyword, condition, pageNo, pageSize, null);

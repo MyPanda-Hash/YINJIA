@@ -1192,46 +1192,11 @@ export const recordSheetConfigs = {
     /** 一台仪器一组行(2026-10-28):切换「仪器名称/型号」只换显示的行
      *  ⚠ detailKey 用「仪器归属」而不是同名的表头字段,原因见 RD_EQUIP_USE.groupBy 注释 */
     groupBy: { headKey: '仪器名称/型号', detailKey: '仪器归属' },
-    /**
-     * 两个页签(2026-11-19 用户口径「为当前的实验室使用记录表增加一个汇总表格」):
-     *   · 页 0 仪器使用记录 = 原有登记表(标题条 + 「仪器名称/型号」一组一行);
-     *   · 页 1 使用记录汇总 = **只读派生表**,一行 = 一条使用记录(跨全部单据/仪器),
-     *     列按用户给的表样:仪器名称/型号 · 日期 · 起止时间 · 仪器状态 · 是否内校 ·
-     *     项目名称/内容 · 数量 · 使用人 · 备注。
-     *   数据走后端 /px/instrUseSummary(rd_instr_use_head × rd_instr_use_detail),不落库;
-     *   渲染复用 RecordSheetPanels 的 ledger 块(与测试申请单「委托测试汇总表」同一套)。
-     *   ⚠ 页 1 必须 headMode:'report' + showHead:false:否则会继承面板级 plain 标题条,
-     *     在汇总表上方多出一条「实验室仪器使用记录表 + 仪器名称/型号」的登记表头。
-     */
-    pages: [
-      { title: '仪器使用记录', headMode: 'plain' },
-      {
-        title: '使用记录汇总',
-        headMode: 'report',
-        showHead: false,
-        ledger: {
-          title: '实验室仪器使用记录表',
-          endpoint: '/px/instrUseSummary',
-          pageSize: 500,
-          emptyText: '暂无使用记录',
-          // 列宽合计 815px ≈ 纸面内容区宽(880 - 内边距):9 列**一屏看全**,
-          // 不让「备注」被挤到横向滚动条外面(用户表样就是一整行 9 列)。
-          cols: [
-            { label: '仪器名称/型号', keys: ['仪器名称/型号'], w: 115 },
-            { label: '日期', keys: ['日期'], w: 95, align: 'center' },
-            { label: '起止时间', keys: ['起止时间'], w: 105, align: 'center' },
-            { label: '仪器状态', keys: ['仪器状态'], w: 65, align: 'center' },
-            { label: '是否内校', keys: ['是否内校'], w: 65, align: 'center' },
-            { label: '项目名称/内容', keys: ['项目名称/内容'], w: 170 },
-            { label: '数量', keys: ['数量'], w: 50, align: 'center' },
-            { label: '使用人', keys: ['使用人'], w: 60 },
-            { label: '备注', keys: ['备注'], w: 90 },
-          ],
-        },
-      },
-    ],
+    // 单页面板(2026-11-20 用户口径「不要这个页签」):2026-11-19 加过的第 2 页签「使用记录汇总」已撤除。
+    //   汇总改为**独立页面** views/modules/rd/InstrSummary.vue(页面级面板 INSTR_SUMMARY,
+    //   后端 /px/instrSummary/summary|export),本面板回到登记表本身:单页、无台账块。
     dataTables: [
-      { page: 0, cols: [
+      { cols: [
           { key: '使用日期', label: '使用日期', w: 110 },
           { key: '起止时间', label: '起止时间', w: 120 },
           // 同 RD_EQUIP_USE.设备状态:key 用 yj_field.label(库里的 `仪器状态\n√/×`、`是否内校\n√/-`,
