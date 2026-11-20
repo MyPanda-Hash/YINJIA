@@ -188,7 +188,11 @@ function onPanelChange() {
   load()
 }
 
-/** 整行 / 单号可点：跳到**当前面板**里那张单（EXT → RD_SAMPLE_EXT，ND → RD_SAMPLE_ND） */
+/**
+ * 整行 / 单号可点：跳到**当前面板**里那张单（EXT → RD_SAMPLE_EXT，ND → RD_SAMPLE_ND）。
+ * 路由用 ?docNo= 按单号定向打开（不是 ?focus=：focus 只在当前列表页里按下标找，
+ * 目标在别的页/被可见范围挡住时就落空，正是 2026-11-20 报障的根因）。
+ */
 function openDoc(row) {
   const no = String(row?.['单据编号'] || '').trim()
   if (!no) return

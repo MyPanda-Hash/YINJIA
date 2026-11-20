@@ -2919,7 +2919,7 @@ import {
 } from '@core/panel/docPreview.js'
 // 列表按单号定位的公共口径（2026-11-20）：单号键序 编号→单据编号→锭号、预览下标换页码。
 // load() 的 ?focus= 深链与「预览点跳转」的 focus 消费共用，纯函数 + 单测见 docFocus.test.js
-import { docNoOf, findDocIndex, pageOfPreviewIndex } from '@core/panel/docFocus.js'
+import { docNoOf, findDocIndex, pageOfPreviewIndex, shouldRestoreAfterDocNo } from '@core/panel/docFocus.js'
 import { missingKeyFromMessage } from './recordSheetFocus'
 // 产品变更申请表：会签人填本部门行 / 管理员终审的纯判断（单测见 changeCosign.test.js）
 import {
@@ -14026,7 +14026,7 @@ watch(
     // 找不回就等于还是丢了),取完再把未保存的填写放回那一行。
     const draft = tabDraftStash.get(String(panelCode.value))
     if (draft && draft.pageNo) query.pageNo = draft.pageNo
-    if (applyDocNoQuery()) await load()
+    if (applyDocNoQuery()) await loadDocNoTarget()
     else if (draft) { curIdx.value = 0; await load() }
     else search()
     // 期间又切了面板就别放回了(否则会把上一个面板的行按到当前面板的列表上)
@@ -14045,12 +14045,29 @@ function applyDocNoQuery() {
   router.replace({ path: route.path, query: { ...route.query, docNo: undefined } })
   return true
 }
+/**
+ * 消费 `?docNo=单号` 的定向取数（2026-11-20：样品进度页报障的兜底）。
+ *
+ * <p>docNo 是「按单号打开一张单」的深链（列表先按 `_docNo` 过滤再显示那张单，不受分页/页签影响）。
+ * 但目标如果在当前账号的可见范围外（别人的单 / 已作废 / 不存在 / 前后端版本不一致），
+ * 过滤结果就是 0 行 —— 旧写法会停在一个 0/0 的空白列表页，用户看到的仍然不是所点的那张单。
+ * 这里明确提示并恢复列表，**绝不**静默留在空白页或别的单上。</p>
+ */
+async function loadDocNoTarget() {
+  const no = String(condition['_docNo'] || '').trim()
+  await load()
+  if (!shouldRestoreAfterDocNo(no, list.value)) return
+  delete condition['_docNo']
+  docQueryNo.value = ''
+  ElMessage.warning(tt('未找到该单据（可能已作废或没有查看权限）'))
+  await load()
+}
 // 同一面板内跳另一张单据(panelCode 不变,上面的 watcher 不触发)
 watch(
   () => route.query.docNo,
   (v) => {
     if (!v || Date.now() - lastDocJumpAt < 400) return
-    if (applyDocNoQuery()) load()
+    if (applyDocNoQuery()) loadDocNoTarget()
   }
 )
 
@@ -14167,9 +14184,9 @@ onMounted(() => {
   }
   // 本实例是当前前台页签(keep-alive 下 onActivated 也会置一次;这里兜住"不在 keep-alive 里"的场景)
   instanceActive.value = true
-  // 从「我的桌面 · 产品开发」矩阵跳转:带 ?docNo= 直接定位到该单据
-  applyDocNoQuery()
-  load()
+  // 从「我的桌面 · 产品开发」矩阵/样品进度页跳转:带 ?docNo= 直接定位到该单据
+  if (applyDocNoQuery()) loadDocNoTarget()
+  else load()
   // 把"未保存状态 + 保存/放弃"登记给页签栏:× 关闭时由它弹三态问句
   // (2026-10-16 用户口径「叉掉时还应该弹窗提示是否保存」;守卫只覆盖"导航离开",覆盖不到点 × 关后台页签)
   unsavedGuard.register(route.path, {

@@ -431,6 +431,25 @@ public class QueryService {
     public List<java.util.Map<String, Object>> sampleFlowRows(String panel) {
         String code = normalizeSampleFlowPanel(panel);
         boolean nonDev = SAMPLE_FLOW_PANEL_ND.equals(code);
+        // 可见范围必须与目标单据列表（queryDocs）同口径 —— 否则进度页列出来的单，
+        // 点进去在列表里找不到：用户报障「点单号/点行不会跳到对应的样品单」的根因。
+        //   ① 作废单：queryDocs 里 `s.canceled='Y'` 无条件排除；
+        //   ② 本人归属：RD_SAMPLE_EXT 在 OWN_DOCS_PANELS，非管理员且无 view_all 只看 asp_user1=当前账号
+        //      （RD_SAMPLE_ND 不在该集合，列表本身全量）。
+        boolean restrictOwn = OWN_DOCS_PANELS.contains(code) && !isAdminLogin() && !canViewAllOf(code);
+        String me = restrictOwn ? currentLogin() : null;
+        String scopeCond;
+        java.util.List<Object> args = new java.util.ArrayList<>();
+        if (restrictOwn) {
+            if (me == null || me.isBlank()) {
+                scopeCond = " AND 1 = 0 "; // 无登录人/空账号:不放行（与 queryDocs 的 1=0 同口径）
+            } else {
+                scopeCond = " AND ISNULL(RTRIM(h.asp_user1),'') = ? ";
+                args.add(me);
+            }
+        } else {
+            scopeCond = "";
+        }
         String sql = nonDev
                 ? "SELECT h.[单据编号], "
                     + "ISNULL(h.[客户名称], N'') AS 客户名称, "
@@ -448,6 +467,8 @@ public class QueryService {
                     + "FROM rd_sample_nondev_head h "
                     + "LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SAMPLE_ND' AND s.doc_no = h.[单据编号] "
                     + "WHERE ISNULL(h.asp_cancel, 'N') <> 'Y' "
+                    + scopeCond
+                    + " AND ISNULL(s.canceled, 'N') <> 'Y' "
                     + "ORDER BY h.[单据日期] DESC, h.[单据编号] DESC"
                 : "SELECT h.[单据编号], "
                     + "ISNULL(h.[客户名称], N'') AS 客户名称, "
@@ -462,6 +483,8 @@ public class QueryService {
                     + "FROM rd_sample_ext_head h "
                     + "LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SAMPLE_EXT' AND s.doc_no = h.[单据编号] "
                     + "WHERE ISNULL(h.asp_cancel, 'N') <> 'Y' "
+                    + scopeCond
+                    + " AND ISNULL(s.canceled, 'N') <> 'Y' "
                     + "ORDER BY h.[单据日期] DESC, h.[单据编号] DESC";
         return jdbc.query(sql, (rs, i) -> {
             java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
@@ -476,7 +499,7 @@ public class QueryService {
             row.put("archived", rs.getString("archived"));
             row.put("canceled", rs.getString("canceled"));
             return row;
-        });
+        }, args.toArray());
     }
     private final TranslationService translations;
 

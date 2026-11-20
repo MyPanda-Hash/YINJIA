@@ -89,16 +89,22 @@ test('外部-非开发样品单只有一级审批：不出现「待二级确认�
   assert.equal(ext.l2, 1)
 })
 
-test('切换后跳转目标面板：EXT → RD_SAMPLE_EXT，ND → RD_SAMPLE_ND（?focus=单号）', () => {
+test('切换后跳转目标面板：EXT → RD_SAMPLE_EXT，ND → RD_SAMPLE_ND（?docNo=单号）', () => {
+  // 2026-11-20 报障：样品进度页点行不跳到对应单。根因是这里用了 ?focus= ——
+  // focus 只在**当前已加载的列表**里找下标，目标一旦在别的页/被页签或可见范围挡住就落空，
+  // 页面停在第 1 张单（用户观感=没反应）。?docNo= 是列表页「按单号定向打开」的既有口子
+  // （applyDocNoQuery → 条件 _docNo），不受分页/页签影响，跨面板跳转与消息中心都走它。
   assert.deepEqual(sampleDocRoute(SAMPLE_PANEL_EXT, 'SPW-2026-11-0001'), {
     path: '/panelx/list/RD_SAMPLE_EXT',
-    query: { focus: 'SPW-2026-11-0001' },
+    query: { docNo: 'SPW-2026-11-0001' },
   })
   assert.deepEqual(sampleDocRoute(SAMPLE_PANEL_ND, ' SPN2-2026-11-0001 '), {
     path: '/panelx/list/RD_SAMPLE_ND',
-    query: { focus: 'SPN2-2026-11-0001' },
+    query: { docNo: 'SPN2-2026-11-0001' },
   }, '单号两端空白去掉')
   assert.equal(sampleDocRoute('', 'SPW-1').path, '/panelx/list/RD_SAMPLE_EXT', '缺省仍跳 EXT')
+  assert.ok(!('focus' in sampleDocRoute(SAMPLE_PANEL_EXT, 'SPW-1').query),
+    '不得再传 focus（列表页按位置定位，目标不在当前页时必然落空）')
 })
 
 test('非开发样品单没有「确认人」：字段仍出现在查询下拉里，按它查就是空结果', () => {
@@ -129,13 +135,31 @@ test('接口契约：按 panel 取不同表 + 按对应面板校验权限，ND �
   assert.match(qSeg, /rd_sample_nondev_head/, 'ND 读 rd_sample_nondev_head')
 })
 
+test('接口契约：进度页可见范围必须与目标单据列表同口径（列出来却点不进去 = 报障根因）', () => {
+  // 2026-11-20 生产取证(谢琴 xieqin，非管理员/无 view_all)：
+  //   进度页 17 行（/px/sampleFlow 返回全表），单据列表只有 1 行（queryDocs 按 asp_user1 过滤）；
+  //   点别人那行 → focus 在列表里找不到 → 停在谢琴自己那张单，用户观感「点了没反应」。
+  // 作废单同理：queryDocs 无条件排除 canceled='Y'，进度页却把 11 张作废单列了出来。
+  // 所以进度页的取数必须复用列表的可见范围口径，否则「能看到的单」≠「点得开的单」。
+  const at = querySvc.indexOf('public List<java.util.Map<String, Object>> sampleFlowRows(String panel)')
+  assert.ok(at > 0, '缺 sampleFlowRows(String panel)')
+  const seg = querySvc.slice(at, at + 5000)
+  assert.match(seg, /ISNULL\(s\.canceled, ?'N'\) ?<> ?'Y'/, '作废单必须从进度页排除（与 queryDocs 的 canceled 过滤同口径）')
+  assert.match(seg, /OWN_DOCS_PANELS/, '本人归属面板要复用同一份登记（RD_SAMPLE_EXT）')
+  assert.match(seg, /canViewAllOf\(/, '有 view_all 的角色看全部（刘磊口径）')
+  assert.match(seg, /asp_user1/, '没有 view_all 的账号按 asp_user1 = 当前账号收口')
+  assert.match(seg, /currentLogin\(/, '取当前登录账号')
+})
+
 test('页面接线：顶部面板切换、切换重拉、行点击按当前面板跳转', () => {
   assert.deepEqual(SAMPLE_PANELS.map((p) => p.label), ['外部-开发样品单', '外部-非开发样品单'], '两个切换标签')
   assert.match(page, /el-radio-group[\s\S]{0,240}v-model="panel"/, '顶部要有分段切换')
   assert.match(page, /v-for="p in SAMPLE_PANELS"[\s\S]{0,120}tt\(p\.label\)/, '标签统一走 SAMPLE_PANELS + tt()')
   assert.match(page, /@change="[^"]*"/, '切换要触发动作（重拉 + 刷 KPI）')
   assert.match(page, /request\.get\('\/px\/sampleFlow',\s*\{\s*params:\s*\{\s*panel:/, '请求要带当前面板')
-  assert.match(page, /sampleDocRoute\(/, '跳转目标面板不能写死')
+  assert.match(page, /sampleDocRoute\(panel\.value, no\)/, '跳转按当前面板 + 单号构造路由')
+  assert.match(page, /@row-click="openDoc"/, '整行点击要接到 openDoc')
+  assert.match(page, /@click\.stop="openDoc\(row\)"/, '单号 el-link 要 stop 后单独接到 openDoc')
   assert.match(page, /sampleKpisOf\(rows\.value,\s*panel\.value\)/, 'KPI 按当前面板统计')
   assert.match(page, /SAMPLE_FLOW_FIELDS/, '字段查询复用')
 })

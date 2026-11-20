@@ -29,6 +29,24 @@ export function findDocIndex(rows, no) {
 }
 
 /**
+ * `?docNo=单号` 定向取数后的回退判定（2026-11-20）。
+ *
+ * <p>docNo 是「按单号打开一张单」的深链：列表按单号过滤后再显示那张单，所以不受分页/页签影响。
+ * 但目标如果在当前账号的**可见范围外**（别人的单 / 已作废 / 不存在 / 前后端版本不一致），
+ * 过滤结果就是 0 行 —— 旧写法停在一个 0/0 的空白列表页，用户看到的仍然不是所点的那张单。
+ * 这里只做判定：有单号且确实拿到了空结果集 ⇒ 调用方要清筛选、恢复列表并明确提示。</p>
+ *
+ * @param {string} no URL 上的 ?docNo=（会去两端空白）
+ * @param {Array} rows 定向取数后的列表
+ * @returns {boolean} true = 需要回退
+ */
+export function shouldRestoreAfterDocNo(no, rows) {
+  const key = String(no == null ? '' : no).trim()
+  if (!key) return false
+  return Array.isArray(rows) && rows.length === 0
+}
+
+/**
  * 预览列表（pageSize=200 一页取全）里的下标 → 还原分页后目标所在的页码（1 起）。
  *
  * <p>index &lt; 0（预览里没找到目标）/ pageSize 非法时一律回第 1 页 —— 绝不返回 0 页或 NaN，

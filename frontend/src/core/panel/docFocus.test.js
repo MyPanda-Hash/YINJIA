@@ -20,7 +20,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { docNoOf, findDocIndex, pageOfPreviewIndex } from './docFocus.js'
+import { docNoOf, findDocIndex, pageOfPreviewIndex, shouldRestoreAfterDocNo } from './docFocus.js'
 
 const list = readFileSync(new URL('../views/PanelxList.vue', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
 
@@ -69,6 +69,19 @@ test('pageOfPreviewIndex: 预览 200 条的下标 → 还原分页（默认 20/�
   assert.equal(pageOfPreviewIndex(undefined, 20), 1)
   assert.equal(pageOfPreviewIndex(5, 0), 6, 'pageSize 兜底 1：任何下标都落在自己那一页，不会除零')
   assert.equal(pageOfPreviewIndex(5, NaN), 6)
+})
+
+test('shouldRestoreAfterDocNo: ?docNo= 定向取数 0 行 = 目标不可见/不存在，必须回退', () => {
+  // 2026-11-20 报障补充：docNo 是「按单号定向打开」的深链，但目标如果在当前账号的可见范围外
+  //   （别人的单 / 已作废 / 不存在 / 前后端版本不一致），列表过滤结果就是 0 行。
+  //   旧写法停在 0/0 空白页，用户看到的仍然不是所点的那张单 ⇒ 必须清筛选、恢复列表并提示。
+  assert.equal(shouldRestoreAfterDocNo('SPW-1', []), true, '有单号但 0 行 ⇒ 要回退')
+  assert.equal(shouldRestoreAfterDocNo('  SPW-1  ', []), true, '空白要吃掉')
+  assert.equal(shouldRestoreAfterDocNo('SPW-1', [{ 编号: 'SPW-1' }]), false, '取到了就不动')
+  assert.equal(shouldRestoreAfterDocNo('', []), false, '没单号 = 没发起定向取数，别误伤正常空列表')
+  assert.equal(shouldRestoreAfterDocNo('   ', []), false)
+  assert.equal(shouldRestoreAfterDocNo('SPW-1', null), false, '非数组按"没有结果集"处理，不误判')
+  assert.equal(shouldRestoreAfterDocNo(null, []), false)
 })
 
 /* ── ② 接线：focus 消费的时序 ───────────────────────────────── */

@@ -5477,6 +5477,8 @@ export default {
     '新增客户': 'New customer',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
     '样品进度跟踪': 'Sample Progress',
+    /* ── 2026-11-20：按单号打开不到（已作废/无权限）时的兜底提示 ── */
+    '未找到该单据（可能已作废或没有查看权限）': 'Document not found (it may be voided or outside your permission scope)',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
     '按外部开发样品单看进展：谁提交、审到第几级、谁在等确认，一屏看完': 'Follow each external development sample request: who submitted it, which approval level it is waiting on, and who needs to act',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */

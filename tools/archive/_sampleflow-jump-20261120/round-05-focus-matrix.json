@@ -1,0 +1,121 @@
+[
+  {
+    "want": "xieqin-2026-11-19-01",
+    "shown": "xieqin-2026-11-19-01",
+    "same": true,
+    "url": "http://36.140.66.163:8090/#/panelx/list/RD_SAMPLE_EXT",
+    "pos": "3/6"
+  },
+  {
+    "want": "liulei-2026-11-19-01",
+    "shown": "客户名称：",
+    "same": false,
+    "url": "http://36.140.66.163:8090/#/panelx/list/RD_SAMPLE_EXT",
+    "pos": "4/6"
+  },
+  {
+    "want": "lily-2026-11-19-01",
+    "shown": "客户名称：",
+    "same": false,
+    "url": "http://36.140.66.163:8090/#/panelx/list/RD_SAMPLE_EXT",
+    "pos": "1/6"
+  },
+  {
+    "want": "admin-2026-11-19-02",
+    "shown": "客户名称：",
+    "same": false,
+    "url": "http://36.140.66.163:8090/#/panelx/list/RD_SAMPLE_EXT",
+    "pos": "2/6"
+  },
+  {
+    "want": "admin-2026-11-19-01",
+    "shown": "客户名称：",
+    "same": false,
+    "url": "http://36.140.66.163:8090/#/panelx/list/RD_SAMPLE_EXT",
+    "pos": "2/6"
+  },
+  {
+    "want": "SPW-2026-11-0012",
+    "shown": "客户名称：",
+    "same": false,
+    "url": "http://36.140.66.163:8090/#/panelx/list/RD_SAMPLE_EXT",
+    "pos": "2/6"
+  },
+  {
+    "want": "SPW-2026-11-0011",
+    "shown": "客户名称：",
+    "same": false,
+    "url": "http://36.140.66.163:8090/#/panelx/list/RD_SAMPLE_EXT",
+    "pos": "2/6"
+  },
+  {
+    "want": "SPW-2026-11-0010",
+    "shown": "SPW-2026-11-0010",
+    "same": true,
+    "url": "http://36.140.66.163:8090/#/panelx/list/RD_SAMPLE_EXT",
+    "pos": "5/6"
+  },
+  {
+    "want": "SPW-2026-11-0009",
+    "shown": "SPW-2026-11-0010",
+    "same": false,
+    "url": "http://36.140.66.163:8090/#/panelx/list/RD_SAMPLE_EXT",
+    "pos": "5/6"
+  },
+  {
+    "want": "SPW-2026-11-0008",
+    "shown": "SPW-2026-11-0010",
+    "same": false,
+    "url": "http://36.140.66.163:8090/#/panelx/list/RD_SAMPLE_EXT",
+    "pos": "5/6"
+  },
+  {
+    "want": "SPW-2026-11-0007",
+    "shown": "SPW-2026-11-0010",
+    "same": false,
+    "url": "http://36.140.66.163:8090/#/panelx/list/RD_SAMPLE_EXT",
+    "pos": "5/6"
+  },
+  {
+    "want": "SPW-2026-11-0006",
+    "shown": "SPW-2026-11-0006",
+    "same": true,
+    "url": "http://36.140.66.163:8090/#/panelx/list/RD_SAMPLE_EXT",
+    "pos": "6/6"
+  },
+  {
+    "want": "SPW-2026-11-0005",
+    "shown": "SPW-2026-11-0006",
+    "same": false,
+    "url": "http://36.140.66.163:8090/#/panelx/list/RD_SAMPLE_EXT",
+    "pos": "6/6"
+  },
+  {
+    "want": "SPW-2026-11-0004",
+    "shown": "SPW-2026-11-0006",
+    "same": false,
+    "url": "http://36.140.66.163:8090/#/panelx/list/RD_SAMPLE_EXT",
+    "pos": "6/6"
+  },
+  {
+    "want": "SPW-2026-11-0003",
+    "shown": "SPW-2026-11-0006",
+    "same": false,
+    "url": "http://36.140.66.163:8090/#/panelx/list/RD_SAMPLE_EXT",
+    "pos": "6/6"
+  },
+  {
+    "want": "SPW-2026-11-0002",
+    "shown": "SPW-2026-11-0006",
+    "same": false,
+    "url": "http://36.140.66.163:8090/#/panelx/list/RD_SAMPLE_EXT",
+    "pos": "6/6"
+  },
+  {
+    "want": "SPW-2026-11-0001",
+    "shown": "SPW-2026-11-0006",
+    "same": false,
+    "url": "http://36.140.66.163:8090/#/panelx/list/RD_SAMPLE_EXT",
+    "pos": "6/6"
+  }
+]

@@ -51,12 +51,20 @@ export function isSingleLevelPanel(panel) {
 /**
  * 点一行/点单号要去哪个面板 —— 必须跟着**当前选中的面板**走：
  * EXT → RD_SAMPLE_EXT，ND → RD_SAMPLE_ND（不能写死 EXT，否则在非开发单页点开的是开发单列表）。
- * @returns {{path: string, query: {focus: string}}} 与 router.push 的参数同构
+ *
+ * ⚠ 用 `?docNo=` 而不是 `?focus=`（2026-11-20 报障根因）：
+ *   focus 是「在**当前已加载的列表**里按下标定位」，但进度页的清单和单据列表的可见范围并不相同
+ *   （RD_SAMPLE_EXT 非管理员只看本人 + 列表无条件排除作废单 + 列表分页），
+ *   目标不在当前列表时 focus 永远命中不了 ⇒ 停在第 1 张单，用户观感「点了没反应」。
+ *   docNo 是列表页既有的「按单号定向打开」口子（applyDocNoQuery → 条件 _docNo），
+ *   先过滤再显示那张单，不受分页/页签影响 —— 消息中心/跨面板跳转同一套写法。
+ *
+ * @returns {{path: string, query: {docNo: string}}} 与 router.push 的参数同构
  */
 export function sampleDocRoute(panel, docNo) {
   return {
     path: `/panelx/list/${normalizeSamplePanel(panel)}`,
-    query: { focus: String(docNo == null ? '' : docNo).trim() },
+    query: { docNo: String(docNo == null ? '' : docNo).trim() },
   }
 }
 
