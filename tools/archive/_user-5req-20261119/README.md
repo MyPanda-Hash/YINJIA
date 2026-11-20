@@ -75,10 +75,27 @@
 | `ego/round-53-process-unfinished.mjs` | 口径复核：选中 2号车间 ⇒ `10700`(不是未交量 11000)；勾 1号+3号 ⇒ `3100`(2400+700) |
 | `ego/round-56-process-unfinished-8090.mjs` | 打包版 8090 复核同一口径(2号车间 10700；勾 1号+3号 ⇒ 3100/2400+700) |
 | `ego/round-58-process-line2-8090.mjs` | 清空勾选后选 2号车间：蓝框 `10700` = 左侧「未完工 10700」/顶部「未完工量 10700」 |
+| `ego/round-62-styled-export-8090.mjs` | 打包版 8090 勾 2 行导出样式版 xlsx(字节捕获) |
 | `ego/round-41-route-dialog.mjs` | 打开工艺路线表格调整并截图 |
 
 导出内容另做了字节级复核：勾 2 行导出的 xlsx 解析后 = 标题 + 公司抬头 + 表头 13 列 + **2 行数据**；
 勾 N 行只出现 N 行。
+
+## 2026-11-20 导出 Excel 表格样式(用户追加口径)
+
+> 「报工记录导出的 Excel 表头列需要做出区分，不同行之间应该存在斑马条做出区分，
+> 当前单文字按表格排列过于简陋，或许是框线没有整体的表格框线的原因。」
+
+- 依赖 `xlsx-js-style@1.2.0`(SheetJS 社区版忽略 `cell.s`，写不出表头底色/框线/斑马纹);
+- 标题/公司抬头跨列合并居中;表头行深蓝底 `1E6FB8` + 白字加粗 + 细框;
+- 数据行整表细框线 + 隔行斑马纹 `FFFFFF` / `F2F7FF`;数字列右对齐 + `#,##0.####`;
+- 列宽按内容自适应(中文 2 字宽)、行高、表头自动筛选;
+- `reportLeaf` 的数值判据补 `data_type=数值`(报工数量)，屏幕列也改为右对齐。
+
+证据：`报工记录-导出样式示例.xlsx`(可直接用 Excel 打开) + `报工记录-导出样式.png`
+(Excel 转 PDF 后渲染，1 页横向适配)；`ego/round-62-styled-export-8090.mjs` 为打包版导出脚本。
+openpyxl 复核：合并 `A1:M1`/`A2:M2`、表头 `FF1E6FB8`/白字/加粗/thin 框、数据行
+`FFFFFFFF`/`FFF2F7FF` 交替 + 四边 thin、筛选 `A4:M6`、列宽/行高均已写入。
 
 ## 测试
 
@@ -87,11 +104,9 @@ cd frontend
 node --test src/core/views/reportListExport.test.js \
             src/views/modules/plan/workOrderBoardUnfinished.test.js \
             src/business/print-formats.test.js
-# 48 tests / 48 pass
+# 50 tests / 50 pass
 
-npm test   # 2292 tests / 2286 pass
-# 6 fail 全部是 recordSheetConfigs.livedb.test.js 的活库直查:
-# spawnSync ... SQLCMD.EXE ENOENT(本机未装 sqlcmd),与本任务改动无关
+npm test   # 仅 6 条活库直查因本机未装 sqlcmd 失败(与本次改动无关)
 ```
 
 `npm run build` 通过。
