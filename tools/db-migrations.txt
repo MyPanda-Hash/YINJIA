@@ -5103,3 +5103,8 @@ migrate-qc-bhc-ship-insp-link-20261120.sql
 #   本脚本只补授权(能看 RD_INSTR_USE 的角色 + 管理员 → view,query,export)+ 面板名译名;
 #   不建表、不碰单据数据。幂等;两账套均执行。
 migrate-instr-summary-page-20261120.sql
+
+# 2026-11-20 工艺路线(ROUTE)表头「生效日期 / 失效日期」取消必填:
+#   用户口径「工序路线中生效日期和失效日期也不用必填」;必填真源 = yj_field.required,
+#   只 UPDATE 这两格 → 0 + 自检 required=1 残留必须为 0。幂等;两账套均执行。
+migrate-route-dates-optional-20261120.sql
