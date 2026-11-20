@@ -84,6 +84,9 @@
   <style name="metaL" style="cell" fontSize="8" isBold="true" mode="Opaque" backcolor="#F2F2F2"/>
   <style name="metaV" style="cell" fontSize="8"/>
   <style name="req" style="base" fontSize="8" vAlign="Middle"/>
+  <!-- 2026-11-20:相关要求第 8/9/10 条在受控表单上是**红字**(修订标记),纸面照印。
+       红字范围与面板 QcFirstInspSheet.vue 的 RED_REQ_INDEXES(=7/8/9)必须同步;改一处必改另一处。 -->
+  <style name="reqRed" style="req" forecolor="#FF0000"/>
   <style name="pager" style="base" fontSize="8" vAlign="Middle"/>
   <style name="pagerR" style="pager" hAlign="Right"/>
 
@@ -127,6 +130,8 @@
   <!-- ======================= 相关要求 十条(纸面固定文案)+ 表尾 =======================
        ⚠ 文案与面板 QcFirstInspSheet.vue 的 REQUIREMENTS 常量**逐字一致**(改一处必须同步另一处)。
        8pt 下 782pt 宽一行约容 97 个汉字,这十条最长的一条(第 10 条)约 53 字 ⇒ 各占一行不折行(已核)。
+       ⚠ 2026-11-20:第 8/9/10 条按受控表单印**红字**(style=reqRed,forecolor #FF0000),
+         与面板 RED_REQ_INDEXES、Excel 导出(带不出颜色,纸面仍黑字)口径见 README。
        ⚠ 2026-11-19:六条换十条 —— 行数从 6 变 10,条高仍 14pt,表尾整体下移到 y=154、band 高 176
          (title 86 + 表头 40 + 明细 ~180 + summary 176 + 页脚 18 < 可用高 547,A4 横向仍一页)。 -->
   <summary>
@@ -139,9 +144,9 @@
       <staticText><reportElement style="req" x="0" y="70" width="782" height="14"/><text><![CDATA[5. 跌落强度测试2支，抗压强度工序单有要求才测，没有要求则只测跌落强度。]]></text></staticText>
       <staticText><reportElement style="req" x="0" y="84" width="782" height="14"/><text><![CDATA[6. 压降测试：依照工艺管控清单，明确测试方法并要求测试压降的才进行测试。]]></text></staticText>
       <staticText><reportElement style="req" x="0" y="98" width="782" height="14"/><text><![CDATA[7. 所有测试均按照检测设备的实际读数进行记录数据。]]></text></staticText>
-      <staticText><reportElement style="req" x="0" y="112" width="782" height="14"/><text><![CDATA[8. 炭棒表观出现严重粘模或明显脱粉情况，需马上停止生产，已生产的产品暂时隔离标示（红色）]]></text></staticText>
-      <staticText><reportElement style="req" x="0" y="126" width="782" height="14"/><text><![CDATA[9. 测试样品需保留至本班次生产完成。]]></text></staticText>
-      <staticText><reportElement style="req" x="0" y="140" width="782" height="14"/><text><![CDATA[10. C-95客户相关产品脱模后立马进行首件检验，压降测试数据需要在3个小时内出结果，合格后方可进行生产作业。]]></text></staticText>
+      <staticText><reportElement style="reqRed" x="0" y="112" width="782" height="14"/><text><![CDATA[8. 炭棒表观出现严重粘模或明显脱粉情况，需马上停止生产，已生产的产品暂时隔离标示（红色）]]></text></staticText>
+      <staticText><reportElement style="reqRed" x="0" y="126" width="782" height="14"/><text><![CDATA[9. 测试样品需保留至本班次生产完成。]]></text></staticText>
+      <staticText><reportElement style="reqRed" x="0" y="140" width="782" height="14"/><text><![CDATA[10. C-95客户相关产品脱模后立马进行首件检验，压降测试数据需要在3个小时内出结果，合格后方可进行生产作业。]]></text></staticText>
       <!-- 表尾:检验结果 | 检验人 | 审核人(与面板表尾、Excel 导出同口径)
            ⚠ 2026-10-18 补第三组「审核人」;
              ⚠ 2026-11-19 **删第四组「批准」**:本单 2026-11-09 起单级审批

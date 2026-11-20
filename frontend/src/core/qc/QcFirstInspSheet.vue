@@ -270,11 +270,11 @@
     </div>
 
     <!-- ⑤ 相关要求(受控表单原文十条;模板与服务端报表、Excel 导出**共用** REQUIREMENTS 这一份,
-         别三处各写一遍) -->
+         别三处各写一遍。其中第 8/9/10 条在受控表单上是**红字**(见 RED_REQ_INDEXES)) -->
     <div class="fi-requirements">
       <b>{{ tt('相关要求') }}：</b>
       <ol>
-        <li v-for="(r, i) in REQUIREMENTS" :key="i">{{ tt(r) }}</li>
+        <li v-for="(r, i) in REQUIREMENTS" :key="i" :class="{ 'is-red': RED_REQ_INDEXES.has(i) }">{{ tt(r) }}</li>
       </ol>
     </div>
 
@@ -454,6 +454,17 @@ const REQUIREMENTS = [
   '测试样品需保留至本班次生产完成。',
   'C-95客户相关产品脱模后立马进行首件检验，压降测试数据需要在3个小时内出结果，合格后方可进行生产作业。',
 ]
+
+/**
+ * 《相关要求》里印**红字**的条目(2026-11-20 用户口径「字体还是黑色的」):
+ * 受控表单上第 8/9/10 条是红字(修订标记),系统纸面与打印件要照印。
+ * 下标从 0 开始 ⇒ 7/8/9 = 第 8/9/10 条。**改红字范围只动这一处**
+ * (服务端报表 `qc_first_insp.jrxml` 的 `reqRed` 样式与本常量必须同步)。
+ *
+ * ⚠ Excel 导出**带不出红字**:xlsx 社区版会丢掉单元格样式(见 firstInspExport.js 头注),
+ *   导出纸上仍是黑字 —— 要红字请用「打印」或「导出报表(PDF)」。
+ */
+const RED_REQ_INDEXES = new Set([7, 8, 9])
 
 /**
  * 导出 Excel(.xlsx)—— 导出的是**当前这张纸**(《炭棒成型车间首件检验记录表》),
@@ -1100,6 +1111,11 @@ defineExpose({ exportFirstInspExcel })
 .fi-requirements ol {
   margin: 2px 0 0 20px;
   padding: 0;
+}
+/* 《相关要求》红字条(受控表单上第 8/9/10 条是红字修订标记;范围见 RED_REQ_INDEXES)。
+   文字颜色不受 print-color-adjust 影响(那条只管底色),所以打印件照样是红的。 */
+.fi-requirements li.is-red {
+  color: #ff0000;
 }
 /* 表尾:三组「标签 96px + 值列」(检验结果 | 检验人 | 审核人;
    2026-11-19 删掉第四组「批准」—— 单级审批没有二级,别再把 nth-child(7) 加回来);

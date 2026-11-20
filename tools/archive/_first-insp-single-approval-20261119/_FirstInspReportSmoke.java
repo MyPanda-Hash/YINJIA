@@ -13,6 +13,7 @@
  *   ③ summary 里**任何**静态文案都不许再出现「批准」,文本域表达式不许再引用 $P{审批人};
  *   ④ 填充后仍是 **1 页**(十条比六条多 50pt,band 高 126 → 176,必须还在一页里);
  *   ⑤ 导出的 xlsx 里十条齐全、「批准」一个单元格都没有。
+ *   ⚠ 2026-11-20 追加:summary 里第 8/9/10 条必须是**红字**(forecolor 红),其余条与表尾不是红。
  *
  * 用法(⚠ 在**仓库根**执行;JDK 必须 25 —— backend/pom.xml 的 maven.compiler.release=25):
  *   cd backend && mvn -o -s ../tools/settings.xml -q -DskipTests compile
@@ -30,6 +31,7 @@ import net.sf.jasperreports.engine.JRBand;
 import net.sf.jasperreports.engine.JRChild;
 import net.sf.jasperreports.engine.JRStaticText;
 import net.sf.jasperreports.engine.JRTextField;
+import net.sf.jasperreports.engine.JRTextElement;
 import net.sf.jasperreports.engine.JasperExportManager;
 import net.sf.jasperreports.engine.JasperFillManager;
 import net.sf.jasperreports.engine.JasperPrint;
@@ -168,6 +170,23 @@ public class _FirstInspReportSmoke {
         for (String label : new String[]{"检验结果", "检验人", "审核人"}) {
             check("summary 表尾含「" + label + "」", statics.contains(label));
         }
+        // ②b 红字:第 8/9/10 条 forecolor=红(2026-11-20 用户口径「字体还是黑色的」)
+        java.util.Set<String> redTexts = new LinkedHashSet<>();
+        if (summary != null) {
+            for (JRChild ch : summary.getChildren()) {
+                if (!(ch instanceof JRTextElement te) || te.getForecolor() == null) continue;
+                java.awt.Color fg = te.getForecolor();
+                boolean isRed = fg.getRed() > 200 && fg.getGreen() < 60 && fg.getBlue() < 60;
+                if (isRed && ch instanceof JRStaticText st && st.getText() != null) redTexts.add(st.getText());
+            }
+        }
+        eq("红字条数", 3, redTexts.size());
+        check("第 8 条是红字", redTexts.contains(REQUIREMENTS[7]));
+        check("第 9 条是红字", redTexts.contains(REQUIREMENTS[8]));
+        check("第 10 条是红字", redTexts.contains(REQUIREMENTS[9]));
+        check("第 7 条不是红字", !redTexts.contains(REQUIREMENTS[6]));
+        check("表尾不是红字", !redTexts.contains("检验结果") && !redTexts.contains("审核人"));
+
         // ③ 批准必须彻底消失(静态文案 + 文本域表达式两条路都查)
         check("summary 静态文案里没有「批准」", statics.stream().noneMatch(s -> s.contains("批准")));
         check("summary 文本域里没有 $P{审批人}", exprs.stream().noneMatch(e -> e.contains("审批人")));
