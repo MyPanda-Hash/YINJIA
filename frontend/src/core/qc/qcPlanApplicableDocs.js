@@ -7,8 +7,8 @@
 // 「显示中文名 / 表单多选 / 提交前拼串」三件事,避免组件里散落 split/join。
 export const QC_PLAN_DOC_OPTIONS = [
   { value: 'QC_FIRST_INSP', label: '首件检验单' },
-  { value: 'QC_PROC_INSP', label: '出货检验单功能' },
-  { value: 'QC_ASM_INSP', label: '组装成品检验单' },
+  { value: 'QC_PROC_INSP', label: '出货检验（功能）' },
+  { value: 'QC_ASM_INSP', label: '出货检验（表观）' },
 ]
 
 const LABEL_OF = new Map(QC_PLAN_DOC_OPTIONS.map((d) => [d.value, d.label]))

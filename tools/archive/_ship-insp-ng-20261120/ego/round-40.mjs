@@ -1,0 +1,27 @@
+const task = await taskSpace('qc-ng-20261120')
+const page = task.page('p1')
+const picked = await page.evaluate(() => {
+  const txt = (el) => (el?.innerText || '').replace(/\s+/g, ' ').trim()
+  const row = [...document.querySelectorAll('tr')].find((tr) => /ZC-2026-10-0131/.test(txt(tr)))
+  if (!row) return '(not found)'
+  row.click()
+  return txt(row)
+})
+console.log('PICK', picked)
+await page.waitForTimeout(3500)
+// 设结论=不合格(英文界面选项仍是中文数据键)
+await page.evaluate(() => { const s = document.querySelector('.qr-foot-table .el-select'); if (s) s.click() })
+await page.waitForTimeout(700)
+const opts = await page.evaluate(() => [...document.querySelectorAll('.el-select-dropdown__item')].map((e) => (e.innerText || '').trim()))
+console.log('OPTS', JSON.stringify(opts))
+await page.evaluate(() => {
+  const opt = [...document.querySelectorAll('.el-select-dropdown__item')].find((e) => (e.innerText || '').trim() === '不合格')
+  if (opt) opt.click()
+})
+await page.waitForTimeout(900)
+console.log('BAND_EN', JSON.stringify(await page.evaluate(() => (document.querySelector('.qr-band')?.innerText || '').replace(/\s+/g, ' '))))
+console.log('FOOT_EN', JSON.stringify(await page.evaluate(() => (document.querySelector('.qr-foot-table')?.innerText || '').replace(/\s+/g, ' '))))
+await page.screenshot({ path: 'C:/Users/vigna/ego/qc-ng-20261120/s40-en-ng.png' })
+// 不点保存不动库:直接刷新丢弃
+await page.reload({ timeout: 40000 })
+await page.waitForTimeout(4000)

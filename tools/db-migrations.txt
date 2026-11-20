@@ -5080,3 +5080,13 @@ migrate-route-process-control-optional-20261119.sql
 #   用户口径「按 excel 排序即可,其他不用改动」⇒ 只改 [序号] 一列,重号(28×2)/跳号清零;
 #   作废行(硬度)不参与、面板配置与列表默认排序不动。幂等;两账套均执行。
 migrate-sample-reg-seq-20261120.sql
+
+# 2026-11-20 出货检验两张面板改名(显示层):出货检验单功能 → 出货检验（功能）,
+#   出货检验表观 → 出货检验（表观）。只改 yj_panel.panel_name + panel 级译名;
+#   面板代号/物理表/单号前缀/菜单 code/历史数据一律不动。幂等;两账套均执行。
+migrate-qc-ship-insp-rename-20261120.sql
+
+# 2026-11-20 不合格品处理单(制程) QC_BHC 增加关联字段「出货检验单号」(参照 QC_PROC_INSP)
+#   +「工单号」,并把两格补进纸面(QC_BHC 第 1/3 行各补一格,不加行)。配合「判定不合格 →
+#   去开不合格处理单」按钮(POST /api/qc/shipInsp/ng 幂等取/建)。幂等;两账套均执行。
+migrate-qc-bhc-ship-insp-link-20261120.sql

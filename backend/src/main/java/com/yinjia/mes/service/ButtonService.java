@@ -3137,8 +3137,8 @@ public class ButtonService {
         if (func.isEmpty() || look.isEmpty())
             throw new IllegalStateException("产成品入库单必须关联「出货检验功能单号」和「出货检验表观单号」后才能提交审批/审核(本单商品「是否过程检验」为是;等两张检验单审核完成后自动带入)");
         // 2026-11-13:只要求两张检验单已审核(不再按批次比明细、不再要求全合格)
-        checkInspAudited("出货检验功能", "QC_PROC_INSP", func);
-        checkInspAudited("出货检验表观", "QC_ASM_INSP", look);
+        checkInspAudited("出货检验（功能）", "QC_PROC_INSP", func);
+        checkInspAudited("出货检验（表观）", "QC_ASM_INSP", look);
     }
 
     /**

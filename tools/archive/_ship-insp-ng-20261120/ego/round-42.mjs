@@ -1,0 +1,6 @@
+const task = await taskSpace('qc-ng-20261120')
+const page = task.page('p1')
+await page.evaluate(() => { localStorage.setItem('mes_locale', 'zh-CN') })
+await page.reload({ timeout: 40000 })
+await page.waitForTimeout(5000)
+console.log(JSON.stringify(await page.evaluate(() => ({ locale: localStorage.getItem('mes_locale'), title: document.title }))))

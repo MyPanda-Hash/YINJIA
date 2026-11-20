@@ -688,12 +688,15 @@ export const menuTree = [
           // (重命名不改面板代号/表结构/单据编号前缀 ZC,历史数据与审批状态原样保留)。
           // 表样=截图「制程检验」页签:外观/尺寸/出货重量 三组 + 出货检验功能性测试组(用「表区」区分)。
           // 检验类别字段区分「首件检验(第2步)」与「制程检验(第3步)」。
-          { code: 'qcProcInsp', title: '出货检验单功能', path: '/panelx/list/QC_PROC_INSP', icon: 'Checked', panelCode: 'QC_PROC_INSP', operationName: '新增流程' },
+          // 2026-11-20 用户口径「名字修改为出货检验（表观）/（功能）」:菜单/面板显示名带全角括号,
+          //   面板代号 QC_PROC_INSP / 表 qc_proc_insp_* / 单号前缀 ZC / 历史数据与审批状态一律不动
+          //   (改名=显示层;代数是数据键,动它等于全链路迁移 + 历史数据对不上)。
+          { code: 'qcProcInsp', title: '出货检验（功能）', path: '/panelx/list/QC_PROC_INSP', icon: 'Checked', panelCode: 'QC_PROC_INSP', operationName: '新增流程' },
           // 组装成品检验单(9.29 批次④,2026-10-05):**组装**报工审核自动出单;含合格转库存/不合格待处理
           // 2026-11-11 用户口径「将当前的组装成品检验修改为出货检验表观」:菜单/页签只改**显示名**,
           //   面板代号 QC_ASM_INSP、物理表 qc_asm_insp_*、单号前缀 ZJ、菜单 code/route、历史数据与
           //   审批状态**全部不动**(改名=显示层,代号是数据键,动它等于全链路迁移+历史数据对不上)。
-          { code: 'qcAsmInsp', title: '出货检验表观', path: '/panelx/list/QC_ASM_INSP', icon: 'Finished', panelCode: 'QC_ASM_INSP', operationName: '新增流程' },
+          { code: 'qcAsmInsp', title: '出货检验（表观）', path: '/panelx/list/QC_ASM_INSP', icon: 'Finished', panelCode: 'QC_ASM_INSP', operationName: '新增流程' },
           // 出厂检验报告(2026-10-30 新增,面板 QC_OQC_REPORT,前缀 OQC):用户口径「出厂检验报告的内容
           // 就是首件/制程/成品三张单检验数据共同数据之上生成;在销售出库勾选货物时跳转到这个页面,
           // 然后走正常的审批形式」。一份报告=一个产品(勾选多行→多张单);行清单来自《出货检验计划表》

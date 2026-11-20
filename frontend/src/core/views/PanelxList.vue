@@ -237,6 +237,7 @@
           :result-text-field="procInspResultTextField"
           @dirty="markInlineDirty"
           @open-items="qcInspPlanVisible = true"
+          @open-ng="openNgDisposition"
         />
         <QcFirstInspSheet
           v-else-if="panelCode === 'QC_FIRST_INSP'"
@@ -10797,13 +10798,13 @@ async function openPickedProcInsp(res) {
   const kind = target === 'QC_FIRST_INSP' ? 'first' : (target === 'QC_ASM_INSP' ? 'asm' : 'proc')
   if (!no) {
     return ElMessage.warning(kind === 'first' ? tt('未生成首件检验单')
-      : (kind === 'asm' ? tt('未生成出货检验表观') : tt('未生成出货检验单功能')))
+      : (kind === 'asm' ? tt('未生成出货检验（表观）') : tt('未生成出货检验（功能）')))
   }
   const existed = res?.['已存在'] === true
   const existedText = kind === 'first' ? tt('该工单行今天已有首件检验单')
-    : (kind === 'asm' ? tt('该工单行已有出货检验表观') : tt('该工单行已有出货检验单功能'))
+    : (kind === 'asm' ? tt('该工单行已有出货检验（表观）') : tt('该工单行已有出货检验（功能）'))
   const createdText = kind === 'first' ? tt('已生成首件检验单')
-    : (kind === 'asm' ? tt('已生成出货检验表观') : tt('已生成出货检验单功能'))
+    : (kind === 'asm' ? tt('已生成出货检验（表观）') : tt('已生成出货检验（功能）'))
   ElMessage.success(`${existed ? existedText : createdText}：${no}`)
   if (target === panelCode.value) {
     // 🔴 2026-10-18 审查补:切单前必须过「未保存修改」守卫 —— openDocByNo 会直接 load() 换掉当前单,
@@ -10823,6 +10824,61 @@ async function openPickedProcInsp(res) {
   tabs.open({ path: targetPath, title: target })
   // 跨面板同样要**打开那张单**(不是只落到列表):目标页用 ?docNo= 定位(applyDocNoQuery 既有机制)
   router.push({ path: targetPath, query: { docNo: no } })
+}
+
+/** 「去开不合格处理单」防重入(建单是跨面板跳转,连点会连开两次请求) */
+const ngOpening = ref(false)
+/**
+ * 出货检验（功能/表观）判定「不合格」→ 开/跳 不合格品处理单(制程)（2026-11-20 用户口径）。
+ *
+ * <p>用户原话:「品质相关所有检验记录选择不合格都需要跳转至相关流程单据，当前出货检验（功能）就是转到
+ * 不合格处理（制程）……为当前不合格处理（制程）的单据增加字段可关联到出货检验(功能）和对应的生产工单。」
+ * 追问确认:入口只做这两张检验单;纸面判定不合格出按钮,点击跳到处理单新单并带出检验单号+工单号。</p>
+ *
+ * <p><b>三步,顺序不能换</b>:</p>
+ * <ol>
+ *   <li><b>先落库</b>:检验结论是刚在纸上选的「不合格」时,库里可能还是空的 —— 不先保存,
+ *       服务端复核会判「结论不是不合格」,用户会以为按钮坏了。脏单先静默保存,保存失败就停;</li>
+ *   <li><b>服务端取/建</b>:幂等(同一检验单只留一张存活处理单)、结论复核、带客户/产品/工单/
+ *       不合格数量,全部在 {@code POST /api/qc/shipInsp/ng};</li>
+ *   <li><b>按 gotoPanel 跳</b>:与「选生产工单」回执同款(关本页签 → 开目标页签 → ?docNo= 定位),
+ *       用户要看的始终是**那张单**,不是列表。</li>
+ * </ol>
+ */
+async function openNgDisposition() {
+  if (ngOpening.value) return
+  const no = curDocNo.value
+  if (!no) return ElMessage.warning(tt('请先保存这张检验单'))
+  if (hasUnsavedChanges()) {
+    const ok = await saveInlineDraft('保存', { silent: true })
+    if (!ok) return
+  }
+  ngOpening.value = true
+  try {
+    const res = await request.post('/qc/shipInsp/ng', { 面板: String(panelCode.value), 单据编号: no })
+    // ⚠ body 里的 code 不是 200 时 axios 不会 reject(权限/业务拒绝按 HTTP 200 + body-code 回,
+    //   见 GlobalExceptionHandler 头注) ⇒ 必须显式判 code,否则会把错误体当成功、拿不到编号
+    if (!res || res.code !== 200) throw new Error(res?.message || tt('开不合格品处理单失败'))
+    const data = res.data || {}
+    const target = String(data['gotoPanel'] || 'QC_BHC')
+    const targetNo = String(data['编号'] || '')
+    if (!targetNo) {
+      ElMessage.warning(tt('未生成不合格品处理单'))
+      return
+    }
+    ElMessage.success(`${data['已存在'] === true ? tt('该检验单已有不合格品处理单')
+      : tt('已生成不合格品处理单')}：${targetNo}`)
+    await guardPageAction(async () => {
+      const targetPath = `/panelx/list/${target}`
+      tabs.close(route.path)
+      tabs.open({ path: targetPath, title: target })
+      router.push({ path: targetPath, query: { docNo: targetNo } })
+    })
+  } catch (e) {
+    ElMessage.error(e?.message || tt('开不合格品处理单失败'))
+  } finally {
+    ngOpening.value = false
+  }
 }
 
 /**

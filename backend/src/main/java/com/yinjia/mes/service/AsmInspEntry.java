@@ -74,18 +74,18 @@ public final class AsmInspEntry {
 
     /** 未进入时的通用拦截话术(具体行会带上末道工序名,见 {@link #notEnteredReason}) */
     public static final String REASON_NOT_ENTERED =
-            "该工单行尚未进入末道工序（上一道工序还没有已审核报工流入），暂不能生成出货检验表观";
+            "该工单行尚未进入末道工序（上一道工序还没有已审核报工流入），暂不能生成出货检验（表观）";
 
     /** 路线末道不是组装/装箱类时的话术(这类工单不出表观单,不是"还没进入") */
     public static final String REASON_NO_ASSEMBLY_OP =
-            "该工单的工艺路线末道工序不是「组装/装箱」，不出出货检验表观";
+            "该工单的工艺路线末道工序不是「组装/装箱」，不出出货检验（表观）";
 
     /** 带末道工序名的未进入话术(前端 {@code tt()} 用同一句原文) */
     public static String notEnteredReason(String op) {
         String o = op == null ? "" : op.trim();
         return o.isEmpty()
                 ? REASON_NOT_ENTERED
-                : "该工单行尚未进入末道工序「" + o + "」（上一道工序还没有已审核报工流入），暂不能生成出货检验表观";
+                : "该工单行尚未进入末道工序「" + o + "」（上一道工序还没有已审核报工流入），暂不能生成出货检验（表观）";
     }
 
     /**

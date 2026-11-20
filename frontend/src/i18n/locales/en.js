@@ -6794,6 +6794,38 @@ export default {
     '勾选车间 = 所选车间合计；不勾选 = 当前选中产线所属车间；未选产线 = 全部车间':
       'Checked workshops = their total; none checked = the workshop of the selected line; no line selected = all workshops',
 
+    // ---- 2026-11-20 出货检验改名(出货检验（功能）/（表观）)+ 判定不合格 → 去开不合格品处理单(制程) ----
+    '出货检验（功能）': 'Outgoing Inspection (Functional)',
+    '出货检验（表观）': 'Outgoing Inspection (Appearance)',
+    '出货检验单号': 'Outgoing Inspection Sheet No.',
+    '去开不合格处理单': 'Open NG Disposition Sheet',
+    '本单检验结论为不合格，去开不合格品处理单（制程）并带出本单号与工单号':
+      'This sheet is judged nonconforming. Open a Nonconforming Product Disposition (Process) sheet carrying this sheet no. and the work order no.',
+    '该检验单已有不合格品处理单': 'This inspection sheet already has a nonconforming product disposition sheet',
+    '已生成不合格品处理单': 'Nonconforming product disposition sheet created',
+    '未生成不合格品处理单': 'No nonconforming product disposition sheet was created',
+    '开不合格品处理单失败': 'Failed to open the nonconforming product disposition sheet',
+    '请先保存这张检验单': 'Save this inspection sheet first',
+    '未生成出货检验（功能）': 'No outgoing functional inspection sheet was created',
+    '未生成出货检验（表观）': 'No outgoing appearance inspection sheet was created',
+    '该工单行已有出货检验（功能）': 'This work-order line already has an outgoing functional inspection sheet',
+    '该工单行已有出货检验（表观）': 'This work-order line already has an outgoing appearance inspection sheet',
+    '已生成出货检验（功能）': 'Outgoing functional inspection sheet created',
+    '已生成出货检验（表观）': 'Outgoing appearance inspection sheet created',
+    '生成出货检验（功能）失败': 'Failed to create the outgoing functional inspection sheet',
+    '生成出货检验（表观）失败': 'Failed to create the outgoing appearance inspection sheet',
+    '选择一条生产工单行（工单号 + 工单行号唯一确定）生成出货检验（功能）草稿；已建单的行会标出来，重复选择不会重复建单。':
+      'Pick a production work-order line (work order no. + line no. uniquely identify it) to create an outgoing functional inspection sheet draft; lines that already have a sheet are marked, re-picking will not create a duplicate.',
+    '选择一条已进入末道工序的生产工单行（工单号 + 工单行号唯一确定）生成出货检验（表观）草稿；已建单的行会标出来，重复选择不会重复建单。':
+      'Pick a production work-order line that has entered the final process (work order no. + line no. uniquely identify it) to create an outgoing appearance inspection sheet draft; lines that already have a sheet are marked, re-picking will not create a duplicate.',
+    '仅「出货检验（功能）」使用，改动只影响本面板（历史单据已填的值不受影响）':
+      'Used by "Outgoing Inspection (Functional)" only; changes affect this panel only (values already saved stay unchanged).',
+    '方案按「适用单据」分套：首件检验单 / 出货检验（功能） / 出货检验（表观）各看自己适用的方案；勾「显示全部单据的方案」可维护所有方案（未填适用单据的旧方案也只在全部里显示）。':
+      'Plans are grouped by "Applicable Document": the first-article, outgoing functional and outgoing appearance sheets each see only the plans that apply to them. Tick "Show plans for all documents" to maintain every plan (legacy plans without an applicable document also appear only there).',
+    '成型出首件检验单与出货检验（功能），组装出出货检验（表观）；切炭/混料/装箱不出检验单':
+      'Moulding produces the first-article and outgoing functional inspection sheets; assembly produces the outgoing appearance inspection sheet; cutting, mixing and packing produce none',
+    '出货检验（功能）(成型产出)': 'Outgoing functional inspection (moulding output)',
+
   },
 
 }
