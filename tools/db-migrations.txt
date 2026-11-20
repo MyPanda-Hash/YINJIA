@@ -5075,3 +5075,8 @@ migrate-selfmade-20261119.sql
 #   用户口径「工艺路线中工序控制不需要必填」;必填真源 = yj_field.required(角色字段视图只管显隐),
 #   只 UPDATE 这一格 required → 0 + 末尾自检 required=1 残留必须为 0。幂等;两账套均执行。
 migrate-route-process-control-optional-20261119.sql
+
+# 2026-11-20 「内部检测目录」(SAMPLE_REG → qc_sample_reg)序号按 Excel 目录顺序重排 1~55:
+#   用户口径「按 excel 排序即可,其他不用改动」⇒ 只改 [序号] 一列,重号(28×2)/跳号清零;
+#   作废行(硬度)不参与、面板配置与列表默认排序不动。幂等;两账套均执行。
+migrate-sample-reg-seq-20261120.sql
