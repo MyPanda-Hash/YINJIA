@@ -319,6 +319,9 @@ export default {
     "压降测试：依照工艺管控清单，明确测试方法并要求测试压降的才进行测试。": "Pressure drop: follow the process control sheet; test only when the test method is specified and pressure drop is required.",
     "所有测试均按照检测设备的实际读数进行记录数据。": "Record all test data exactly as displayed on the measuring equipment.",
     "炭棒表观出现严重粘模或明显脱粉情况，需马上停止生产，已生产的产品暂时隔离标示（红色）": "If severe sticking or obvious powder removal appears on the carbon rod, stop production immediately and mark produced items as temporarily isolated (red).",
+    // 2026-11-20 第 8 条改成「前半句黑 + 后半句红」的片段渲染,片段各自要词条
+    "炭棒表观出现严重粘模或明显脱粉情况，": "If severe sticking or obvious powder removal appears on the carbon rod, ",
+    "需马上停止生产，已生产的产品暂时隔离标示（红色）": "stop production immediately and mark produced items as temporarily isolated (red)",
     "C-95客户相关产品脱模后立马进行首件检验，压降测试数据需要在3个小时内出结果，合格后方可进行生产作业。": "For C-95 customer products, perform first-article inspection immediately after demolding; pressure-drop results must be available within 3 hours, and production may start only after passing.",
     "按检测设备的实际读数记录": "Record exactly as displayed on the measuring equipment",
     '完工明细': 'Completion Details',

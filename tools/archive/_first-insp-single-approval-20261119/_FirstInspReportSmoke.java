@@ -13,7 +13,8 @@
  *   ③ summary 里**任何**静态文案都不许再出现「批准」,文本域表达式不许再引用 $P{审批人};
  *   ④ 填充后仍是 **1 页**(十条比六条多 50pt,band 高 126 → 176,必须还在一页里);
  *   ⑤ 导出的 xlsx 里十条齐全、「批准」一个单元格都没有。
- *   ⚠ 2026-11-20 追加:summary 里第 8/9/10 条必须是**红字**(forecolor 红),其余条与表尾不是红。
+ *   ⚠ 2026-11-20 追加:红字口径 = 第 10 条整行红、第 8 条**只有后半句**红(markup styled 的 font 片段)、
+ *      其余条与表尾全黑;PDF 内容流里红色填充算子 >= 2。
  *
  * 用法(⚠ 在**仓库根**执行;JDK 必须 25 —— backend/pom.xml 的 maven.compiler.release=25):
  *   cd backend && mvn -o -s ../tools/settings.xml -q -DskipTests compile
@@ -159,8 +160,10 @@ public class _FirstInspReportSmoke {
         }
         System.out.println("  summary 静态文案 " + statics.size() + " 条 / 文本域 " + exprs.size() + " 条");
 
-        // ① 十条逐字都在(顺序也一致)
-        for (String r : REQUIREMENTS) check("summary 含《相关要求》「" + r.substring(0, Math.min(14, r.length())) + "…」", statics.contains(r));
+        // ① 十条逐字都在(顺序也一致)。第 8 条带 styled 红片段 ⇒ 比对前先剥掉 <font> 标签
+        java.util.List<String> staticsPlain = new ArrayList<>();
+        for (String st : statics) staticsPlain.add(st.replaceAll("<font[^>]*>", "").replace("</font>", ""));
+        for (String r : REQUIREMENTS) check("summary 含《相关要求》「" + r.substring(0, Math.min(14, r.length())) + "…」", staticsPlain.contains(r));
         int reqCount = 0;
         for (String s : statics) if (s.matches("^\\d+\\. .*")) reqCount++;
         eq("summary 里编号要求条数", REQUIREMENTS.length, reqCount);
@@ -170,22 +173,34 @@ public class _FirstInspReportSmoke {
         for (String label : new String[]{"检验结果", "检验人", "审核人"}) {
             check("summary 表尾含「" + label + "」", statics.contains(label));
         }
-        // ②b 红字:第 8/9/10 条 forecolor=红(2026-11-20 用户口径「字体还是黑色的」)
+        // ②b 红字口径(2026-11-20 用户逐条点明):第 10 条整行红、第 8 条只有后半句红、其余全黑
         java.util.Set<String> redTexts = new LinkedHashSet<>();
+        String item8Markup = null;
         if (summary != null) {
             for (JRChild ch : summary.getChildren()) {
+                if (!(ch instanceof JRStaticText st) || st.getText() == null) continue;
+                if (st.getText().startsWith("8. ")) item8Markup = st.getText();
                 if (!(ch instanceof JRTextElement te) || te.getForecolor() == null) continue;
                 java.awt.Color fg = te.getForecolor();
                 boolean isRed = fg.getRed() > 200 && fg.getGreen() < 60 && fg.getBlue() < 60;
-                if (isRed && ch instanceof JRStaticText st && st.getText() != null) redTexts.add(st.getText());
+                if (isRed) redTexts.add(st.getText());
             }
         }
-        eq("红字条数", 3, redTexts.size());
-        check("第 8 条是红字", redTexts.contains(REQUIREMENTS[7]));
-        check("第 9 条是红字", redTexts.contains(REQUIREMENTS[8]));
-        check("第 10 条是红字", redTexts.contains(REQUIREMENTS[9]));
+        eq("整行套红样式的条数(只该有第 10 条)", 1, redTexts.size());
+        check("第 10 条整行是红字(reqRed)", redTexts.contains(REQUIREMENTS[9]));
+        check("第 9 条不是红字", !redTexts.contains(REQUIREMENTS[8]));
         check("第 7 条不是红字", !redTexts.contains(REQUIREMENTS[6]));
         check("表尾不是红字", !redTexts.contains("检验结果") && !redTexts.contains("审核人"));
+        // 第 8 条:整行黑底 + 后半句 styled 红片段
+        check("第 8 条存在", item8Markup != null);
+        if (item8Markup != null) {
+            check("第 8 条前半句仍是黑的(不带 font 片段)",
+                    item8Markup.startsWith("8. 炭棒表观出现严重粘模或明显脱粉情况，"));
+            check("第 8 条后半句是红片段",
+                    item8Markup.contains("<font color=\"#FF0000\">需马上停止生产，已生产的产品暂时隔离标示（红色）</font>"));
+            check("第 8 条红片段只包后半句(不吞序号)",
+                    !item8Markup.contains("<font color=\"#FF0000\">8. "));
+        }
 
         // ③ 批准必须彻底消失(静态文案 + 文本域表达式两条路都查)
         check("summary 静态文案里没有「批准」", statics.stream().noneMatch(s -> s.contains("批准")));
@@ -209,6 +224,9 @@ public class _FirstInspReportSmoke {
         System.out.println("  " + pdf.getPath() + " " + pdf.length() + " bytes");
         String pdfText = new String(java.nio.file.Files.readAllBytes(pdf.toPath()), java.nio.charset.StandardCharsets.ISO_8859_1);
         eq("PDF 页对象数(/Type/Page)", 1, countPdfPages(pdfText));
+        // 红字是否真印进 PDF:解压内容流后数红色填充算子(第 8 条红片段 + 第 10 条整行)
+        int redOps = countOf(pdfFlateText(java.nio.file.Files.readAllBytes(pdf.toPath())), "1 0 0 rg");
+        check("PDF 红色填充算子 >= 2(实际 " + redOps + ")", redOps >= 2);
 
         File xlsx = new File(outDir, "_first-insp-report-single.xlsx");
         SimpleXlsxReportConfiguration cfg = new SimpleXlsxReportConfiguration();
@@ -270,6 +288,50 @@ public class _FirstInspReportSmoke {
             }
         }
         throw new IllegalStateException("假明细里没有该格：" + key + " / " + sample);
+    }
+
+    /** 解压 PDF 里所有 FlateDecode 流,拼成纯文本(用于数颜色算子) */
+    private static String pdfFlateText(byte[] pdf) {
+        StringBuilder sb = new StringBuilder();
+        String raw = new String(pdf, java.nio.charset.StandardCharsets.ISO_8859_1);
+        java.util.regex.Matcher m = Pattern.compile("stream\\r?\\n").matcher(raw);
+        int from = 0;
+        while (m.find(from)) {
+            int start = m.end();
+            int end = raw.indexOf("endstream", start);
+            if (end < 0) break;
+            byte[] slice = java.util.Arrays.copyOfRange(pdf, start, end);
+            try {
+                sb.append(new String(inflate(slice), java.nio.charset.StandardCharsets.ISO_8859_1)).append('\n');
+            } catch (Exception ignore) { /* 非 Flate 流(图片等)跳过 */ }
+            from = end + 9;
+        }
+        return sb.toString();
+    }
+
+    private static byte[] inflate(byte[] src) throws java.io.IOException {
+        java.util.zip.Inflater inf = new java.util.zip.Inflater();
+        inf.setInput(src);
+        java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        try {
+            while (!inf.finished()) {
+                int n = inf.inflate(buf);
+                if (n == 0) break;
+                out.write(buf, 0, n);
+            }
+        } catch (Exception e) {
+            throw new java.io.IOException(e);
+        } finally {
+            inf.end();
+        }
+        return out.toByteArray();
+    }
+
+    private static int countOf(String hay, String needle) {
+        int n = 0;
+        for (int i = hay.indexOf(needle); i >= 0; i = hay.indexOf(needle, i + needle.length())) n++;
+        return n;
     }
 
     /** PDF 页对象数:`/Type/Page`(排除 `/Type/Pages`) */

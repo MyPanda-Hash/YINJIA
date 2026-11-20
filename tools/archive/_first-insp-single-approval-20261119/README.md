@@ -137,6 +137,33 @@ PDF/xlsx 已重新生成；8090 打包版实测 `li` 颜色 = `rgb(255,0,0)`（�
 ⚠ 仍有两处是黑字且属**已知限制**：① 前端「导出 Excel(.xlsx)」—— xlsx 社区版写不了字体颜色；
 ② 服务器（36.140.66.163）尚未部署本轮改动。
 
+## 追补三（2026-11-20 二轮）：红字改成「片段级」
+
+用户逐条点明：「第十条保持当前的红字状态，第8条只保持这些为**需马上停止生产，已生产的产品暂时隔离标示（红色）**红字，
+其余都为黑字」⇒ 取代上一轮「8/9/10 全红」：
+
+| 条 | 之前 | 现在 |
+|---|---|---|
+| 1～7 | 黑 | 黑 |
+| 8 | 整行红 | **前半句黑 + 后半句红**（红从「需马上停止生产」起） |
+| 9 | 红 | **黑**（按「其余都为黑字」） |
+| 10 | 整行红 | 整行红（不变） |
+
+实现：
+
+- 面板 `REQUIREMENTS` 改成**片段数组** `{ t, red? }`，第 8 条两片、第 10 条一片 `red:true`；
+  渲染 `<span class="is-red">`，`.fi-requirements li .is-red { color:#ff0000 }`；Excel 导出按片拼接（仍无颜色）。
+- 报表 `qc_first_insp.jrxml`：第 8 条 `staticText` 加 `<textElement markup="styled"/>`，
+  正文 `<font color="#FF0000">` 只包后半句（`<color>` 标签不是合法 styled tag，实测报
+  `Tag <color> is not a valid styled text tag`，用 `<font color=...>` 才对）；第 9 条回 `req`（黑）；
+  第 10 条仍 `reqRed`。
+
+复验：单测 `node --test src/core/qc/*.test.js` → 173 pass / 0 fail；
+冒烟新增断言（整行红样式只该有第 10 条、第 9 条不是红、第 8 条 `<font>` 片段只包后半句、
+**PDF 内容流里 `1 0 0 rg` >= 2**）→ **52 PASS / 0 FAIL**；
+8090 实测逐片计算样式（`ego/round-34-partial-red.mjs`）：第 8 条两片 = `rgb(34,34,34)` + `rgb(255,0,0)`，
+第 9 条 `rgb(34,34,34)`，第 10 条 `rgb(255,0,0)`；特写截图 `ego/round-35-closeup.mjs` 产物。
+
 ## 复跑
 ```bash
 cd frontend && node --test src/core/qc/*.test.js          # ①
