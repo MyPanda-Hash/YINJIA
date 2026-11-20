@@ -903,11 +903,33 @@ public class QueryService {
             return counted;
         }
 
+        // 列表默认排序(2026-11-20,yj_panel.config 的 listOrder):档案面板可声明「按某列升/降序」——
+        //   现役唯一消费者 SAMPLE_REG(内部检测目录:按「序号」升序,与 Excel 目录同序);
+        //   未声明 ⇒ 沿原来的 id DESC(新录入的在最上面),其它档案面板行为一字不变。
+        // ⚠ 列名来自配置,必须两段校验:① 先按「字段标签→物理列」映射(l2c);② 再确认该列真在
+        //   line_table 上(与上面 dateCol 同一判据)——否则拼出的 SQL 直接「列名无效」把列表打挂。
+        //   同序值再按 id ASC 兜底,保证行序稳定(翻页/参照取数不会飘)。
+        String orderBy = "t.id DESC";
+        String[] listOrder = def.listOrder();
+        if (listOrder != null) {
+            String orderCol = l2c.getOrDefault(listOrder[0], listOrder[0]);
+            Integer hasOrderCol = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(?) AND name = ?",
+                    Integer.class, "dbo." + def.lineTable(), orderCol);
+            if (hasOrderCol != null && hasOrderCol > 0) {
+                orderBy = "t.[" + orderCol + "] " + listOrder[1] + ", t.id ASC";
+            } else {
+                org.slf4j.LoggerFactory.getLogger(QueryService.class)
+                        .warn("[listOrder] 面板 {} 声明的排序列「{}」不在表 {} 上,回落 id DESC",
+                                def.code(), orderCol, def.lineTable());
+            }
+        }
+
         // 全量返回(上限 ARCH_LOAD_CAP):保存语义为"缺席行=已删除",必须保证明细完整
         String sql = "SELECT t.id AS __id, " + cols
                 + (panelNameField != null ? ", pn.panel_name AS [" + panelNameField + "]" : "")
                 + " FROM " + from + " " + where
-                + " ORDER BY t.id DESC OFFSET 0 ROWS FETCH NEXT " + ARCH_LOAD_CAP + " ROWS ONLY";
+                + " ORDER BY " + orderBy + " OFFSET 0 ROWS FETCH NEXT " + ARCH_LOAD_CAP + " ROWS ONLY";
         List<Map<String, Object>> rows = jdbc.queryForList(sql, args.toArray());
 
         List<Map<String, Object>> items = new ArrayList<>();

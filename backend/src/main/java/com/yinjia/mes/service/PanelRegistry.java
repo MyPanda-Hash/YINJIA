@@ -92,6 +92,40 @@ public class PanelRegistry {
             }
         }
 
+        /**
+         * **档案列表的默认排序**(yj_panel.config 的 {@code "listOrder"},2026-11-20 起):
+         * <pre>{"listOrder": ["序号", "ASC"]}</pre>
+         *
+         * <p>背景(用户 2026-11-20):送样登记表 →「内部检测目录」的序号已按 Excel 目录重排 1~55,
+         * 但档案列表默认 {@code id DESC}(新录入的在最上面)⇒ 打开看到的仍是一串倒着的序号
+         * (屏幕上是 50、49、48…),用户口径「还是乱序的」。
+         *
+         * <p>值 = {@code [列, 方向]}:列可写**字段标签**(按 yj_field 映射成物理列)或物理列名;
+         * 方向只认 {@code ASC}/{@code DESC}(大小写不敏感),其余按 ASC。缺键/空数组/首元素空串 ⇒
+         * {@code null}(调用方回落到 {@code id DESC})。解析失败只 {@code warn} 不抛 ——
+         * 一段配置写坏不能把列表面板打不开。
+         *
+         * <p>与 {@link #detailTabLabel()} / {@link #uniqueKeys()} 同一条规矩:声明式,换面板 = 改一行 JSON。
+         */
+        public String[] listOrder() {
+            if (config == null || !config.contains("listOrder")) return null;
+            try {
+                com.fasterxml.jackson.databind.JsonNode n =
+                        CONFIG_JSON.readTree(config).path("listOrder");
+                if (!n.isArray() || n.size() == 0) return null;
+                String col = n.get(0).asText("").trim();
+                if (col.isEmpty()) return null;
+                String dir = n.size() > 1 ? n.get(1).asText("ASC").trim().toUpperCase() : "ASC";
+                if (!"DESC".equals(dir)) dir = "ASC";
+                return new String[]{col, dir};
+            } catch (Exception ex) {
+                org.slf4j.LoggerFactory.getLogger(PanelRegistry.class)
+                        .warn("[listOrder] 面板 {} 的 yj_panel.config 解析失败(列表排序按缺省 id DESC):{}",
+                                code, ex.getMessage());
+                return null;
+            }
+        }
+
         private static final com.fasterxml.jackson.databind.ObjectMapper CONFIG_JSON =
                 new com.fasterxml.jackson.databind.ObjectMapper();
 

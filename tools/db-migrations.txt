@@ -5081,6 +5081,12 @@ migrate-route-process-control-optional-20261119.sql
 #   作废行(硬度)不参与、面板配置与列表默认排序不动。幂等;两账套均执行。
 migrate-sample-reg-seq-20261120.sql
 
+# 2026-11-20 「内部检测目录」(SAMPLE_REG)列表默认按「序号」升序(与 Excel 目录同序):
+#   上一支脚本把序号数据排成 1~55 后用户仍报「还是乱序的」——根因是档案列表默认 id DESC,
+#   屏幕上是 50、49、48…;本支给 yj_panel.config 加 "listOrder":["序号","ASC"],
+#   读取方 = PanelRegistry#listOrder + QueryService#queryArchive。幂等;两账套均执行。
+migrate-sample-reg-list-order-20261120.sql
+
 # 2026-11-20 出货检验两张面板改名(显示层):出货检验单功能 → 出货检验（功能）,
 #   出货检验表观 → 出货检验（表观）。只改 yj_panel.panel_name + panel 级译名;
 #   面板代号/物理表/单号前缀/菜单 code/历史数据一律不动。幂等;两账套均执行。
