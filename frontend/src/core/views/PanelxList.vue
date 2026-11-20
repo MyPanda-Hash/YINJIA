@@ -10178,16 +10178,19 @@ async function downloadReport(fmt) {
 }
 
 /**
- * 报工记录「导出报表 → 导出 Excel」(2026-11-19 用户口径)。
+ * 报工记录「导出报表 → 导出 Excel」(2026-11-19 用户口径;2026-11-20 加表格样式)。
  *
- * <p>用户口径:「报工记录需要可以选择出所选行导出 Excel,就是当前的导出报表需要实现,
+ * <p>用户口径 2026-11-19:「报工记录需要可以选择出所选行导出 Excel,就是当前的导出报表需要实现,
  * 但是需要增加勾选行。」⇒ 平表没有 .jrxml 模板,导出走前端 xlsx:</p>
  * <ul>
  *   <li>列 = **当前列设置后的可见列**(reportColumnTree 的叶子,与屏幕表头同源);</li>
  *   <li>行 = 当前排序/筛选后的 reportList(勾选行模式只取勾中的行,且必须仍在本页结果里);</li>
  *   <li>勾 0 行走「全部当前结果」入口;勾选行入口勾 0 行时给提示,不静默导全部。</li>
  * </ul>
- * 文件名带面板名 + 范围 + 日期;导出成功后才关弹窗,失败保留弹窗可重试。
+ * <p>2026-11-20 用户口径:「表头列需要做出区分,不同行之间应该存在斑马条做出区分,当前单文字按
+ * 表格排列过于简陋,或许是框线没有整体的表格框线的原因。」⇒ 改用 `xlsx-js-style` 写带样式的
+ * xlsx:标题/抬头合并居中、深蓝表头白字加粗、整表细框线、数据行隔行浅蓝斑马纹、数字右对齐 +
+ * 千分位、列宽按内容自适应、表头行冻结/筛选。文字仍与屏幕列设置/查询结果一致。</p>
  *
  * @param {boolean} onlyChecked true=只导勾选行;false=导出当前查询结果全部行
  */
@@ -10207,7 +10210,16 @@ async function exportReportExcel(onlyChecked) {
   }
   if (!leaves.length) { ElMessage.warning(tt('没有可导出的列')); return }
   try {
-    const XLSX = await import('xlsx')
+    // 🔴 必须用 xlsx-js-style(SheetJS 社区版忽略 cell.s 样式):表头/斑马纹/框线靠它才写进文件
+    const mod = await import('xlsx-js-style')
+    const XLSX = mod.default || mod
+    // 列宽:中文按 2 字宽估算,取「表头 / 全部数据」最大宽度,夹在 10~44
+    const wideLen = (v) => [...String(v ?? '')].reduce((n, ch) => n + (/[\u4e00-\u9fff]/.test(ch) ? 2 : 1), 0)
+    const colWidths = leaves.map((c) => {
+      const label = String(tt(c.label || c.prop))
+      const maxData = rows.reduce((m, r) => Math.max(m, wideLen(r[c.prop])), 0)
+      return Math.min(Math.max(Math.max(wideLen(label), maxData) + 2, 10), 44)
+    })
     const aoa = [
       [String(panelName.value || '报工记录')],
       [`惠州市银嘉环保科技有限公司　　${tt('单据日期')} ${reportPeriod.value}`],
@@ -10217,11 +10229,63 @@ async function exportReportExcel(onlyChecked) {
     for (const r of rows) {
       aoa.push(leaves.map((c) => {
         const v = r[c.prop]
-        return v === null || v === undefined ? '' : String(v)
+        if (v === null || v === undefined || v === '') return ''
+        // 数值列保留数字类型(导出后能直接求和/排序);其它一律文本
+        const n = Number(v)
+        return c.align === 'right' && Number.isFinite(n) ? n : String(v)
       }))
     }
     const ws = XLSX.utils.aoa_to_sheet(aoa)
-    ws['!cols'] = leaves.map((c) => ({ wch: c.align === 'right' ? 12 : 16 }))
+    const lastCol = Math.max(leaves.length - 1, 0)
+    // 整表细框线(表头 + 数据行;标题/抬头不画框,免得像两行表格)
+    const thin = { style: 'thin', color: { rgb: 'B7C3D0' } }
+    const border = { top: thin, bottom: thin, left: thin, right: thin }
+    const headerStyle = {
+      font: { bold: true, sz: 11, color: { rgb: 'FFFFFF' }, name: '微软雅黑' },
+      fill: { patternType: 'solid', fgColor: { rgb: '1E6FB8' } },
+      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+      border,
+    }
+    const titleStyle = {
+      font: { bold: true, sz: 16, color: { rgb: '1F2937' }, name: '微软雅黑' },
+      alignment: { horizontal: 'center', vertical: 'center' },
+    }
+    const infoStyle = {
+      font: { sz: 10, color: { rgb: '4B5563' }, name: '微软雅黑' },
+      alignment: { horizontal: 'left', vertical: 'center' },
+    }
+    const title = ws['A1']
+    if (title) title.s = titleStyle
+    const info = ws['A2']
+    if (info) info.s = infoStyle
+    // 表头行(第 4 行,r=3):深蓝底白字 + 居中 + 细框
+    for (let c = 0; c <= lastCol; c++) {
+      const addr = XLSX.utils.encode_cell({ r: 3, c })
+      if (ws[addr]) ws[addr].s = headerStyle
+    }
+    // 数据行(r=4 起):隔行浅蓝斑马纹 + 细框;数字右对齐 + 千分位
+    for (let i = 0; i < rows.length; i++) {
+      const fill = { patternType: 'solid', fgColor: { rgb: i % 2 === 1 ? 'F2F7FF' : 'FFFFFF' } }
+      for (let c = 0; c <= lastCol; c++) {
+        const addr = XLSX.utils.encode_cell({ r: 4 + i, c })
+        const cell = ws[addr] || (ws[addr] = { t: 's', v: '' })
+        cell.s = {
+          font: { sz: 10, name: '微软雅黑', color: { rgb: '303133' } },
+          fill,
+          alignment: { horizontal: leaves[c].align === 'right' ? 'right' : 'left', vertical: 'center' },
+          border,
+        }
+        if (leaves[c].align === 'right' && typeof cell.v === 'number') cell.z = '#,##0.####'
+      }
+    }
+    // 标题/抬头跨列合并;列宽/行高;表头行自动筛选(导出后直接筛/排序)
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } },
+      { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } },
+    ]
+    ws['!cols'] = colWidths.map((wch) => ({ wch }))
+    ws['!rows'] = [{ hpt: 30 }, { hpt: 20 }, { hpt: 8 }, { hpt: 28 }, ...rows.map(() => ({ hpt: 20 }))]
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 3, c: 0 }, e: { r: 3 + rows.length, c: lastCol } }) }
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, String(panelName.value || '报工记录').slice(0, 28))
     const d = new Date()
@@ -11984,7 +12048,9 @@ function qOptions(qr) {
 
 function reportLeaf(column) {
   const field = fieldDefOf(column)
-  const numeric = field.dataType === '小数' || field.dataType === '整数'
+  // 「数值」也要按数值列处理(2026-11-20):报工数量在 yj_field 里 data_type=数值,
+  // 旧判据只认 小数/整数 ⇒ 报表列左对齐、导出 Excel 也当文本(不能直接求和/右对齐)。
+  const numeric = ['小数', '整数', '数值'].includes(field.dataType)
   return { prop: column, label: column, width: colW(field), align: numeric ? 'right' : 'left' }
 }
 

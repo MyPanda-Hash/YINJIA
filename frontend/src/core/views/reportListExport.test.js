@@ -42,14 +42,41 @@ test('导出报表弹窗:报工记录走「勾选行 / 全部当前结果」,其
 })
 
 test('导出内容取当前可见列 + 当前排序/筛选结果;勾选行必须仍在本页结果里', () => {
-  const fn = vue.slice(vue.indexOf('async function exportReportExcel'), vue.indexOf('async function exportReportExcel') + 3000)
+  const fn = vue.slice(vue.indexOf('async function exportReportExcel'), vue.indexOf('async function exportReportExcel') + 9000)
   assert.match(fn, /reportColumnTree\.value/, '列必须取当前可见列表(reportColumnTree)')
   assert.match(fn, /c\.children/, '分组表头要摊平成叶子列')
   assert.match(fn, /reportList\.value/, '行必须取当前排序/筛选后的 reportList')
   assert.match(fn, /reportCheckedRows\.value/, '勾选行入口必须用当前结果里的勾选行(reportCheckedRows)')
   assert.match(fn, /pool\.includes\(r\)/, '勾选行必须过滤掉已不在当前结果里的行')
   assert.match(fn, /XLSX\.utils\.aoa_to_sheet/, '必须用 xlsx 生成真正的 .xlsx')
+  assert.match(fn, /c\.align === 'right' && Number\.isFinite\(n\) \? n : String\(v\)/, '数值列必须写成数字(可求和),文本列写文本')
+  assert.match(vue, /const numeric = \['小数', '整数', '数值'\]\.includes\(field\.dataType\)/,
+    'reportLeaf 必须把 data_type=数值(报工数量)也识别成数值列,否则导出会当文本左对齐')
   assert.match(fn, /请先勾选要导出的行/, '勾 0 行时给提示,不得静默导全部')
+})
+
+// 2026-11-20 用户口径:「表头列需要做出区分,不同行之间应该存在斑马条做出区分,
+// 当前单文字按表格排列过于简陋,或许是框线没有整体的表格框线的原因。」
+test('导出 Excel 必须有表格样式:表头区分 + 斑马行 + 整表框线', () => {
+  const fn = vue.slice(vue.indexOf('async function exportReportExcel'), vue.indexOf('async function exportReportExcel') + 9000)
+  // SheetJS 社区版会忽略 cell.s ⇒ 必须用带样式分支的 xlsx-js-style
+  assert.match(fn, /import\('xlsx-js-style'\)/, '必须用 xlsx-js-style(社区版 xlsx 不写 cell.s 样式)')
+  assert.match(fn, /const XLSX = mod\.default \|\| mod/, '兼容 ESM/CJS 导出')
+  // 表头:深蓝底白字 + 加粗 + 细框
+  assert.match(fn, /headerStyle/, '必须定义表头样式')
+  assert.match(fn, /bgColor|fgColor: \{ rgb: '1E6FB8' \}/, '表头要用深蓝底区分')
+  assert.match(fn, /color: \{ rgb: 'FFFFFF' \}/, '表头文字必须是白色')
+  assert.match(fn, /bold: true/, '表头加粗')
+  // 框线 + 斑马
+  assert.match(fn, /const border = \{ top: thin, bottom: thin, left: thin, right: thin \}/, '整表必须有四边细框线')
+  assert.match(fn, /F2F7FF/, '数据行必须有浅蓝斑马纹')
+  assert.match(fn, /i % 2 === 1/, '斑马纹必须按行交替')
+  assert.match(fn, /cell\.s =/, '样式必须写到单元格(cell.s)')
+  // 版面:合并标题、列宽、行高、筛选
+  assert.match(fn, /ws\['!merges'\]/, '标题/抬头要跨列合并')
+  assert.match(fn, /ws\['!cols'\]/, '列宽必须自适应')
+  assert.match(fn, /ws\['!rows'\]/, '行高要设置(表头/数据行)')
+  assert.match(fn, /ws\['!autofilter'\]/, '表头行应有自动筛选')
 })
 
 test('导出报表入口:报工记录不再要求管理员(它不走服务端模板)', () => {
