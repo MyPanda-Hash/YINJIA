@@ -3016,9 +3016,11 @@ const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', '
   // 改为纸张式受控表单(QcOqcSheet,c-95-12 / YJ-QR-05/A1),不再是表头+17 列明细的数据页。
   'QC_OQC_REPORT',
   // 巡线检验·成型车间巡线记录表(QC_LINE_PATROL,2026-11-14 用户口径「照第二张图纸面样式,先可填即可」):
-  // 纸张式记录表(QcLinePatrolSheet:标题/日期/审核人 + 12 列表头 + 每块 4 子行),
+  // 纸张式记录表(QcLinePatrolSheet:标题/日期/审核人 + 12 列表头 + 每块 2 子行),
   // 不列进来会退回「表头字段平铺 + 明细表格」的数据页,与用户给的纸样不符。
-  // 本期**不做审批流**(契约 §一):故不进 hasApprovalBtns / L2_DOC_PANELS,侧栏只有新增/保存/打印。
+  // 审批流:2026-11-20 用户第 5 条「为当前页面增加一级审批流程」⇒ 单级审批
+  // (提交审批 → 审批通过 → 已审核 → 弃审 → 草稿),故**进** hasApprovalBtns(见下方名单);
+  // 后端同批登记 ButtonService.SINGLE_LEVEL_INSP_PANELS(编制格 = 巡线人员)。
   // 契约唯一真源 docs/design/成型车间巡线记录表-首版.md。
   'QC_LINE_PATROL',
   // 样品二级目录两张单（2026-11-06）：各自有 DocSheet 版式（sampleExt/IntSheetCfg），
@@ -5332,7 +5334,13 @@ const hasApprovalBtns = computed(() => isStandardFlowSheet.value
   //   走**通用单级审批**(草稿 → 提交审批 → 审批中 → 审批通过 → 已审核 → 弃审 → 草稿),
   //   不进 ADMIN_L2_PANELS(两级)/ 不进 SINGLE_LEVEL_INSP_PANELS(那两张的编制格是「检验员」),
   //   后端零改动;审批权 = yj_role_panel.can_approve(迁移里照 QC_INSP 授权,4 个质量角色可审批)。
-  || String(panelCode.value) === 'INSP_COMMISSION')
+  || String(panelCode.value) === 'INSP_COMMISSION'
+  // 成型车间巡线记录表(2026-11-20 用户第 5 条「为当前页面增加一级审批流程」):
+  //   与首件/制程/出货检验表观同形 —— 单级审批(提交审批 → 审批通过 = 已审核 → 弃审 → 草稿),
+  //   后端已在 ButtonService.SINGLE_LEVEL_INSP_PANELS 登记(编制格 = 巡线人员)。
+  //   ⚠ 2026-11-17 那次只登记了后端、前端名单漏了 ⇒ 侧栏压根没有「提交审批」按钮,
+  //     用户看到的就是"没有审批流"。两处必须成对,别再只改一边。
+  || String(panelCode.value) === 'QC_LINE_PATROL')
 /**
  * 侧栏是否放出**直接「审核 / 弃审」**按钮(2026-10-17 用户口径「为当前制程检验单增加审核」)。
  *

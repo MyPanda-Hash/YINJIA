@@ -4,24 +4,25 @@
 
        版式一比一照用户 2026-11-14 给的第二张纸样(脱模检验记录表,1843×1109,
        原图 tools/archive/_qc-line-patrol-20261114/refs/paper.png):
-         纸头   : 左「日期：<单据日期>」· 中「大标题」· 右「审核人：<审核人>」(审核人本期只读)
+         纸头   : 左「日期：<单据日期>」· 中「大标题」· 右「审核人：<审核人>」(审核人由审批回填,只读)
          主表   : **12 列**(列序照纸样)
                   巡线时间 | 车间 | 产品信息确认（重点产品标注★） | 炭棒长度范围mm |
-                  内径检查mm | 重量范围g | 两端密度（伊可普高品质炭棒需要测试） |
+                  内径检查mm | 重量范围g | 两液密度（伊玛印品耐水煮要求测试） |
                   表面状态 | 跌落强度 | 抗压强度 | 结果判定 | 巡线人员
-         记录块 : 每块 = **4 个子行**(纸样如此:每块记 2 支 / 2 个产品):
-                  子行1 编号① + 长度标准① + 内径标准① + 重量标准①
-                  子行2 型号① + 长度实测① + 内径实测① + 重量实测①
-                  子行3 编号② + 长度标准② + 内径标准② + 重量标准②
-                  子行4 型号② + 长度实测② + 内径实测② + 重量实测②
-                  块级列(巡线时间/车间/两端密度/表面状态/跌落强度/抗压强度/结果判定/巡线人员)
-                  在 4 个子行上 **rowspan=4**(纸样就是这样一块一大格)。
+         记录块 : **一个巡线时间 = 一个产品**,故每块 = **2 个子行**(1 组编号/型号):
+                  子行1 编号 + 长度标准 + 内径标准 + 重量标准
+                  子行2 型号 + 长度实测 + 内径实测 + 重量实测
+                  块级列(巡线时间/车间/两液密度/表面状态/跌落强度/抗压强度/结果判定/巡线人员)
+                  在 2 个子行上 **rowspan=2**(一块一大格)。
          交互   : 每块右侧「＋」= 在本块之后插入一块、「×」= 删除本块(no-print,不上纸);
-                  新建草稿空表**默认铺 3 块**(用户口径「先可填即可」);草稿态全格可填、
-                  只读态一律显示文本。导出 Excel 本期不做(打印 = 浏览器打印本纸)。
-                  **审批流 2026-11-17 已接**(用户口径 Excel #13「程志/李光从填 → 刘磊审核」):
+                  **新建草稿不铺任何块**(2026-11-20 用户口径「新增不默认带入三个行,需要自己手动新增行」)
+                  ⇒ 空表给「＋ 新增巡线记录」入口,由用户逐块添加;
+                  新建一块时**巡线时间自动填入当前时间**(2026-11-20 用户口径),用户仍可改;
+                  草稿态全格可填、只读态一律显示文本。导出 Excel 本期不做(打印 = 浏览器打印本纸)。
+                  **审批流**(用户口径 Excel #13「程志/李光从填 → 刘磊审核」;2026-11-20 再确认要一级审批):
                     单级审批 提交审批 → 审批通过 → 已审核 → 弃审 → 草稿,
-                    编制格 = 巡线人员;登记见 ButtonService.SINGLE_LEVEL_INSP_PANELS。
+                    编制格 = 巡线人员;登记见 ButtonService.SINGLE_LEVEL_INSP_PANELS,
+                    侧栏按钮显隐见 PanelxList.hasApprovalBtns。
 
        契约唯一真源:docs/design/成型车间巡线记录表-首版.md(§一 版式 / §二 库表)。
        写法与 QcFirstInspSheet.vue / QcOqcSheet.vue 同款:
@@ -30,8 +31,8 @@
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="lp-sheet" :class="{ 'is-editing': editable }" data-lp-sheet="QC_LINE_PATROL">
     <!-- ① 纸头:左日期 · 中标题 · 右审核人
-         ⚠ 审核人本期**只读**(契约 §一「审核人（只读）」/ 审批流以后接),故这里恒 render 文本,
-           不给输入框 —— 后端 ButtonService 保存时也会把「审核人」键从 body 摘掉(审批流才落值)。 -->
+         ⚠ 审核人**只读**:单级审批通过时由后端 ButtonService 回填(审核人/审核时间),
+           故这里恒 render 文本、不给输入框 —— 保存时后端也会把「审核人」键从 body 摘掉。 -->
     <div class="lp-head">
       <div class="lp-head-left">
         <span class="lp-label">{{ tt('日期') }}：</span>
@@ -55,7 +56,7 @@
     </div>
 
     <!-- ② 主表:12 列 + (可编辑时)行操作列
-         ⚠ 列多且块内 4 子行 ⇒ 给表格一个最小宽度、外面套横向滚动容器
+         ⚠ 列多且块内 2 子行 ⇒ 给表格一个最小宽度、外面套横向滚动容器
            (屏上窗口窄时不把每列压成一条线,拉滚动条即可;打印时容器退回可见,见文件末尾 @media print)。 -->
     <div class="lp-grid-scroll">
       <table class="lp-grid" :style="{ minWidth: gridMinWidth }">
@@ -70,7 +71,7 @@
           </tr>
         </thead>
         <tbody>
-          <!-- 一块 = 4 个 <tr>;块级格只在第一子行出现并 rowspan=4 -->
+          <!-- 一块 = 2 个 <tr>;块级格只在第一子行出现并 rowspan=2 -->
           <template v-for="(row, ri) in items" :key="rowKeyOf(row, ri)">
             <tr v-for="(sr, si) in SUB_ROWS" :key="ri + '-' + si" class="lp-row" :class="{ 'is-block-first': si === 0 }">
               <!-- 块级列(前半:巡线时间 / 车间) -->
@@ -78,7 +79,7 @@
                 <td
                   v-for="c in LEAD_BLOCK_COLUMNS"
                   :key="c.key"
-                  class="lp-block"
+                  :class="['lp-block', { 'lp-col-time': c.time }]"
                   :rowspan="SUB_ROWS.length"
                   :data-lp="c.key"
                 >
@@ -94,7 +95,8 @@
                 </td>
               </template>
 
-              <!-- 产品信息确认 4 格:编号/型号 + 本标准值/实测(纸样:「编号：____」「标准值：____」这种label+值的格) -->
+              <!-- 产品信息确认 4 格:编号/型号 + 本标准值/实测(纸样:「编号：____」「标准值：____」这种label+值的格)
+                   2026-11-20 用户口径重申「一个巡线时间里面就只有一个编号和型号内容」⇒ 只有这一组。 -->
               <td
                 v-for="(cellDef, ci) in sr.cells"
                 :key="ri + '-' + si + '-' + ci"
@@ -115,7 +117,7 @@
                 </div>
               </td>
 
-              <!-- 块级列(后半:两端密度 / 表面状态 / 跌落强度 / 抗压强度 / 结果判定 / 巡线人员)
+              <!-- 块级列(后半:两液密度 / 表面状态 / 跌落强度 / 抗压强度 / 结果判定 / 巡线人员)
                    + 行操作(＋插入本块之后 / ×删除本块) -->
               <template v-if="si === 0">
                 <td
@@ -160,7 +162,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { tt } from '@/i18n'
 
 const props = defineProps({
@@ -193,24 +195,28 @@ function ensureItems() {
 
 /**
  * 表头 12 列(顺序/文案照契约 §一 与纸样;数据键 = qc_line_patrol_detail 的中文列名)。
- * `block: true` = 块级列(4 子行合并 rowspan=4);`prod: true` = 产品确认区(每子行一格)。
- * 列宽按纸样比例分配(合计 100%);两端密度那列纸样文字最长,给到 11%。
+ * `block: true` = 块级列(2 子行合并 rowspan=2);`prod: true` = 产品确认区(每子行一格)。
+ * 列宽按纸样比例分配(合计 100%);两液密度那列纸样文字最长,给到 11%。
+ *
+ * 2026-11-20:巡线时间 8% → 10% —— 该列现在自动填「YYYY-MM-DD HH:mm」(16 字符),
+ *   8% 时在 1152px 最小表宽下只有约 92px,实机截图会把时间截断成「2026-11-20 17」;
+ *   10% 给小屏留出余量(产品信息确认 13→12、表面状态 7→6 平账),并给该列单给一档小字号。
  */
 const COLUMNS = [
-  { key: '巡线时间', label: '巡线时间', width: '8%', block: true },
+  { key: '巡线时间', label: '巡线时间', width: '10%', block: true, time: true },
   // 车间 7%:原 6% 时「成型一车间」在格内会被截断(2026-11-14 实机截图抓到),加宽 1% 后够放 5 字;
-  // 产品信息确认让出 1%(14% → 13%)平账。
+  // 产品信息确认让出 1%(14% → 13% → 2026-11-20 再让 1% 给巡线时间)。
   { key: '车间', label: '车间', width: '7%', block: true },
-  { key: 'prod', label: '产品信息确认（重点产品标注★）', width: '13%', prod: true },
+  { key: 'prod', label: '产品信息确认（重点产品标注★）', width: '12%', prod: true },
   { key: 'len', label: '炭棒长度范围mm', width: '10%', prod: true },
   { key: 'dia', label: '内径检查mm', width: '10%', prod: true },
   { key: 'wt', label: '重量范围g', width: '10%', prod: true },
   // ⚠ key = **物理列名**（qc_line_patrol_detail.[两液密度]），不可改 —— 改了就读不到值、
   //   保存也写不进库（2026-11-17 首次改版踩过：把 key 一起改成「两端密度」，线上直接空列）。
-  //   用户口径（Excel #13）改的是**显示名**：「原列标题为两端密度（伊可普高品质炭棒需要测试），
-  //   实际搞错为两液密度（伊玛印品耐水煮要求测试）」⇒ 只换 label，数据键按 ADR-0001 保持中文原样。
-  { key: '两液密度', label: '两端密度（伊可普高品质炭棒需要测试）', width: '11%', block: true },
-  { key: '表面状态', label: '表面状态', width: '7%', block: true },
+  //   用户口径（Excel #13 → 2026-11-20 第 4 条）：「两端密度（伊可普高品质炭棒需要测试）」
+  //   **改回**「两液密度（伊玛印品耐水煮要求测试）」⇒ 只动 label，数据键按 ADR-0001 保持中文原样。
+  { key: '两液密度', label: '两液密度（伊玛印品耐水煮要求测试）', width: '11%', block: true },
+  { key: '表面状态', label: '表面状态', width: '6%', block: true },
   { key: '跌落强度', label: '跌落强度', width: '6%', block: true },
   { key: '抗压强度', label: '抗压强度', width: '6%', block: true },
   { key: '结果判定', label: '结果判定', width: '6%', block: true },
@@ -223,13 +229,14 @@ const TAIL_BLOCK_COLUMNS = COLUMNS.filter((c) => c.block).slice(2)
 const COL_COUNT = computed(() => COLUMNS.length + (props.editable ? 1 : 0))
 
 /**
- * 4 个子行(**契约 §一 + 纸样**):
+ * 2 个子行 = **一个产品的编号/型号 + 标准值/实测**(**契约 §一 + 纸样**):
  *   cells = 产品确认区的 4 格(编号/型号 + 三组标准值/实测),prefix = 纸样印在格内的标签。
  * 数据键 = qc_line_patrol_detail 的物理列名(编号1/型号1/长度标准1/…),中文数据键不翻译(ADR-0001)。
  */
 const SUB_ROWS = [
   // 2026-11-17 用户口径（Excel #13）：「产品信息确认，一个巡线时间里面就只有一个编号和型号内容
   // （现在有 2 个）」⇒ 由 4 组（编号1/型号1/编号2/型号2）**收敛为 1 组**。
+  // 2026-11-20 用户第 3 条再次确认同一条口径（纸面只留 1 组）。
   // 旧列 编号2/型号2/…标准2/…实测2 保留在 DETAIL_KEYS 里（历史数据不丢），
   // 只是不再上纸面、新块也不铺值。
   { cells: [
@@ -258,10 +265,25 @@ const DETAIL_KEYS = [
   '两液密度', '表面状态', '跌落强度', '抗压强度', '结果判定', '巡线人员',
 ]
 
-/** 新建一块(所有格空白;行号先给序号,插入/删除后统一重排) */
+/**
+ * 当前时间(本地时区),格式 `YYYY-MM-DD HH:mm`。
+ *
+ * 2026-11-20 用户口径(第 1 条)：「表格处能增加当前的创建时间。让当前的巡线时间能在增加这一行表格的
+ * 时候填入当前的时间」⇒ 新建一块时把该块「巡线时间」预填成此刻,**精确到分**(秒对巡线记录没有意义,
+ * 而 `qc_line_patrol_detail.巡线时间` 是 nvarchar(20),这种 16 字符的写法留足余量)。
+ * 预填只是草稿期的初值:格内仍是可编辑 input,现场可以改成实际到线巡查的时刻。
+ */
+function nowStamp() {
+  const d = new Date()
+  const p = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+/** 新建一块(所有格空白,唯「巡线时间」= 当前时间;行号先给序号,插入/删除后统一重排) */
 function newBlock(seq) {
   const row = {}
   for (const k of DETAIL_KEYS) row[k] = k === '行号' ? seq : ''
+  row['巡线时间'] = nowStamp()
   return row
 }
 
@@ -311,39 +333,15 @@ function rowKeyOf(row, index) {
 }
 
 /**
- * 默认铺 3 块(契约 §一「新建草稿空表时默认铺 3 块」;用户口径「先可填即可」)。
+ * **不再默认铺块**。
  *
- * 触发口径(只此一处,避免"删光就自动又冒出来"):
- *   · 可编辑 + 明细为 0 时,按**单据身份**判一次:换了单(或第一次进)才铺;
- *   · 空白新建草稿(无单据编号)每次换单都判 —— 连点两次「新增」两张空单都能各铺 3 块;
- *   · 已保存单据(有单据编号)只在第一次进它时判,用户手动把块删光后不会再被强行塞回。
- * 铺完标脏:这些块要跟着第一次「保存」一起落库(与首件检验单的默认列同一口径)。
+ * 2026-11-20 用户口径(第 2 条)：「新增不默认带入三个行,需要自己手动新增行」
+ * ⇒ 新建草稿 = **空表** + 一行「＋ 新增巡线记录」入口(见模板 `!items.length` 那段),
+ * 由用户自己决定要记几块。顺带解决一个老毛病:以前建单即铺 3 块会顺手 `emit('dirty')`,
+ * 什么都没填的新单也被标成"有改动"。
+ *
+ * ⚠ 别再把它改回"自动补块":删光块(或新建)后空表是**正常状态**,不是缺数据。
  */
-const seededFor = ref(null)
-function docKeyOf() {
-  return String(props.head?.['单据编号'] || props.head?.['编号'] || '')
-}
-function seedBlocksOnce() {
-  if (!props.editable) return
-  const key = docKeyOf()
-  // 已保存单据:同一张只判一次(key 相同直接跳过)
-  if (key && key === seededFor.value) return
-  // 空白草稿:每次「新增」都是一张新单(key 恒为空串 ⇒ 用 items 长度兜底,不在有数据时重铺)
-  if (!key && items.value.length) { seededFor.value = key; return }
-  seededFor.value = key
-  const arr = ensureItems()
-  if (arr.length) return
-  for (let i = 0; i < DEFAULT_BLOCKS; i++) arr.push(newBlock(i + 1))
-  bump.value++
-  emit('dirty')
-}
-const DEFAULT_BLOCKS = 3
-watch(
-  () => [props.editable, docKeyOf(), items.value.length],
-  () => { seedBlocksOnce() },
-  { immediate: true },
-)
-
 /**
  * 只读判定:该字段在 yj_field 里登记成不可编辑(未登记 ≠ 锁定,与首件/出厂检验报告同口径)。
  * ⚠ 后端契约:yj_field.editable=0 在 dataSchema 里下发的是 **`readonly:true`**
@@ -491,6 +489,10 @@ const gridMinWidth = computed(() => `${COLUMNS.length * COL_MIN_WIDTH + (props.e
   text-align: center;
   font-size: 13px;
   height: 22px;
+}
+/* 巡线时间格:值是「YYYY-MM-DD HH:mm」(16 字符),字号降一档以免在窄列里被截成「2026-11-20 17」 */
+.lp-col-time :deep(.el-input__inner) {
+  font-size: 12px;
 }
 
 /* ── 行操作(＋插入 / ×删除):只编辑态出现,且不上纸(no-print) ── */

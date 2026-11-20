@@ -5108,3 +5108,10 @@ migrate-instr-summary-page-20261120.sql
 #   用户口径「工序路线中生效日期和失效日期也不用必填」;必填真源 = yj_field.required,
 #   只 UPDATE 这两格 → 0 + 自检 required=1 残留必须为 0。幂等;两账套均执行。
 migrate-route-dates-optional-20261120.sql
+
+# 2026-11-20 成型车间巡线记录表(QC_LINE_PATROL)一级审批权:
+#   用户口径(2026-11-20 第 5 条)「为当前页面增加一级审批流程」;审批人选定「与首件/制程检验单同口径」
+#   (生产 / 质量审核 / 总经理 / 品质审核)。2026-11-17 后端已登记 SINGLE_LEVEL_INSP_PANELS
+#   (提交审批 → 审批通过 → 已审核 → 弃审 → 草稿),本条只补前端漏掉的按钮显隐名单 + yj_role_panel 审批权:
+#   1033/1039/1042/1048 置 can_approve='Y',1048 缺行则补行(perms 照 QC_FIRST_INSP)。幂等;两账套均执行。
+migrate-qc-line-patrol-approval-20261120.sql
