@@ -62,9 +62,17 @@
           <span>{{ tt('查询') }}</span>
         </el-button>
         <el-button size="small" :disabled="loading" @click="reset">{{ tt('重置') }}</el-button>
+        <!-- 2026-11-20 用户口径:「能够勾选检验委托单行,导出 Excel 时能够选择所需的行」。
+             勾选状态在工具条回显条数,并提供一键清除(只导所选时按钮文案同步变成「导出所选」)。 -->
+        <span v-if="selectedDocs.length" class="iss-picked">
+          {{ tt('已选') }} <b>{{ selectedDocs.length }}</b> {{ tt('张委托单') }}
+          <el-button link type="primary" size="small" class="iss-picked-clear" @click="clearSelection">
+            {{ tt('清除选择') }}
+          </el-button>
+        </span>
         <el-button v-if="canExport" size="small" type="success" plain :disabled="loading || !hasData" class="iss-export" @click="exportExcel">
           <el-icon><Download /></el-icon>
-          <span>{{ tt('导出 Excel') }}</span>
+          <span>{{ exportLabel }}</span>
         </el-button>
       </div>
     </div>
@@ -138,8 +146,10 @@
           <template #label>
             <span>{{ tt('按委托单/样品') }}<em v-if="docs.length"> ({{ docs.length }})</em></span>
           </template>
-          <el-table :data="docs" v-loading="loading" border stripe size="small" row-key="单据编号"
-                    class="iss-table" :empty-text="emptyText">
+          <el-table ref="docTableRef" :data="docs" v-loading="loading" border stripe size="small" row-key="单据编号"
+                    class="iss-table" :empty-text="emptyText" @selection-change="onDocSelection">
+            <!-- 勾选列(2026-11-20):勾中的委托单 = 导出 Excel 的「所需的行」;不勾 = 导全部(原行为) -->
+            <el-table-column type="selection" width="44" fixed :label="tt('选择')" />
             <el-table-column type="expand" width="56" :label="tt('展开')">
               <template #default="{ row }">
                 <div class="iss-expand">
@@ -231,6 +241,9 @@ const dataTime = ref('')
 const stat = ref({})
 const senders = ref([])
 const docs = ref([])
+const docTableRef = ref(null)
+/** 「按委托单/样品」表勾中的行(2026-11-20 用户口径):导出时只导这些单;不勾 = 全部 */
+const selectedDocs = ref([])
 
 const hasData = computed(() => senders.value.length > 0 || docs.value.length > 0)
 const emptyText = computed(() => {
@@ -240,6 +253,10 @@ const emptyText = computed(() => {
   return s && e ? `${tt('当前时间范围内没有送样记录')}（${s} ~ ${e}）` : tt('暂无数据')
 })
 const canExport = computed(() => canDo({ isAdmin: user.isAdmin, pagePerms: user.pagePerms }, PANEL, 'export'))
+/** 导出按钮文案:勾了行就说清「只导所选」,避免用户以为还是导全部 */
+const exportLabel = computed(() => (selectedDocs.value.length
+  ? `${tt('导出所选 Excel')} (${selectedDocs.value.length})`
+  : tt('导出 Excel')))
 
 function pad(n) {
   return String(n).padStart(2, '0')
@@ -279,6 +296,7 @@ function onRangeChange(v) {
 
 async function load() {
   if (!range.value || range.value.length !== 2) range.value = rangeOf('week')
+  clearSelection()          // 每次重新查询都清勾选:所选行必须属于当前结果集,避免导出到看不见的单
   loading.value = true
   error.value = ''
   try {
@@ -321,6 +339,17 @@ function reset() {
   load()
 }
 
+/** 勾选变化(Element Plus 直接给整批选中行) */
+function onDocSelection(rows) {
+  selectedDocs.value = Array.isArray(rows) ? rows : []
+}
+
+/** 清除勾选(工具条与查询前置都调它;表实例不在时只清状态) */
+function clearSelection() {
+  docTableRef.value?.clearSelection?.()
+  selectedDocs.value = []
+}
+
 function money(v) {
   const n = Number(v)
   return Number.isFinite(n) ? n.toFixed(2) : '0.00'
@@ -358,14 +387,18 @@ function openDoc(no) {
 async function exportExcel() {
   if (!hasData.value) return
   const loading = ElMessage({ message: tt('正在生成 Excel…'), duration: 0 })
+  // 勾了行 ⇒ 只导所选(后端按「单据编号」精确过滤);没勾 ⇒ 导当前查询结果全部(原行为不变)
+  const picked = selectedDocs.value.map((d) => d['单据编号']).filter(Boolean)
+  const body = {
+    日期起: range.value[0],
+    日期止: range.value[1],
+    送样人: sender.value.trim(),
+    单据状态: status.value,
+    keyword: keyword.value.trim(),
+  }
+  if (picked.length) body.单据编号 = picked
   try {
-    const blob = await request.post('/px/inspSummary/export', {
-      日期起: range.value[0],
-      日期止: range.value[1],
-      送样人: sender.value.trim(),
-      单据状态: status.value,
-      keyword: keyword.value.trim(),
-    }, { responseType: 'blob' })
+    const blob = await request.post('/px/inspSummary/export', body, { responseType: 'blob' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -374,7 +407,9 @@ async function exportExcel() {
     a.click()
     a.remove()
     setTimeout(() => URL.revokeObjectURL(url), 60000)
-    ElMessage.success(tt('已导出'))
+    ElMessage.success(picked.length
+      ? `${tt('已导出')} ${picked.length} ${tt('张委托单')}`
+      : tt('已导出'))
   } catch (e) {
     ElMessage.error(await blobErrorMessage(e) || tt('导出失败'))
   } finally {
@@ -453,6 +488,21 @@ onMounted(() => {
 }
 .iss-status {
   width: 110px;
+}
+/* 勾选回显:紧跟导出按钮左侧,靠 .iss-export 的 margin-left:auto 一起贴右 */
+.iss-picked {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #606266;
+}
+.iss-picked b {
+  color: #409eff;
+  font-weight: 600;
+}
+.iss-picked-clear {
+  padding: 0;
 }
 .iss-export {
   margin-left: auto;

@@ -358,6 +358,16 @@ public class InspSummaryService {
         List<Map<String, Object>> docs = (List<Map<String, Object>>) data.getOrDefault("按单据", List.of());
         @SuppressWarnings("unchecked")
         Map<String, Object> cond = (Map<String, Object>) data.getOrDefault("查询条件", Map.of());
+        // 2026-11-20 用户口径:「能够勾选检验委托单行,导出 Excel 时能够选择所需的行」
+        // ⇒ body 里的 单据编号[] = 只导这几张单;缺省/空数组 = 全导(保持原行为)。
+        Set<String> picked = pickedDocNos(body);
+        if (picked != null) {
+            List<Map<String, Object>> only = new ArrayList<>();
+            for (Map<String, Object> d : docs) {
+                if (picked.contains(strOf(d.get("单据编号")))) only.add(d);
+            }
+            docs = only;
+        }
 
         try (XSSFWorkbook wb = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Sheet sheet = wb.createSheet("送检信息汇总表");
@@ -413,6 +423,31 @@ public class InspSummaryService {
         } catch (IOException e) {
             throw new IllegalStateException("生成送检信息汇总表失败：" + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 只导勾选行:body 里的 {@code 单据编号} 支持数组 / 逗号串 / 单值;缺省或空 = 不过滤(全导)。
+     *
+     * <p>前端在「按委托单/样品」表勾选后把选中的单号数组一起提交;单号是字符串,按 trim 后精确匹配
+     * (不做模糊,避免选了 A 却把 A-1 也带出去)。
+     */
+    private static Set<String> pickedDocNos(Map<String, Object> body) {
+        if (body == null) return null;
+        Object v = body.get("单据编号");
+        if (v == null) return null;
+        Set<String> picked = new LinkedHashSet<>();
+        if (v instanceof Iterable<?> it) {
+            for (Object o : it) addDocNo(picked, o);
+        } else {
+            for (String part : String.valueOf(v).split("[,，\\s]+")) addDocNo(picked, part);
+        }
+        return picked.isEmpty() ? null : picked;
+    }
+
+    private static void addDocNo(Set<String> set, Object o) {
+        if (o == null) return;
+        String s = String.valueOf(o).trim();
+        if (!s.isEmpty()) set.add(s);
     }
 
     private static String strOf(Object v) {
