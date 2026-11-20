@@ -67,6 +67,7 @@
 | `ego/round-38-report-export.mjs` | 报工记录勾选行 + 导出弹窗 |
 | `ego/round-39-unfinished-box.mjs` | 旧版(按类型勾选)取证；2026-11-20 修正后以 `ego/round-51-line-checkboxes.mjs` 为准 |
 | `ego/round-51-line-checkboxes.mjs` | 不勾=当前线 `1号车间 6000`；勾 1号+3号 ⇒ `6715`；勾选不切换右侧明细 |
+| `ego/round-52-line-checkboxes-8090.mjs` | 打包版 8090 复核(30 个车间勾选框；默认 6000；勾 1号+3号 ⇒ 6715) |
 | `ego/round-41-route-dialog.mjs` | 打开工艺路线表格调整并截图 |
 
 导出内容另做了字节级复核：勾 2 行导出的 xlsx 解析后 = 标题 + 公司抬头 + 表头 13 列 + **2 行数据**；
