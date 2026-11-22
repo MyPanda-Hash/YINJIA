@@ -402,6 +402,13 @@ public class QcInspPlanController {
                         + " ISNULL([序号],N'') AS seqNo, ISNULL([备注],N'') AS remark"
                         + " FROM dbo.rd_insp_plan_detail"
                         + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        // 2026-11-22 用户口径「填写为空的就不带入」:
+                        //   ① 没填检验项目(控制项目)的行 = 空行,不下发;
+                        //   ② 「修订记录」那一页是**同一张行表**里的另一个分块(表区='修订记录',
+                        //      blankRows 预铺 18 行),它从来不是检验项 —— 不下发。
+                        //   此前不过滤 ⇒ 弹窗里多出 18 行空行,还能被手勾带进检验单。
+                        + " AND LTRIM(RTRIM(ISNULL([控制项目],N''))) <> N''"
+                        + " AND ISNULL([表区],N'检验项目') <> N'修订记录'"
                         + " ORDER BY ISNULL(TRY_CAST([序号] AS int), 999999), id", planNo);
 
         List<Map<String, Object>> mapped = new ArrayList<>();
