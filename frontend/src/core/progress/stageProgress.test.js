@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { chainNextStageStart, hasPhaseContent, nextDay, pickStages, stageRowState, statusLabel, summarizeStages } from './stageProgress.js'
+import { hasPhaseContent, nextDay, pickStages, stageRowState, statusLabel, summarizeStages } from './stageProgress.js'
 
 const TODAY = '2026-09-15'
 
@@ -173,32 +173,5 @@ test('nextDay:解析不出或空值返回空串(不写脏数据)', () => {
   assert.equal(nextDay('2026.09.10'), '')
 })
 
-test('chainNextStageStart:阶段N计划完成后,下一阶段计划开始为空则填次日', () => {
-  const head = { 阶段1_计划完成: '2026-09-10', 阶段2_计划开始: '' }
-  assert.equal(chainNextStageStart(head, 1), 2)
-  assert.equal(head['阶段2_计划开始'], '2026-09-11')
-})
-
-test('chainNextStageStart:下一阶段计划开始已有值时不覆盖', () => {
-  const head = { 阶段1_计划完成: '2026-09-10', 阶段2_计划开始: '2026-10-01' }
-  assert.equal(chainNextStageStart(head, 1), 0)
-  assert.equal(head['阶段2_计划开始'], '2026-10-01')
-})
-
-test('chainNextStageStart:第 10 阶段没有下一阶段', () => {
-  const head = { 阶段10_计划完成: '2026-12-31' }
-  assert.equal(chainNextStageStart(head, 10), 0)
-})
-
-test('chainNextStageStart:本阶段计划完成为空/非法时不动下一阶段', () => {
-  const head1 = { 阶段1_计划完成: '', 阶段2_计划开始: '' }
-  assert.equal(chainNextStageStart(head1, 1), 0)
-  assert.equal(head1['阶段2_计划开始'], '')
-  const head2 = { 阶段1_计划完成: '待定', 阶段2_计划开始: '' }
-  assert.equal(chainNextStageStart(head2, 1), 0)
-  assert.equal(head2['阶段2_计划开始'], '')
-})
-
-test('chainNextStageStart:head 为空时不抛异常', () => {
-  assert.equal(chainNextStageStart(null, 1), 0)
-})
+/* 2026-11-23 用户口径「自动生成下一个阶段计划的开始时间这个功能去掉，时间自己来选就行」
+   ⇒ chainNextStageStart 与它的 5 条单测一并删除（同文件上方注释）。 */

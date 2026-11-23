@@ -958,7 +958,7 @@ import { attachFieldOf } from '@core/panel/attachField.js'
 import request from '@core/request'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { useRouter } from 'vue-router'
-import { chainNextStageStart, hasPhaseContent } from '@core/progress/stageProgress'
+import { hasPhaseContent } from '@core/progress/stageProgress'
 import { fixedSheetWidth, docnoLabel } from './docSheetConfigs'
 import { resolveCustomerCode } from './approvalCustomerCode'
 
@@ -1395,11 +1395,14 @@ function onPhaseStart(phaseKey, v) {
   emit('dirty')
 }
 
-/** 阶段计划完成:同上归一,并把下一阶段的「计划开始」接上次日(仅当其为空) */
+/** 阶段计划完成:归一后落值。
+ *
+ *  <p>2026-11-23 用户口径：「项目实施计划自动生成下一个阶段计划的开始时间这个功能去掉，时间自己来选就行」
+ *  —— 原先这里会把下一阶段「计划开始」自动接成次日（已按用户口径整体删除，函数与单测一并移除），
+ *  于是用户没选过的日期被系统写死，改起来还得逐格清。现在**只落本格**，不再推算任何其它格。</p>
+ */
 function onPhaseDone(phaseKey, v) {
   props.head[phaseKey + '_计划完成'] = v || ''
-  const n = Number(String(phaseKey).replace(/[^0-9]/g, ''))
-  if (n) chainNextStageStart(props.head, n)
   emit('dirty')
 }
 async function doStageComplete(stageNum) {
@@ -2261,8 +2264,9 @@ defineExpose({ focusField })
   color: #fff;
   font-size: 15px;
   display: flex;
-  align-items: center;
-  padding: 0 0 0 10px;
+  /* 2026-11-23：与标签列同步顶部对齐 —— 测试计划那一行高达 1500px，居中会把序号甩到半空中 */
+  align-items: flex-start;
+  padding: 8px 0 0 10px;
 }
 .as-name {
   /* 2026-11-13：允许在窄排版（A4 733px）下收缩，但保住最小宽度 —— 否则标签会被压成竖排字 */
@@ -2273,11 +2277,16 @@ defineExpose({ focusField })
   overflow-wrap: anywhere;
   background: #29b8f0;
   color: #fff;
-  font-size: 19px;
+  /* 2026-11-23 用户口径「项目实施计划出现串行，字体没有对上框」：
+     原来是 19px —— 8 字标签（测试产品打样要求）实测 8×19=152px > 可用宽 134px，**必然折行**，
+     折下来的第二行紧贴下一行的蓝列，看上去就像串到下一行去了。
+     收到 16px：8×16=128px 单行放得下；确实放不下的长标签才折行，且行高按 1.35 收一点。 */
+  font-size: 16px;
+  line-height: 1.35;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 8px;
+  padding: 2px 8px;
   text-align: center;
 }
 /* 校验定位闪烁:琥珀高亮约3秒(保存必填缺失时) */
@@ -2539,8 +2548,12 @@ defineExpose({ focusField })
   flex: 1; min-width: 0;
   display: flex; align-items: center;
 }
-.as-phase-date { width: 100%; }
-.as-phase-input { max-width: 160px; }
+/* 2026-11-23 用户口径「第一个时间没有显示全」：
+   实测 el-date-picker 外层 191px、内部 input 只有 161px，而 value 的滚动宽度是 186px ⇒ 后半截被裁掉
+   （2026-11-30 显示成 2026-11-3）。给足可用宽度 + 把日期框字号收到 12px，两项一起才稳。 */
+.as-phase-date { width: 100%; min-width: 170px; }
+.as-phase-date .el-input__inner { font-size: 12px; letter-spacing: 0; }
+.as-phase-input { max-width: 220px; }
 .as-phase-text {
   font-size: 12px; color: #444; line-height: 24px;
   word-break: break-all; white-space: pre-wrap;

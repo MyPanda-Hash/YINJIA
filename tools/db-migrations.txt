@@ -5116,3 +5116,14 @@ migrate-po-erp-qty-cols-20261123.sql
 #   「客户编码不能为空」挡住而用户无处可填。值现由「客户名称」参照 KHDA 档案带入。
 #   幂等 + 事务内自检（失败整体回滚）。两账套都执行。
 migrate-prodinfo-notrequired-20261123.sql
+
+# 2026-11-23 项目进度查询：把「项目定级原则」说明段改成可自己编辑的字段
+#   原来写死在前端 ProgressControlSheet.vue 的静态文案，用户改不了。本迁移加 rd_progress.项目定级原则
+#   列 + 登记 yj_field(header, editable=1)；纸面同批改成 textarea（空值回落默认文案）。幂等 + 自检。
+migrate-progress-grade-principle-20261123.sql
+
+# 2026-11-23 修复项目实施计划「项目名称」被自动建单写成尺寸的存量数据
+#   根因：ensurePlanForApproval 把 立项.机型及应用位置 写进 项目名称（同批代码已改）。
+#   判据很窄：项目名称同时含 * 或 × 且含 mm，且对应立项的立项背景有值 ⇒ 只有 1 行命中。
+#   幂等 + 事务内自检（失败整体回滚）。两账套都执行。
+migrate-plan-wrong-project-name-20261123.sql

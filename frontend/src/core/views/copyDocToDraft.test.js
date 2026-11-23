@@ -133,8 +133,11 @@ test('④ 新单号走 nextDocNoFor（不照搬源单号），且源单号只当
 })
 
 test('④ 任何状态都可复制（不按状态拦），新单是草稿、不进审批', () => {
+  // ⚠ 用「下一个方法」当结束标记，不要写死长度：2026-11-23 该方法加了客户编码兜底与行序重排，
+  //   长度一变固定切片就会把 markDocSaved 切到窗口外，测试假红。
   const at = btn.indexOf('private Map<String, Object> copyDocToDraft')
-  const seg = btn.slice(at, at + 5200)
+  const end = btn.indexOf('private String customerCodeFrom', at)
+  const seg = end > at ? btn.slice(at, end) : btn.slice(at)
   // 不禁「已审核/已归档」——已归档正是主要复制场景
   assert.ok(!/已归档.*不可复制|仅草稿.*可复制|仅草稿或修改中/.test(seg), '不能按状态拦复制（已归档必须能复制）')
   assert.match(seg, /markDocSaved\(def\.code\(\), newNo, false\)/, '新单必须标为草稿（saved=N）')

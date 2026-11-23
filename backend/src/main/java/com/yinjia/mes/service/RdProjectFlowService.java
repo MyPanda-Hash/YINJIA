@@ -55,8 +55,18 @@ public class RdProjectFlowService {
     public Map<String, Object> query(String keyword) {
         String kw = keyword == null ? "" : keyword.trim();
         List<Map<String, Object>> approvals = jdbc.queryForList(
+                // 2026-11-23 用户报障「项目名称带成尺寸了」：原来项目名称直接取 [机型及应用位置]，
+                //   而那一格实际常填尺寸（如 44.5*9.5*46±0.5mm(包布)）⇒ 项目流程管控/项目控制列表
+                //   把尺寸当项目名显示。现在改为：**优先取该立项已生成的实施计划的项目名称**（业务上
+                //   真正的项目名，用户可在计划里改），没有计划才回落 机型；再没有回落客户名。
+                //   ⚠ 关联口径沿用既有的两种：计划.文档编号 = 立项单据编号 / 立项文档编号（老单）。
                 "SELECT TOP " + MAX_ROWS + " [单据编号] AS no, ISNULL([文档编号],N'') AS docNo,"
-                        + " ISNULL([机型及应用位置],N'') AS projectName, ISNULL([客户名],N'') AS customer,"
+                        + " ISNULL(NULLIF(LTRIM(RTRIM(COALESCE("
+                        + "   (SELECT TOP 1 p.[项目名称] FROM rd_plan p WHERE ISNULL(p.asp_cancel,'N') <> 'Y'"
+                        + "      AND LTRIM(RTRIM(ISNULL(p.[项目名称],N''))) <> N''"
+                        + "      AND (p.[文档编号] = rd_approval.[单据编号] OR p.[文档编号] = rd_approval.[文档编号])"
+                        + "      ORDER BY p.id DESC)), N'')), N''),"
+                        + "   ISNULL([机型及应用位置],N'')), N'') AS projectName, ISNULL([客户名],N'') AS customer,"
                         + " ISNULL([申请立项人],N'') AS initiator, ISNULL([项目等级],N'') AS level,"
                         + " ISNULL([备用1],N'') AS liaison, ISNULL([备用2],N'') AS owner,"
                         + " ISNULL([备用3],N'') AS ownerAck, ISNULL([备用4],N'') AS ownerAckAt,"

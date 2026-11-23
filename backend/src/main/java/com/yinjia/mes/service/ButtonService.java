@@ -7615,13 +7615,31 @@ public class ButtonService {
                 approvalNo);
         if (!exists.isEmpty()) return str(exists.get(0).get("单据编号"));
         Map<String, Object> ap = jdbc.queryForList(
-                "SELECT TOP 1 项目等级, 备用1, 备用2, ISNULL(机型及应用位置, N'') AS 机型, ISNULL(客户名, N'') AS 客户名 "
+                "SELECT TOP 1 项目等级, 备用1, 备用2, ISNULL(机型及应用位置, N'') AS 机型, ISNULL(客户名, N'') AS 客户名,"
+                        + " ISNULL(立项背景, N'') AS 立项背景 "
                         + "FROM rd_approval WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", approvalNo)
                 .stream().findFirst().orElse(Map.of());
         String level = blankSafe(ap.get("项目等级"));
         String owner = blankSafe(ap.get("备用2"));
-        String name = blankSafe(ap.get("机型"));
+        // 🔴 2026-11-23 用户报障「带过来的内容对应错位，项目名称带成尺寸了」：
+        //   原来这里写的是 `项目名称 = 机型及应用位置` —— 机型格实际填的是**尺寸**
+        //   （生产实测 LXA-2026-11-0031：机型=`44.5*9.5*46±0.5mm(包布)`），于是自动建出来的
+        //   实施计划项目名称显示成尺寸（LXB-2026-11-0012），再经 syncPlanToProgress 同步进
+        //   项目进度查询，错值一路外泄。立项申请表**没有「项目名称」这个字段**
+        //   （yj_field 实测无该 label），故不能靠参照同名带回，只能由这里按业务含义取：
+        //     ① 立项背景 —— 用户写项目名/项目背景的那一格（本单是「C3项目」），最贴近"项目名称"；
+        //     ② 其次 客户名 + 机型（有客户语境时才拼，避免又是裸尺寸）；
+        //     ③ 都没有才回落单号，保证非空。
+        String bg = blankSafe(ap.get("立项背景"));
+        String model = blankSafe(ap.get("机型"));
+        String custName = blankSafe(ap.get("客户名"));
+        String name = bg;
+        if (name.isEmpty() && !model.isEmpty()) {
+            name = (custName.isEmpty() ? "" : custName + " ") + model;
+        }
         if (name.isEmpty()) name = approvalNo;
+        // 项目名称是纸面一格短文本，超长截断（否则整行表格被撑爆；截断不动库里的立项背景）
+        if (name.length() > 50) name = name.substring(0, 50);
         String today = java.time.LocalDate.now().toString();
         Map<String, Object> form = new LinkedHashMap<>();
         form.put("单据日期", today);
@@ -8626,6 +8644,16 @@ public class ButtonService {
             // 客户编码同样走 label→col(立项申请的「客户编号」物理列就是 客户编号,但别写死)
             PanelRegistry.FieldDef custF = def.byLabel("客户编号");
             String custCode = custF == null ? null : str(headCols.get(custF.col()));
+            // 🔴 2026-11-23 用户报障「复制过来内容不全」的可见症状之一：立项申请的右上角
+            //   「项目编号」复制后**永久空白**。根因是本段只从 客户编号 取前缀，源单客户编号为空
+            //   （实测 LXA-2026-11-0012 的 客户编号 本就是空）⇒ 拼出来是空串。
+            //   补两条兜底：① 从「客户名」里抠编码（与前端 approvalCustomerCode.resolveCustomerCode
+            //   同口径：客户名里常直接带 A-60 这种号）；② 仍没有就按客户名回查客户档案取 dm。
+            if (custCode == null || custCode.isBlank()) {
+                PanelRegistry.FieldDef nameF = def.byLabel("客户名");
+                String custName = nameF == null ? null : str(headCols.get(nameF.col()));
+                custCode = customerCodeFrom(custName);
+            }
             String ymd = LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
             headCols.put(docNoF.col(), custCode == null ? "" : custCode + ymd);
         }
@@ -8639,19 +8667,25 @@ public class ButtonService {
             List<Map<String, Object>> lines = jdbc.queryForList("SELECT * FROM " + lineTable
                     + " WHERE " + def.groupCol() + " = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", srcNo);
             java.util.Set<String> linePhysical = tableCols(lineTable);
+            // 2026-11-23 修正:原注释称「行序让 insertRow 侧重排」,而 insertRow 实际**不重排**
+            //   ⇒ 复制出来的明细保留源单的行号(中间断号、或从中间开始)。这里显式从 1 连续编号,
+            //   并对「行序 / 序号」两个既有语义各写一次(面板用哪个就命中哪个)。
+            String seqCol = lineSeqColOf(def);
+            int seq = 1;
             for (Map<String, Object> line : lines) {
                 Map<String, Object> cols = new LinkedHashMap<>();
                 for (Map.Entry<String, Object> e : line.entrySet()) {
                     String col = e.getKey();
                     if (isCopyStructuralCol(def, col)) continue;
-                    // 行序让 insertRow 侧重排(与 assignNewLineSeq 同口径:新单从 1 开始连续)
-                    if (isLineSeqCol(def, col)) continue;
+                    if (isLineSeqCol(def, col)) continue;          // 行序由下面统一重排
                     if (!linePhysical.isEmpty() && !linePhysical.contains(col)) continue;
                     if (e.getValue() == null) continue;
                     cols.put(col, e.getValue());
                 }
                 cols.put(def.groupCol(), newNo);
+                if (seqCol != null) cols.put(seqCol, seq);          // 新单从 1 开始连续
                 insertRow(lineTable, cols, user);
+                seq++;
                 lineCount++;
             }
         }
@@ -8664,6 +8698,42 @@ public class ButtonService {
         out.put("源单据状态", srcStatus);
         out.put("明细行数", lineCount);
         return out;
+    }
+
+    /**
+     * 客户名 → 客户编码（复制单据时拼「文档编号」用）。
+     *
+     * <p>与前端 {@code core/views/approvalCustomerCode.resolveCustomerCode} 同口径，分两步：</p>
+     * <ol>
+     *   <li>客户名里直接写着编码的（如「B-85-06 青岛伊可普」）⇒ 用正则抠出来，不发 SQL；</li>
+     *   <li>否则按客户名回查客户档案（{@code KHDA} 面板的头表 {@code bd_khda} 的 dm/mc）——
+     *       表名/列名取不到就放弃（返回 null），绝不因为一个前缀把复制整个搞挂。</li>
+     * </ol>
+     */
+    private String customerCodeFrom(String custName) {
+        String name = custName == null ? "" : custName.trim();
+        if (name.isEmpty()) return null;
+        // ① 名字里带的编码：字母段(1-4) + '-' + 数字开头（A-60 / B-85-06 / C-112），与前端同一形态
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("[A-Za-z]{1,4}-[0-9][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*").matcher(name);
+        if (m.find()) return m.group();
+        // ② 回查客户档案（面板编码 KHDA；表/列缺失一律当取不到）
+        try {
+            PanelRegistry.PanelDef kh = registry.panel("KHDA");
+            if (kh == null || kh.headTable() == null || kh.headTable().isBlank()) return null;
+            java.util.Set<String> cols = tableCols(kh.headTable());
+            String codeCol = cols.contains("dm") ? "dm" : (cols.contains("客户编码") ? "客户编码" : null);
+            String nameCol = cols.contains("mc") ? "mc" : (cols.contains("客户名称") ? "客户名称" : null);
+            if (codeCol == null || nameCol == null) return null;
+            List<String> hit = jdbc.queryForList(
+                    "SELECT TOP 1 [" + codeCol + "] FROM " + kh.headTable()
+                            + " WHERE ISNULL([" + nameCol + "],N'') = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    String.class, name);
+            return hit.isEmpty() ? null : str(hit.get(0));
+        } catch (Exception e) {
+            log.warn("[复制单据] 按客户名回查客户编码失败(不影响复制): {}", e.getMessage());
+            return null;
+        }
     }
 
     /** 源单号:前端 formData 的「编号」/「单据编号」(面板不同键不同,与 requireNo 同口径但更宽) */
@@ -8682,6 +8752,15 @@ public class ButtonService {
      * <p>刻意不在这里列业务列 —— 业务列按 yj_field 的 label 判(见 COPY_DOC_SKIP_LABELS 与
      * isAttachField),避免「物理列名写死」的老毛病(AGENTS §5①)。</p>
      */
+    /** 明细表的「行序」物理列名(面板用 行序 或 序号 两种叫法;都没有返回 null) */
+    private String lineSeqColOf(PanelRegistry.PanelDef def) {
+        for (String label : new String[]{"行序", "序号"}) {
+            PanelRegistry.FieldDef f = def.byLabel(label);
+            if (f != null && f.col() != null && !f.col().isBlank()) return f.col();
+        }
+        return null;
+    }
+
     private boolean isCopyStructuralCol(PanelRegistry.PanelDef def, String col) {
         if (col == null) return true;
         if ("id".equalsIgnoreCase(col)) return true;

@@ -458,7 +458,13 @@ public class PanelConfigService {
             if (IMPORTABLE_PANELS.contains(def.code())) {
                 buttonGroups.add(group("导入", List.of("导入")));
             }
-            buttonGroups.add(group("更多", List.of("复制", "表格调整", "导出", "退出")));
+            // 2026-11-23：这 4 张单据改用服务端「复制单据」（整单另存为新草稿，见
+            //   ButtonService.copyDocToDraft），把旧的「更多 → 复制」从工具栏撤掉 ——
+            //   旧路径是前端 getFormDescriptor + 删字段再调「保存」，对文书面板会直接走
+            //   「保存=提交/归档」，用户很容易点错并以为"复制过来内容不全"。
+            buttonGroups.add(group("更多", COPY_DOC_PANELS.contains(def.code())
+                    ? List.of("表格调整", "导出", "退出")
+                    : List.of("复制", "表格调整", "导出", "退出")));
         }
 
         // 「审核」(直接审核:草稿 → 已审核,一步到位)是**每张单据面板都要有**的按钮 ——
@@ -1184,6 +1190,10 @@ public class PanelConfigService {
         out.add("退出");
         return out;
     }
+
+    /** 用服务端「复制单据」的 4 张单（旧「复制」对这些面板不再下发，见「更多」组的注释） */
+    private static final java.util.Set<String> COPY_DOC_PANELS =
+            com.yinjia.mes.service.ButtonService.COPY_DOC_PANELS;
 
     private static final Map<String, List<String[]>> PANDA_BUTTONS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.ofEntries(
             // 供应商采购打印(2026-10-25 用户口径「是多做一个和采购订单一样的供应商面版,
