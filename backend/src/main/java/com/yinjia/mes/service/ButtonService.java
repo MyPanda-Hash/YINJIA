@@ -8750,13 +8750,18 @@ public class ButtonService {
         // ② 回查客户档案（面板编码 KHDA；表/列缺失一律当取不到）
         try {
             PanelRegistry.PanelDef kh = registry.panel("KHDA");
-            if (kh == null || kh.headTable() == null || kh.headTable().isBlank()) return null;
-            java.util.Set<String> cols = tableCols(kh.headTable());
+            if (kh == null) return null;
+            // ⚠ 客户档案是**档案(flat)面板**：生产实测 yj_panel 里 KHDA 的 head_table 为空、
+            //   数据在 line_table(= dm_kh)。首版只认 headTable ⇒ 直接 return null，
+            //   于是「客户编号为空时按客户名回查」这条兜底整个失效（复制件项目编号仍空白，2026-11-23 实测）。
+            String khTable = (kh.headTable() != null && !kh.headTable().isBlank()) ? kh.headTable() : kh.lineTable();
+            if (khTable == null || khTable.isBlank()) return null;
+            java.util.Set<String> cols = tableCols(khTable);
             String codeCol = cols.contains("dm") ? "dm" : (cols.contains("客户编码") ? "客户编码" : null);
             String nameCol = cols.contains("mc") ? "mc" : (cols.contains("客户名称") ? "客户名称" : null);
             if (codeCol == null || nameCol == null) return null;
             List<String> hit = jdbc.queryForList(
-                    "SELECT TOP 1 [" + codeCol + "] FROM " + kh.headTable()
+                    "SELECT TOP 1 [" + codeCol + "] FROM " + khTable
                             + " WHERE ISNULL([" + nameCol + "],N'') = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
                     String.class, name);
             return hit.isEmpty() ? null : str(hit.get(0));
