@@ -5095,3 +5095,15 @@ migrate-filter-eff-dyncols-visible-20261120.sql
 #   ② 清空未审批（shr 空且未归档）单据的 审核人一级/审核人二级 存量签名（2026-11-11 的 l1 回填把草稿也写了）；
 #   ③ 改前/改后行数 + 自检；幂等（重复执行 0 行、键不存在为 0）。两账套（HSDZ_MES / HSDZ_MES_TEST）都要执行。
 migrate-prodinfo-approver-no-default-20261120.sql
+
+# 2026-11-23 ERP 接口预留：新增 erp_push_log（每次「转ERP」留痕：提供方/面板/单号/结果/耗时/
+#   接口地址/ERP单号；同时是通用 HTTP 适配器做幂等的依据——同提供方+面板+单号已成功则不再重推）。
+#   表与关键列写 MS_Description、两个索引、幂等；只建表不碰业务表，金蝶推送行为不变。
+#   执行：本机只有正式库 HSDZ_MES（sys.databases 实测无 HSDZ_MES_TEST，登录工厂 enable-test-ledger=false），
+#   已在本机正式库执行；生产服务器若两账套都在，按 §2.3 各跑一次。
+migrate-erp-gateway-20261123.sql
+
+# 2026-11-23 产品信息表：「产品名称」取消必填（纸面大标题已固定为「产品信息表」，无输入口）
+#   2026-10-16 置的 required=1 仍在 ⇒ 保存/提交会被「产品名称不能为空」挡住而用户无处可填。
+#   只置 required=0，字段与历史值保留（下游工艺清单仍靠它参照带回）；幂等 + 自检。
+migrate-prodinfo-name-not-required-20261123.sql
