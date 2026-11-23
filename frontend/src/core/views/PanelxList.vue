@@ -5107,6 +5107,9 @@ const canFullPreview = computed(() => isFullPreviewPanel(panelCode.value))
  * 其它模块（品质/供应链/WMS）本来就不在这个登记表里，行为一个字不动。</p>
  */
 const canPreviewSide = computed(() => !canFullPreview.value && PREVIEW_SIDE_PANELS.has(String(panelCode.value)))
+/** 样品模块三张单（侧边栏「单据预览」统一叫「样品查询」，2026-11-23） */
+const SAMPLE_PANELS = new Set(['RD_SAMPLE_EXT', 'RD_SAMPLE_INT', 'RD_SAMPLE_ND'])
+
 /**
  * 「单据预览」按钮/浮层的**按面板命名**（2026-11-19 销售问题汇总）：
  *   产品信息表 P11「改为：产品搜索」、P12 预览页标题「改为：产品信息查询」；
@@ -5117,6 +5120,9 @@ const previewBtnLabel = computed(() => {
   const p = String(panelCode.value)
   if (p === 'RD_PROD_INFO') return '产品搜索'
   if (p === 'RD_APPROVAL') return '立项查询'
+  // 2026-11-23 用户口径：「样品模块的侧边栏的单据预览改名为样品查询」
+  //   样品模块三张单（外部开发 / 内部开发 / 外部非开发）统一叫「样品查询」。
+  if (SAMPLE_PANELS.has(p)) return '样品查询'
   return '单据预览'
 })
 /** 全屏预览浮层的标题（产品信息查询 / 立项查询 / 单据预览） */
@@ -5124,6 +5130,8 @@ const previewOverlayTitle = computed(() => {
   const p = String(panelCode.value)
   if (p === 'RD_PROD_INFO') return '产品信息查询'
   if (p === 'RD_APPROVAL') return '立项查询'
+  // 与按钮同名（同 立项查询 的做法）：样品模块的浮层标题也叫「样品查询」。
+  if (SAMPLE_PANELS.has(p)) return '样品查询'
   return '单据预览'
 })
 /** 全屏预览浮层是否打开 */
