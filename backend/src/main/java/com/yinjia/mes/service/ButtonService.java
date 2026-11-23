@@ -1,8 +1,6 @@
 package com.yinjia.mes.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.yinjia.mes.erp.ErpGatewayRegistry;
-import com.yinjia.mes.erp.ErpNotConfiguredException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -65,11 +63,7 @@ public class ButtonService {
     private final WoReportService woReport;
     /** 工序任务(路线驱动,A 项):报工审核/弃审回写任务完成量与状态 */
     private final ProcessTaskService processTask;
-    /**
-     * ERP 网关(2026-11-23 接口预留):原来这里直接依赖 KingdeePushService,接第二家 ERP 要改业务代码。
-     * 现在只认注册表,由 erp.provider 决定落到金蝶/通用 HTTP/用友。金蝶客户行为不变。
-     */
-    private final ErpGatewayRegistry erpGateways;
+    private final KingdeePushService kingdeePush;
     private final BatchService batchService;
     private final InvCostService invCost;
     /** 检验目录联动(生单建行/完成/修改/守卫);本服务只单向依赖它,避免循环依赖 */
@@ -107,7 +101,7 @@ public class ButtonService {
                          DevTaskService devTaskService, MessageService messageService,
                          LotSeqService lotSeqService, StockLedgerService stockLedger,
                          WoReportService woReport,
-                         ErpGatewayRegistry erpGateways, BatchService batchService,
+                         KingdeePushService kingdeePush, BatchService batchService,
                          InvCostService invCost, QcCatalogService qcCatalog,
                          ManuWritebackService manuWriteback, CalcRuleService calcRuleService,
                          ProcessTaskService processTask, StockMonthCloseService monthCloseService,
@@ -123,7 +117,7 @@ public class ButtonService {
         this.lotSeqService = lotSeqService;
         this.stockLedger = stockLedger;
         this.woReport = woReport;
-        this.erpGateways = erpGateways;
+        this.kingdeePush = kingdeePush;
         this.batchService = batchService;
         this.invCost = invCost;
         this.qcCatalog = qcCatalog;
@@ -7394,11 +7388,7 @@ public class ButtonService {
         if (docNo.isBlank()) throw new IllegalArgumentException("缺少单据编号");
         String operator = currentUserName();
         try {
-            // 走注册表:erp.provider=kingdee 时与改之前逐字节相同(KingdeeErpGateway 只做转发)
-            return erpGateways.current().pushDocument(def.code(), docNo, operator);
-        } catch (ErpNotConfiguredException e) {
-            // 未配置 ≠ 推送失败:前端据此提示「去配置 ERP」,而不是让用户以为是 ERP 拒了单据
-            throw new RuntimeException("转ERP失败: " + e.getMessage(), e);
+            return kingdeePush.pushDocument(def.code(), docNo, operator);
         } catch (Exception e) {
             throw new RuntimeException("转ERP失败: " + e.getMessage(), e);
         }
