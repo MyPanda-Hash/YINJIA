@@ -835,6 +835,9 @@ export default {
     // 2026-10-15 数据一致性修订:质检汇总结论新增「未检验」(合格数量 = 检验数量 − Σ不合格,
     // 还没检验就不显示合格数、不再误报「全部合格」)
     '未检验': 'Not inspected yet',
+    // 2026-11-23 生产工序进度看板「检验状态」筛选(全部检验/未检验/已检验)
+    '全部检验': 'All Inspection Statuses',
+    '已检验': 'Inspected',
     '三类工序检验单由报工审核自动生成；混料/装箱不出检验单': 'The three process inspection sheets are auto-created on work-report approval; mixing and packing produce none',
     // ---- 工单追溯·质检段补首件/制程(2026-10-18)----
     '成型出首件检验单与出货检验单功能，组装出组装成品检验单；切炭/混料/装箱不出检验单': 'Molding produces the first-article and outgoing functional inspection sheets; assembly produces the finished-goods inspection sheet; cutting, mixing and packing produce none',
@@ -6828,6 +6831,9 @@ export default {
     // ---- 2026-11-20 出货检验改名(出货检验（功能）/（表观）)+ 判定不合格 → 去开不合格品处理单(制程) ----
     '出货检验（功能）': 'Outgoing Inspection (Functional)',
     '出货检验（表观）': 'Outgoing Inspection (Appearance)',
+    // 2026-11-23 两张只读明细表(菜单/页签名)
+    '出货检验（功能）明细表': 'Outgoing Inspection (Functional) Details',
+    '出货检验（表观）明细表': 'Outgoing Inspection (Appearance) Details',
     '出货检验单号': 'Outgoing Inspection Sheet No.',
     '去开不合格处理单': 'Open NG Disposition Sheet',
     '本单检验结论为不合格，去开不合格品处理单（制程）并带出本单号与工单号':

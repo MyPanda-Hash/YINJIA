@@ -54,6 +54,12 @@
         <el-select v-model="statusFilter" size="small" class="wpb-sel" @change="reload">
           <el-option v-for="o in STATUS_OPTIONS" :key="o.value" :label="tt(o.label)" :value="o.value" />
         </el-select>
+        <!-- 2026-11-23 用户口径「增加未检验的筛选，然后能看到需要检验和没有检验的」:
+             与生产状态分开的第二筛选(全部检验/未检验/已检验)；未检验=待检验+检验中(含缺检)，
+             已检验=合格/不合格；无需检验不进这两个桶。 -->
+        <el-select v-model="qcFilter" size="small" class="wpb-sel wpb-sel-qc" @change="reload">
+          <el-option v-for="o in QC_OPTIONS" :key="o.value" :label="tt(o.label)" :value="o.value" />
+        </el-select>
         <el-select v-model="lineFilter" size="small" clearable filterable class="wpb-sel wpb-sel-line"
                    :placeholder="tt('全部生产线')" @change="reload">
           <el-option v-for="l in lineOptions" :key="l" :label="l" :value="l" />
@@ -319,6 +325,13 @@ const STATUS_OPTIONS = [
   { value: '全部', label: '全部' },
 ]
 
+/** 检验状态筛选(2026-11-23):'全部检验' 不下发;其余原样给后端 检验状态。 */
+const QC_OPTIONS = [
+  { value: '全部', label: '全部检验' },
+  { value: '未检验', label: '未检验' },
+  { value: '已检验', label: '已检验' },
+]
+
 /**
  * 生产状态 → 展示档位。后端行上的「生产状态」是四态+结案:
  * 未排产 / 未完工 / 在产 / 完工 / 已结案;「完工」按用户口径显示成「已完工」。
@@ -351,6 +364,7 @@ const router = useRouter()
 
 const viewMode = ref('board') // 默认看板(两种视图都保留,用户拍板)
 const statusFilter = ref('未完工')
+const qcFilter = ref('全部')
 const lineFilter = ref('')
 const keyword = ref('')
 const autoRefresh = ref(true) // 看板常态 = 开着自动刷新;切走/卸载时清定时器
@@ -392,6 +406,7 @@ async function load(opts = {}) {
   if (!silent) loading.value = true
   error.value = ''
   const payload = { 状态: statusFilter.value, limit: 300 }
+  if (qcFilter.value && qcFilter.value !== '全部') payload['检验状态'] = qcFilter.value
   const kw = keyword.value.trim()
   if (kw) payload.keyword = kw
   if (lineFilter.value) payload['生产线'] = lineFilter.value

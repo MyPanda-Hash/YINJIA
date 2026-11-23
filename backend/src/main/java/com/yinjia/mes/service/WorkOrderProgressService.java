@@ -62,6 +62,13 @@ public class WorkOrderProgressService {
         if (state.isEmpty()) state = "未完工";
         String keyword = str(b.get("keyword"));
         String line = str(b.get("生产线"));
+        // 2026-11-23 用户口径「增加未检验的筛选，然后能看到需要检验和没有检验的」:
+        //   独立于生产状态(未完工/已完工/全部)的第二筛选,只认 QC 行级判定结果:
+        //   · 未检验 = 质检状态 待检验/检验中(还没检验完的单，含缺检);
+        //   · 已检验 = 质检状态 合格/不合格;
+        //   · 无需检验 对两个筛选都不算(它本来就不该进品质待办)。
+        String qcState = nz(str(b.get("检验状态")));
+        if (!"未检验".equals(qcState) && !"已检验".equals(qcState)) qcState = "";
         int limit = intOf(b.get("limit"), DEFAULT_LIMIT);
         limit = Math.max(1, Math.min(limit, MAX_LIMIT));
 
@@ -279,6 +286,21 @@ public class WorkOrderProgressService {
             if (isActive(st)) active++; else finished++;
             progressSum += num(summary.get("进度"));
         }
+        // 检验状态筛选(2026-11-23):在 QC 判定挂到行上之后过滤,再按**过滤后的行**重算汇总,
+        // 否则顶部统计(行数/未完工/已完工/平均进度/待检验行数)会与被筛掉的列表对不上。
+        if (!qcState.isEmpty()) {
+            final String want = qcState;
+            rows.removeIf((r) -> !qcMatches(r, want));
+            active = 0;
+            finished = 0;
+            waiting = 0;
+            progressSum = 0;
+            for (Map<String, Object> r : rows) {
+                if (!((List<?>) r.getOrDefault("待检验工序", List.of())).isEmpty()) waiting++;
+                if (isActive(str(r.get("生产状态")))) active++; else finished++;
+                progressSum += num(r.get("进度"));
+            }
+        }
         out.put("汇总", summary(rows.size(), active, finished,
                 rows.isEmpty() ? 0 : Math.round(progressSum / rows.size() * 100d) / 100d, waiting));
         out.put("行", rows);
@@ -332,6 +354,17 @@ public class WorkOrderProgressService {
     }
 
     /** 生产状态是否属于「未完工」侧(未排产/未完工/在产);已结案/完工为另一侧 */
+    /**
+     * 检验状态筛选判定(2026-11-23):未检验 = 还没得出合格/不合格结论(待检验/检验中/缺字段);
+     * 已检验 = 合格/不合格。无需检验两边都不算。
+     */
+    private static boolean qcMatches(Map<String, Object> row, String want) {
+        String s = nz(str(row.get("质检状态")));
+        if ("无需检验".equals(s)) return false;
+        boolean inspected = "合格".equals(s) || "不合格".equals(s);
+        return "已检验".equals(want) == inspected;
+    }
+
     private static boolean isActive(String productionState) {
         if (productionState == null) return true;
         return !("已结案".equals(productionState) || "完工".equals(productionState));

@@ -63,6 +63,9 @@
           <span class="as-info-label">{{ tt(info.label) }}</span>
           <span class="as-info-value">
             <template v-if="info.kind === 'static'">{{ tt(info.text || '') }}</template>
+            <!-- 只读派生格(2026-11-23):值来自后端合成字段(如不合格品处理单的「提交时间」= 提交审批时间戳),
+                 不落库、不进 yj_field ⇒ 永远只显示值,不渲染输入控件。 -->
+            <span v-else-if="info.kind === 'head-static'" class="as-info-static">{{ head[info.key] || '' }}</span>
             <div v-else-if="editable && !infoLocked(info) && isRefKey(info.key)" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef(info.key)">
               <span class="as-ref-text">{{ head[info.key] || tt('点击选择') }}</span>
               <el-icon class="as-ref-ico"><Search /></el-icon>
@@ -1729,6 +1732,9 @@ defineExpose({ focusField })
   border: 1px solid #8a8a8a;
   font-size: 14px;
   color: #222;
+  /* 2026-11-23 版面规整:纸宽会随面板/窗口变化(540~1242),标题按纸宽缩放,
+     否则窄纸(540)里 30px 标题会折成「（制 / 程）」两行。 */
+  container-type: inline-size;
 }
 
 /* ═══ 表格式纸面（2026-11-06 样品申请单）：白底黑框、宋体，与设计原表同构 ═══
@@ -2107,14 +2113,21 @@ defineExpose({ focusField })
 }
 .as-title {
   flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  text-align: center;
   font-family: 'SimSun', 'Songti SC', serif;
-  font-size: 30px;
+  /* 纸宽自适应(2026-11-23):窄纸 540px 时 30px/3px 字距放不下「不合格品处理单（制程）」，
+     会折成「（制 / 程）」；按容器宽度缩放，宽纸(≥1242)仍是原来的 30px。 */
+  font-size: clamp(18px, 4.2cqw, 30px);
   font-weight: 600;
   color: #1f5fa8;
-  letter-spacing: 3px;
+  letter-spacing: clamp(0px, 0.35cqw, 3px);
+  line-height: 1.15;
+  white-space: normal;
+  word-break: break-word;
 }
 .as-info-table {
   width: 250px;
@@ -2509,6 +2522,9 @@ defineExpose({ focusField })
   border-right: 1px solid #c9c9c9;
   text-align: right;
   line-height: 1.4;
+  /* 长标签(如「不合格品处理意见」)在窄格里断行，不撑破格线 */
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 /* 左侧竖排格(申请单位列):逐行一格、一行一字,竖线因此贯通整个表头区 */
 /* 竖排列合并格:整个 vcell 连续段只有这一格(在 .q-vrun 里)。
@@ -2551,6 +2567,9 @@ defineExpose({ focusField })
   align-items: center;
   padding: 3px 6px;
   min-height: 32px;
+  /* 2026-11-23 版面规整:长客户名/人名在窄格里按整词换行，禁止"一字一行"式挤成竖条 */
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 /* 大填写区取值格:纵向排布 —— 填写区自适应撑满,签名行贴在本格最下一行 */
 .q-value.q-col {
@@ -2626,6 +2645,10 @@ defineExpose({ focusField })
   color: #222;
   border-bottom: 1px solid #c9c9c9;
   background: #f7fbfe;
+  /* 章节标题长(「一．问题描述（可附图片，必要时另附问题品）」)按格换行，不横向溢出 */
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 .q-section-body {
   display: flex;
@@ -2655,6 +2678,9 @@ defineExpose({ focusField })
   gap: 6px;
   padding: 2px 2px 0;
   font-size: 13.5px;
+  /* 责任人 + 日期在窄格里允许折行，不互相压字 */
+  flex-wrap: wrap;
+  row-gap: 2px;
 }
 /* 签名行贴底(填写区 flex:1 撑开,签名行自然落在最下一行;再兜一层) */
 .q-value.q-col .q-signline {

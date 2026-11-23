@@ -5104,6 +5104,11 @@ migrate-qc-bhc-ship-insp-link-20261120.sql
 #   不建表、不碰单据数据。幂等;两账套均执行。
 migrate-instr-summary-page-20261120.sql
 
+# 2026-11-20 「品质流程监控」改名「来料品质流程监控」(显示层):页面级虚拟面板 QC_FLOW 的展示名 +
+#   panel 级译名(旧 key 整体改名,保住各语种译文)+ yj_menu_node 菜单覆盖行;
+#   面板码/路由/菜单 code/授权/取数口径一律不动。幂等;两账套均执行。
+migrate-qc-flow-rename-20261120.sql
+
 # 2026-11-20 工艺路线(ROUTE)表头「生效日期 / 失效日期」取消必填:
 #   用户口径「工序路线中生效日期和失效日期也不用必填」;必填真源 = yj_field.required,
 #   只 UPDATE 这两格 → 0 + 自检 required=1 残留必须为 0。幂等;两账套均执行。
@@ -5115,3 +5120,15 @@ migrate-route-dates-optional-20261120.sql
 #   (提交审批 → 审批通过 → 已审核 → 弃审 → 草稿),本条只补前端漏掉的按钮显隐名单 + yj_role_panel 审批权:
 #   1033/1039/1042/1048 置 can_approve='Y',1048 缺行则补行(perms 照 QC_FIRST_INSP)。幂等;两账套均执行。
 migrate-qc-line-patrol-approval-20261120.sql
+
+# 2026-11-23 不合格品处理单(制程) QC_BHC 分章节责任人:
+#   用户口径「这每个责任人都是不同的责任人，而不是作为同一个责任人」⇒ qc_bhc 加 5 个独立人员列
+#   (问题描述/原因分析/性能验证/处理意见/改善效果验证责任人) + yj_field + 译名;纸面 signKey 各自绑定。
+#   表头「责任人」列保留原语义(本单业务责任人，后端预填可改)。幂等;两账套均执行。
+migrate-qc-bhc-resp-per-section-20261123.sql
+
+# 2026-11-23 出货检验（功能）/（表观）两张只读明细表(实现参考检验数据记录明细表):
+#   视图 v_qc_proc_insp_detail / v_qc_asm_insp_detail(一行=一个检验项目×内部批次,头表摊平)
+#   + flat 面板 QC_PROC_INSP_DETAIL / QC_ASM_INSP_DETAIL(报表,100 行/页) + yj_field + 只读授权 + 译名。
+#   幂等;两账套均执行。
+migrate-qc-insp-detail-panels-20261123.sql

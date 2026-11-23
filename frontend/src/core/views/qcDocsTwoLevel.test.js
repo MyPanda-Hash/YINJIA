@@ -38,7 +38,14 @@ test('① 责任部门 = 责任人所属部门(动态):5 张单右上信息表�
     assert.equal(info[0].text, '公司内部', code)
     assert.equal(info[1].key, '责任部门', `${code} 责任部门必须是动态列`)
     assert.equal(info[1].kind, undefined, `${code} 责任部门不能写死成 static`)
-    assert.equal(info[2].key, '单据日期', code)
+    // 2026-11-23 用户口径「时间取填写提交日期」:QC_BHC 右上「时间」改绑后端派生只读「提交时间」
+    // (= 提交审批时间戳，含时分)，别的单仍是单据日期。
+    if (code === 'QC_BHC') {
+      assert.equal(info[2].key, '提交时间', 'QC_BHC 时间格必须绑提交时间')
+      assert.equal(info[2].kind, 'head-static', 'QC_BHC 时间格是只读派生值')
+    } else {
+      assert.equal(info[2].key, '单据日期', code)
+    }
   }
   // QC_BHG 保持「填写部门/填写人/填写日期」(它的责任部门是表头业务值)
   assert.deepEqual(qcSheetCfgs.QC_BHG.info.map((i) => i.label), ['填写部门', '填写人', '填写日期'])
@@ -60,7 +67,18 @@ test('① 各章节「责任人/日期」:日期段绑单据日期(自动生成,
   }
   // 「责任人」签名必须绑到责任人列(2026-11-18 实测:sign 写了「责任人」但缺 signKey 时
   // DocSheet 回落「填写人」⇒ 纸面签名行是空的,而表头明明有责任人姓名)
-  for (const code of ['QC_BHC', 'QC_BHZ', 'QC_SCP']) {
+  // 2026-11-23 用户口径「这每个责任人都是不同的责任人，而不是作为同一个责任人」:
+  //   QC_BHC 五处落款各绑独立列(迁移 migrate-qc-bhc-resp-per-section-20261123.sql)；
+  //   QC_BHZ/QC_SCP 维持原口径(共用表头「责任人」)。
+  const BHC_SIGN_KEYS = [
+    '问题描述责任人', '原因分析责任人', '性能验证责任人', '处理意见责任人', '改善效果验证责任人',
+  ]
+  const bhcSigns = qcSheetCfgs.QC_BHC.rows
+    .filter((r) => r.kind === 'section' && r.signKey)
+    .map((r) => r.signKey)
+  assert.deepEqual(bhcSigns, BHC_SIGN_KEYS, 'QC_BHC 五段责任人必须各绑独立列')
+  assert.equal(new Set(bhcSigns).size, bhcSigns.length, 'QC_BHC 责任人列不得重复')
+  for (const code of ['QC_BHZ', 'QC_SCP']) {
     for (const row of qcSheetCfgs[code].rows.filter((r) => r.kind === 'section' && r.sign === '责任人')) {
       assert.equal(row.signKey, '责任人', `${code}「${row.label}」的签名键必须显式写责任人`)
     }

@@ -40,6 +40,7 @@ export default {
     '该批次还没有采购入库单：在送料暂收单上点「生成检验或入库单」即可直达入库（免检物料不需要检验）': 'Für diese Charge gibt es noch keinen Eingangsbeleg: im Wareneingangsbeleg auf „Prüfung/Eingang erzeugen" klicken, dann direkt einlagern (prüfbefreite Artikel werden nicht geprüft)',
     '还没有送料暂收单': 'Noch kein Wareneingangsbeleg',
     '还没有来料检验单': 'Noch keine Eingangsprüfung',
+    '还没有检验数据记录：来料检验单生单时会按物料各建一张（在来料检验单上生单后回来刷新即可）': "Noch keine Prüfdatenaufzeichnung: Beim Anlegen des Wareneingangs-Prüfblatts wird je Material eine erzeugt (dort anlegen, dann hier aktualisieren)",
     '还没有暂收退回单': 'Noch kein Rückgabebeleg',
     '还没有特采单': 'Noch keine Sonderfreigabe',
 
@@ -75,7 +76,8 @@ export default {
 
 
     // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
-    '品质流程监控': 'Qualitätsprozess-Monitor',
+    '来料品质流程监控': 'Wareneingangs-Qualitätsprozess-Monitor',
+    '检验数据记录': 'Prüfdatenaufzeichnung',
     '物料批号': 'Chargennummer',
     '物料批号与物料编码': 'Charge und Artikelcode',
     '供应商与采购订单': 'Lieferant und Bestellung',

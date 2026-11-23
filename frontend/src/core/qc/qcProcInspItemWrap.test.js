@@ -70,3 +70,15 @@ test('④ 出货检验(功能)与出货检验(表观)共用同一张纸面 => �
   assert.match(list, /const PROC_INSP_SHEET_PANELS = \['QC_PROC_INSP', 'QC_ASM_INSP'\]/,
     '两张单必须共用 QcProcInspSheet(PROC_INSP_SHEET_PANELS 里两个代号)')
 })
+
+test('⑤ 数据格一律顶对齐(批次格不再垂直居中 => 内容不会看着掉到下一行)', () => {
+  const m = sheet.match(/\.qr-grid th,\r?\n\.qr-grid td \{[\s\S]*?\r?\n\}/)
+  assert.ok(m, '找不到 .qr-grid th/td 基础样式块')
+  assert.match(m[0], /vertical-align: top/, '数据格必须顶对齐,否则行高一撑就"内容跑到下面"')
+  // 表头仍居中(批次号/检验项目 等表头文字)
+  const thead = sheet.match(/\.qr-grid thead th \{[\s\S]*?\r?\n\}/)
+  assert.ok(thead, '找不到表头样式块')
+  assert.match(thead[0], /vertical-align: middle/, '表头文字保持垂直居中')
+  // 批次格不允许再单独写 middle
+  assert.doesNotMatch(sheet, /\.qr-grid td\.c-batchtext \{[^}]*vertical-align: middle/)
+})

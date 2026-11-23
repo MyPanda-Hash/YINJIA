@@ -137,11 +137,11 @@ const routes = [
       //   点行跳「生产工单」页并定位该工单(WorkOrderList 支持 ?keyword=&focus= 定位)。
       //   页面级虚拟面板 WORK_ORDER_PROGRESS(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由。
       { path: 'prod/plan/workOrderProgress', component: () => import('@/views/modules/plan/WorkOrderProgressBoard.vue'), meta: { title: '生产工序进度看板', code: 'workOrderProgress', panelCode: 'WORK_ORDER_PROGRESS' } },
-      // 品质流程监控(2026-11-12 用户口径「流程监控:从送料->检验单->入库……主要要显示物料批号和物料编码」):
-      //   一行=一个来料批次(送料暂收单的一条物料行),右侧 送料 → 检验 → 入库 三节点带单号/状态/日期,
+      // 来料品质流程监控(2026-11-12 建,原名「品质流程监控」;2026-11-20 用户口径改名):
+      //   一行=一个来料批次(送料暂收单的一条物料行),右侧 送料 →(来料检验单 ∥ 检验数据记录)→ 入库,
       //   点节点跳对应面板并定位该单(没有该面板查看权时只提示不跳);数据由 QcFlowService 现算。
       //   页面级虚拟面板 QC_FLOW(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由。
-      { path: 'qc/flowMonitor', component: () => import('@/views/modules/qc/QcFlowMonitor.vue'), meta: { title: '品质流程监控', code: 'qcFlowMonitor', panelCode: 'QC_FLOW' } },
+      { path: 'qc/flowMonitor', component: () => import('@/views/modules/qc/QcFlowMonitor.vue'), meta: { title: '来料品质流程监控', code: 'qcFlowMonitor', panelCode: 'QC_FLOW' } },
       // 样品检验汇总表(2026-11-17 用户口径:「……按一个时间范围,去导出有多少人送了啥样品测试啥,安排检测工作。」):
       //   按送样人 / 按委托单两个视角 + 今日/本周/本月快捷区间 + 导出 Excel(前端 xlsx 现生成)。
       //   页面级虚拟面板 INSP_SUMMARY(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由,显式注册。

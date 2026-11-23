@@ -1,11 +1,13 @@
 <!--
-  QcFlowMonitor.vue — 「品质流程监控」(2026-11-12)
+  QcFlowMonitor.vue — 「来料品质流程监控」(原名「品质流程监控」,2026-11-20 用户口径改名)
 
   用户口径:「流程监控:从送料->检验单->入库。为品质做一个流程监控的面版,可以知道每个单据的状态,
   和跳转,如果没有对应面版的权限就无法跳转过去。这种看板类似,而且参考检验目录,主要要显示物料批号和物料编码。」
 
   一行 = 送料暂收单的一条物料行(= 一个来料批次),与「待检验目录」同粒度;每行右侧是
-  **送料暂收单 → 来料检验单 → 采购入库单** 三个节点,每个节点显示 单号 + 单据状态 + 日期(+ 检验/入库数量)。
+  **送料暂收单 →(来料检验单 ∥ 检验数据记录)→ 采购入库单** 的节点,每个节点显示 单号 + 单据状态 + 日期
+  (+ 检验/入库数量)。2026-11-20 用户口径:「(检验数据记录)应该是和来料检验单作为并列关系的指向采购入库单,
+  当前的采购入库需要两个单据的审核完成」⇒ 中间那一格叠两单,两单都审核完当前环节才离开「检验」。
 
   跳转(用户口径里的第二条硬要求):点节点 = `/panelx/list/<目标面板>?docNo=<单号>` 定位那张单;
   **没有该面板查看权时只提示、不发路由** —— 判定走 `canViewPanel`(与导航/我的桌面/单据间跳转同一真源),
@@ -23,7 +25,7 @@
     <!-- ===== ① 工具条 ===== -->
     <div class="qcf-toolbar">
       <div class="qcf-head">
-        <span class="qcf-title">{{ tt('品质流程监控') }}</span>
+        <span class="qcf-title">{{ tt('来料品质流程监控') }}</span>
         <span class="qcf-clock">{{ nowText }}</span>
         <span class="qcf-datatime">{{ tt('数据时间') }}<em>{{ dataTime || '-' }}</em></span>
       </div>
@@ -134,28 +136,35 @@
           <!-- ③ 流程:主链 送料→检验→入库 + 不合格分支 退回→特采(点节点跳该单据;无权限不可跳) -->
           <div class="qcf-cell qcf-flow">
             <div class="qcf-lane">
-              <template v-for="(s, i) in chainOf(row).main" :key="s.key">
+              <!-- 2026-11-20 用户口径:「(检验数据记录)应该是和来料检验单作为并列关系的指向采购入库单」
+                   ⇒ 中间那一格是**两单并列**(来料检验单 ∥ 检验数据记录,两单都指向采购入库单),
+                   故一个 slot 内可叠 1~2 个节点,箭头只画在 slot 之间。 -->
+              <template v-for="(slot, i) in laneSlots(row)" :key="slot.key">
                 <span v-if="i" class="qcf-arrow" aria-hidden="true">→</span>
-                <!-- 免检物料:来料检验这一步是被**跳过**的,不是"没做" —— 不给它单据框,只留一个灰色小标,
-                     免得看成「检验单未生成」把免检批次误当成卡单(2026-11-12 用户提问) -->
-                <div v-if="s.skip" class="qcf-skip-chip" :title="nodeTitle(s)">{{ tt('免检跳过') }}</div>
-                <div v-else class="qcf-node" :class="['is-' + s.state, { 'is-link': s.no && canOpen(s.panel) }]"
-                     :title="nodeTitle(s)" role="button" tabindex="0"
-                     @click.stop="openDoc(s.panel, s.no)"
-                     @keydown.enter.prevent="openDoc(s.panel, s.no)"
-                     @keydown.space.prevent="openDoc(s.panel, s.no)">
-                  <span class="qcf-node-name">{{ tt(s.name) }}</span>
-                  <span v-if="s.no" class="qcf-node-no" :title="s.no">{{ s.no }}</span>
-                  <!-- 没有单据时,「未生成」在这一个位置说一次就够(不再重复挂徽标) -->
-                  <span v-else class="qcf-node-no is-empty">{{ tt('未生成') }}</span>
-                  <span class="qcf-node-meta">
-                    <em v-if="s.no" class="qcf-badge" :class="'tone-' + s.tone">{{ tt(s.status) }}</em>
-                    <i v-if="s.date">{{ s.date }}</i>
-                  </span>
-                  <span v-if="s.qty" class="qcf-node-qty" :title="s.qtyTitle">{{ s.qty }}</span>
-                  <span v-if="s.no && !canOpen(s.panel)" class="qcf-lock" :title="tt('无查看该面板的权限')">
-                    <el-icon><Lock /></el-icon>
-                  </span>
+                <div class="qcf-slot" :class="{ 'is-par': slot.nodes.length > 1 }">
+                  <template v-for="s in slot.nodes" :key="s.key">
+                    <!-- 免检物料:来料检验这一步是被**跳过**的,不是"没做" —— 不给它单据框,只留一个灰色小标,
+                         免得看成「检验单未生成」把免检批次误当成卡单(2026-11-12 用户提问) -->
+                    <div v-if="s.skip" class="qcf-skip-chip" :title="nodeTitle(s)">{{ tt('免检跳过') }}</div>
+                    <div v-else class="qcf-node" :class="['is-' + s.state, { 'is-link': s.no && canOpen(s.panel) }]"
+                         :title="nodeTitle(s)" role="button" tabindex="0"
+                         @click.stop="openDoc(s.panel, s.no)"
+                         @keydown.enter.prevent="openDoc(s.panel, s.no)"
+                         @keydown.space.prevent="openDoc(s.panel, s.no)">
+                      <span class="qcf-node-name">{{ tt(s.name) }}</span>
+                      <span v-if="s.no" class="qcf-node-no" :title="s.no">{{ s.no }}</span>
+                      <!-- 没有单据时,「未生成」在这一个位置说一次就够(不再重复挂徽标) -->
+                      <span v-else class="qcf-node-no is-empty">{{ tt('未生成') }}</span>
+                      <span class="qcf-node-meta">
+                        <em v-if="s.no" class="qcf-badge" :class="'tone-' + s.tone">{{ tt(s.status) }}</em>
+                        <i v-if="s.date">{{ s.date }}</i>
+                      </span>
+                      <span v-if="s.qty" class="qcf-node-qty" :title="s.qtyTitle">{{ s.qty }}</span>
+                      <span v-if="s.no && !canOpen(s.panel)" class="qcf-lock" :title="tt('无查看该面板的权限')">
+                        <el-icon><Lock /></el-icon>
+                      </span>
+                    </div>
+                  </template>
                 </div>
               </template>
             </div>
@@ -243,6 +252,18 @@
               <span v-else class="qcf-l-sub">{{ row['需检验'] ? tt('待检验') : tt('免检') }}</span>
               <el-tag v-if="row['检验单号']" size="small" effect="light" :type="tagType(row['检验状态'])" class="qcf-l-tag">
                 {{ tt(row['检验状态'] || '草稿') }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <!-- 检验数据记录(2026-11-20):与来料检验单并列的第二张单,两单都审完才算过检验 -->
+          <el-table-column :label="tt('检验数据记录')" min-width="130">
+            <template #default="{ row }">
+              <a v-if="row['检验数据记录单号']" class="qcf-link" :title="nodeTitleOf(row, 'rec')"
+                 @click.stop="openDoc('QC_INSP_REC', row['检验数据记录单号'])">{{ row['检验数据记录单号'] }}</a>
+              <span v-else class="qcf-l-sub">{{ row['需检验'] ? tt('待检验') : tt('免检') }}</span>
+              <el-tag v-if="row['检验数据记录单号']" size="small" effect="light"
+                      :type="tagType(row['检验数据记录状态'])" class="qcf-l-tag">
+                {{ tt(row['检验数据记录状态'] || '草稿') }}
               </el-tag>
             </template>
           </el-table-column>
@@ -455,6 +476,23 @@ function chainOf(row) {
   }
 }
 
+/**
+ * 主链的一格(slot):`送料 | 检验 | 入库` 三格;中间那格 = 来料检验单 + 检验数据记录 **两单并列**
+ * (2026-11-20 用户口径:「和来料检验单作为并列关系的指向采购入库单」)。
+ * 免检批次整个检验环节不存在 ⇒ 只留检验单那一个「免检跳过」小标,不把记录格也画一遍。
+ * 记录单有钱(有单号)时,即使 需检验=0 也照实显示 —— 有单就绝不藏。
+ */
+function laneSlots(row) {
+  const c = chainOf(row)
+  const mid = [c.main[1]]
+  if (c.needInsp || c.rec?.no) mid.push(c.rec)
+  return [
+    { key: 'recv', nodes: [c.main[0]] },
+    { key: 'insp', nodes: mid },
+    { key: 'in', nodes: [c.main[2]] },
+  ]
+}
+
 function inspQty(row) {
   const submitted = row?.['送检数量']
   if (submitted == null) return ''
@@ -488,6 +526,7 @@ function nodeTitle(s) {
     const msg = {
       recv: '还没有送料暂收单',
       insp: '还没有来料检验单',
+      rec: '还没有检验数据记录：来料检验单生单时会按物料各建一张（在来料检验单上生单后回来刷新即可）',
       in: '该批次还没有采购入库单：在送料暂收单上点「生成检验或入库单」即可直达入库（免检物料不需要检验）',
       ret: '还没有暂收退回单',
       tc: '还没有特采单',
@@ -501,6 +540,7 @@ function nodeTitle(s) {
 function nodeTitleOf(row, key) {
   if (key === 'recv') return nodeTitle({ no: row?.['送料暂收单号'], panel: 'QC_RECV' })
   if (key === 'insp') return nodeTitle({ no: row?.['检验单号'], panel: 'QC_INSP' })
+  if (key === 'rec') return nodeTitle({ no: row?.['检验数据记录单号'], panel: 'QC_INSP_REC' })
   if (key === 'ret') return nodeTitle({ no: row?.['退货单号'], panel: 'QC_RETURN' })
   if (key === 'tc') return nodeTitle({ no: row?.['特采单号'], panel: 'QC_TC_IN' })
   return nodeTitle({ no: row?.['入库单号'], panel: 'PURCHASE_IN' })
@@ -903,8 +943,11 @@ onBeforeUnmount(stopTimers)
 }
 .qcf-lane {
   display: flex;
-  align-items: stretch;
-  gap: 2px;
+  /* 2026-11-20 第二轮:并列格(检验单 ∥ 检验数据记录)比单节点高一倍,原来 stretch 会让
+     送料/入库贴顶、箭头落在两格接缝上 —— 整条链路看起来"错位"。改为垂直居中:
+     三个 slot 共用同一条中线,箭头也走中线,一眼能看出"送料 →(检验两单)→ 入库"。 */
+  align-items: center;
+  gap: 4px;
   min-width: 0;
 }
 /* 不合格分支:比主链矮一号、左缩进一点,一眼能看出是"另一条路" */
@@ -931,6 +974,34 @@ onBeforeUnmount(stopTimers)
   color: #c0c4cc;
   font-size: 12px;
   line-height: 1;
+}
+/* 主链的一格:中间那格可能是「来料检验单 + 检验数据记录」两单**并列叠放**(2026-11-20),
+   两单共用同一列宽 ⇒ 节点不再自己抢宽度(flex:0 0 auto),由 slot 统一占位。 */
+.qcf-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 0;
+  max-width: 168px;
+}
+/* 并列格(2026-11-20 第二轮用户口径「并行的情况下要规整」):
+   两格**等宽等高**(grid 1fr 自动拉平,检验单有数量行、记录单没有 ⇒ 不拉平就会一高一矮),
+   外加一层浅色描边框把「两单同属检验环节」画成一组 —— 箭头连的是这一组,不是某个盒子。 */
+.qcf-slot.is-par {
+  display: grid;
+  grid-auto-rows: 1fr;
+  gap: 6px;
+  max-width: 180px;
+  padding: 6px;
+  border: 1px solid #e4eefb;
+  border-radius: 6px;
+  background: #fbfdff;
+}
+.qcf-slot > .qcf-node {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: none;
 }
 .qcf-node {
   position: relative;

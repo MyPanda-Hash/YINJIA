@@ -1,9 +1,10 @@
 /**
- * qcFlow.js — 「品质流程监控」(QC_FLOW)的**纯逻辑**:把后端一行数据摊成
- * 「送料 → 检验 → 入库」主链 + 「不合格 → 退回 / 特采」分支,并给出每个节点的时态与跳转目标。
+ * 「来料品质流程监控」(原名「品质流程监控」,2026-11-20 用户口径改名;面板码不变)的**纯逻辑**:
+ * 把后端一行数据摊成「送料 →(检验单 ∥ 检验数据记录)→ 入库」主链 + 「不合格 → 退回 / 特采」分支,
+ * 并给出每个节点的时态与跳转目标。
  *
  * 为什么单独成模块而不是写在 QcFlowMonitor.vue 里:
- *   · 五张单的时态判定(已审核/草稿/审批中/作废/未生成/免检)是这一页最容易改错的地方,
+ *   · 六张单的时态判定(已审核/草稿/审批中/作废/未生成/免检)是这一页最容易改错的地方,
  *     抽出来才能单测(见 qcFlow.test.js);
  *   · 跳转**必须**先过面板查看权 —— 判定放在这里,前端各处(主链节点、分支节点、列表链接)只有一个实现,
  *     不会出现"看板点了会拦、列表点了不拦"的漂移。
@@ -12,16 +13,22 @@
  *   状态 5 档 = yj_doc_status 折叠(已作废 > 已中止 > 审批中 > 已审核 > 草稿);
  *   「免检」= 该物料 bs_inv.来料检验 <> '是' 且还没有检验单(免检批次不走来料检验);
  *   分支链只在「有退回单/特采单,或检验被判不合格」时才显示(全合格批次不占版面)。
+ *
+ * 检验数据记录(2026-11-20 用户口径「和来料检验单作为并列关系的指向采购入库单」):
+ *   主链上是**与来料检验单并列**的一个节点(qcFlow.rec),两单都审完「当前环节」才离开「检验」;
+ *   `main` 仍是 [送料, 检验, 入库] 三格,记录单另给 `rec` —— 渲染层把 检验 与 记录 叠成同一列,
+ *   这样列表/看板/单测都不用为"中间多一格"重排所有下标。
  */
 import { canViewPanel } from '../auth/panelAccess.js'
 
 /**
- * 五张单对应的目标面板(面板码是跳转的唯一凭据)。
- * recv/insp/in 是主链;ret(暂收退回单)/tc(特采单)是不合格分支。
+ * 六张单对应的目标面板(面板码是跳转的唯一凭据)。
+ * recv/insp/rec/in 是主链(insp 与 rec 并列);ret(暂收退回单)/tc(特采单)是不合格分支。
  */
 export const FLOW_PANELS = Object.freeze({
   recv: Object.freeze({ code: 'QC_RECV', name: '送料暂收单' }),
   insp: Object.freeze({ code: 'QC_INSP', name: '来料检验单' }),
+  rec: Object.freeze({ code: 'QC_INSP_REC', name: '检验数据记录' }),
   in: Object.freeze({ code: 'PURCHASE_IN', name: '采购入库单' }),
   ret: Object.freeze({ code: 'QC_RETURN', name: '暂收退回单' }),
   tc: Object.freeze({ code: 'QC_TC_IN', name: '特采单' }),
@@ -99,17 +106,26 @@ export function makeNode(key, no, status, date, opt = {}) {
 }
 
 /**
- * 一行 → 主链(送料→检验→入库)+ 不合格分支(退回→特采)。
+ * 一行 → 主链(送料→检验→入库,其中「检验」由 检验单 + 检验数据记录 两格并列构成)
+ * + 不合格分支(退回→特采)。
  *
  * @param {object} row 后端 /px/qcFlow/list 的一行
- * @returns {{main: Array, ng: Array, showNg: boolean, needInsp: boolean}}
+ * @returns {{main: Array, rec: object, ng: Array, showNg: boolean, needInsp: boolean}}
  */
 export function buildChain(row) {
   const needInsp = Number(row?.['需检验'] ?? 0) === 1
   const verdict = String(row?.['检验结论'] ?? '').trim()
+  const insp = makeNode('insp', row?.['检验单号'], row?.['检验状态'], row?.['检验日期'], { skip: !needInsp })
+  // 检验数据记录:与检验单并列(两单都审完当前环节才离开「检验」)。
+  // 免检批次整个检验环节都不存在 ⇒ 它的「免检」由检验单那格说一次就够,记录格不重复挂标:
+  //   · 需检验 ⇒ 没有记录时照常显示「未生成」(缺哪张补哪张);
+  //   · 免检却没有记录 ⇒ 同样给「免检」(有单号时仍按真实状态显示,绝不把已有单据藏掉)。
+  const rec = makeNode('rec', row?.['检验数据记录单号'], row?.['检验数据记录状态'], row?.['检验数据记录日期'], {
+    skip: !needInsp,
+  })
   const main = [
     makeNode('recv', row?.['送料暂收单号'], row?.['送料状态'], row?.['送料日期']),
-    makeNode('insp', row?.['检验单号'], row?.['检验状态'], row?.['检验日期'], { skip: !needInsp }),
+    insp,
     makeNode('in', row?.['入库单号'], row?.['入库状态'], row?.['入库日期']),
   ]
   const ng = [
@@ -120,7 +136,7 @@ export function buildChain(row) {
   // 全合格 / 免检 / 还没检的批次不显示,免得每行都挂着两条"未生成"。
   const hasNgDoc = !!(String(row?.['退货单号'] ?? '').trim() || String(row?.['特采单号'] ?? '').trim())
   const showNg = hasNgDoc || verdict === '不合格' || verdict === '部分不合格'
-  return { main, ng, showNg, needInsp }
+  return { main, rec, ng, showNg, needInsp }
 }
 
 /**

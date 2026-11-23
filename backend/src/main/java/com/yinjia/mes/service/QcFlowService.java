@@ -13,12 +13,17 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 品质流程监控(2026-11-12;同日第二轮用户口径见下)。
+ * 来料品质流程监控(原名「品质流程监控」,2026-11-20 用户口径改名;面板码仍然是 {@code QC_FLOW})。
  *
  * <p><b>一行是什么</b>:一行 = **送料暂收单的一条物料行**(= 一个来料批次),把这条批次在
  * 「送料暂收单 {@code sl_recv} → 来料检验单 {@code qc_insp} →(不合格时)暂收退回单 {@code qc_return}
  * →(让步接收时)特采单 {@code qc_tc_in} → 采购入库单 {@code bd_purchase_in}」上的落点摊平到一行 ——
  * 这是「一条来料批次走到哪一步、卡在谁手上」的最小单元,也是用户点名要的「物料批号 + 物料编码」那一层粒度。
+ *
+ * <p><b>检验数据记录(2026-11-20 用户口径)</b>:「当前的采购入库需要两个单据的审核完成,当前只显示了来料检验单
+ * 而没有显示对应的检验数据记录」⇒ 来料检验单 {@code qc_insp} 与检验数据记录 {@code qc_insp_rec}(JYSJ)
+ * 是**并列**的两张单(都指向采购入库单),「当前环节 = 检验」只有在**两单都已审核**时才放行到入库。
+ * 记录按 {@code qc_insp_rec.来料检验单号 = 检验单号} 关联,同单多物料时按物料编码取对应那张(空编码兜底)。
  *
  * <p><b>不合格分支(2026-11-12 第二轮)</b>:检验之后是**两条路**,不是一条直线:
  * <ul>
@@ -94,9 +99,10 @@ public class QcFlowService {
             String like = "%" + keyword + "%";
             w.append(" AND (送料暂收单号 LIKE ? OR 供应商 LIKE ? OR 采购订单号 LIKE ?")
                     .append(" OR 物料编码 LIKE ? OR 物料名称 LIKE ? OR 物料批号 LIKE ?")
-                    .append(" OR ISNULL(检验单号,N'') LIKE ? OR ISNULL(入库单号,N'') LIKE ?")
+                    .append(" OR ISNULL(检验单号,N'') LIKE ? OR ISNULL(检验数据记录单号,N'') LIKE ?")
+                    .append(" OR ISNULL(入库单号,N'') LIKE ?")
                     .append(" OR ISNULL(退货单号,N'') LIKE ? OR ISNULL(特采单号,N'') LIKE ?)");
-            for (int i = 0; i < 10; i++) args.add(like);
+            for (int i = 0; i < 11; i++) args.add(like);
         }
         if (from != null) {
             w.append(" AND 送料日期 >= ?");
@@ -201,6 +207,15 @@ public class QcFlowService {
                 + statusOf("d5", "tc.特采头状态", "tc.特采审核时间") + " END";
         String pinStatus = "CASE WHEN put.入库单号 IS NULL THEN NULL ELSE "
                 + statusOf("d3", "put.入库头状态", "put.入库审核时间") + " END";
+        // 检验数据记录(QC_INSP_REC / JYSJ,2026-11-20 新增):它与来料检验单**并列**,两单都审完才轮得到入库。
+        // 该面板属「归档一族」(保存/归档即完结,审批落 yj_doc_status.shr;存量单有的只置 archived='Y'),
+        // ⇒ 判「已审核」必须把 archived 也算上 —— 否则已审的记录会显示成草稿、把采购入库永远卡在「检验」。
+        String recStatus = "CASE WHEN rec.记录单号 IS NULL THEN NULL ELSE "
+                + "CASE WHEN ISNULL(d6.canceled,'N')='Y' THEN N'已作废'"
+                + " WHEN ISNULL(d6.stopped,'N')='Y' THEN N'已中止'"
+                + " WHEN ISNULL(d6.pending,'N')='Y' THEN N'审批中'"
+                + " WHEN ISNULL(d6.archived,'N')='Y' OR ISNULL(d6.shr,N'')<>N'' THEN N'已审核'"
+                + " ELSE N'草稿' END END";
         String core = """
                 SELECT
                     d.id AS 行id,
@@ -235,6 +250,11 @@ public class QcFlowService {
                          WHEN ISNULL(ins.合格数量, 0) > 0 THEN N'合格'
                          ELSE NULL END AS 检验结论,
                     %s AS 检验状态,
+                    /* ── 检验数据记录(与来料检验单并列:两单都审完才算过检验,才轮得到入库) ── */
+                    rec.记录单号 AS 检验数据记录单号,
+                    CONVERT(nvarchar(10), rec.记录日期, 120) AS 检验数据记录日期,
+                    ISNULL(rec.记录检验结论, N'') AS 检验数据记录结论,
+                    %s AS 检验数据记录状态,
                     /* ── 不合格分支一:暂收退回单 ── */
                     ret.退货单号 AS 退货单号,
                     CONVERT(nvarchar(10), ret.退货日期, 120) AS 退货日期,
@@ -288,6 +308,16 @@ public class QcFlowService {
                                   AND x.物料编码 = d.物料编码
                                 ORDER BY CASE WHEN ISNULL(x.批次号, N'') = ISNULL(d.批次号, N'') THEN 0 ELSE 1 END,
                                          i.id DESC) ins
+                  /* 检验数据记录(QC_INSP_REC / JYSJ):2026-11-20 用户口径「和来料检验单作为并列关系的指向采购入库单」。
+                     一单多物料时各建一张记录 ⇒ 按(来料检验单号, 物料编码)取最靠前的一张;
+                     物料编码为空的历史记录只按检验单号兜底(别因那一格没填就当它不存在)。 */
+                  OUTER APPLY (SELECT TOP 1 r.单据编号 AS 记录单号, r.单据日期 AS 记录日期,
+                                      r.检验结论 AS 记录检验结论
+                                 FROM dbo.qc_insp_rec r
+                                WHERE ISNULL(r.asp_cancel,'N') <> 'Y'
+                                  AND r.来料检验单号 = ins.检验单号
+                                  AND (ISNULL(r.物料编码, N'') = d.物料编码 OR ISNULL(r.物料编码, N'') = N'')
+                                ORDER BY CASE WHEN r.物料编码 = d.物料编码 THEN 0 ELSE 1 END, r.id DESC) rec
                   /* 暂收退回单(不合格退回):先按检验单号,再按「批次号 + 明细物料编码」兜底 */
                   OUTER APPLY (SELECT TOP 1 r.单据编号 AS 退货单号, r.单据日期 AS 退货日期, r.退货类型,
                                       r.单据状态 AS 退货头状态, r.审核时间 AS 退货审核时间,
@@ -380,14 +410,20 @@ public class QcFlowService {
                   OUTER APPLY (SELECT TOP 1 s.canceled, s.stopped, s.pending, s.shr
                                  FROM dbo.yj_doc_status s
                                 WHERE s.panel_code = N'QC_TC_IN' AND s.doc_no = tc.特采单号) d5
+                  /* 检验数据记录的状态:归档一族连 archived 一起取,见 recStatus */
+                  OUTER APPLY (SELECT TOP 1 s.canceled, s.stopped, s.pending, s.shr, s.archived
+                                 FROM dbo.yj_doc_status s
+                                WHERE s.panel_code = N'QC_INSP_REC' AND s.doc_no = rec.记录单号) d6
                  WHERE ISNULL(d.asp_cancel,'N') <> 'Y'
-                """.formatted(recvStatus, inspStatus, retStatus, tcStatus, pinStatus);
-        // 当前环节:送料未审 → 检验 → (不合格)退货 → (让步)特采 → 入库 → 完成。
+                """.formatted(recvStatus, inspStatus, recStatus, retStatus, tcStatus, pinStatus);
+        // 当前环节:送料未审 → 检验(来料检验单 + 检验数据记录**两单都审完**) → (不合格)退货
+        //   → (让步)特采 → 入库 → 完成。
         // 异常(作废/中止)单独出标记,不参与环节判定(异常单也要看得见卡在哪一步)。
         String stage = """
                 CASE
                   WHEN c.送料状态 <> N'已审核' THEN N'送料'
-                  WHEN c.需检验 = 1 AND (c.检验单号 IS NULL OR c.检验状态 <> N'已审核') THEN N'检验'
+                  WHEN c.需检验 = 1 AND (c.检验单号 IS NULL OR c.检验状态 <> N'已审核'
+                       OR c.检验数据记录单号 IS NULL OR c.检验数据记录状态 <> N'已审核') THEN N'检验'
                   WHEN c.特采单号 IS NOT NULL AND c.特采状态 IN (N'草稿', N'审批中') THEN N'特采'
                   WHEN c.特采单号 IS NULL AND c.退货单号 IS NOT NULL
                        AND c.退货状态 IN (N'草稿', N'审批中') THEN N'退货'

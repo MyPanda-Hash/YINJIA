@@ -40,6 +40,7 @@ export default {
     '该批次还没有采购入库单：在送料暂收单上点「生成检验或入库单」即可直达入库（免检物料不需要检验）': 'Lô này chưa có phiếu nhập mua: mở phiếu nhận và bấm "Tạo phiếu kiểm tra/nhập kho" để nhập trực tiếp (vật tư miễn kiểm không cần kiểm)',
     '还没有送料暂收单': 'Chưa có phiếu nhận hàng',
     '还没有来料检验单': 'Chưa có phiếu kiểm tra',
+    '还没有检验数据记录：来料检验单生单时会按物料各建一张（在来料检验单上生单后回来刷新即可）': "Chưa có bản ghi dữ liệu kiểm tra: mỗi vật tư được tạo một bản khi lập phiếu kiểm tra nhập hàng (hãy tạo trên phiếu rồi tải lại đây)",
     '还没有暂收退回单': 'Chưa có phiếu trả hàng',
     '还没有特采单': 'Chưa có phiếu chấp nhận đặc biệt',
 
@@ -75,7 +76,8 @@ export default {
 
 
     // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
-    '品质流程监控': 'Giám sát quy trình chất lượng',
+    '来料品质流程监控': 'Giám sát quy trình chất lượng nhập hàng',
+    '检验数据记录': 'Bản ghi dữ liệu kiểm tra',
     '物料批号': 'Số lô vật tư',
     '物料批号与物料编码': 'Số lô và mã vật tư',
     '供应商与采购订单': 'Nhà cung cấp và đơn mua',

@@ -40,6 +40,7 @@ export default {
     '该批次还没有采购入库单：在送料暂收单上点「生成检验或入库单」即可直达入库（免检物料不需要检验）': 'Ce lot n a pas encore d entrée achat : sur le bon de réception, cliquez sur « Générer contrôle / entrée » pour la créer directement (les articles exonérés ne sont pas contrôlés)',
     '还没有送料暂收单': 'Pas encore de bon de réception',
     '还没有来料检验单': 'Pas encore de contrôle réception',
+    '还没有检验数据记录：来料检验单生单时会按物料各建一张（在来料检验单上生单后回来刷新即可）': "Pas encore de fiche de données d'inspection : une fiche par matière est créée lors de la génération de la feuille de contrôle réception (générez-la sur la feuille puis actualisez ici)",
     '还没有暂收退回单': 'Pas encore de bon de retour',
     '还没有特采单': 'Pas encore de dérogation',
 
@@ -75,7 +76,9 @@ export default {
 
 
     // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----
-    '品质流程监控': 'Suivi du processus qualité',
+    '来料品质流程监控': 'Suivi du processus qualité réception',
+    "检验数据记录": "Fiche de données d'inspection",
+
     '物料批号': 'N° de lot',
     '物料批号与物料编码': 'Lot et code article',
     '供应商与采购订单': 'Fournisseur et commande',

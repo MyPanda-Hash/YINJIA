@@ -1,7 +1,7 @@
 /**
- * qcFlow 单测 —— 「品质流程监控」(QC_FLOW)的纯判定:
+ * qcFlow 单测 —— 「来料品质流程监控」(QC_FLOW)的纯判定:
  *   ① 单据状态 → 展示档位(与后端 QcFlowService 的 5 档折叠一一对应);
- *   ② 一行业务数据 → 主链(送料/检验/入库)+ 不合格分支(退回/特采)的时态与"该不该显示分支";
+ *   ② 一行业务数据 → 主链(送料/检验/入库)+ 并列的检验数据记录 + 不合格分支(退回/特采)的时态与"该不该显示分支";
  *   ③ 跳转前的能力判定 —— **没有目标面板查看权就不能跳**(用户 2026-11-12 原话);
  *   ④ 隐藏口径(已转ERP)由后端算,前端只认 已隐藏 标记做提示(这里钉住不误读)。
  *
@@ -62,6 +62,43 @@ test('一行业务数据 → 主链三个节点:面板码/单号/状态/日期�
   assert.equal(chain.main[0].date, '2026-10-12')
   assert.equal(chain.main[1].no, 'IJ-2026-10-0020')
   assert.equal(chain.main[1].status, '草稿')
+})
+
+/* ── ②a 检验数据记录:与来料检验单**并列**(2026-11-20 用户口径) ── */
+test('检验数据记录是主链里与来料检验单并列的独立节点(不挤进 main,免得所有下标重排)', () => {
+  const row = {
+    需检验: 1,
+    送料暂收单号: 'SL-1', 送料状态: '已审核',
+    检验单号: 'IJ-1', 检验状态: '已审核', 检验日期: '2026-11-10',
+    检验数据记录单号: 'JYSJ-2026-11-0003', 检验数据记录状态: '已审核', 检验数据记录日期: '2026-11-11',
+    入库单号: 'PI-1', 入库状态: '已审核',
+  }
+  const chain = buildChain(row)
+  assert.equal(chain.main.length, 3, 'main 仍三格:送料 / 检验 / 入库')
+  assert.equal(chain.rec.key, 'rec')
+  assert.equal(chain.rec.panel, 'QC_INSP_REC', '点单号要能跳检验数据记录面板')
+  assert.equal(chain.rec.name, '检验数据记录')
+  assert.equal(chain.rec.no, 'JYSJ-2026-11-0003')
+  assert.equal(chain.rec.status, '已审核')
+  assert.equal(chain.rec.state, 'done')
+  assert.equal(chain.rec.date, '2026-11-11')
+  assert.equal(chain.needInsp, true)
+})
+
+test('需检验的批次还没有记录单 ⇒ 记录节点显示「未生成」(缺哪张补哪张,不冒充免检)', () => {
+  const chain = buildChain({ 需检验: 1, 送料暂收单号: 'SL-1', 送料状态: '已审核', 检验单号: 'IJ-1', 检验状态: '已审核' })
+  assert.equal(chain.rec.no, '')
+  assert.equal(chain.rec.status, '未生成')
+  assert.equal(chain.rec.state, 'todo')
+  assert.equal(chain.rec.skip, false)
+})
+
+test('免检批次:记录节点与检验节点同为「免检」(检验环节整个跳过),有单号仍照实显示', () => {
+  const chain = buildChain({ 需检验: 0, 送料暂收单号: 'SL-1', 送料状态: '已审核' })
+  assert.equal(chain.rec.status, '免检')
+  assert.equal(chain.rec.state, 'skip')
+  // 有单号就绝不藏:免检口径只管"没有单据"的那种情况
+  assert.equal(buildChain({ 需检验: 0, 检验数据记录单号: 'JYSJ-1', 检验数据记录状态: '草稿' }).rec.status, '草稿')
 })
 
 test('免检批次(需检验=0 且没有检验单):检验节点显示「免检」,不是「未生成」', () => {
@@ -163,11 +200,18 @@ test('跳转:空单号/空面板一律不跳(别把人带到列表第一张)', (
   assert.equal(jumpTarget(null, 'QC_RECV', 'SL-2026-10-0119').ok, false)
 })
 
-test('五个节点的面板码与页面菜单/后端 PagePanelRegistry 约定一致', () => {
+test('六个节点的面板码与页面菜单/后端 PagePanelRegistry 约定一致', () => {
   assert.deepEqual(Object.values(FLOW_PANELS).map((p) => p.code),
-    ['QC_RECV', 'QC_INSP', 'PURCHASE_IN', 'QC_RETURN', 'QC_TC_IN'])
+    ['QC_RECV', 'QC_INSP', 'QC_INSP_REC', 'PURCHASE_IN', 'QC_RETURN', 'QC_TC_IN'])
   assert.deepEqual(Object.values(FLOW_PANELS).map((p) => p.name),
-    ['送料暂收单', '来料检验单', '采购入库单', '暂收退回单', '特采单'])
+    ['送料暂收单', '来料检验单', '检验数据记录', '采购入库单', '暂收退回单', '特采单'])
+})
+
+test('检验数据记录的跳转同样过权限闸:没 QC_INSP_REC 查看权 → 不跳', () => {
+  assert.equal(jumpTarget(ADMIN, 'QC_INSP_REC', 'JYSJ-2026-11-0003').ok, true)
+  assert.deepEqual(jumpTarget(ADMIN, 'QC_INSP_REC', 'JYSJ-2026-11-0003').query, { docNo: 'JYSJ-2026-11-0003' })
+  assert.equal(jumpTarget(LIMITED, 'QC_INSP_REC', 'JYSJ-2026-11-0003').ok, false)
+  assert.equal(jumpTarget(LIMITED, 'QC_INSP_REC', 'JYSJ-2026-11-0003').reason, 'no-permission')
 })
 
 /* ── ④ 隐藏口径(后端算 已隐藏,前端只做提示,不影响节点可点) ── */

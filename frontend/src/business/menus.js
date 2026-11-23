@@ -647,11 +647,12 @@ export const menuTree = [
         // 《品质资料 2026.09.19.xlsx》检验目录页签一比一;改名后**只显示待检验(正在检验中)的行**,
         // 已完成检验的记录到下面的「检验数据记录明细表」查(面板编码/路径/权限一个字节没动)。
         code: 'incoming', title: '来料品质', children: [
-          // 品质流程监控(2026-11-12 用户口径「流程监控:从送料->检验单->入库……主要要显示物料批号和物料编码」):
+          // 来料品质流程监控(2026-11-12 建,原名「品质流程监控」;2026-11-20 用户口径改名 —— 它只管来料这一条
+          // 采购支线,叫「品质流程监控」会让人以为覆盖全部品质流程):
           // 页面级虚拟面板 QC_FLOW(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由,菜单/路由显式注册。
-          // 一行 = 送料暂收单的一条物料行(= 一个来料批次),右侧 送料 → 检验 → 入库 三节点带单号/状态/日期;
-          // 点节点跳对应面板定位该单,**没有该面板查看权时只提示不跳**。
-          { code: 'qcFlowMonitor', title: '品质流程监控', path: '/qc/flowMonitor', icon: 'DataLine', panelCode: 'QC_FLOW' },
+          // 一行 = 送料暂收单的一条物料行(= 一个来料批次),右侧 送料 →(来料检验单 ∥ 检验数据记录)→ 入库,
+          // 节点带单号/状态/日期;点节点跳对应面板定位该单,**没有该面板查看权时只提示不跳**。
+          { code: 'qcFlowMonitor', title: '来料品质流程监控', path: '/qc/flowMonitor', icon: 'DataLine', panelCode: 'QC_FLOW' },
           { code: 'qcInsp', title: '来料检验单', path: '/panelx/list/QC_INSP', icon: 'Search', panelCode: 'QC_INSP', operationName: '新增流程' },
           { code: 'qcCatalog', title: '待检验目录', path: '/panelx/list/QC_CATALOG', icon: 'Notebook', panelCode: 'QC_CATALOG' },
           // 检验数据记录(2026-09-22):纸张式检验报告 YJ-QR-96,版式对照《品质资料 2026.09.19.xlsx》「检验数据记录模版」;
@@ -702,6 +703,12 @@ export const menuTree = [
           //   面板代号 QC_ASM_INSP、物理表 qc_asm_insp_*、单号前缀 ZJ、菜单 code/route、历史数据与
           //   审批状态**全部不动**(改名=显示层,代号是数据键,动它等于全链路迁移+历史数据对不上)。
           { code: 'qcAsmInsp', title: '出货检验（表观）', path: '/panelx/list/QC_ASM_INSP', icon: 'Finished', panelCode: 'QC_ASM_INSP', operationName: '新增流程' },
+          // 出货检验两张只读明细表(2026-11-23 用户口径「增加当前出货检验两个表的明细表，实现方式参考
+          //   检验数据记录明细表」):一行 = 一个检验项目×内部批次，头表信息摊平，可查询/导出/打印。
+          //   实现 = 视图 v_qc_proc_insp_detail / v_qc_asm_insp_detail + flat 报表面板
+          //   (tools/migrate-qc-insp-detail-panels-20261123.sql)；本菜单只给入口。
+          { code: 'qcProcInspDetail', title: '出货检验（功能）明细表', path: '/panelx/list/QC_PROC_INSP_DETAIL', icon: 'Tickets', panelCode: 'QC_PROC_INSP_DETAIL' },
+          { code: 'qcAsmInspDetail', title: '出货检验（表观）明细表', path: '/panelx/list/QC_ASM_INSP_DETAIL', icon: 'Tickets', panelCode: 'QC_ASM_INSP_DETAIL' },
           // 出厂检验报告(2026-10-30 新增,面板 QC_OQC_REPORT,前缀 OQC):用户口径「出厂检验报告的内容
           // 就是首件/制程/成品三张单检验数据共同数据之上生成;在销售出库勾选货物时跳转到这个页面,
           // 然后走正常的审批形式」。一份报告=一个产品(勾选多行→多张单);行清单来自《出货检验计划表》

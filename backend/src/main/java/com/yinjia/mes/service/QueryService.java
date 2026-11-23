@@ -330,6 +330,23 @@ public class QueryService {
     private static final java.util.Set<String> DOC_CYCLE_PANELS = java.util.Set.of("QC_PROC_INSP", "QC_ASM_INSP");
 
     /**
+     * 纸面右上「时间」要显示**提交审批时间戳**的面板(2026-11-23 用户口径:
+     * 「时间取填写提交日期」;追问确认取提交审批时间戳，含时分)。
+     *
+     * <p>为什么要派生而不是直接用单据日期:不合格品处理单(制程) QC_BHC 的「单据日期」是业务日期，
+     * 从不合格报告/出货检验单带出来时会是来源单的旧日期(实测:09-10 的旧单在 11 月打开右上仍显示 09-10)，
+     * 用户要看的是"这张单什么时候填写/提交的"。故:
+     * <ul>
+     *   <li>已提交/已审核 ⇒ {@code yj_doc_status.pending_at}(提交审批时刻，含时分);</li>
+     *   <li>历史单 pending_at 为空但已审核 ⇒ {@code shsj}(审核时刻);</li>
+     *   <li>草稿 ⇒ 头表 {@code asp_time1}(首次填写/保存时刻，批量一次查);</li>
+     *   <li>三者都没有 ⇒ 空串(纸面留空，不编造)。</li>
+     * </ul>
+     * 只读派生、**不落库**、不进 yj_field(属后端合成行键，与「检测周期」「发起人」同类)。
+     */
+    private static final java.util.Set<String> DOC_SUBMIT_TIME_PANELS = java.util.Set.of("QC_BHC");
+
+    /**
      * 供应商门户的数据范围控制键(2026-10-25 用户口径「供应商打印面版的前端要与采购订单一致。
      * 只是显示和权限不一样」)。
      *
@@ -1062,7 +1079,9 @@ public class QueryService {
 
         // 「检测周期」的左端(首次填写/保存时间):**一次批量查**全部单号(与 loadStatus 同款),
         // 不要放进下面的单号循环里逐单查 —— 那会变成一页 50 次查询的 N+1。
-        Map<String, java.sql.Timestamp> firstSave = DOC_CYCLE_PANELS.contains(def.code())
+        boolean needFirstSave = DOC_CYCLE_PANELS.contains(def.code())
+                || DOC_SUBMIT_TIME_PANELS.contains(def.code());
+        Map<String, java.sql.Timestamp> firstSave = needFirstSave
                 ? loadFirstSaveTimes(def, docNos)
                 : Map.of();
 
@@ -1139,6 +1158,12 @@ public class QueryService {
                 doc.put("审批状态", "审批中");
                 doc.put("提交人", st.get("pending_by"));
                 doc.put("提交时间", auditTimeText(st.get("pending_at")));
+            }
+            // 纸面右上「时间」= 提交审批时间戳(含时分;草稿回退首次填写时间) —— 见 DOC_SUBMIT_TIME_PANELS。
+            // ⚠ 放在状态分支**之后**:上面「审批中」分支会写一次 auditTimeText(pending_at)(带秒),
+            //   这里是本面板的唯一口径(精确到分),两处都写会让纸面格式随单据状态漂移。
+            if (DOC_SUBMIT_TIME_PANELS.contains(def.code())) {
+                doc.put("提交时间", submitTimeText(st, firstSave.get(no)));
             }
             docs.add(doc);
         }
@@ -1291,6 +1316,22 @@ public class QueryService {
                     .warn("[检测周期] 面板 {} 取首次保存时间失败(该列留空): {}", def.code(), e.getMessage());
         }
         return out;
+    }
+
+    /** 纸面「时间」格式:yyyy-MM-dd HH:mm */
+    private static final java.time.format.DateTimeFormatter SUBMIT_TS =
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
+    /**
+     * 纸面「时间」= 提交审批时间戳(含时分;2026-11-23 用户口径)。
+     * 优先级见 {@link #DOC_SUBMIT_TIME_PANELS}:pending_at(提交) → shsj(审核) → 首次填写时间。
+     */
+    private String submitTimeText(Map<String, Object> st, java.sql.Timestamp firstSave) {
+        java.sql.Timestamp ts = st == null ? null : (java.sql.Timestamp) st.get("pending_at");
+        if (ts == null && st != null) ts = (java.sql.Timestamp) st.get("shsj");
+        if (ts == null) ts = firstSave;
+        if (ts == null) return "";
+        return new java.sql.Timestamp(ts.getTime()).toLocalDateTime().format(SUBMIT_TS);
     }
 
     /**

@@ -251,7 +251,7 @@
       <colgroup>
         <col class="qr-foot-label-col" />
         <col />
-        <col class="qr-foot-label-col" />
+        <col class="qr-foot-label-col qr-foot-label-wide" />
         <col />
       </colgroup>
       <tbody>
@@ -300,12 +300,17 @@
           </td>
           <th class="qr-label">
             {{ tt('处理意见') }}
+            <!-- 2026-11-20 用户口径:这一格的维护入口照图1《检验报告》的样式来 —— 用
+                 「⧉ 标准库维护」文字按钮,不再是 11-11 那版的小齿轮 ⚙(太小,现场看不出是什么、
+                 也不好点)。**只改这一格**,检验结论/其余版式一律不动。
+                 实现侧不变:维护的仍是本面板「处理意见」的候选清单(yj_field.dict_sql,
+                 经 saveFieldOptions 整份覆盖),历史单据已填的值不受影响。 -->
             <span
               v-if="canEditHead(FOOT_KEYS.disposal) && canMaintainOptions"
-              class="qr-opt-mgr no-print"
-              :title="tt('维护处理意见选项')"
+              class="qr-lib-btn no-print"
+              :title="tt('处理意见候选来自标准库，可在此维护')"
               @click="openOptManager"
-            >⚙</span>
+            >⧉ {{ tt('标准库维护') }}</span>
           </th>
           <td class="qr-value">
             <el-select
@@ -332,7 +337,7 @@
     <!-- 处理意见「选项库」维护弹窗(2026-11-11 用户口径:弹窗形式更好维护) -->
     <el-dialog
       v-model="optManagerVisible"
-      :title="tt('处理意见选项维护')"
+      :title="tt('标准库维护') + ' · ' + tt('处理意见')"
       width="460px"
       append-to-body
       class="qr-opt-dialog"
@@ -380,6 +385,8 @@ import {
 } from '@/core/qc/qcProcInspExport.js'
 // 判定不合格 → 去开不合格品处理单(制程):显隐契约是纯函数(见模块头注),纸面只管渲染
 import { canOpenNgDisposition, NG_DISPOSITION_ACTION } from '@/core/qc/shipInspNg.js'
+// 项目行分组(按身份全局归并,不按"连续行"分组)—— 纯函数 + 单测,避免"新增批次后内容出现第二块"
+import { buildGroups, isContiguouslyGrouped, setToken, tokenOf } from '@/core/qc/qcProcInspGroups.js'
 
 const props = defineProps({
   /** 当前单据(列表行:表头字段平铺 + detail.items 明细) */
@@ -457,53 +464,19 @@ const detailFieldMap = computed(() => new Map((props.detailFields || []).map((f)
 
 /* ────────────────────────────── 行分组(一个检验项目一组) ────────────────────────────── */
 
-/** 行 → 分组身份:
- *  · DB 里来的行没有本地身份 ⇒ 按「检验项目」文本分组(同名同项目 = 一组,数据模型如此);
- *  · 本组件「＋新增检验项」造的行会给一个内存 token(WeakMap,**不写进行对象**,不会被
- *    JSON.stringify 带进"未保存修改"快照、也不会跟着明细提交给后端)——
- *    否则连点两次「＋新增检验项」(两个都还没填名字)会被同名的空串塌成一组。
- *  ⚠ 行对象可能被 markRaw,WeakMap 照样能用(它按对象引用记,与响应式无关)。 */
-// ⚠ 2026-11-11 实机 bug:原来用 WeakMap<行对象, token> 记身份 —— 但 props.head 可能是 reactive
-//   代理:addItem 里 set 的是**当时的对象引用**,渲染时 groups 拿到的可能是代理(或反过来),
-//   WeakMap 查不到 ⇒ 连点「＋新增检验项」产生的两个空名字行都退化成 'n:' 键、被塌成**同一组**
-//   (实测:明细 items 3 行、groups 只剩 1 组)。改用 **Symbol 键**直接挂在行上:
-//   ① 经代理读照样拿得到;② Symbol 键不会被 Object.keys/展开/JSON.stringify 带走 ⇒
-//   不进"未保存修改"快照、也不随明细提交给后端(与原来的设计约束一致)。
-const ROW_TOKEN = Symbol('qcProcInspRowToken')
+/** 行身份/分组口径收在 @core/qc/qcProcInspGroups(纯函数 + 单测):
+ *  · 同一检验项目的批次行**按身份全局归并** —— 不再要求它们在数组里连续;
+ *    历史/复制数据出现 `项目1-批1, 项目2-批1, 项目1-批2, 项目2-批2` 时,
+ *    旧实现会把项目 1 拆成两组,纸面出现"同一个项目两行、刚填的值掉到下面一块"(2026-11-23 报障);
+ *  · 手工「＋新增检验项」造的行带内存 Symbol token(不落库、不进快照),连点两次空名字行不会塌成一组。
+ *  ⚠ 旧实机 bug:用 WeakMap 记身份时,props.head 的 reactive 代理与 addItem 时的对象引用对不上,
+ *    token 查不到 ⇒ 两个空名字行被塌成同一组;改用 Symbol 直接挂行上后解决(保持原口径)。 */
 let tokenSeq = 0
-function tokenOf(row) {
-  return row && typeof row === 'object' ? row[ROW_TOKEN] : undefined
-}
-function setToken(row, token) {
-  if (row && typeof row === 'object' && token) row[ROW_TOKEN] = token
-}
-function groupKeyOf(row) {
-  const token = tokenOf(row)
-  if (token) return 't:' + token
-  return 'n:' + String(row?.['检验项目'] ?? '')
-}
 
-/** 检验项目分组:按明细数组顺序把**连续的**同一个项目行收成一组(顺序 = 数据顺序,
- *  不做排序;保存时数组顺序原样落库)。 */
+/** 检验项目分组(顺序 = 身份首次出现顺序;不做排序,保存时数组顺序原样落库) */
 const groups = computed(() => {
   bump.value
-  const out = []
-  let cur = null
-  for (const row of items.value) {
-    if (!row || typeof row !== 'object') continue
-    const key = groupKeyOf(row)
-    if (!cur || cur.key !== key) {
-      cur = { key, name: String(row['检验项目'] ?? ''), rows: [] }
-      out.push(cur)
-    }
-    cur.rows.push(row)
-  }
-  // 名字以下面渲染时取「首个有值的行」为准(手工新增的空名字组填了字要立刻显示)
-  for (const g of out) {
-    const named = g.rows.find((r) => String(r?.['检验项目'] ?? '').trim())
-    if (named) g.name = String(named['检验项目'])
-  }
-  return out
+  return buildGroups(items.value)
 })
 
 /** 规范化/编辑后 computed 会重算出新的 group 对象 —— 按"是否含同一批行对象"找回最新那一组。 */
@@ -631,6 +604,9 @@ function needsNormalize() {
       if (!g.rows.some((r) => String(r?.['内部批次'] ?? '').trim() === b)) return true
     }
   }
+  // 同一项目的批次行在数组里不相邻(历史/复制数据常见) ⇒ 重排成"项目优先"，
+  // 否则保存/导出沿用的数组顺序会让纸面出现"同一项目两行"的观感(2026-11-23 报障)。
+  if (!isContiguouslyGrouped(items.value)) return true
   return false
 }
 
@@ -655,17 +631,14 @@ function normalizeRows(listOverride) {
     if (row && typeof row === 'object' && !String(row['内部批次'] ?? '').trim()) row['内部批次'] = list[0]
   }
   const out = []
-  let i = 0
-  while (i < arr.length) {
-    const base = arr[i]
-    if (!base || typeof base !== 'object') { out.push(base); i++; continue }
-    const key = groupKeyOf(base)
-    let j = i + 1
-    while (j < arr.length && arr[j] && typeof arr[j] === 'object' && groupKeyOf(arr[j]) === key) j++
-    const rows = arr.slice(i, j)
+  // ⚠ 分组用 buildGroups(按身份全局归并),不是只并"连续同名行":
+  //   历史/复制数据的行序可能是 项目1-批1, 项目2-批1, 项目1-批2, 项目2-批2，
+  //   按连续行分组会把项目 1 拆成两组、各自只剩一个批次 ⇒ 纸面出现两行同名项目。
+  for (const g of buildGroups(arr)) {
+    const base = g.rows[0]
     const byBatch = new Map()      // 批次 → 该批的行(先到先得)
     const extra = []               // 同批次重复行 / 清单外批次行:原样保留
-    for (const row of rows) {
+    for (const row of g.rows) {
       const b = String(row['内部批次'] ?? '').trim()
       if (byBatch.has(b)) extra.push(row)
       else byBatch.set(b, row)
@@ -679,7 +652,6 @@ function normalizeRows(listOverride) {
       out.push(row)
     }
     for (const row of extra) out.push(row)
-    i = j
   }
   arr.splice(0, arr.length, ...out)
   bump.value++
@@ -1162,6 +1134,12 @@ defineExpose({ exportProcInspExcel })
 .qr-foot-label-col {
   width: 96px;
 }
+/* 右侧标签格(检验结论 / 处理意见):要容下「处理意见 ⧉ 标准库维护」排在同一行(照图1),
+   96px 装不下 —— 实测链接会越过格线压到右边值格的「请选择」上。这一格单独放宽到 132px:
+   纸宽不变,两个值格是弹性宽度、各让一点,整个框架不越界。 */
+.qr-foot-label-col.qr-foot-label-wide {
+  width: 132px;
+}
 .qr-label {
   border: 1px solid #b8cfe6;
   background: #dce9f5;
@@ -1169,7 +1147,11 @@ defineExpose({ exportProcInspExcel })
   color: #1f4e79;
   text-align: center;
   padding: 3px 6px;
-  white-space: nowrap;
+  /* 2026-11-23 版面规整:标签允许在窄格里换行(处理意见旁的「标准库维护」链接不再把格撑破);
+     短标签仍是一行,观感不变。 */
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.3;
 }
 .qr-value {
   border: 1px solid #b8cfe6;
@@ -1177,6 +1159,9 @@ defineExpose({ exportProcInspExcel })
   text-align: left;
   background: #fff;
   word-break: break-all;
+  /* 长产品型号/客户名按格换行,不横向冲出纸面 */
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 /* 分区带(「检验明细」+ 动作):标题与动作放同一行居中,窄屏自动换行
    (原实现动作绝对定位到右侧,面板一窄就压到标题上 —— 2026-11-11 实测) */
@@ -1237,7 +1222,11 @@ defineExpose({ exportProcInspExcel })
   border: 1px solid #b8cfe6;
   padding: 3px 4px;
   text-align: center;
-  vertical-align: middle;
+  /* 2026-11-23 用户报障「新增批次后填写内容跑到下面去了」:
+     原来全部单元格 vertical-align: middle —— 检验方法/检验要求是多行文本、行高被撑到 80~120px,
+     而批次格里的单行输入框/下拉被垂直居中,视觉上落在整个行的中下部(看着像掉到了下一行)。
+     ⇒ 数据格统一**顶对齐**,填写框与检验项目/方法/要求的第一行齐平;只有表头保持居中。 */
+  vertical-align: top;
   word-break: break-all;
 }
 .qr-grid thead th {
@@ -1245,6 +1234,7 @@ defineExpose({ exportProcInspExcel })
   color: #1f4e79;
   font-weight: 600;
   white-space: normal;
+  vertical-align: middle;
 }
 .qr-grid th.c-result {
   background: #e8f1fa;
@@ -1407,15 +1397,17 @@ defineExpose({ exportProcInspExcel })
   word-break: break-word;
 }
 
-/* ── 处理意见「选项库」维护(2026-11-11 用户口径:弹窗形式更好维护) ── */
-.qr-label .qr-opt-mgr {
-  margin-left: 4px;
-  cursor: pointer;
-  color: var(--el-color-primary, #116a5b);
-  font-size: 13px;
+/* ── 处理意见「标准库维护」入口(2026-11-20 用户口径:照图1《检验报告》的样子,
+      用「⧉ 标准库维护」文字链接;样式与 QcInspRecSheet 的 .qr-lib-btn 同款) ── */
+.qr-label .qr-lib-btn {
+  margin-left: 6px;
+  font-size: 11px;
   font-weight: 400;
+  color: #1677ff;
+  cursor: pointer;
+  white-space: nowrap;
 }
-.qr-label .qr-opt-mgr:hover { text-decoration: underline; }
+.qr-label .qr-lib-btn:hover { text-decoration: underline; }
 .qr-opt-hint { font-size: 12px; line-height: 1.5; color: #8b9893; margin-bottom: 10px; }
 .qr-opt-list { max-height: 260px; overflow-y: auto; }
 .qr-opt-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 6px; }

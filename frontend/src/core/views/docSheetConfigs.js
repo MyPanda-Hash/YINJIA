@@ -262,18 +262,26 @@ export const qcSheetCfgs = {
   QC_BHC: {
     docno: 'YJ-QR-59',
     titlePart1: '不合格品处理单', titlePart2: '制程', titlePart3: '',
-    info: qcInfoRespDept(),   // 责任部门 = 责任人所属部门(2026-11-18)
+    // 2026-11-23 用户口径「时间取填写提交日期」:
+    //   右上「时间」不再绑业务「单据日期」，改绑后端派生只读「提交时间」
+    //   (= 提交审批时间戳 yj_doc_status.pending_at，含时分；未提交过的草稿回退首次填写时间，
+    //    口径见 QueryService.DOC_SUBMIT_TIME_PANELS / submitTimeText)。不落库、不进 yj_field。
+    info: [...qcInfoRespDept().slice(0, 2), { label: '时间', key: '提交时间', kind: 'head-static' }],
     rows: [
+      // 2026-11-23 版面规整(用户口径「换行、字数居中的问题处理」):
+      //   窄纸(540~600px)下标签固定 110px × 3~4 格会把值区挤到 20~40px，人名/数量被挤成一字一行。
+      //   按标签实际字数收窄(客户名称/产品编码/产品名称=88，生产量=64，数量/比例=104)，
+      //   值区拿回 60~120px；纸面格线不变，只是标签列变窄。
       { kind: 'pairs', cells: [
-        { label: '客户名称', key: '客户名称', flex: 1.1 },
-        { label: '产品编码', key: '产品编码', flex: 0.9 },
-        { label: '产品名称', key: '产品名称', flex: 1 },
+        { label: '客户名称', key: '客户名称', labelW: 88, flex: 1.1 },
+        { label: '产品编码', key: '产品编码', labelW: 88, flex: 0.9 },
+        { label: '产品名称', key: '产品名称', labelW: 88, flex: 1 },
       ] },
       { kind: 'pairs', cells: [
-        { label: '产品规格', key: '产品规格', flex: 1 },
-        { label: '生产量', key: '生产量', flex: 0.8 },
-        { label: '不合格品数量', key: '不合格品数量', flex: 0.9 },
-        { label: '不合格品比例', key: '不合格品比例', flex: 0.9 },
+        { label: '产品规格', key: '产品规格', labelW: 84, flex: 1 },
+        { label: '生产量', key: '生产量', labelW: 64, flex: 0.8 },
+        { label: '不合格品数量', key: '不合格品数量', labelW: 104, flex: 0.9 },
+        { label: '不合格品比例', key: '不合格品比例', labelW: 104, flex: 0.9 },
       ] },
       // 2026-11-20 用户口径「为当前不合格处理（制程）的单据增加字段可关联到出货检验(功能）和对应的
       //   生产工单」⇒ 本行两格 = 出货检验单号(参照 QC_PROC_INSP) + 工单号。
@@ -299,16 +307,21 @@ export const qcSheetCfgs = {
       //   异名(产品规格←异常产品规格、问题描述←异常描述)挂 refCarry。
       //   refExclude 文档编号:后端同名 refMap 会把 BHG 的「文档编号(YJ-QR-11)」带过来,本单必须是 YJ-QR-59。
       { kind: 'pairs', cells: [
-        { label: '问题来源', key: '问题来源', kind: 'checks', options: ['成型', '组装'], flex: 1.35 },
-        { label: '责任人', key: '责任人', flex: 0.9 },
-        { label: '不合格报告单号', key: '不合格报告单号', flex: 1.3, refAllStatus: true,
+        // 标签宽度同批收窄:责任人 70(3 字) / 问题来源 88 / 不合格报告单号 112(7 字),
+        // 否则「系统管理员」在 41px 值区里会一字一行。
+        { label: '问题来源', key: '问题来源', kind: 'checks', options: ['成型', '组装'], labelW: 80, flex: 1.25 },
+        { label: '责任人', key: '责任人', labelW: 64, flex: 1.2 },
+        { label: '不合格报告单号', key: '不合格报告单号', labelW: 104, flex: 1.15, refAllStatus: true,
           refExclude: ['文档编号'],
           refCarry: { '产品规格': ['异常产品规格'], '问题描述': ['异常描述'] } },
       ] },
-      { kind: 'section', label: '一．问题描述（可附图片，必要时另附问题品）', key: '问题描述', h: 110, max: 2000, dateKey: '单据日期', sign: '责任人', signKey: '责任人', attach: '附件' },
-      { kind: 'section', label: '二．原因分析', key: '原因分析', h: 100, max: 2000, dateKey: '单据日期', sign: '责任人', signKey: '责任人' },
-      { kind: 'section', label: '三．性能验证', key: '性能验证', h: 90, max: 1000, dateKey: '单据日期', sign: '责任人', signKey: '责任人' },
-      { kind: 'section', label: '四．不合格品处理意见', key: '处理意见', h: 70, dateKey: '单据日期', sign: '品质部', signKey: '责任人',
+      // 2026-11-23 用户口径「这每个责任人都是不同的责任人，而不是作为同一个责任人」:
+      //   五处落款各自绑独立列(迁移 tools/migrate-qc-bhc-resp-per-section-20261123.sql)，
+      //   不再共用表头「责任人」。表头「责任人」列保留原语义(本单业务责任人，后端预填可改)。
+      { kind: 'section', label: '一．问题描述（可附图片，必要时另附问题品）', key: '问题描述', h: 110, max: 2000, dateKey: '单据日期', sign: '责任人', signKey: '问题描述责任人', attach: '附件' },
+      { kind: 'section', label: '二．原因分析', key: '原因分析', h: 100, max: 2000, dateKey: '单据日期', sign: '责任人', signKey: '原因分析责任人' },
+      { kind: 'section', label: '三．性能验证', key: '性能验证', h: 90, max: 1000, dateKey: '单据日期', sign: '责任人', signKey: '性能验证责任人' },
+      { kind: 'section', label: '四．不合格品处理意见', key: '处理意见', h: 70, dateKey: '单据日期', sign: '品质部', signKey: '处理意见责任人',
         checks: ['返工达到规定要求', '让步使用', '报废', '筛选合格品留用'] },
       { kind: 'section', label: '五．相关部门处理意见', h: 34 },
       { kind: 'dept', label: '产品开发部意见', h: 130, subs: [
@@ -318,7 +331,7 @@ export const qcSheetCfgs = {
       { kind: 'dept', label: '销售部意见', h: 80, subs: [
         { key: '销售部意见', checks: ['同意使用', '不同意使用'], max: 250 },
       ] },
-      { kind: 'section', label: '六、改善效果验证（如有返工处理需填写）', key: '改善效果验证', h: 90, max: 1000, dateKey: '单据日期', sign: '责任人', signKey: '责任人' },
+      { kind: 'section', label: '六、改善效果验证（如有返工处理需填写）', key: '改善效果验证', h: 90, max: 1000, dateKey: '单据日期', sign: '责任人', signKey: '改善效果验证责任人' },
       { kind: 'section', label: '七．损失成本', h: 46 },
       { kind: 'pairs', cells: [
         { label: '材料费用', key: '材料费用', flex: 1 },
