@@ -83,3 +83,10 @@ ego-browser nodejs -e "await import('file:///C:/Users/vigna/ego/qc-8fix-20261123
   ego 报 `<html> intercepts pointer events`，真实鼠标点不到「查询」。
 - 修法(PanelxList.vue):`.header-query-dialog` 限高 `calc(100vh - 32px)` + 内容区滚动 + 页脚不收缩。
 - 复测:页脚「查询」按钮 y=574~606(视口内)，鼠标点选查询后列表从 2531 条过滤到 0 条。
+
+### 鼠标实测补充(round-58/59)
+
+- 「生产状态」鼠标点下拉 + 键盘选「全部」→ 300 行；
+- 「检验状态」鼠标点下拉 + 键盘选「未检验」→ 37 行（未完工 35 + 已完工未检 2），
+  选「已检验」→ 263 行（全部已完工）⇒ 两个筛选可组合、可切换，汇总同步。
+- 证据:`round-58-inspected.png / round-59-uninspected.png`。
