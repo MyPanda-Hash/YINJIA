@@ -32,7 +32,7 @@
       </el-input>
       <el-button type="primary" :loading="loading" @click="load">{{ tt('查询') }}</el-button>
       <el-checkbox v-model="onlyOpen">{{ tt('只看未完成') }}</el-checkbox>
-      <span class="pf-tip">{{ tt('展开行可看 10 步时间轴') }}</span>
+      <span class="pf-tip">{{ tt('展开行可看 9 步时间轴') }}</span>
     </div>
 
     <section class="pf-card">
@@ -104,7 +104,7 @@
             <span v-if="row.flow.canceled" class="pf-badge is-cancel">{{ tt('已弃审/作废') }}</span>
             <span v-else-if="!row.flow.currentKey" class="pf-badge is-done">{{ tt('已完成') }}</span>
             <span v-else class="pf-cur">
-              <span class="pf-cur-no">{{ row.flow.steps.findIndex((s) => s.key === row.flow.currentKey) + 1 }}/10</span>
+              <span class="pf-cur-no">{{ row.flow.steps.findIndex((s) => s.key === row.flow.currentKey) + 1 }}/{{ row.flow.total }}</span>
               <span class="pf-cur-name">{{ tt(row.flow.currentName) }}</span>
             </span>
           </template>
@@ -190,7 +190,7 @@ const kpiCards = computed(() => {
     { key: 'total', label: '在册立项', value: list.length, tone: 'primary', hint: '本次查询到的立项申请' },
     { key: 'open', label: '未走完', value: open.length, tone: open.length ? 'warn' : 'ok', hint: '至少还差一个环节' },
     { key: 'slow', label: '超 7 天没动', value: slow.length, tone: slow.length ? 'bad' : 'ok', hint: '停留 ≥7 天的在办项目' },
-    { key: 'done', label: '已进进度查询', value: list.filter((r) => !r.flow.currentKey).length, tone: 'ok', hint: '10 个环节全部完成' },
+    { key: 'done', label: '已进进度查询', value: list.filter((r) => !r.flow.currentKey).length, tone: 'ok', hint: '9 个环节全部完成' },
   ]
 })
 
@@ -367,7 +367,7 @@ onBeforeUnmount(() => window.removeEventListener('resize', syncWidth))
 .pf-line.is-cancel { color: var(--pf-bad); }
 .pf-foot-tip { margin: 8px 0 0; font-size: 12px; color: var(--pf-warn); }
 
-/* 展开行:10 步时间轴 */
+/* 展开行:9 步时间轴 */
 .pf-flow { padding: 4px 8px 8px 40px; white-space: normal; word-break: break-word; }
 .pf-headline { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
 .pf-headline.is-stuck { color: var(--pf-warn); }
