@@ -5007,7 +5007,9 @@ const hasMaterialPickTable = computed(() =>
  *   而 BOM 要引用的只有**采购进来的物料**；裸棒/成品/滤芯是自制或成品口径，选进来就是错数据。
  * 只作用于**本次弹窗的候选行**（matPickRows），不动档案本身、也不影响其它面板引用商品档案。
  */
-const MAT_PICK_EXCLUDE_CATS = new Set(['裸棒', '成品', '滤芯'])
+// 2026-11-23 用户口径（产品信息表 · 产品BOM表）：「把这个半成品也去掉，这里面填写 BOM 表不需要这个类别」
+//   —— 半成品是上一道工序的半制件，BOM 只填直接采购/直接投入的物料。
+const MAT_PICK_EXCLUDE_CATS = new Set(['裸棒', '成品', '滤芯', '半成品'])
 
 /** 过滤掉自制/成品类别（空类别保留 —— 历史档案有脏值为空的物料，不能因过滤把它们藏掉） */
 function isPurchasableMaterial(r) {
