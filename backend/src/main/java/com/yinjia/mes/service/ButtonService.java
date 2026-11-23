@@ -1,6 +1,8 @@
 package com.yinjia.mes.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yinjia.mes.erp.ErpGatewayRegistry;
+import com.yinjia.mes.erp.ErpNotConfiguredException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -63,7 +65,11 @@ public class ButtonService {
     private final WoReportService woReport;
     /** 工序任务(路线驱动,A 项):报工审核/弃审回写任务完成量与状态 */
     private final ProcessTaskService processTask;
-    private final KingdeePushService kingdeePush;
+    /**
+     * ERP 网关(2026-11-23 接口预留):原来这里直接依赖 KingdeePushService,接第二家 ERP 要改业务代码。
+     * 现在只认注册表,由 erp.provider 决定落到金蝶/通用 HTTP/用友。金蝶客户行为不变。
+     */
+    private final ErpGatewayRegistry erpGateways;
     private final BatchService batchService;
     private final InvCostService invCost;
     /** 检验目录联动(生单建行/完成/修改/守卫);本服务只单向依赖它,避免循环依赖 */
@@ -101,7 +107,7 @@ public class ButtonService {
                          DevTaskService devTaskService, MessageService messageService,
                          LotSeqService lotSeqService, StockLedgerService stockLedger,
                          WoReportService woReport,
-                         KingdeePushService kingdeePush, BatchService batchService,
+                         ErpGatewayRegistry erpGateways, BatchService batchService,
                          InvCostService invCost, QcCatalogService qcCatalog,
                          ManuWritebackService manuWriteback, CalcRuleService calcRuleService,
                          ProcessTaskService processTask, StockMonthCloseService monthCloseService,
@@ -117,7 +123,7 @@ public class ButtonService {
         this.lotSeqService = lotSeqService;
         this.stockLedger = stockLedger;
         this.woReport = woReport;
-        this.kingdeePush = kingdeePush;
+        this.erpGateways = erpGateways;
         this.batchService = batchService;
         this.invCost = invCost;
         this.qcCatalog = qcCatalog;
@@ -7388,7 +7394,11 @@ public class ButtonService {
         if (docNo.isBlank()) throw new IllegalArgumentException("缺少单据编号");
         String operator = currentUserName();
         try {
-            return kingdeePush.pushDocument(def.code(), docNo, operator);
+            // 走注册表:erp.provider=kingdee 时与改之前逐字节相同(KingdeeErpGateway 只做转发)
+            return erpGateways.current().pushDocument(def.code(), docNo, operator);
+        } catch (ErpNotConfiguredException e) {
+            // 未配置 ≠ 推送失败:前端据此提示「去配置 ERP」,而不是让用户以为是 ERP 拒了单据
+            throw new RuntimeException("转ERP失败: " + e.getMessage(), e);
         } catch (Exception e) {
             throw new RuntimeException("转ERP失败: " + e.getMessage(), e);
         }
@@ -8577,6 +8587,36 @@ public class ButtonService {
     private boolean isAttachField(PanelRegistry.PanelDef def, String label) {
         PanelRegistry.FieldDef f = def.byLabel(label);
         return f != null && f.dataType() != null && "附件".equals(f.dataType().trim());
+    }
+
+    /**
+     * 项目进度查询「项目定级原则」的保存（2026-11-23 用户口径，窄通道）。
+     *
+     * <p>RD_PROGRESS 是只读汇总面板（服务端拦掉全部写按钮），这张纸只有这一格需要可编辑，
+     * 故单独给一条只改一列的更新语句 —— 不经过 save()，不会顺手改动任何其它字段/状态。</p>
+     *
+     * <p>目标行 = 该面板当前唯一那张未作废的单（单单据面板，按 id 倒序取最新一张；
+     * 一张都没有时插入一行只含该列的表头，保证第一次编辑就能落库）。</p>
+     */
+    @Transactional
+    public Map<String, Object> saveProgressPrinciple(String text) {
+        String val = text == null ? "" : text.trim();
+        if (val.length() > 1000) val = val.substring(0, 1000);
+        PanelRegistry.PanelDef def = registry.panel("RD_PROGRESS");
+        String table = def == null ? "rd_progress" : def.headTable();
+        List<String> nos = jdbc.queryForList(
+                "SELECT TOP 1 [" + def.groupCol() + "] FROM " + table
+                        + " WHERE ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC", String.class);
+        if (nos.isEmpty()) {
+            throw new IllegalStateException("项目进度单还不存在：请先点「同步进度」生成进度单，再编辑该说明");
+        }
+        String no = nos.get(0);
+        jdbc.update("UPDATE " + table + " SET [项目定级原则] = ? WHERE [" + def.groupCol() + "] = ?", val, no);
+        log.info("[项目定级原则] {} 已保存(长度 {})", no, val.length());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("编号", no);
+        out.put("项目定级原则", val);
+        return out;
     }
 
     /**

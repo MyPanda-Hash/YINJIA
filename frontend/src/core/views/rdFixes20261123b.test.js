@@ -44,8 +44,9 @@ test('④ 不再自动推算下一阶段开始时间（函数、调用、单测�
   assert.ok(!/阶段\d\+?1?_计划开始|chainNextStageStart/.test(fn[0]), 'onPhaseDone 只能落本格')
 })
 
-test('⑤ 项目定级原则可编辑：纸面 textarea + 迁移加列登记字段', () => {
-  assert.match(progress, /v-model="head\['项目定级原则'\]"/, '纸面必须绑到字段')
+test('⑤ 项目定级原则可编辑：迁移加列登记字段 + 纸面可回显默认文案', () => {
+  // ⚠ 2026-11-23 二版：本面板是**只读汇总面板**（editable 恒 false），不能再用 editable 绑纸面输入框，
+  //   改成弹窗编辑（见下一条）。这里只保留「字段已登记 + 默认文案回落」两条不变的口径。
   assert.match(progress, /GRADE_PRINCIPLE_DEFAULT/, '空值要有默认文案回落')
   assert.ok(progress.includes('type="textarea"'), '多行文本用 textarea')
   assert.match(mig, /ALTER TABLE dbo\.rd_progress ADD \[项目定级原则\]/)
@@ -66,4 +67,12 @@ test('①/② 补充：日期框必须定宽 + 子组件样式必须走 :deep()�
   assert.match(docSheet, /\.as-phase-date :deep\(\.el-input__inner\)/, '子组件内部元素必须用 :deep()，否则 scoped 选择器匹配不到')
   const n = docSheet.match(/\.as-name \{[^}]*\}/)
   assert.match(n[0], /align-items:\s*flex-start/, '标签列要顶部对齐（1232px 高的行居中会把字甩到行中间）')
+})
+
+test('⑤ 项目定级原则：只读面板上用「弹窗 + 专用端点」编辑（不把整张面板变可编辑）', () => {
+  assert.match(progress, /\/px\/progressPrinciple/, '要走专用端点')
+  assert.match(progress, /principleOpen/, '要有编辑弹窗')
+  assert.match(progress, /request\.post\('\/px\/progressPrinciple'/, '保存请求缺')
+  // RD_PROGRESS 是只读面板：绝不能靠 editable 打开整张纸
+  assert.ok(!/v-if="editable"[\s\S]{0,200}项目定级原则/.test(progress), '不要把定级原则绑到 editable')
 })

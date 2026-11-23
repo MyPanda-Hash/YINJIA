@@ -1260,6 +1260,25 @@ public class PxController {
         return ApiResult.ok(buttons.termRowOf(code));
     }
 
+    /**
+     * 项目进度查询：「项目定级原则」说明段的保存（2026-11-23 用户口径）。
+     *
+     * <p>用户原话：「标红的项目控制列表的这个题头位置的内容改为可以自己编辑」。</p>
+     *
+     * <p>⚠ 为什么单独开一个端点，而不走「保存」按钮：RD_PROGRESS 自 2026-10-19 用户口径起是
+     * 只读汇总面板（服务端 READONLY_PANELS 拦掉全部写按钮），纸面 editable 恒 false。
+     * 要把这一格改成可编辑、又不把整张面板变成可编辑，只能给这一格一条窄通道 ——
+     * 只允许改 rd_progress 的「项目定级原则」一列，其余字段一个都碰不到。</p>
+     *
+     * <p>权限：与读取同源（该面板的「可见」词），不额外要求编辑权 —— 它就是一段说明文字。</p>
+     */
+    @PostMapping("/progressPrinciple")
+    public ApiResult<Map<String, Object>> progressPrinciple(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView("RD_PROGRESS");
+        String text = body == null || body.get("text") == null ? "" : String.valueOf(body.get("text"));
+        return ApiResult.ok(buttons.saveProgressPrinciple(text));
+    }
+
     /** 项目进度查询:按项目编号(=立项申请文档编号)取该项目全部数据记录表单据(8 面板,含状态) */
     @GetMapping("/progress/dataSheets")
     public ApiResult<List<Map<String, Object>>> progressDataSheets(@RequestParam String code) {

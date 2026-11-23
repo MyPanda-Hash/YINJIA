@@ -75,22 +75,30 @@
            tools/migrate-progress-grade-principle-20261123.sql）。
          空值回落默认文案：老单据没填过也能照旧显示，观感不变。 -->
     <div class="ps-principle">
-      <template v-if="editable">
-        <span class="ps-principle-label">{{ tt('项目定级原则') }}：</span>
-        <el-input
-          v-model="head['项目定级原则']"
-          type="textarea"
-          :autosize="{ minRows: 1, maxRows: 6 }"
-          size="small"
-          class="ps-principle-input"
-          :placeholder="tt(GRADE_PRINCIPLE_DEFAULT)"
-          @input="emit('dirty')"
-        />
-      </template>
-      <template v-else>
-        {{ tt('项目定级原则') }}：{{ tt(head['项目定级原则'] || GRADE_PRINCIPLE_DEFAULT) }}
-      </template>
+      <span class="ps-principle-label">{{ tt('项目定级原则') }}：</span>
+      <!-- 2026-11-23：本面板是**只读汇总面板**（纸面 editable 恒 false），
+           所以这一格不能跟着 editable 走 —— 用独立的小编辑入口（弹窗 + 专用端点），
+           只改这一列，不把整张面板变成可编辑。 -->
+      <span class="ps-principle-text">{{ tt(head['项目定级原则'] || GRADE_PRINCIPLE_DEFAULT) }}</span>
+      <el-button link type="primary" size="small" class="ps-principle-edit no-print" @click="openPrinciple">
+        {{ tt('编辑') }}
+      </el-button>
     </div>
+
+    <el-dialog v-model="principleOpen" :title="tt('编辑项目定级原则')" width="640px" append-to-body>
+      <el-input
+        v-model="principleDraft"
+        type="textarea"
+        :autosize="{ minRows: 4, maxRows: 10 }"
+        :placeholder="tt(GRADE_PRINCIPLE_DEFAULT)"
+        maxlength="1000"
+        show-word-limit
+      />
+      <template #footer>
+        <el-button @click="principleOpen = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="principleSaving" @click="savePrinciple">{{ tt('保存') }}</el-button>
+      </template>
+    </el-dialog>
 
     <!-- ⑤ 主从控制表 -->
     <div class="ps-scroll">
@@ -402,6 +410,29 @@ import { parseCarbonSize, productsOfKey, devSummaryOf, prefillProduct } from '@c
  *
  * <p>⚠ 文案来源《产品开发系统需求汇总.xlsx》sheet「开发相关流程」（2026-09-30 已按原文更正）。</p>
  */
+/** 项目定级原则：编辑弹窗状态（2026-11-23；本面板只读，故用独立小通道，见模板注释） */
+const principleOpen = ref(false)
+const principleDraft = ref('')
+const principleSaving = ref(false)
+function openPrinciple() {
+  principleDraft.value = String(props.head?.['项目定级原则'] || '') || GRADE_PRINCIPLE_DEFAULT
+  principleOpen.value = true
+}
+async function savePrinciple() {
+  principleSaving.value = true
+  try {
+    const res = await request.post('/px/progressPrinciple', { text: principleDraft.value })
+    const saved = (res && res.data && res.data['项目定级原则']) ?? principleDraft.value
+    props.head['项目定级原则'] = saved
+    principleOpen.value = false
+    ElMessage.success(tt('已保存'))
+  } catch (e) {
+    ElMessage.error(e?.message || tt('保存失败'))
+  } finally {
+    principleSaving.value = false
+  }
+}
+
 const GRADE_PRINCIPLE_DEFAULT =
   '1.二级项目-A级或B级客户/该产品一年内有重要经济效益或对应技术产品有重大推广价值/部分对客户认同有重要影响的项目；'
   + '2.三级项目-A级或B级客户/未来（一年后）可能有重要经济效益；'
@@ -1070,15 +1101,13 @@ defineExpose({ exportProgressExcel })
   padding-top: 4px;
   white-space: nowrap;
 }
-.ps-principle-input {
+.ps-principle-text {
   flex: 1;
   min-width: 0;
 }
-.ps-principle-input .el-textarea__inner {
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: #4A4642;
-  background: #fff;
+.ps-principle-edit {
+  flex: none;
+  white-space: nowrap;
 }
 
 /* ═══ ⑤ 控制表 ═══ */
