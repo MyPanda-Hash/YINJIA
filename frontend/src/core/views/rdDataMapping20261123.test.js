@@ -49,3 +49,19 @@ test('B3 四张单不再下发旧「复制」按钮（避免点到会丢内容�
   assert.match(cfg, /COPY_DOC_PANELS\.contains\(def\.code\(\)\)/, '「更多」组要按面板剔除 复制')
   assert.match(cfg, /List\.of\("表格调整", "导出", "退出"\)/, '这 4 张单的更多组里没有 复制')
 })
+
+test('B4 项目流程的 SQL 括号必须配平（2026-11-23 首版少关两层，线上 500）', () => {
+  const at = flow.indexOf('"SELECT TOP " + MAX_ROWS')
+  const end = flow.indexOf('AS projectName,', at)
+  assert.ok(at > 0 && end > at, '找不到 projectName 的 SELECT 片段')
+  const raw = flow.slice(at, end)
+  // 只留字符串字面量里的内容：去掉 Java 的 + " 与注释行
+  const sql = raw
+    .split('\n')
+    .filter((l) => !l.trim().startsWith('//'))
+    .map((l) => l.replace(/^\s*\+?\s*"/, '').replace(/"\s*,?\s*$/, '').replace(/\\"/g, '"'))
+    .join(' ')
+  const open = (sql.match(/\(/g) || []).length
+  const close = (sql.match(/\)/g) || []).length
+  assert.equal(open, close, `SQL 括号不配平（左 ${open} / 右 ${close}）：${sql.slice(0, 160)}`)
+})
