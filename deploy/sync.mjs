@@ -24,6 +24,13 @@
 //                                      多个用逗号分隔,=* 或 =ALL 表示所有类型。
 //                                      用于「金蝶新接了一个字段、要给存量行补拉一次」:
 //                                      如商品·来料检验(见 sync-core.mjs 的 CF_INSPECTION_KEYS)。
+//   node sync.mjs --refresh-bill=YJ-20261117-01 --yes
+//                                      点名**单张/几张单**强制重取详情(2026-11-23):多个用逗号分隔。
+//                                      为什么需要:金蝶订单列表只回表头 18 个键,**看不见明细** ⇒
+//                                      「弃审→改分录→重审」改单不改变列表级指纹,增量会一直判
+//                                      「无变化跳过」(详见 sync-core.mjs 的 orderDailyStampOnly)。
+//                                      日常已由「明细每日复核日戳」兜底(每天各重取一次),此参数用于
+//                                      当场补某一张,不必等下一轮或全量 --refresh。
 //   node sync.mjs --config=D:\path\config.json
 // 安全规范:写入前自动备份受影响单据前像(backup/*.jsonl);超阈值(默认200条)要求确认;
 //           日志按日写 logs/sync-YYYY-MM-DD.log 与 logs/stock-sync-YYYY-MM-DD.log,均保留至少一年。
@@ -69,6 +76,7 @@ try {
     probe,
     assumeYes: has('yes'),
     refresh: (argOf('refresh') || '').split(',').map((x) => x.trim()).filter(Boolean),
+    refreshBill: (argOf('refresh-bill') || '').split(',').map((x) => x.trim()).filter(Boolean),
   });
 } catch (e) {
   const line = `[${new Date().toISOString().replace('T', ' ').slice(0, 19)}] ✗ 同步失败: ${e.message}`;

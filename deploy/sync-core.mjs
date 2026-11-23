@@ -93,6 +93,22 @@ function cfInspection(d) {
  *  成本有界(每天 ≤ 窗内条数),且不必每 5 分钟把 3852 个商品详情重拉一遍。 */
 const CF_REFRESH_WINDOW_DAYS = 31;
 
+/** 订单类「明细复核日戳」(2026-11-23,用户报「金蝶改了采购订单,MES 数量/行数没跟上」)。
+ *
+ *  【为什么会漏】金蝶**订单列表**接口只回表头 18 个键(实测 pur_order:create_time / bill_date / id /
+ *  bill_no / bill_status / bill_close_state / supplier_id,_name,_number / emp_id,_name,_number / remark /
+ *  io_status / real_io_status / delivery_type_id,_name,_number)——**没有数量、金额、明细行、修改时间、
+ *  审核时间**。而本同步器的「指纹跳过」判的正是列表行 ⇒ 在金蝶做「弃审 → 改分录(改数量/加行/删行) →
+ *  重审」这类改单,那 9 项表头指纹前后一模一样,于是被**永久**判「无变化跳过」,MES 一直停在老版本。
+ *  实测 2026-11-23:YJ-20261117-01 金蝶 3 行 100/15/70、审核时间 11-23 14:03,而 MES 还是 11-19 那版
+ *  2 行 50/15(窗口内 168 张已审核订单里只此一张不一致)。注:`init-sync.mjs` 也不强制刷新
+ *  (强制只认 `--refresh=`),所以月度复核同样修不好。
+ *
+ *  【办法】同商品自定义字段复核的先例:增量模式下给**订单**指纹追加当日戳 ⇒ 每天第一轮把「近
+ *  windowDays 窗口内」的订单详情全部重取一次(当前约 170 张,详情节流 120ms ⇒ 约 40 s),之后同一天
+ *  指纹一致即跳过;最坏延迟 1 天。要立刻补某一张:`node sync.mjs --refresh-bill=<单号>`。 */
+const orderDailyStampOnly = (mode, today) => (mode === 'incremental' ? '|D' + today : '');
+
 // ---------- 类型注册表 ----------
 // 订单条目:{ code,label,listPath,detailPath,headTable,lineTable,fingerprintOf,mapHead,mapLines }
 // 档案条目:{ code,label,archive:true,listPath,detailPath(可空=仅列表),table,codeCol,
@@ -785,7 +801,7 @@ async function writeImportLog({ mssql, pool, doc, total, inserted, updated, fail
   return { batchNo, batchId, rows: rowNo };
 }
 
-export async function runCore({ mode, configPath, dryRun = false, probe = false, assumeYes = false, refresh = [] }) {
+export async function runCore({ mode, configPath, dryRun = false, probe = false, assumeYes = false, refresh = [], refreshBill = [] }) {
   configPath = configPath || join(HERE, 'config.json');
   if (!existsSync(configPath)) {
     console.error(`✗ 未找到配置文件 ${configPath}\n  请复制 config.example.json 为 config.json 并填入凭证/数据库信息`);
@@ -814,6 +830,9 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
   // 用途:新接一个金蝶字段(如商品·来料检验)后给存量行补拉一次;指纹永远感知不到的改动也靠它兜底。
   const forceCodes = new Set(refresh.map((x) => String(x).trim().toUpperCase()).filter(Boolean));
   const forceEverything = forceCodes.has('*') || forceCodes.has('ALL');
+  // --refresh-bill=单号[,单号…](2026-11-23):点名某几张单**强制重取详情**(单张补同步)。
+  // 与 --refresh=CODE 的区别:那个按"类型"全量重取(订单约 2400 张),这个只动点名的几张。
+  const refreshBillSet = new Set(refreshBill.map((x) => String(x).trim()).filter(Boolean));
   const statePath = join(HERE, 'state.json');
   const state = existsSync(statePath) ? JSON.parse(readText(statePath)) : {};
   const saveState = () => writeFileSync(statePath, JSON.stringify(state, null, 2), 'utf8');
@@ -892,6 +911,17 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
       const limited = opt.maxRecords > 0 ? rows.slice(0, opt.maxRecords) : rows.slice(); // 复制数组:不定上限时不能与 rows 同引用,下方清空会连它一起清掉
       if (opt.maxRecords > 0) log(`【${doc.label}】测试上限生效:共 ${rows.length} 条 → 只处理前 ${limited.length} 条`);
       rows.length = 0; rows.push(...limited);
+      // --refresh-bill:点名的单若不在本轮列表里(超出 31 天窗口 / 已不在 bill_status=C 列表),
+      // 按单号单独补一次列表查询塞进来 —— 否则"点名了却什么都没做"会静默通过。
+      if (refreshBillSet.size && !doc.archive) {
+        const have = new Set(rows.map((r) => String(r.bill_no || '')).filter(Boolean));
+        const missing = [...refreshBillSet].filter((no) => !have.has(no));
+        for (const no of missing) {
+          const data = await kingdeeGet(cfg.kingdee, token, doc.listPath, { bill_no: no, page: '1', page_size: '5' });
+          for (const r of (data.rows || [])) { rows.push(r); have.add(String(r.bill_no)); }
+        }
+        log(`【${doc.label}】--refresh-bill 点名 ${[...refreshBillSet].join(',')} → 命中 ${[...refreshBillSet].filter((no) => have.has(no)).length} 张(其余未取到,检查单号/状态)`);
+      }
       if (doc.afterList) doc.afterList(rows, ctx); // 登记分类映射(供后续条目解析 id→名称/编码)
 
       // 初始化清污(仅档案+init+真实写库):确认→全量前像备份→删除本同步器先前写入/收编的行→全量重建。
@@ -935,8 +965,13 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
       }
       const forced = forceEverything || forceCodes.has(doc.code);
       if (forced) log(`【${doc.label}】强制刷新(--refresh):忽略库内指纹,全部重取详情`);
+      // 订单「明细复核日戳」(见文件上方 orderDailyStampOnly 说明):只动分录的改单不会改变列表级指纹,
+      // 每日追加一个日期戳 ⇒ 每天第一轮把窗口内订单详情重取一次,之后同一天命中同一指纹即跳过。
+      const dayStamp = doc.archive ? '' : orderDailyStampOnly(mode, nowLocal().slice(0, 10));
+      if (dayStamp) log(`【${doc.label}】明细每日复核:窗口内 ${rows.length} 张,今日(${dayStamp.slice(2)})各重取一次详情${dryRun ? '(dry-run 不写库)' : ''}`);
       const fpOf = (row) => doc.fingerprintOf(row)
-        + (cfRecentIds && cfRecentIds.has(String(row.id).trim()) ? cfStampSuffix : '');
+        + (cfRecentIds && cfRecentIds.has(String(row.id).trim()) ? cfStampSuffix : '')
+        + dayStamp;
 
       // 指纹比对先行:算出真正要写的单(新增/有变化)——提示、备份、写入都只针对它们
       let knownFps = new Map();
@@ -949,6 +984,8 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
       const changedRows = rows.filter((row) => {
         const id = String(row.id).trim();
         if (forced) return true; // --refresh:无条件重取(存量补拉新接字段)
+        // --refresh-bill:点名单强制重取(单张补同步;不受指纹影响)
+        if (refreshBillSet.size && refreshBillSet.has(String(row.bill_no || '').trim())) return true;
         return !(knownFps.has(id) && knownFps.get(id) === fpOf(row));
       });
       const skipped = rows.length - changedRows.length;
