@@ -5053,6 +5053,61 @@ migrate-sample-ext-attach-20261118.sql
 #   ② 旧聚合格「产品整体尺寸」required 归 0（纸面已改三内格，避免必填挡提交）
 migrate-prodinfo-i18n-required-20261118.sql
 
+# 2026-11-19 送样登记表(SAMPLE_REG)「内部检测目录」复核/部署版:
+#   用户新给的 提供系统更新版2026.11.17(1).xls 的「内部检测目录」sheet 与 2026-11-17 版内容**逐格一致**
+#   ⇒ 本脚本为在册复核版(重跑全部幂等步骤:内部检出限→标准方法检出限 label 改名 + en 译名
+#   + 55 行(54 检测项 + 外送部分)按检测元素逐行 upsert + 目录外旧项置作废 + 自检 55 行),
+#   不新增/不删除目录项。生成器 tools/archive/_sample-catalog-20261119/gen-migration.mjs(可重跑再生)。
+#   幂等;两账套(HSDZ_MES / HSDZ_MES_TEST)均已执行(2026-11-19)。
+migrate-sample-catalog-rev-20261119.sql
+
+# 2026-11-19 送样登记表明细页签标题:「送样登记表明细」→「内部检测目录」(用户口径)。
+#   零 DDL:yj_panel.config 用 JSON_MODIFY 合并写入 "detailTabLabel":"内部检测目录"(保留既有 uniqueKeys)
+#   ⇒ 后端 PanelConfigService.buildArchiveConfig 用它做 tabLabel(gridTabs 与 detail.tabs 同源),
+#   PanelRegistry.PanelDef.detailTabLabel() 读取(缺省/非法回落原「面板名+明细」);
+#   同批 yj_translation 补 panel 级 en 译名(Internal Test Catalog),前端 locales/en.js 同词条。
+#   幂等(已声明同值命中 0 行);两账套(HSDZ_MES / HSDZ_MES_TEST)均已执行(2026-11-19)。
+migrate-sample-reg-detail-tab-20261119.sql
+# 2026-11-19 研发管理·自制料（制程记录录入面板 + 头/明细表 + 字段 + 权限骨架）
+migrate-selfmade-20261119.sql
+# 2026-11-19 立项申请表：选客户后带出并显示客户编号（头表加列 + 字段行）
+migrate-approval-customer-code-20261119.sql
+# 2026-11-19 非开发样品单明细：加 产品编码/产品名称（销售问题 P5）
+migrate-sample-nd-columns-20261119.sql
+# 2026-11-19 立项申请「申请立项人」必填（销售问题 P18）
+migrate-approval-initiator-required-20261119.sql
+# 2026-11-19 产品变更申请表：会签人填本部门评审意见（服务端按部门行强制）+ 会签全过转「待批准」
+#   + 管理员终审（批准/驳回，只读回填批准人/签字/日期并归档）。本脚本补齐 rd_change_detail
+#   部门评审列/字段登记、批准三格只读字段与 en 译名、列注明，均带守卫与自检；幂等。
+migrate-change-cosign-20261119.sql
+
+# 2026-11-20 功能性滤效(RD_FILTER_EFF)动态样品列：清除把「出水含量（ug/L）样品2..6」
+#   「去除率%样品2..6」共 10 行置成 hidden=1/visible=0 的历史脏偏好。
+#   生产实测：这两组被藏后，点「样品列 ＋/－」只有「取样前样品」跟着增删（用户连报两次）；
+#   本地库同 10 行 visible=1 ⇒ 本地复现不了。同批前端加护栏（动态样品列不可被隐藏）。
+#   幂等：只归位这 10 个 label，重复执行影响 0 行；脚本自带 before/after 行数与越界自检。
+#   执行：正式库 HSDZ_MES 已于 2026-11-20 执行（归位 10 行）；测试库 HSDZ_MES_TEST
+#   在本机/生产服务器均不存在（登录工厂 enable-test-ledger=false），无库可跑。
+migrate-filter-eff-dyncols-visible-20261120.sql
+# 2026-11-20 产品信息表：两级审批人改为「审批之后才有名字」
+#   ① 清 yj_panel.config.headDefaults 里 审核人（一级审批人）/（二级审批人） 两个默认值键
+#      （前端 docDefaults.js 2026-11-19 已清空，但后端下发的 headDefaults 仍会把草稿空格补成陈秀丽）；
+#   ② 清空未审批（shr 空且未归档）单据的 审核人一级/审核人二级 存量签名（2026-11-11 的 l1 回填把草稿也写了）；
+#   ③ 改前/改后行数 + 自检；幂等（重复执行 0 行、键不存在为 0）。两账套（HSDZ_MES / HSDZ_MES_TEST）都要执行。
+migrate-prodinfo-approver-no-default-20261120.sql
+
+# 2026-11-23 ERP 接口预留：新增 erp_push_log（每次「转ERP」留痕：提供方/面板/单号/结果/耗时/
+#   接口地址/ERP单号；同时是通用 HTTP 适配器做幂等的依据——同提供方+面板+单号已成功则不再重推）。
+#   表与关键列写 MS_Description、两个索引、幂等；只建表不碰业务表，金蝶推送行为不变。
+#   执行：本机只有正式库 HSDZ_MES（sys.databases 实测无 HSDZ_MES_TEST，登录工厂 enable-test-ledger=false），
+#   已在本机正式库执行；生产服务器若两账套都在，按 §2.3 各跑一次。
+migrate-erp-gateway-20261123.sql
+
+# 2026-11-23 产品信息表：「产品名称」取消必填（纸面大标题已固定为「产品信息表」，无输入口）
+#   2026-10-16 置的 required=1 仍在 ⇒ 保存/提交会被「产品名称不能为空」挡住而用户无处可填。
+#   只置 required=0，字段与历史值保留（下游工艺清单仍靠它参照带回）；幂等 + 自检。
+migrate-prodinfo-name-not-required-20261123.sql
 # 2026-11-23 采购订单明细显示金蝶「已入库/未入库」数量：只放开 yj_field 两列可见性(visible=1、hidden 不动)
 #   + 角色视图 cksh 同步放开 + 两个新标签补 en 译名；不改业务流程、不改表结构；幂等，两账套
 migrate-po-erp-qty-cols-20261123.sql
+

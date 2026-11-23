@@ -22,14 +22,16 @@ test('标题 = 非开发样品申请单，且与外部开发样品单共用版�
   assert.equal(sampleNdSheetCfg.titlePart1, sampleExtSheetCfg.titlePart1, '前缀仍是（外部）')
   assert.equal(sampleNdSheetCfg.titlePart2, '非开发样品申请单')
   assert.equal(sampleNdSheetCfg.layout, 'grid', '仍是表格式纸面')
-  assert.deepEqual(sampleNdSheetCfg.grid.cols.map((c) => c.key), sampleExtSheetCfg.grid.cols.map((c) => c.key),
-    '表体 8 列与外部单一致')
+  // 2026-11-19 销售问题汇总 P5：非开发单的列**故意**与开发单不同 ——
+  //   去掉 产品整体规格/产品功能/性能要求，前面加 产品编码/产品名称（7 列）。
+  assert.deepEqual(sampleNdSheetCfg.grid.cols.map((c) => c.key),
+    ['产品编码', '产品名称', '炭棒规格', '样品数量', '组装要求', '背景', '配方及工艺要求'])
 })
 
-test('一级审批：纸面只留「申请 / 审核」两格，span 合计 = 8', () => {
+test('一级审批：纸面只留「申请 / 审核」两格，span 合计 = 7', () => {
   const cells = sampleNdSheetCfg.signCells
   assert.deepEqual(cells.map((c) => c.label), ['申请', '审核'], '没有「确认」格（一级审批）')
-  assert.equal(cells.reduce((n, c) => n + c.span, 0), 8, '签名条要铺满 8 列，否则竖线对不齐')
+  assert.equal(cells.reduce((n, c) => n + c.span, 0), 7, '签名条要铺满 7 列，否则竖线对不齐')
 })
 
 test('侧栏放出审批按钮组，且 ND 用独立配置', () => {

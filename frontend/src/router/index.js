@@ -112,6 +112,11 @@ const routes = [
       //   权限不新造虚拟码:挂 RD_SAMPLE_EXT 的查看权(这份数据就是那张单的数据);
       //   菜单项带 panelCode ⇒ 不进 flatMenus 自动路由,故在此显式注册。
       { path: 'rd/sampleFlow', component: () => import('@/views/rd/SampleFlow.vue'), meta: { title: '样品进度跟踪', code: 'rdSampleFlow', panelCode: 'RD_SAMPLE_EXT' } },
+      // 自制料制程记录查询（2026-11-19）：只读页 + 导出 Excel + 打印二维码（材料名+主批次）。
+      // 权限复用 RD_SELFMADE 的查看权；菜单项带 panelCode ⇒ 不进 flatMenus 自动路由。
+      { path: 'rd/selfmadeQuery', component: () => import('@/views/rd/SelfmadeQuery.vue'), meta: { title: '制程记录查询', code: 'rdSelfmadeQuery', panelCode: 'RD_SELFMADE' } },
+      // 自制料·制程记录录入（2026-11-19 用户口径：版式照 Excel 的**横行表**，独立页面）
+      { path: 'rd/selfmadeEntry', component: () => import('@/views/rd/SelfmadeEntry.vue'), meta: { title: '制程记录录入', code: 'rdSelfmadeEntry', panelCode: 'RD_SELFMADE' } },
       // 订单结转·发单工作台(方案 V1.0):待结转行→转工单/转采购单;不进 flatMenus 自动路由。
       // 2026-10-16 权限化:四处看板页面各挂**页面级虚拟面板码**(定义见后端 PagePanelRegistry),
       // meta.panelCode 供下方守卫拦「直接敲 URL」——菜单隐藏挡不住手输地址。
@@ -141,6 +146,12 @@ const routes = [
       //   按送样人 / 按委托单两个视角 + 今日/本周/本月快捷区间 + 导出 Excel(前端 xlsx 现生成)。
       //   页面级虚拟面板 INSP_SUMMARY(定义见后端 PagePanelRegistry)⇒ 不进 flatMenus 自动路由,显式注册。
       { path: 'qc/inspSummary', component: () => import('@/views/modules/qc/InspSummary.vue'), meta: { title: '样品检验汇总表', code: 'qcInspSummary', panelCode: 'INSP_SUMMARY' } },
+      // 测试申请汇总表(2026-11-19 用户口径:「做一个类似于样品检验汇总单一样的按照人员进行一个汇总分类的
+      //   有关测试申请单的测试申请汇总面板,还可以点击跳转到对应的测试申请单」):
+      //   按申请人 / 按单据两个视角 + 今日/本周/本月快捷区间 + 导出 Excel;点单号跳 RD_DOM_TEST 并 focus 该单。
+      //   权限**复用测试申请单面板码 RD_DOM_TEST**(能看到这张单的人才看得到它的汇总,不新造虚拟码、不加权限行)
+      //   ⇒ 菜单项带 panelCode 不进 flatMenus 自动路由,故在此显式注册。
+      { path: 'qc/testApplySummary', component: () => import('@/views/modules/qc/TestApplySummary.vue'), meta: { title: '测试申请汇总表', code: 'qcTestApplySummary', panelCode: 'RD_DOM_TEST' } },
       // ══════════ 手机扫码(2026-10-30 新增一级目录)══════════
       // 用户口径:「把生产领料和工序报工这两个 app 的面版重新放在一个新的『手机扫码』(和生产计划平级)
       //   导航下。工序报工不变。生产领料重写。」
@@ -294,6 +305,10 @@ const routes = [
         meta: { title: 'X烧结工艺清单', panelCode: 'RD_X_SINTER' },
       },
       // ── 以上为远端新增(X烧结并入烧结工艺清单为双模板 Tab),与本地「工序流程追踪卡」互不冲突,两条都保留 ──
+      // 自制料制程记录录入：**旧地址也指到新版横行页**（2026-11-19 用户口径：
+      //   「这个先更新一下」——他打开的仍是 /panelx/list/RD_SELFMADE 的引擎版）。
+      //   显式静态路由必须排在下面的参数路由之前，否则又被 PanelxList 接走。
+      { path: 'panelx/list/RD_SELFMADE', component: () => import('@/views/rd/SelfmadeEntry.vue'), meta: { title: '制程记录录入', code: 'rdSelfmadeEntry', panelCode: 'RD_SELFMADE' } },
       { path: 'panelx/list/:panelCode', component: PanelxList, meta: { title: '单据', operationName: '新增流程' } },
       { path: 'panelx/form/:panelCode', component: PanelxForm, meta: { title: '表单' } },
       ...flatMenus()

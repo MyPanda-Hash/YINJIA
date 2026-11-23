@@ -26,20 +26,19 @@ import { readFileSync } from 'node:fs'
 const DOC = readFileSync(new URL('../panel/docDefaults.js', import.meta.url), 'utf8')
 const BTN = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/service/ButtonService.java', import.meta.url), 'utf8')
 
-test('① 一级默认陈秀丽、二级留空(2026-11-11 口径变更)', () => {
+test('① 两级审核人默认值都清空（2026-11-19 口径：审批之后才有名字）', () => {
   const at = DOC.indexOf('RD_PROD_INFO: [')
   assert.ok(at >= 0, '找不到 RD_PROD_INFO 默认值段')
   // 取到该段的收尾 `  ],`(两个空格的缩进)—— 不能用 indexOf('],') ,那会截到注释里的逗号
   const end = DOC.indexOf('\n  ],', at)
   assert.ok(end > at, '找不到 RD_PROD_INFO 段的结尾')
   const seg = DOC.slice(at, end)
-  // 2026-11-11 用户口径:「产品信息表的一级审核人名字改为：陈秀丽，这个是固定的…
-  //   责任人在一级审批选择二级签核人之前都是空的，选了二级签核人就回填二级签核人进去」
-  assert.match(seg, /'审核人（一级审批人）',\s*'陈秀丽'/, '一级审核人默认应为「陈秀丽」(固定)')
-  assert.match(seg, /'审核人（二级审批人）',\s*''/, '二级审核人不得给默认值(选择前必须为空)')
-  // 反例:不能是冯敏(那是 fengmin 账号的姓名,不是冯总)
-  assert.ok(!/'审核人（一级审批人）',\s*'冯敏'/.test(seg), '一级不该是「冯敏」——冯敏是另一个账号')
-  assert.ok(!/['"]秀丽['"]\s*\]/.test(seg), '段内不该再残留旧值「秀丽」(缺姓)')
+  // 2026-11-19 用户口径：「审批人没有默认显示名字，在审批之后才填进去」
+  //   2026-11-20 截图复验后进一步清掉 yj_panel.config.headDefaults（见 prodInfoFix20261120.test.js）
+  assert.match(seg, /'审核人（一级审批人）',\s*''/, '一级审核人不得再有默认值')
+  assert.match(seg, /'审核人（二级审批人）',\s*''/, '二级审核人不得再有默认值')
+  assert.ok(!/['"]陈秀丽['"]/.test(seg), '段内不该再出现默认姓名「陈秀丽」')
+  assert.ok(!/['"]冯敏['"]/.test(seg), '段内不该再出现默认姓名「冯敏」')
 })
 
 test('② 后端主保存路径也要补默认值(不能只在空白草稿分支)', () => {

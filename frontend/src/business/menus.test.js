@@ -19,9 +19,10 @@ const leafCodes = (node) => (node.children || []).map((child) => child.panelCode
  * ⇒ 二级分组由 4 个变 5 个，「样品」插在「项目管理」之后、「测试记录」之前
  *   （研发流程顺序：立项 → 打样 → 测试 → 出文件）。
  */
-test('研发管理五个二级分组,顺序=项目管理/样品/测试记录/产品文件/共享文件', () => {
-  assert.deepEqual((rd.children || []).map((c) => c.code), ['rdProject', 'rdSample', 'rdTest', 'rdFiles', 'rdShare'])
-  assert.deepEqual((rd.children || []).map((c) => c.title), ['项目管理', '样品', '测试记录', '产品文件', '共享文件'])
+test('研发管理六个二级分组,顺序=项目管理/样品/自制料/测试记录/产品文件/共享文件', () => {
+  // 2026-11-19 用户口径：「新建「自制料」分组，和样品平级」
+  assert.deepEqual((rd.children || []).map((c) => c.code), ['rdProject', 'rdSample', 'rdSelfmade', 'rdTest', 'rdFiles', 'rdShare'])
+  assert.deepEqual((rd.children || []).map((c) => c.title), ['项目管理', '样品', '自制料', '测试记录', '产品文件', '共享文件'])
 })
 
 test('样品组：三张单 + 一个只读进度页（外部-开发 / 内部-开发 / 外部-非开发 / 样品进度跟踪）', () => {
@@ -47,17 +48,17 @@ test('样品组：三张单 + 一个只读进度页（外部-开发 / 内部-开
  * 2026-10-20 用户口径:「填完立项申请提交审批后不知道文件到哪个流程了……在项目管理里面加上一个项目流程管控,
  *   通过立项申请表的编号查流程走到哪里」。⇒ 项目管理组多一张只读盯单页 PROJECT_FLOW(排最后)。
  */
-test('项目管理组:立项申请 → 项目实施计划 → 项目进度查询 → 项目流程管控', () => {
+test('项目管理组:立项申请 → 项目实施计划 → 项目控制列表 → 项目进度查询（2026-11-19 改名）', () => {
   assert.deepEqual(leafCodes(group('rdProject')), ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'PROJECT_FLOW'])
   const flow = group('rdProject').children.find((c) => c.panelCode === 'PROJECT_FLOW')
-  assert.equal(flow.title, '项目流程管控')
+  assert.equal(flow.title, '项目进度查询')   // 2026-11-19 销售问题汇总 P13：项目流程管控 → 项目进度查询
   assert.equal(flow.path, '/rd/projectFlow', '页面级虚拟面板走专用路由,不是 /panelx/list')
   // 2026-11-11 用户口径「新的流程管控面板应该放在产品文件列表」⇒ 产品文件流程管控**不占菜单**:
   // 入口是产品文件列表侧栏那颗「流程管控」按钮(PanelxList),路由 /rd/productFlow 仍存在。
   assert.ok(!group('rdProject').children.some((c) => c.code === 'rdProductFlow'), '不挂菜单项')
 })
 
-test('测试记录组下挂数据记录表 9 张（8 张记录表 + 特殊数据记录表）与实验室使用记录表 4 张', () => {
+test('测试记录组下挂数据记录表 9 张（8 张记录表 + 特殊数据记录表）与实验室使用记录表 5 张（含汇总表）', () => {
   const test1 = group('rdTest')
   assert.deepEqual((test1.children || []).map((c) => c.code), ['rdData', 'rdLab'])
   const data = test1.children.find((c) => c.code === 'rdData')
@@ -67,12 +68,16 @@ test('测试记录组下挂数据记录表 9 张（8 张记录表 + 特殊数据
   assert.equal((data.children || []).length, 9)
   assert.ok((data.children || []).some((c) => c.code === 'rdExtraRecFile'), '特殊数据记录表必须挂在数据记录表下')
   assert.equal((data.children || []).filter((c) => c.code !== 'rdExtraRecFile').length, 8, '原有 8 张记录表一个不少')
-  assert.equal((lab.children || []).length, 4)
+  // 2026-11-19:实验室使用记录表组 +1 = 「测试申请汇总表」(页面级视图,权限复用 RD_DOM_TEST)
+  assert.equal((lab.children || []).length, 5)
   // 2026-09-30:RD_DOM_TEST 由「内部委托测试申请单」升级为**一张单三个页签**的「测试申请单」
   // (面板编码不变 ⇒ 权限行/单据表/单据编号前缀全沿用);菜单名必须跟着改,否则用户找不到。
+  // 2026-11-19:汇总表紧跟测试申请单(与「样品检验汇总表紧跟检验委托单」同一摆法)
   assert.deepEqual((lab.children || []).map((c) => c.title), [
-    '加标水配置记录表', '测试申请单', '设备使用登记表', '仪器使用记录表',
+    '加标水配置记录表', '测试申请单', '测试申请汇总表', '设备使用登记表', '仪器使用记录表',
   ])
+  assert.equal(lab.children[2].path, '/qc/testApplySummary', '汇总表是页面级视图,不是 /panelx/list')
+  assert.equal(lab.children[2].panelCode, 'RD_DOM_TEST', '权限复用测试申请单面板码')
   assert.ok(!JSON.stringify(menuTree).includes('内部委托测试申请单'), '旧菜单名不应残留')
 })
 
@@ -252,8 +257,11 @@ test('研发管理 26 个面板一个不少(含新增 项目流程管控 与两�
   // 2026-11-17 Excel #14：再 +1（新增「外部-非开发样品 RD_SAMPLE_ND」，独立面板 + 独立入口）
   // 2026-11-18 Excel #9：样品组多一个「样品进度跟踪」页面入口（panelCode 复用 RD_SAMPLE_EXT）
   //   ⇒ 叶子项 29 → 30，**去重后面板数不变（仍 28 张）**。
-  assert.equal(codes.length, 30, '叶子项 30 个（+ 样品进度跟踪）')
-  assert.equal(new Set(codes).size, 28, '去重后 28 张面板')
+  // 2026-11-19:叶子项 32 → 33（新增「测试申请汇总表」页面入口，panelCode 复用 RD_DOM_TEST）
+  //   ⇒ 去重后的面板数不变（仍 29 张）。
+  assert.equal(codes.length, 33, '叶子项 33 个（+ 测试申请汇总表）')
+  assert.equal(new Set(codes).size, 29, '去重后 29 张面板（+ RD_SELFMADE）')
+  assert.ok(codes.includes('RD_SELFMADE'), '自制料面板必须登记面板码（权限矩阵同源）')
   assert.ok(codes.includes('RD_SAMPLE_EXT'), '样品进度跟踪复用 RD_SAMPLE_EXT 的权限')
   assert.ok(codes.includes('RD_EXTRA_REC_FILE'), '特殊数据记录表必须登记面板码（权限矩阵同源）')
   assert.ok(codes.includes('PROJECT_FLOW'), '项目流程管控必须挂在研发管理下')
@@ -365,7 +373,8 @@ test('手机扫码:二级 = 生产扫码登记(原 4 项)+ 实验室记录手机
   assert.ok(!(lab.children || []).some((c) => c.panelCode === 'RD_DOM_TEST'))
   // 三张记录表在研发管理里**仍保留电脑端入口**(手机端是并列入口,不是搬家)
   const rdLab = (rd.children || []).find((c) => c.code === 'rdTest').children.find((c) => c.code === 'rdLab')
-  assert.deepEqual(leafCodes(rdLab), ['RD_SPIKE_WATER', 'RD_DOM_TEST', 'RD_EQUIP_USE', 'RD_INSTR_USE'])
+  // 2026-11-19:汇总表复用 RD_DOM_TEST(同一个码出现两次:单据入口 + 汇总入口,权限同一行)
+  assert.deepEqual(leafCodes(rdLab), ['RD_SPIKE_WATER', 'RD_DOM_TEST', 'RD_DOM_TEST', 'RD_EQUIP_USE', 'RD_INSTR_USE'])
 
   // 旧位置不得再残留(生产计划组里) —— 否则侧栏两个「生产领料」入口
   const plan = menuTree.find((n) => n.code === 'plan')

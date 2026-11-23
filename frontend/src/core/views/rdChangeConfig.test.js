@@ -131,7 +131,10 @@ test('「批准」段下方三格：审批通过时回填、纸面只读（2026-
   // 窗口 600 → 1200(2026-10-19):`editable && c.key` 与末尾只读渲染之间**多插了一支**
   //   「变更文件只读态 → 跳转入口」的分支(见 openLinkedFile),原 600 字符窗口装不下。
   //   断言意图不变:这条可编辑分支之后**必须**落到 AnnotatedText 只读渲染,不能没有出口。
-  assert.match(rec, /<template v-else-if="editable && c\.key && !c\.ro">[\s\S]{0,1200}?<AnnotatedText v-else class="rs-txt" :text="head\[c\.key\] \|\| c\.fixed \|\| ''"/,
+  //   2026-11-20:只读文案改为 `tt(c.fixed)` —— 烧结工艺清单的「实际灌料重量计算公式」用
+  //   fixed 承载固定公式,词条在 10 个语言文件里都有,不翻译会把中文带到英文/日文界面。
+  //   改的只是**文案取值表达式**,"必须落到只读文本"的意图不变。
+  assert.match(rec, /<template v-else-if="editable && c\.key && !c\.ro">[\s\S]{0,1200}?<AnnotatedText v-else class="rs-txt" :text="head\[c\.key\] \|\| tt\(c\.fixed\) \|\| ''"/,
     '网格格:无 key/ro 时必须是只读文本,不能给输入控件')
 })
 

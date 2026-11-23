@@ -65,6 +65,15 @@ const props = defineProps({
    * 其它面板不传=false,行为与改造前逐字一致。
    */
   downloadOnly: { type: Boolean, default: false },
+  /**
+   * 只读附件清单（2026-11-19，自制料制程记录查询页）：
+   * 后端已在 selfmadeRows 里按「行锚点 → 文件名 → 字段名」三级兜底解析好该行的附件
+   * （历史数据可能上传在旧锚点，前端拿 字段-行id 精确查会查空 ⇒ 退化成不可点文本）。
+   * 传入数组时组件**不再请求 /attachment/list**，直接用这份清单渲染可点 chip；
+   * 元素字段与 /attachment/list 一致：id / fileName / fileSize / contentType / uploader / uploadTime。
+   * 查询页配合 :can-edit="false" 使用：只能点开预览/下载，不能上传/删除。
+   */
+  attachments: { type: Array, default: null },
 })
 const emit = defineEmits(['update:modelValue', 'change'])
 
@@ -139,7 +148,12 @@ function emitChange() {
   emit('change', map)
 }
 
-watch(() => [props.panelCode, props.docNo, props.fieldKey, slotsKey.value], () => {
+watch(() => [props.panelCode, props.docNo, props.fieldKey, slotsKey.value, props.attachments], () => {
+  // 只读清单模式（查询页）：后端已解析好，不再按锚点请求 /attachment/list
+  if (Array.isArray(props.attachments)) {
+    files.value = props.attachments.map((a) => ({ ...a }))
+    return
+  }
   isMulti.value ? loadAll(true) : load(true)
 }, { immediate: true })
 

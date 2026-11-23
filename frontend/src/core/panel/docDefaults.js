@@ -90,7 +90,13 @@ const DOC_DEFAULTS = {
     //   二级仍给陈秀丽作初值，但真正回填发生在**一级审批选了二级签核人之后**
     //     （ButtonService.writeBackL2Approver → 写 rd_prod_info_head.审核人二级），
     //     用户口径「责任人在一级审批选择二级签核人之前都是空的，选了就回填，后续改动也对应改动」。
-    ['审核人（一级审批人）', '陈秀丽'],
+    // 2026-11-19 用户口径：「审批人没有默认显示名字，在审批之后才填进去」
+    //   ⇒ 去掉一级默认「陈秀丽」，两格都从空开始，审批动作写入后才显示。
+    // 2026-11-20 截图复验：只清这里不够 —— 后端 buildMeta 下发的 yj_panel.config.headDefaults
+    //   里仍有「审核人（一级审批人）: 陈秀丽」，草稿态 applyDocDefaults 会把空格补成它。
+    //   已在 tools/migrate-prodinfo-approver-no-default-20261120.sql 清掉两个键；
+    //   审批动作写回见 ButtonService.writeBackL1Approver / writeBackL2Approver。
+    ['审核人（一级审批人）', ''],
     ['审核人（二级审批人）', ''],
   ],
   // 2026-09-20 出货检验项目控制计划按《出货检验项目控制计划.xlsx》重排为「一张表 7 列」。
@@ -99,6 +105,11 @@ const DOC_DEFAULTS = {
   //   与 RD_PROD_INFO 的两级审批人同款口径。
   //   版本号设计原文是「V + 按照日期来」⇒ 'V@today' 展开成「V2026-09-20」(当天)。
   //   ⚠ 编写人不在这里:它由登录人决定,在 LOCKED_PERSON 里(editable=0,UI 三处按只读渲染)。
+  // 自制料-制程记录录入（2026-11-19 用户口径：「录入人的名字是先默认练庆文」）：
+  //   只**默认**填，不锁只读 —— 用户要改也能改。
+  RD_SELFMADE: [
+    ['录入人', '练庆文'],
+  ],
   RD_INSP_PLAN: [
     // 2026-10-28 用户口径:「出货检验计划表，默认填写出货检验项目控制计划」。
     // 大标题格 2026-10-19 起是 titleKey='标题' 的输入框(yj_field: required=1),

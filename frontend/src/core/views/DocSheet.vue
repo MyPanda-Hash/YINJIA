@@ -63,6 +63,16 @@
           <span class="as-info-label">{{ tt(info.label) }}</span>
           <span class="as-info-value">
             <template v-if="info.kind === 'static'">{{ tt(info.text || '') }}</template>
+            <!-- 2026-11-19 销售问题汇总 P4/P6：「这里无法输入客户」——
+                 样品单的客户名称既要是参照（点放大镜选档案），也要能**直接打字**（新客户/临时客户）。
+                 故 manualRef 的格子改成输入框 + 放大镜：打字即手填，点放大镜仍走客户参照弹窗。 -->
+            <div v-else-if="editable && !infoLocked(info) && info.manualRef && isRefKey(info.key)" class="as-ref-input">
+              <el-input
+                v-model="head[info.key]" size="small" class="as-ref-in"
+                :placeholder="tt('输入客户名称，或点放大镜选择')" @input="emit('dirty')"
+              />
+              <el-icon class="as-ref-ico" :title="tt('点击选择')" @click.stop="openProdRef(info.key)"><Search /></el-icon>
+            </div>
             <div v-else-if="editable && !infoLocked(info) && isRefKey(info.key)" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef(info.key)">
               <span class="as-ref-text">{{ head[info.key] || tt('点击选择') }}</span>
               <el-icon class="as-ref-ico"><Search /></el-icon>
@@ -127,8 +137,25 @@
               <span class="sg-info-line">
               <span class="sg-info-label">{{ tt(f.label) }}：</span>
               <span class="sg-info-value">
+                <!-- 手填客户（2026-11-18，Excel #10；2026-11-20 补 grid 版式）：
+                     输入框 + 放大镜 +「＋新客户」必须作为**同一条 v-if 链的首支**。
+                     ⚠ 之前「＋新客户」是独立 v-if，把链断成两段：docno/date 先渲染一次，
+                     又落进下面的通用输入框分支 ⇒ 样品单编号出现两个输入框（前一个被挤成截断小徽标），
+                     两个日期格也多挂了一个纯文本框。 -->
+                <span v-if="editable && f.manualRef" class="as-ref-input sg-info-manual">
+                  <el-input
+                    v-model="head[f.key]" size="small" class="as-ref-in sg-info-input"
+                    :placeholder="tt('输入客户名称，或点放大镜选择')" @input="emit('dirty')"
+                  />
+                  <el-icon v-if="isRefKey(f.key)" class="as-ref-ico" :title="tt('点击选择')" @click.stop="openProdRef(f.key)"><Search /></el-icon>
+                  <span
+                    class="sg-manual-ref no-print"
+                    :title="tt('客户档案里没有？手动填一个新客户')"
+                    @click="openManualRef(f.key)"
+                  >＋{{ tt('新客户') }}</span>
+                </span>
                 <el-input
-                  v-if="editable && f.kind === 'docno'" v-model="head[f.key]" size="small"
+                  v-else-if="editable && f.kind === 'docno'" v-model="head[f.key]" size="small"
                   maxlength="30" class="as-docno-input sg-info-input" @input="emit('dirty')"
                 />
                 <el-date-picker
@@ -140,16 +167,10 @@
                   v-else-if="editable && isRefKey(f.key)" class="as-ref-ctl sg-info-ref"
                   :title="tt('点击选择')" @click="openProdRef(f.key)"
                 >
+                  <span v-if="custCodeOf(f.key)" class="as-ref-code is-prefix">{{ custCodeOf(f.key) }}</span>
                   <span class="as-ref-text">{{ head[f.key] || tt('点击选择') }}</span>
                   <el-icon class="as-ref-ico"><Search /></el-icon>
                 </div>
-                <!-- 手填新客户（2026-11-18，Excel #10）：参照选择之外再给一条"档案里没有"的路 -->
-                <span
-                  v-if="editable && f.manualRef"
-                  class="sg-manual-ref no-print"
-                  :title="tt('客户档案里没有？手动填一个新客户')"
-                  @click="openManualRef(f.key)"
-                >＋{{ tt('新客户') }}</span>
                 <el-select
                   v-else-if="editable && (f.kind === 'select' || selectOptions(f.key).length)"
                   v-model="head[f.key]" size="small" class="as-cell-input sg-info-input" :clearable="false"
@@ -362,6 +383,7 @@
                     </div>
                   </template>
                   <div v-else-if="editable && isRefKey(c.key)" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
+                    <span v-if="custCodeOf(c.key)" class="as-ref-code is-prefix">{{ custCodeOf(c.key) }}</span>
                     <span class="as-ref-text">{{ head[c.key] || tt('点击选择') }}</span>
                     <el-icon class="as-ref-ico"><Search /></el-icon>
                   </div>
@@ -439,6 +461,7 @@
                 </div>
               </template>
               <div v-else-if="editable && isRefKey(c.key)" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
+                <span v-if="custCodeOf(c.key)" class="as-ref-code is-prefix">{{ custCodeOf(c.key) }}</span>
                 <span class="as-ref-text">{{ head[c.key] || tt('点击选择') }}</span>
                 <el-icon class="as-ref-ico"><Search /></el-icon>
               </div>
@@ -617,6 +640,10 @@
                 :title="tt('点击选择')"
                 @click="openProdRef(row.key)"
               >
+                <!-- 2026-11-20 用户报障修：立项申请「客户名」命中的就是这个「单字段行」分支
+                     （rows=[{num,label,key,kind:'input'}]，不是 cells 也不是 grid）。
+                     2026-11-19 的前缀只加在信息条 / vcell 两个分支 ⇒ 生产上代码写了、界面不显示。 -->
+                <span v-if="custCodeOf(row.key)" class="as-ref-code is-prefix">{{ custCodeOf(row.key) }}</span>
                 <span class="as-ref-text">{{ head[row.key] || tt('点击选择') }}</span>
                 <el-icon class="as-ref-ico"><Search /></el-icon>
               </div>
@@ -652,6 +679,13 @@
                 :placeholder="row.hint ? tt(row.hint) : ''"
                 @input="emit('dirty')"
               />
+              <!-- 2026-11-20：只读态（已归档 / 无编辑权 / 锁定）同款显示「编码 客户名」。
+                   只对 custCodeOf 命中的格子（RD_APPROVAL 客户名）走这个分支，其余字段原样渲染，
+                   避免给所有只读单字段行套 flex 容器。 -->
+              <span v-else-if="custCodeOf(row.key)" class="as-ro-ref">
+                <span v-if="custCodeOf(row.key)" class="as-ref-code is-prefix">{{ custCodeOf(row.key) }}</span>
+                <AnnotatedText class="as-ro-text" :text="head[row.key] || ''" :field-key="String(row.key || '')" />
+              </span>
               <AnnotatedText v-else class="as-ro-text" :text="head[row.key] || ''" :field-key="String(row.key || '')" />
             </div>
             <!-- 同一行右侧的第二字段:实施计划第 8 行 = 负责人 + 编制日期
@@ -926,6 +960,7 @@ import { usePanelRuntime } from '@core/panel-runtime'
 import { useRouter } from 'vue-router'
 import { chainNextStageStart, hasPhaseContent } from '@core/progress/stageProgress'
 import { fixedSheetWidth, docnoLabel } from './docSheetConfigs'
+import { resolveCustomerCode } from './approvalCustomerCode'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -980,7 +1015,7 @@ const manualRefForm = reactive({ name: '', code: '', contact: '' })
 
 function openManualRef(key) {
   manualRefField.value = String(key || '')
-  manualRefForm.name = String(head[manualRefField.value] || '')
+  manualRefForm.name = String(props.head?.[manualRefField.value] || '')
   manualRefForm.code = ''
   manualRefForm.contact = ''
   manualRefOpen.value = true
@@ -993,7 +1028,7 @@ async function submitManualRef() {
   const code = String(manualRefForm.code || '').trim()
   if (!code) {
     // 不填编号 ⇒ 只写在这张单上，不碰客户档案（用户明确口径）
-    head[key] = name
+    props.head[key] = name
     emit('dirty')
     manualRefOpen.value = false
     ElMessage.info(tt('未填客户编号：已填进本单，不进客户档案'))
@@ -1003,7 +1038,7 @@ async function submitManualRef() {
   try {
     const res = await request.post('/px/khdaUpsert', { name, code, contact: manualRefForm.contact })
     const state = String(res?.data?.result || '')
-    head[key] = name
+    props.head[key] = name
     emit('dirty')
     manualRefOpen.value = false
     if (state === 'created') ElMessage.success(tt('已写进客户档案，之后其他单据可直接选到'))
@@ -1604,6 +1639,17 @@ const prodRefVisible = ref(false)
 const prodRefKey = ref('')
 const prodRefSkipAudit = ref(false)
 const prodRefField = computed(() => fieldMap.value.get(prodRefKey.value) || null)
+/**
+ * 客户编号后缀显示（2026-11-19 用户口径）：
+ *   立项申请表选完客户，纸面在客户名后以灰色小字显示「客户编号」。
+ *   只对 RD_APPROVAL 的「客户名」格生效，其余面板/字段一律返回空串（不改其它单据）。
+ */
+function custCodeOf(key) {
+  if (String(props.panelCode || '') !== 'RD_APPROVAL') return ''
+  if (String(key || '') !== '客户名') return ''
+  return String(props.head?.['客户编号'] || '').trim()
+}
+
 function openProdRef(key) {
   if (!props.editable || !isRefKey(key)) return
   prodRefKey.value = key
@@ -1620,49 +1666,20 @@ function openProdRef(key) {
  */
 function applyApprovalDocNo(source) {
   if (String(props.panelCode || '') !== 'RD_APPROVAL') return
-  // 客户编码的键名在不同取数路径下可能不同（参照行按字段 label 给键：
-  // 档案面板 KHDA 的「客户编码」/ 有的路径给物理列 dm / 显示名 客户代码），逐个兜底取第一个非空。
-  const CODE_KEYS = ['客户编码', '客户代码', 'dm', '客户编号', '编码']
-  let code = ''
-  for (const k of CODE_KEYS) {
-    const v = source?.[k]
-    if (v !== undefined && v !== null && String(v).trim() !== '') { code = String(v).trim(); break }
-  }
-  // 2026-11-17 修（用户口径「这个项目编号在选择客户的时候自己根据规则带入」）：
-  //   上一步在**正式环境永远取不到值** —— 客户参照（RD_APPROVAL.客户名）的 ref_field 是 `mc`，
-  //   回填的是**客户名**本身，既没有「客户编码」列也没有 dm 列 ⇒ code 恒为空 ⇒ 立项编号一直空白。
-  //   而用户口径明确：**客户名里已含编码**（如「B-85-06 青岛伊可普」）⇒ 从名字开头把编码抠出来。
-  //   只认 ASCII 开头的编码段（字母/数字/连字符/下划线/点）；纯中文客户名抠不出编码就**不填**，
-  //   绝不拿中文当编码拼接。
+  // 客户编码的解析口径抽在 ./approvalCustomerCode.js（纯函数 + node:test）：
+  //   显式编码列(客户编码/客户代码/dm) → 客户名里的编码段 → 扫全行值兜底。
+  const code = resolveCustomerCode(source)
+  // 2026-11-20 用户报障修：**先写 客户编号，再决定是否填立项编号**。
+  //   旧实现把 `props.head['客户编号'] = code` 放在 `if (!code) return` 之后 ⇒
+  //   编码取不到时那一行永远不执行：界面上「名称已选、编号空白」，且上一次选客户留下的旧编号不会被清掉。
+  //   口径（用户 2026-11-19 / 2026-11-20）：取不到就写空串，纸面 v-if 判空 ⇒ 不显示前缀
+  //   （绝不显示空灰块/空冒号），但绝不把「名称已选、编号空白」当成正常留着旧值。
+  const prevCode = String(props.head['客户编号'] || '').trim()
+  props.head['客户编号'] = code
   if (!code) {
-    const NAME_KEYS = ['客户名', '客户名称', 'mc']
-    // ⚠ 编码位置**不固定**，必须全串扫，不能只看开头：
-    //   用户给的例子是「B-85-06 青岛伊可普」（编码在前），
-    //   而生产实测（2026-11-17 ego 选客户）是「浙江德凌电器有限公司 A-60 跟单客户 18658439031 …」
-    //   —— 编码在**中文名之后**。只看开头永远抠不到 ⇒ 立项编号仍旧空白。
-    // 规则：字母段(1-4) + 连字符 + 数字开头，后面可继续接字母/数字/连字符。
-    //   这样 B-85-06 / A-60 / C-112 都能命中；纯数字手机号 18658439031、中文都不会误命中。
-    const CODE_IN_NAME = /[A-Za-z]{1,4}-[0-9][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*/
-    for (const k of NAME_KEYS) {
-      const name = source?.[k]
-      if (name === undefined || name === null) continue
-      const m = String(name).match(CODE_IN_NAME)
-      if (m && m[0]) { code = m[0]; break }
-    }
-    // 最后兜底：**扫这一行的所有字段值**。
-    //   客户参照行的键名不可靠 —— 实测弹窗里明明有一列值是 `A-60`，
-    //   但按「客户编码 / dm / 客户名称…」逐个取名都落空（行对象键名与列标题不一定同名），
-    //   于是 app 侧永远算不出编码 ⇒ 立项编号空白。扫值则与键名无关，命中率最高。
-    //   只认「字母段+连字符+数字」形态，手机号/纯中文不会误命中。
-    if (!code) {
-      for (const v of Object.values(source || {})) {
-        if (v === null || v === undefined) continue
-        const m = String(v).match(CODE_IN_NAME)
-        if (m && m[0]) { code = m[0]; break }
-      }
-    }
+    if (prevCode) emit('dirty')
+    return
   }
-  if (!code) return
   const d = new Date()
   const ymd = String(d.getFullYear())
     + String(d.getMonth() + 1).padStart(2, '0')
@@ -1889,6 +1906,12 @@ defineExpose({ focusField })
   cursor: pointer; white-space: nowrap; vertical-align: middle;
 }
 .sg-manual-ref:hover { background: #f2f7fd; }
+/* 表格式信息条的 manualRef 格（2026-11-20）：输入框 + 放大镜 +「＋新客户」同一行，
+   高度/边框/字号与同排 date/docno 输入框一致（size=small + 同一套 el-input 边框）。 */
+.sg-info-manual { gap: 6px; }
+.sg-info-manual .as-ref-in { flex: 1; min-width: 0; }
+.sg-info-manual .as-ref-ico { flex: none; }
+.sg-info-manual .sg-manual-ref { flex: none; margin-left: 0; }
 .mref-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .mref-label { width: 72px; color: #606266; font-size: 13px; }
 .mref-tip { margin: 4px 0 0; font-size: 12px; color: #909399; line-height: 1.6; }
@@ -1926,6 +1949,36 @@ defineExpose({ focusField })
 }
 /* 输入控件去边框:保持原版表格线条(编辑/聚焦均无提示线) */
 .approval-sheet :deep(.el-input__wrapper),
+/**
+ * 纸面下拉内容过长导致**被覆盖/截断**（2026-11-19 用户报障：X烧结配方工艺管控清单的
+ * 「产品形态」等标准库下拉，长选项如「外PP棉+炭棒」后半截被裁）。
+ * 与 RecordSheetPanels 同一口径：选中项允许折行，控件高度随内容走；
+ * 打印时同样折行（否则纸上仍是省略号）。
+ */
+.approval-sheet :deep(.el-select__selected-item),
+.approval-sheet :deep(.el-select__placeholder) {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 18px;
+  word-break: break-all;
+}
+.approval-sheet :deep(.el-select__wrapper) {
+  height: auto;
+  min-height: 28px;
+  align-items: flex-start;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+@media print {
+  .approval-sheet :deep(.el-select__selected-item),
+  .approval-sheet :deep(.el-select__placeholder) {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+  .approval-sheet :deep(.el-select__wrapper) { height: auto !important; min-height: 0 !important; }
+}
 .approval-sheet :deep(.el-select__wrapper),
 .approval-sheet :deep(.el-input__wrapper.is-focus),
 .approval-sheet :deep(.el-select__wrapper.is-focused),
@@ -2085,6 +2138,17 @@ defineExpose({ focusField })
   color: #333;
   text-align: right;
 }
+.as-ref-code { margin-left: 6px; font-size: 12px; color: #8c8c8c; font-variant-numeric: tabular-nums; }
+/* 2026-11-19 销售问题汇总 P16：「增加客户编码，所以就是客户编码+客户名字」⇒ 编号放**前面**，
+   与客户名同一行显示成「A-60 欧科塑胶制品(深圳)有限公司」 */
+.as-ref-code.is-prefix { margin-left: 0; margin-right: 6px; color: #595959; }
+/* 2026-11-20：只读态同款前缀（归档/无编辑权）。前缀 + 名字按基线同行；名字仍可换行。 */
+.as-ro-ref { display: flex; align-items: baseline; flex: 1; min-width: 0; }
+.as-ro-ref .as-ro-text { flex: 1; min-width: 0; }
+/* manualRef 客户格：输入框 + 放大镜（2026-11-19） */
+.as-ref-input { display: flex; align-items: center; gap: 4px; width: 100%; }
+.as-ref-in { flex: 1; }
+.as-ref-input .as-ref-ico { cursor: pointer; color: #8c8c8c; flex: none; }
 .as-ref-text.is-empty { color: #a8b6c4; }   /* 空值时的背景提示词,与 input placeholder 同观感 */
 .as-ref-ico {
   flex-shrink: 0;
@@ -2163,6 +2227,22 @@ defineExpose({ focusField })
 }
 .as-info-value .as-ref-text {
   text-align: left;
+}
+/* 2026-11-20：单字段行（立项申请「客户名」）的参照框撑满值区。
+ * 根因：`.as-ref-ctl` 自身写死 width:200px（那是顶栏「文档编号」小格的尺寸），
+ *   客户编号前缀加进来后 200px 装不下「KH00021 惠州市芯悦纯净设备有限公司」，
+ *   `.as-ref-text` 的 nowrap+ellipsis 会把它截成「KH00021 惠州市芯悦纯净...」。
+ * 纸面是打印件，客户名必须完整可读 ⇒ 宽度交给格子 + 允许换行（同 .q-value .as-ref-ctl 口径）。 */
+.as-fill-main .as-fill-ref {
+  width: 100%;
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: flex-start;
+}
+.as-fill-main .as-fill-ref .as-ref-text {
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* ═══ ③ 内容表 ═══ */

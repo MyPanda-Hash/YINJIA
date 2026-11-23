@@ -323,7 +323,7 @@
           <RecordSheetPanels
             ref="approvalSheetRef"
             :head="cur" :fields="sheetAllFields" :detail-fields="sheetDetailFields" :editable="draftEditable && !annOn" :panel-code="panelCode"
-            :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true" :dept-fill-open="changeDeptFillOpen"
+            :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true && !changeSignoffFillOpen" :dept-fill-open="changeRowEditOpen"
             @dirty="markInlineDirty"
             @refresh-config="onFieldEditRefresh"
             @open-file="onOpenLinkedFile"
@@ -338,7 +338,7 @@
         </div>
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
 
-        <div class="approval-side" :class="{ collapsed: sideCollapsed, 'preview-on': previewInSide }">
+        <div class="approval-side" :class="{ collapsed: sideCollapsed, 'preview-on': previewInSide, 'is-rd': isRdPanel }">
           <!-- ═══ 单据预览：**替换**右侧栏（2026-11-13 用户口径）────────────────────────
                用户原话：「把侧边栏换成右边展开，使用的时候替换右边栏，要有返回按钮」。
                形态：点「单据预览」→ 右栏整体换成「单据预览」面板（表格列表 + 返回按钮）；
@@ -478,7 +478,7 @@
               <!-- 2026-11-13 用户口径：「把侧边栏换成右边展开，使用的时候替换右边栏，要有返回按钮」。
                    ⇒ 产品信息表 / 立项申请：点本按钮把**右侧操作栏整体换成预览面板**（带返回）；
                      其余面板仍走原来的窄侧栏卡片预览（openDocPreview），行为逐字不变。 -->
-              <div class="as-side-btn" @click="canPreviewSide ? openSidePreview() : openDocPreview()">{{ tt(isProdDocMatrix ? '产品预览' : '单据预览') }}</div>
+              <div class="as-side-btn" @click="openPreviewEntry()">{{ tt(isProdDocMatrix ? '产品预览' : previewBtnLabel) }}</div>
               <!-- 流程管控(2026-11-11 用户口径:「新的流程管控面板应该放在产品文件列表」)——
                    入口就放在这张表的侧栏,点开是**独立页面** /rd/productFlow(版式照项目流程管控:
                    KPI + 检索 + 5 步时间轴),不再是本页里的内嵌切换。 -->
@@ -582,13 +582,16 @@
                 <div class="as-side-btn" :class="{ disabled: isDisabled('弃审') }" @click="onSideAction('弃审')">{{ tt('弃审') }}</div>
               </template>
               <!-- 产品变更申请单(RD_CHANGE,2026-09-21):会签子流程(审批本身走上面的统一审批块)。
-                   状态链 草稿 →(填写中)→ 会签中(可选)→ 审批中(admin)→ 已生效;驳回回草稿。
+                   状态链 草稿 →(填写中)→ 会签中(可选，会签人可填本部门行)→ 待批准(admin 终审) → 已生效;驳回回草稿。
                    显隐按"状态 × 身份":发起人(∪管理员)才提交/撤回,会签人(∪管理员)才签。服务端每步都再校验一次身份。
                    2026-10-16 侧栏整理:本块的「审批通过/审批驳回/审批情况」删掉 —— 已并入统一审批块,不再重复渲染。 -->
               <template v-if="isChangePanel">
                 <div v-if="['草稿', '修改中'].includes(curDocStatus) && cur['需会签'] === '是' && isChangeInitiator"
                      class="as-side-btn primary" @click="onSideAction('提交会签')">{{ tt('提交会签') }}</div>
                 <template v-if="curDocStatus === '会签中'">
+                  <!-- 2026-11-19 用户口径：「现在会签人只能点会签通过，但是不能填对应的部门评审意见」
+                       ⇒ 会签中只放开「三、部门评审意见」的本部门行；点会签通过前会自动保存一次。 -->
+                  <div v-if="changeSignoffFillOpen" class="as-side-hint">{{ tt('会签人可在「三、部门评审意见」填写本部门那一行，保存后再点「会签通过」') }}</div>
                   <div v-if="iAmChangeSigner" class="as-side-btn primary" @click="onSideAction('会签通过')">{{ tt('会签通过') }}</div>
                   <div v-if="iAmChangeSigner" class="as-side-btn" @click="onSideAction('会签驳回')">{{ tt('会签驳回') }}</div>
                   <div v-if="isChangeInitiator" class="as-side-btn sub" @click="onSideAction('撤回会签')">{{ tt('撤回会签') }}</div>
@@ -1329,9 +1332,12 @@
             <!-- 新增数据(2026-10-21 起可下拉):物料清单(WLBOM)用户口径「可以通过点击新增数据的下拉栏:
                  导入商品数据,然后勾选商品里面的数据进行一个批量导入」⇒ 同一颗按钮点开是两项菜单。
                  ⚠ 只有声明过商品导入的面板(当前 = WLBOM)才下拉,其余面板保持原来的一击加行,
-                   免得一次无人要求的按钮改版波及全部单据面板。 -->
+                   免得一次无人要求的按钮改版波及全部单据面板。
+                 🔴 2026-11-19:两个分支都改判 canAddDetailRow(b) = 单据可编辑 ∧ 面板「新增保存」(add)词。
+                   取消该面板的 add 词后按钮即消失;下拉里的「导入商品数据」同样是加行,一并受控
+                   (真闸门在后端 ButtonService.saveArchive 的新增行校验)。 -->
             <el-dropdown
-              v-if="detailEditable(b) && canImportProducts(b)"
+              v-if="canAddDetailRow(b) && canImportProducts(b)"
               trigger="click"
               @command="(cmd) => onAddDetailCommand(cmd, b)"
             >
@@ -1345,7 +1351,7 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <el-button v-else-if="detailEditable(b)" size="small" type="primary" :icon="Plus" :class="{ 'btn-blink': isMissingHintTab(b) }" @click="addInlineDetailRow(b)">{{ tt('新增数据') }}</el-button>
+            <el-button v-else-if="canAddDetailRow(b)" size="small" type="primary" :icon="Plus" :class="{ 'btn-blink': isMissingHintTab(b) }" @click="addInlineDetailRow(b)">{{ tt('新增数据') }}</el-button>
             <span class="dt-ic" v-for="ic in b.isMain ? iconA : iconB" :key="ic" @click="onIcon(ic, b)">{{ tt(ic) }}</span>
           </span>
         </div>
@@ -2377,17 +2383,16 @@
 
     <!-- 产品变更申请表：审批通过 + 签字/日期（2026-11-11）。
          这三个值通过后写进 rd_change_head 备用2/3/4，纸面「批准 / 签字 / 日期」三格即显示并可打印。 -->
-    <el-dialog v-model="chgApvVisible" :title="tt('审批通过（签字）')" width="460px" append-to-body>
+    <el-dialog v-model="chgApvVisible" :title="tt(changeFinalStage ? '批准（产品变更申请单）' : '审批通过（签字）')" width="460px" append-to-body>
       <div class="dq-form">
-        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('批准后，签字与日期会回填到纸面「批准 / 签字 / 日期」三格，保存与打印都可见。') }}</div>
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('批准后系统自动写入当前登录人的姓名与当天日期，并回填到纸面「批准 / 签字 / 日期」三格，保存与打印都可见。') }}</div>
         <div class="dq-row" style="align-items:center">
-          <span class="dq-label">{{ tt('签字') }}</span>
-          <el-input v-model="chgApvSign" maxlength="30" :placeholder="tt('签字（默认当前登录人姓名）')" />
+          <span class="dq-label">{{ tt('批准') }}</span>
+          <span class="dq-fixed">{{ user?.realName || user?.userName || '' }}<span class="dq-fixed-hint">{{ tt('（系统自动写入）') }}</span></span>
         </div>
         <div class="dq-row" style="align-items:center">
           <span class="dq-label">{{ tt('日期') }}</span>
-          <el-date-picker v-model="chgApvDate" type="date" value-format="YYYY-MM-DD" format="YYYY-MM-DD"
-                          style="flex:1" :placeholder="tt('日期（默认今天）')" />
+          <span class="dq-fixed">{{ todayStr() }}<span class="dq-fixed-hint">{{ tt('（当天）') }}</span></span>
         </div>
         <div class="dq-row" style="align-items:flex-start">
           <span class="dq-label">{{ tt('审批意见') }}</span>
@@ -2396,7 +2401,7 @@
       </div>
       <template #footer>
         <el-button @click="chgApvVisible = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" :loading="chgApvBusy" @click="confirmChangeApprove">{{ tt('确认审批通过') }}</el-button>
+        <el-button type="primary" :loading="chgApvBusy" @click="confirmChangeApprove">{{ tt(changeFinalStage ? '确认批准' : '确认审批通过') }}</el-button>
       </template>
     </el-dialog>
 
@@ -2556,7 +2561,8 @@
       :owner-key="previewOwnerKey"
       :subject="previewSubject"
       :panel-code="String(panelCode || '')"
-      @close="approvalPreviewOpen = false"
+      :title-text="previewOverlayTitle"
+      @close="closeApprovalPreview"
       @jump="jumpToApprovalDoc"
     />
     <!-- 检验项目/检验方案(2026-10-09 **合并口径**):三类工序检验单(成型/切炭/组装成品)工具栏**唯一**入口 ——
@@ -2882,7 +2888,7 @@ import { applyCodes, applyFuzzy, applyPicked, clearField, normalizeCodeList } fr
 // 产品文件列表的矩阵行筛选(单一口径,与 ProdDocListSheet 共用;纯函数 + 单测)
 import { PROD_DOC_FIELD_OPTIONS, buildProdDocFilter, filterProdDocRows } from '@core/prod/prodDocSearch'
 import { nextSortState, sortRows } from '@core/sort/rowSort'
-import { canConfigFields, canConfigWarn, canViewPanel } from '@core/auth/panelAccess'
+import { canConfigFields, canConfigWarn, canPanelDo, canViewPanel } from '@core/auth/panelAccess'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import { BARCODE_PANELS, barcodeLabelsOf } from '@core/panel/barcodeLabel'
 import RefPickDialog from './RefPickDialog.vue'
@@ -2908,8 +2914,18 @@ import DataRecordSheet from './DataRecordSheet.vue'
 import RecordSheetPanels from './RecordSheetPanels.vue'
 import { recordSheetConfigs } from './recordSheetConfigs'
 // 单据预览卡片的摘要口径（2026-11-11）：按面板挑「最主要的信息」，纯函数 + 单测
-import { previewLineText, previewSummaryOf } from '@core/panel/docPreview.js'
+import {
+  isFullPreviewPanel, previewLineText, previewSummaryOf, resolvePreviewOwnerKey,
+} from '@core/panel/docPreview.js'
+// 列表按单号定位的公共口径（2026-11-20）：单号键序 编号→单据编号→锭号、预览下标换页码。
+// load() 的 ?focus= 深链与「预览点跳转」的 focus 消费共用，纯函数 + 单测见 docFocus.test.js
+import { docNoOf, findDocIndex, pageOfPreviewIndex, shouldRestoreAfterDocNo } from '@core/panel/docFocus.js'
 import { missingKeyFromMessage } from './recordSheetFocus'
+// 产品变更申请表：会签人填本部门行 / 管理员终审的纯判断（单测见 changeCosign.test.js）
+import {
+  canFillOwnDeptRow, changeApproveLabel, changeRejectLabel, changeWaitingTip,
+  isChangeFinalStage as isChangeFinalStageOf, isChangeSigner, splitChangeSigners,
+} from './changeCosign'
 import QcInspReqSheet from './QcInspReqSheet.vue'
 import { isQcInspReqPanel } from './qcInspReqConfig'
 import { approvalSheetCfg, planSheetCfg, qcSheetCfgs, sampleExtSheetCfg, sampleIntSheetCfg, sampleNdSheetCfg } from './docSheetConfigs'
@@ -3030,15 +3046,35 @@ const changeDeptFillOpen = computed(() => String(panelCode.value) === 'RD_CHANGE
   && user?.isAdmin !== true
   && (changeDeptRows.value || []).length > 0)
 
+/**
+ * 会签中「会签人填本部门那一行」模式(2026-11-19 用户口径)。
+ *
+ * <p>用户原话：「现在会签人只能点会签通过，但是不能填对应的部门评审意见」。
+ * 与服务端 ButtonService.allowChangeSignoffFill 同口径：面板 + 会签中 + 本单待签会签人 +
+ * 有部门映射。管理员不豁免（admin 若也是会签人，同样只填自己部门那一行；
+ * 终审走「批准通过」，不靠这个口子）。</p>
+ */
+const changeSignoffFillOpen = computed(() => canFillOwnDeptRow({
+  panelCode: panelCode.value,
+  status: current.value?.['单据状态'],
+  head: cur.value,
+  account: user.account || user.userName,
+  deptRows: changeDeptRows.value,
+}))
+
+/** 两种「只填本部门行」窄口子（会签中 / 已生效后）合成一个纸面行编辑开关 */
+const changeRowEditOpen = computed(() => changeDeptFillOpen.value || changeSignoffFillOpen.value)
+
 // ── 产品变更申请单:会签按钮组的身份判据(2026-09-21)──
 // 会签人 = 头字段「会签人」里的账号(顿号/逗号分隔);发起人 = 纸面「申请人」= 当前用户姓名。
 // 两者只决定**按钮显不显示**:服务端 ButtonService.requireSigner / requireChangeInitiator 才是门禁。
 const isChangePanel = computed(() => String(panelCode.value) === 'RD_CHANGE')
-const changeSigners = computed(() => String(cur.value?.['会签人'] ?? '')
-  .split(/[,，、;；\s]+/).map((s) => s.trim()).filter(Boolean))
-const iAmChangeSigner = computed(() => changeSigners.value.includes(String(user.account || user.userName || '')))
+const changeSigners = computed(() => splitChangeSigners(cur.value?.['会签人']))
+const iAmChangeSigner = computed(() => isChangeSigner(cur.value, user.account || user.userName))
 const isChangeInitiator = computed(() => user.isAdmin === true
   || (!!user.realName && String(cur.value?.['申请人'] ?? '') === String(user.realName)))
+/** 会签全过后的「待批准」最终节点（只有 RD_CHANGE 有这个词，且只有 admin 能批/驳） */
+const changeFinalStage = computed(() => isChangeFinalStageOf(panelCode.value, current.value?.['单据状态']))
 /** 内部样品单的月份标题前缀：`2026年11月内部`（优先单号里的年月，退回当前月） */
 const sampleMonthTitle = computed(() => {
   const no = String(cur.value?.['单据编号'] || curDocNo.value || '')
@@ -5051,38 +5087,89 @@ const previewKw = ref('')
  *    点返回或再点「单据预览」→ 恢复原来的操作按钮栏。两者**互斥替换**，不叠在一起。</p>
  */
 const PREVIEW_SIDE_PANELS = new Set(['RD_PROD_INFO', 'RD_APPROVAL'])
-const canPreviewSide = computed(() => PREVIEW_SIDE_PANELS.has(String(panelCode.value)))
 /**
- * 走**全屏**单据预览的面板（2026-11-17 用户口径，目前只有立项申请）。
+ * 走**全屏**单据预览的面板（2026-11-20 用户口径：研发管理**全部面板**统一）。
  *
- * <p>用户原话：「点击单据预览就根据申请立项人进行一个筛选全屏展示这些属于自己申请的单据的明细，
- * 设计要好看，使用设计库进行设计，要留一个返回按钮，点击对应单据要有一个跳转按钮，
- * 可以直接跳转到对应单据」。</p>
+ * <p>用户原话：「现在所有的研发模块的单据预览全部做成和立项申请和产品信息表类似的单据查询界面」。</p>
  *
- * <p>与右栏那个 176px 的窄预览是**两回事**：立项申请的字段多（背景/机型/规格/目标/等级…），
- * 挤在侧栏里根本看不清，所以单独开全屏浮层（组件 ApprovalPreviewOverlay）。
- * 其余面板（RD_PROD_INFO 等）继续走原来的右栏 DocSelectRail，行为逐字不变。</p>
+ * <p>判定规则 = {@link isFullPreviewPanel}（core/panel/docPreview）：panelCode 以 RD_ 开头。
+ * 为什么不用后端 yj_panel.module_group：它确实存在且研发管理 32 张全是 RD_ 前缀（2026-11-20 查库核对），
+ * 但前端面板配置 metadata **不下发 moduleGroup**（只有 panelCode/panelName/panelCategory…），
+ * 要用它得先改后端契约；RD_ 前缀在本库与 module_group 一一对应 ⇒ 取零后端改动、更可靠的那条。
+ * 详细证据与唯一例外（RD_PROD_DOCLIST 是产品矩阵预览，不是单据）见 docPreview.js 同名函数注释。</p>
  */
-// 2026-11-17 用户口径：立项申请 + 产品信息表共用同一套「全屏单据预览」（左状态树 + 多条件查询栏）
-const FULL_PREVIEW_PANELS = new Set(['RD_APPROVAL', 'RD_PROD_INFO'])
-const canFullPreview = computed(() => FULL_PREVIEW_PANELS.has(String(panelCode.value)))
+const canFullPreview = computed(() => isFullPreviewPanel(panelCode.value))
+/**
+ * 右栏窄预览（2026-11-13 的形态）：只在**非全屏**面板上生效。
+ *
+ * <p>2026-11-20 起 RD_* 一律走全屏 —— RD_PROD_INFO/RD_APPROVAL 也包含在内，
+ * 若这里不排除它们，同一颗按钮就会在"全屏 / 右栏"两套预览之间并存（用户口径要求避免）。
+ * 其它模块（品质/供应链/WMS）本来就不在这个登记表里，行为一个字不动。</p>
+ */
+const canPreviewSide = computed(() => !canFullPreview.value && PREVIEW_SIDE_PANELS.has(String(panelCode.value)))
+/** 样品模块三张单（侧边栏「单据预览」统一叫「样品查询」，2026-11-23） */
+const SAMPLE_PANELS = new Set(['RD_SAMPLE_EXT', 'RD_SAMPLE_INT', 'RD_SAMPLE_ND'])
+
+/**
+ * 「单据预览」按钮/浮层的**按面板命名**（2026-11-19 销售问题汇总）：
+ *   产品信息表 P11「改为：产品搜索」、P12 预览页标题「改为：产品信息查询」；
+ *   立项申请  P16/P17「改为：立项查询」（按钮与标题同名）。
+ * 未登记的面板仍叫「单据预览」—— 其它 20 多个面板的文案一个字不动。
+ */
+const previewBtnLabel = computed(() => {
+  const p = String(panelCode.value)
+  if (p === 'RD_PROD_INFO') return '产品搜索'
+  if (p === 'RD_APPROVAL') return '立项查询'
+  // 2026-11-23 用户口径：「样品模块的侧边栏的单据预览改名为样品查询」
+  //   样品模块三张单（外部开发 / 内部开发 / 外部非开发）统一叫「样品查询」。
+  if (SAMPLE_PANELS.has(p)) return '样品查询'
+  return '单据预览'
+})
+/** 全屏预览浮层的标题（产品信息查询 / 立项查询 / 单据预览） */
+const previewOverlayTitle = computed(() => {
+  const p = String(panelCode.value)
+  if (p === 'RD_PROD_INFO') return '产品信息查询'
+  if (p === 'RD_APPROVAL') return '立项查询'
+  // 与按钮同名（同 立项查询 的做法）：样品模块的浮层标题也叫「样品查询」。
+  if (SAMPLE_PANELS.has(p)) return '样品查询'
+  return '单据预览'
+})
 /** 全屏预览浮层是否打开 */
 const approvalPreviewOpen = ref(false)
 /** 当前登录人姓名（用于「只看我申请的」判据） */
 const myApplicantName = computed(() => String(user.realName || '').trim())
-/** 全屏预览的「归属人」字段：立项申请看申请立项人；产品信息表没有该列，看编辑人（=制单人姓名） */
-const previewOwnerKey = computed(() => (String(panelCode.value) === 'RD_APPROVAL' ? '申请立项人' : '编辑人'))
+/**
+ * 全屏预览的「归属人」字段（2026-11-20 改为**按面板探测**，不再按面板写死）。
+ *
+ * <p>候选顺序见 core/panel/docPreview.PREVIEW_OWNER_CANDIDATES：立项=申请立项人、
+ * 产品信息表=编辑人、样品单=申请、产品变更=申请人、实施计划=负责人、数据记录表=测试负责人、
+ * 工艺清单=表单管理人…；一个都没有 ⇒ 创建人（列表行的「发起人」，见 PREVIEW_OWNER_FALLBACK）。</p>
+ *
+ * <p>字段来源 = 面板配置的 dataSchema.fields（后端按 yj_field 的**表头行**下发，含隐藏列）——
+ * 不能用 list 行反推：行里只带非空值，某张单没填就探测不到那一步。</p>
+ */
+const previewOwnerKey = computed(() => resolvePreviewOwnerKey(cfgCache.value?.dataSchema?.fields || []))
 /** 全屏预览副标题里的面板名 */
 const previewSubject = computed(() => tt(String(panelName.value || '')))
 /** 右栏是否处于「单据预览」态 */
 const previewInSide = ref(false)
 /**
+ * 「单据预览」入口的**唯一分派**（2026-11-20）：
+ *   全屏（RD_*）→ 右栏窄预览（历史形态，当前只有非 RD 面板会命中）→ 老卡片预览。
+ *
+ * <p>为什么全屏必须排在最前：RD_PROD_INFO/RD_APPROVAL 同时登记在 PREVIEW_SIDE_PANELS 里，
+ * 不先判就会两套预览并存（用户口径「避免两套并存」）。</p>
+ */
+async function openPreviewEntry() {
+  if (canFullPreview.value) { await openApprovalPreview(); return }
+  if (canPreviewSide.value) { await openSidePreview(); return }
+  await openDocPreview()
+}
+/**
  * 打开右栏预览。取数口径与 openDocPreview 一致（pageSize 拉到 200 一次取全、客户端筛选），
  * 但**不走 previewMode** —— previewMode 是"把左栏/整页切走"的老预览态，这里只替换右栏内容。
  */
 async function openSidePreview() {
-  // 2026-11-17：立项申请走**全屏浮层**（按申请立项人筛选 + 可跳转），不进右栏窄预览。
-  if (canFullPreview.value) { await openApprovalPreview(); return }
   if (canPreviewSide.value && previewInSide.value) { closeSidePreview(); return }
   previewKw.value = ''
   previewInSide.value = true
@@ -5094,8 +5181,9 @@ async function openSidePreview() {
   await load()
 }
 /**
- * 打开立项申请的全屏单据预览（2026-11-17）。
+ * 打开**全屏**单据预览（2026-11-17 立项申请 → 2026-11-20 研发管理全部面板）。
  * 取数：与右栏预览同一口径 —— pageSize 拉到 200 一次取全、客户端筛选（不额外造接口）。
+ * 面板数量不增加取数次数：一次 load() 取当前面板最多 200 张，打开浮层只是本地筛选。
  */
 async function openApprovalPreview() {
   if (previewPrevPageSize === null) previewPrevPageSize = query.pageSize
@@ -5107,15 +5195,44 @@ async function openApprovalPreview() {
 }
 
 /**
+ * 关闭全屏预览（2026-11-19 用户报障：「单据预览的查询的数据不对」）：
+ * 打开时把 pageSize 拉到 200 一次取全，**关闭必须还原**并重新取数 ——
+ * 原来只把 open 置 false，分页/查询条件就永久停在"取 200 条、第 1 页"的状态，
+ * 用户再点查询看到的结果与分页都不对（正是这个报障）。
+ */
+async function closeApprovalPreview() {
+  approvalPreviewOpen.value = false
+  if (previewPrevPageSize !== null) {
+    query.pageSize = previewPrevPageSize
+    previewPrevPageSize = null
+  }
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+}
+
+/**
  * 浮层里点「跳转」= 回到本面板并定位到那张单（?focus=单号）。
  * ⚠ 用 focus 而不是 docNo：本面板走列表式定位（applyDocNoQuery 那条是 RD_SPEC_DOC 的深链口径），
  *   与 gotoDocNo / 派发后的跳转保持同一套写法。
  */
-function jumpToApprovalDoc(row) {
-  const no = String(row?.['单据编号'] || '').trim()
-  approvalPreviewOpen.value = false
+async function jumpToApprovalDoc(row) {
+  // 单号键序统一走 core/panel/docFocus（编号 → 单据编号 → 锭号）：
+  //   产品信息表的 group_col 是「单据编号」，历史面板可能只有 编号/锭号 ——
+  //   别让「跳转」因为取错键拿到空单号而静默不跳。
+  const no = docNoOf(row)
+  // 2026-11-19 用户报障：「跳转对应单据功能不对」——
+  //   原来写死 /panelx/list/RD_APPROVAL，产品信息表点「跳转」会跑到立项申请列表。
+  //   现在跳**当前面板**并带 ?focus=单号（focus 定位逻辑见 load() 里的 route.query.focus）。
+  // 2026-11-20 用户报障：「跳转回到第一张草稿」——
+  //   关闭浮层会还原 pageSize（200 → 分页大小）并 load 一次；随后的 router.push 同 path
+  //   只改 query，组件不重挂、load 不重跑 ⇒ ?focus= 从来没被消费，curIdx 停在 0。
+  //   这里**先**记下目标在预览列表（200 条一页取全）里的下标，关浮层后再由
+  //   watch(route.query.focus) → consumeFocusQuery() 消费：还原分页后靠这个下标换算页码。
+  previewFocusHint = { no, index: no ? findDocIndex(list.value, no) : -1 }
+  await closeApprovalPreview()
   if (!no) return
-  router.push({ path: '/panelx/list/RD_APPROVAL', query: { focus: no } })
+  router.push({ path: `/panelx/list/${panelCode.value}`, query: { ...route.query, focus: no } })
 }
 
 /** 返回：恢复右侧操作栏（操作按钮原样回来） */
@@ -5124,6 +5241,15 @@ function closeSidePreview() {
   previewKw.value = ''
 }
 let previewPrevPageSize = null
+/**
+ * 「预览浮层里点跳转」记下的目标在**预览列表**（pageSize=200 一页取全）里的下标。
+ *
+ * <p>关闭浮层会把 pageSize 还原成分页大小（通常 20），同一张单在还原后的列表里可能落到
+ * 第 2 页以后 —— 只按"当前 list"找会找不到，用户看到的仍是第一张草稿。consumeFocusQuery
+ * 用这个下标换算目标页码。只在 jumpToApprovalDoc → consumeFocusQuery 之间有效，消费完即清空；
+ * no 对不上（期间又跳了别的单）时按无提示处理（回第 1 页），不会把两张单的定位串在一起。</p>
+ */
+let previewFocusHint = { no: '', index: -1 }
 /**
  * 摘要内容 = 纯函数 core/panel/docPreview.js 的口径（2026-11-11 用户口径：
  * 「立项申请的单据预览做成和销售订单左侧栏类似，显示最主要的信息方便去查找对应单据」）：
@@ -5161,7 +5287,14 @@ const previewCards = computed(() => {
     const no = String(row['单据编号'] || row['编号'] || '')
     const sum = previewSummaryFor(row)
     const kw = previewKw.value.trim().toLowerCase()
-    const hit = !kw || no.toLowerCase().includes(kw) || sum.items.some((x) => x.value.toLowerCase().includes(kw))
+    // 2026-11-19 销售问题汇总 P7：「搜索还是一样的问题，要跟产品信息和立项申请一样的搜索」——
+    //   侧栏「单据预览查找」原来只匹配**单号 + 摘要里的几个字段**，样品单想按客户/规格找单就搜不到。
+    //   改成整行字段一起匹配（与列表页模糊搜索、全屏预览搜索同一口径）。
+    const rowHay = Object.keys(row || {})
+      .filter((k) => k !== 'detail')
+      .map((k) => { const v = row[k]; return v === null || v === undefined ? '' : String(v).toLowerCase() })
+      .join(' ')
+    const hit = !kw || no.toLowerCase().includes(kw) || rowHay.includes(kw)
     return {
       no,
       date: String(row['单据日期'] || ''),
@@ -5753,7 +5886,7 @@ const approvalSideGroups = computed(() => toolbarGroups.value
  *  这是纯展示层取舍,动作本身没被删:状态回到草稿/修改中时它们自动回来。 */
 const sheetSideGroups = computed(() => approvalSideGroups.value
   .map((g) => ({ ...g, actions: actsOf(g).filter((a) => a !== '字段管理'
-    && !(!draftEditable.value && !changeDeptFillOpen.value && ['保存', '保存为草稿', '保存新增'].includes(a))) }))
+    && !(!draftEditable.value && !changeRowEditOpen.value && ['保存', '保存为草稿', '保存新增'].includes(a))) }))
   .filter((g) => (g.actions || []).length))
 /** 「字段管理」是否可用(有才在 ④ 输出段末尾渲染,不再混在本单操作里)。
  *  ⚠ 2026-10-16 用户口径:「侧边栏的字段管理在研发管理不可用,可以去掉」——
@@ -5786,19 +5919,29 @@ const hasFieldAdmin = computed(() => (!String(panelCode.value).startsWith('RD_')
  *     · 显示 = 有没有**资格**(有审批权 ∪ 被一级选定的二级审核人;QC 两级仍走原口径);
  *     · 能不能点 = 交给 isDisabled(提交人自己的一级「审批通过」仍置灰,悬停给出那句话)。
  */
-const approvalBtnsVisible = computed(() => (isQcL2Panel.value
-  ? canApproveQcL2Here.value
-  : (canApproveHere() || l2ApproverNow.value)))
+const approvalBtnsVisible = computed(() => (
+  // 产品变更申请表「待批准」：只有 admin 看得到「批准通过/批准驳回」——用户口径「只有 admin
+  // 看到批准/驳回按钮」。其他有审批角色的账号即使能通过权限层，也不该看到这个最终节点入口。
+  changeFinalStage.value
+    ? user.isAdmin === true
+    : (isQcL2Panel.value
+      ? canApproveQcL2Here.value
+      : (canApproveHere() || l2ApproverNow.value))))
 /** 轮不到我审批时的侧栏说明(宁可说"在等谁",也别让用户对着空侧栏猜是不是卡住了) */
 const approvalWaitingTip = computed(() => (curDocStatus.value === '待二级审批'
   ? '本单在二级签核：由一级选定的二级审核人（或管理员）签核'
-  : '本单已提交审批，等待一级审批人处理（提交人不能审批自己提交的单）'))
-/** 审批通过按钮文案:QC 两级面板走原「审批通过/批准通过」,RD_PROD_INFO 二级节点明确叫「二级签核」 */
-const approveBtnLabel = computed(() => (isQcL2Panel.value
-  ? qcL2ApproveLabel()
-  : (curDocStatus.value === '待二级审批' ? '二级签核' : '审批通过')))
-/** 审批驳回按钮文案:QC 两级面板「一级驳回/二级驳回」;其余「审批驳回」 */
-const rejectBtnLabel = computed(() => (isQcL2Panel.value ? qcL2RejectLabel() : '审批驳回'))
+  : changeWaitingTip(curDocStatus.value)))
+/** 审批通过按钮文案:产品变更「待批准」= 批准通过;QC 两级面板走原「审批通过/批准通过」;
+ *  RD_PROD_INFO 二级节点明确叫「二级签核」 */
+const approveBtnLabel = computed(() => (changeFinalStage.value
+  ? changeApproveLabel(true)
+  : (isQcL2Panel.value
+    ? qcL2ApproveLabel()
+    : (curDocStatus.value === '待二级审批' ? '二级签核' : '审批通过'))))
+/** 审批驳回按钮文案:产品变更「待批准」= 批准驳回;QC 两级面板「一级驳回/二级驳回」;其余「审批驳回」 */
+const rejectBtnLabel = computed(() => (changeFinalStage.value
+  ? changeRejectLabel(true)
+  : (isQcL2Panel.value ? qcL2RejectLabel() : '审批驳回')))
 const headerFields = computed(() => {
   const fields = (cfgCache.value?.dataSchema?.fields || []).filter((field) => !field.hidden)
   const names = cfgCache.value?.metadata?.panelPageDto?.formPages?.[0]?.fieldNames
@@ -8242,7 +8385,8 @@ function closeCtx() {
 const APPROVE_ACTIONS = ['审批通过', '审批驳回']
 
 /** 处于审批流程中的状态(2026-09-20 两级审批:一级「审批中」/二级「待二级审批」) */
-const IN_APPROVAL = ['审批中', '待二级审批']
+// 2026-11-19：产品变更申请表会签全过后进入「待批准」（admin 终审），同样属于审批在途状态。
+const IN_APPROVAL = ['审批中', '待二级审批', '待批准']
 
 // ---------- 二级审核人选取(2026-09-20 两级审批:一级通过时必须选人) ----------
 const l2PickVisible = ref(false)
@@ -8476,23 +8620,19 @@ async function confirmDomApprove() {
     domApvBusy.value = false
   }
 }
-/* ── 产品变更申请表：审批通过 + 签字/日期回填（2026-11-11 用户口径）───────────────
- * 用户原话：「审批的时候弹出弹窗，审批人可以进行批准，还有签字，把信息回填进这里面，还有日期，
- *   保存之后该单据可见内容，打印出来也是有数据的」。
- * 与立项申请「审批+定级」、测试申请单「审批+分发」同一范式：**专用弹窗**收集本次审批的额外输入，
- * 通过即在同一个 callButton 里提交；后端 ButtonService 的 RD_CHANGE 分支写进
- * rd_change_head 备用2/3/4（那三格 yj_field.editable=0，只有审批动作写得进去）。
- * 默认值：签字 = 当前登录人姓名，日期 = 今天 —— 审批人通常就是签自己名字、签当天。 */
+/* ── 产品变更申请表：审批通过 / 管理员最终批准（2026-11-11 建立，2026-11-19 改口径）──
+ * 2026-11-11 用户口径：「审批的时候弹出弹窗，审批人可以进行批准，还有签字，把信息回填进这里面，
+ *   还有日期」——那时弹窗可手填签字/日期。
+ * 2026-11-19 用户口径更新：「点批准时自动写入 admin 的姓名（系统管理员）+ 当天日期」⇒
+ *   弹窗只展示"将回填的姓名/日期"（不可改）+ 可填审批意见；服务端 writeChangeApprovalSign
+ *   也不再接受「批准签字/批准日期」载荷，三格只有服务端一个真源。
+ * 「待批准」节点只有 admin 能看到该按钮（见 approvalBtnsVisible / canFinalApprove）。 */
 const chgApvVisible = ref(false)
 const chgApvBusy = ref(false)
 const chgApvDocNo = ref('')
-const chgApvSign = ref('')
-const chgApvDate = ref('')
 const chgApvOpinion = ref('')
 function openChangeApprove(no) {
   chgApvDocNo.value = no || ''
-  chgApvSign.value = String(user?.realName || user?.userName || '').trim()
-  chgApvDate.value = todayStr()
   chgApvOpinion.value = ''
   chgApvVisible.value = true
 }
@@ -8504,14 +8644,12 @@ async function confirmChangeApprove() {
       panelCode: 'RD_CHANGE', buttonName: '审批通过',
       formData: {
         编号: chgApvDocNo.value,
-        // 空串不发：后端兜底为「审批人姓名 / 当天」，不会把格子覆盖成空
-        ...(chgApvSign.value ? { 批准签字: chgApvSign.value } : {}),
-        ...(chgApvDate.value ? { 批准日期: chgApvDate.value } : {}),
+        // 签字/日期由服务端固定写入，这里不再传（传了也会被忽略）
         ...(chgApvOpinion.value ? { 审批意见: chgApvOpinion.value } : {}),
       },
       buttonParam: {},
     })
-    ElMessage.success(tt('审批通过'))
+    ElMessage.success(tt(changeFinalStage.value ? '批准通过' : '审批通过'))
     chgApvVisible.value = false
     await load()
   } catch (e) {
@@ -10432,6 +10570,26 @@ function detailEditable(b) {
   return draftEditable.value && !!b && tabView(b, activeTab(b)) !== 'summary'
 }
 
+/**
+ * 明细「新增数据」闸门(2026-11-19 用户口径)。
+ *
+ * 需求原话:「送样登记表明细页签工具栏的绿色『+ 新增数据』按钮,其『新增』要能在
+ * 组织架构 → 角色与面板权限里去掉:取消该面板的『新增保存』(add 词)后,按钮应消失;
+ * 后端也不能靠直调接口绕过」。
+ *
+ * 判据 = 单据状态可编辑(**原有**) ∧ 当前角色在该面板持有 add 词(**新增**):
+ *   · 原实现两个分支都只看 detailEditable(草稿/修改中即可加行),与 yj_role_panel.perms 无关;
+ *   · 现在走 canPanelDo(user, panelCode, 'add') —— 与后端权威闸门
+ *     ButtonService.saveArchive(新增行校验 add)同一份 yj_role_panel.perms,显示层不再自成一派。
+ * 只作用于**加行**:保存/删除/行内编辑一律不经过这里(它们的词表见后端 BUTTON_PERMS)。
+ */
+const canAddRowsHere = computed(() => canPanelDo(user, panelCode.value, 'add'))
+
+/** 本明细区块此刻能否加行(= detailEditable ∧ 面板 add 词);绿色「新增数据」与加行函数共用 */
+function canAddDetailRow(b) {
+  return detailEditable(b) && canAddRowsHere.value
+}
+
 function detailRefTrigger(field) {
   return field?.refTrigger || field?.trigger || 'click'
 }
@@ -10527,7 +10685,9 @@ function newDetailRow(tabKey) {
 }
 
 function addInlineDetailRow(b) {
-  if (!detailEditable(b)) return
+  // 加行闸门(2026-11-19):不只隐藏按钮,函数自身也拦 —— 占位行点击/下拉命令等其它入口
+  // 都汇到这里;判据见 canAddDetailRow(面板「新增保存」add 词)。
+  if (!canAddDetailRow(b)) return
   const tabKey = activeTab(b).key
   if (!cur.value.detail) cur.value.detail = {}
   const rows = cur.value.detail[tabKey] || (cur.value.detail[tabKey] = [])
@@ -10577,8 +10737,11 @@ function canImportProducts(b) {
   return !!b && PRODUCT_IMPORT_PANELS.has(panelCode.value) && detailEditable(b)
 }
 
-/** 「新增数据」下拉的命令分发:加一行 / 打开商品导入弹窗 */
+/** 「新增数据」下拉的命令分发:加一行 / 打开商品导入弹窗(两个命令都属"加行",同一 add 词闸门) */
 function onAddDetailCommand(cmd, b) {
+  // 2026-11-19:下拉在模板层已由 canAddDetailRow 控制显隐,这里再挡一次 ——
+  // 命令分发是"加行"的唯一入口(含「导入商品数据」批量追加行),不能只靠按钮 v-if。
+  if (!canAddDetailRow(b)) return
   if (cmd === 'importProduct') {
     if (!canImportProducts(b)) return
     productImpBlockId.value = b.id
@@ -11265,7 +11428,8 @@ function validateInlineDraft() {
         cur.value[key] = todayStr()
         continue
       }
-      if (key === '单据编号' || key === '规格书种类') continue
+      // 2026-11-23：申请立项人由系统写入（新增带当前人、提交审批按提交人回写），不拦必填
+      if (key === '单据编号' || key === '规格书种类' || key === '申请立项人') continue
       missing.push({ key, text: headerFieldLabel(field) + '不能为空' })
     }
   }
@@ -11320,8 +11484,8 @@ function validateInlineDraft() {
  *   用户一眼能看懂「审核前得先把这单存下来,缺的是明细行」。
  */
 async function saveInlineDraft(buttonName = '保存', { silent = false, skipValidation = false, reason = '' } = {}) {
-  // changeDeptFillOpen：已生效后由会签人填本部门行，也要能走保存（服务端只写明细）
-  if ((!draftEditable.value && !changeDeptFillOpen.value) || inlineSaving.value) return false
+  // changeRowEditOpen：会签中 / 已生效后由会签人填本部门行，也要能走保存（服务端只写明细）
+  if ((!draftEditable.value && !changeRowEditOpen.value) || inlineSaving.value) return false
   // 归档单据「修改单据」后的保存 = 保存修改(2026-11-06 用户口径「修改完成点击保存回到归档状态」):
   //   后端 saveDirectModify 落库后立刻做 修改记录 diff 收尾并把状态拨回 已归档 —— 不能走普通「保存」,
   //   那样只会停在 修改中。
@@ -11342,7 +11506,9 @@ async function saveInlineDraft(buttonName = '保存', { silent = false, skipVali
   //   参数早就声明了、调用方也传了(「保存为草稿」传 true),但函数体里**从来没读过它** ——
   //   于是草稿路径照样跑全量必填校验 ⇒ "保存为草稿"做不到"存一半"。
   //   用户口径:保存为草稿不做必填限制;保存/提交才做。
-  const validation = skipValidation ? '' : validateInlineDraft()
+  // 会签中填本部门意见：表头/其他行都不落库，也不该被"提交级"必填挡（历史单据可能本来就有漏填）。
+  const narrowDeptFill = changeSignoffFillOpen.value && !draftEditable.value
+  const validation = (skipValidation || narrowDeptFill) ? '' : validateInlineDraft()
   if (validation) {
     // 2026-11-12 用户口径：未填完就提交审批时**弹窗提示一次**，并高亮未填写内容。
     // 高亮已由 validateInlineDraft 内部对每个缺失点调用 focusMissingFields 完成（翻页 + 闪烁）；
@@ -11966,15 +12132,18 @@ function isDisabled(action) {
     审批通过: !current.value || !IN_APPROVAL.includes(st)
       // 编制与审批分离:提交人不能点**一级**审批通过(后端必拒)。只管「审批中」这一档 ——
       // 「待二级审批」时如果被一级选成了二级审核人,本人签核是允许的(后端 approveSecond 只认 l2_approver)。
-      || (st === '审批中' && iAmCurSubmitter.value),
+      || (st === '审批中' && iAmCurSubmitter.value)
+      // 产品变更申请表「待批准」节点：只有 admin（按钮本身对非 admin 不渲染，这里再兜一道）。
+      || (changeFinalStage.value && user.isAdmin !== true),
     审批驳回: !current.value || !IN_APPROVAL.includes(st),
    驳回审批: !current.value || !IN_APPROVAL.includes(st),
     // 卡死单据出口(2026-09-11):撤回删除/修改申请仅在对应申请态可点
     撤回删除申请: !current.value || st !== '删除申请中',
     撤回修改申请: !current.value || st !== '修改申请中',
     // 2026-11-11：已生效/已归档时，会签人仍可「填本部门那一行」并保存（changeDeptFillOpen）
-    //   —— 只放「保存」这一个动作，保存为草稿/保存新增仍按原口径（草稿才有意义）。
-    保存: (!draftEditable.value && !changeDeptFillOpen.value) || inlineSaving.value,
+    // 2026-11-19：会签中同样放开（changeSignoffFillOpen）—— 只放「保存」这一个动作，
+    //   保存为草稿/保存新增仍按原口径（草稿才有意义）。
+    保存: (!draftEditable.value && !changeRowEditOpen.value) || inlineSaving.value,
     保存为草稿: !draftEditable.value || inlineSaving.value,
     保存新增: !draftEditable.value || inlineSaving.value,
     扫描填单: reportMode.value,
@@ -11983,6 +12152,9 @@ function isDisabled(action) {
     多仓库入库: !current.value || st !== '草稿' || !draftEditable.value || inlineSaving.value,
     // PANDA 工具栏动作(列表页语义)
     复制: !current.value,            // 整单复制=另存为一张新草稿
+    // 复制单据(2026-11-23,只有 4 张单据):只要有选中单就能点 —— **任何状态都可复制**
+    // (已归档正是主要场景),不按单据状态/是否可编辑置灰;真闸门在服务端(存在性 + 未作废 + 新增权限)。
+    复制单据: !current.value,
     放弃: false,                     // 丢弃内联草稿修改,恢复最近一次保存
     打印: false, 预览: false, 导出: false,
     发送邮件: false, 退出: false, 表格调整: false, 分类管理: false, 表头调整: false,
@@ -12050,6 +12222,10 @@ function disabledReason(action) {
     if (IN_APPROVAL.includes(st)) return tt('该单已提交审批：请用「审批通过」完成审批，不能再点「审核」')
     if (iAmDraftAuthor.value) return tt('本单由你填写：按「编制与审批分离」不能自己审核（未授「本人自审」），请用「提交审批」→「审批通过」由他人审批')
     return tt('单据状态') + '：' + stText + '，' + tt('仅草稿可审核')
+  }
+  // 产品变更申请表「待批准」：最终批准/驳回只有 admin
+  if (action === '审批通过' && changeFinalStage.value && user.isAdmin !== true) {
+    return tt('仅管理员可执行最终批准')
   }
   // 编制与审批分离:提交人自己点一级「审批通过」= 后端必拒(实测 403),这里把原因说在他点之前
   if (action === '审批通过' && st === '审批中' && iAmCurSubmitter.value) {
@@ -12822,6 +12998,34 @@ async function onButton(action) {
     }
     return
   }
+  // 复制单据(2026-11-23 用户口径):4 张单据各一颗侧栏按钮 —— 把**当前这张单**整单复制成新草稿。
+  //   与下面那颗通用的「复制」(PANDA 工具栏整单复制)不是同一件事,必须排在它之前分派:
+  //     · 服务端实现 ButtonService.copyDocToDraft:新单号按新规则取(绝不照搬源单号)、
+  //       签核/审批留痕 + 唯一键 + 附件列一律清空、只留可复用的业务内容;
+  //     · 复制出的新单 = **草稿**且已落库(saved='N'),不进审批;
+  //     · 成功后刷新列表并**定位到新单**(openDocByNo = load + 按单号找,找不到再用 _docNo 精确取一次),
+  //       用户不用自己去列表里翻。
+  if (action === '复制单据') {
+    if (!current.value) return ElMessage.warning(tt('请先选择一张单据'))
+    const srcNo = current.value['编号'] || current.value['单据编号'] || ''
+    if (!srcNo) return ElMessage.warning(tt('请先选择一张单据'))
+    try {
+      const res = await engine.callButton({
+        panelCode: panelCode.value, buttonName: '复制单据', formData: { 编号: srcNo }, buttonParam: {},
+      })
+      // ⚠ 与 directAdd 同一口径:200 + body code≠200 的错误体不会抛,必须自己认
+      if (res && typeof res === 'object' && res.code != null && res.code !== 200) {
+        throw new Error(res.message || ('复制失败（code=' + res.code + '）'))
+      }
+      const newNo = res && (res['编号'] || res.formNo)
+      if (!newNo) return ElMessage.error(tt('复制失败') + '：' + JSON.stringify(res).slice(0, 120))
+      ElMessage.success(tt('已复制为新草稿：') + newNo)
+      await openDocByNo(newNo)
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || tt('复制失败'))
+    }
+    return
+  }
   // 复制(列表页):整单复制为一张新草稿(表头+明细,去掉编号/状态/行 id)
   if (action === '复制') {
     if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
@@ -13258,7 +13462,7 @@ async function onButton(action) {
       if (action === '提交审批') {
         if (!['草稿', '修改中'].includes(current.value['单据状态'])) return ElMessage.warning('仅草稿或修改中状态可提交审批')
       } else if (!IN_APPROVAL.includes(current.value['单据状态'])) {
-        return ElMessage.warning('仅审批中或待二级审批状态可审批通过')
+        return ElMessage.warning('仅审批中、待二级审批或待批准状态可审批通过')
       }
       // 产品信息表一级节点(状态=审批中):走「选取二级审核人」弹窗(二级签核人由一级指定)
       // 外部开发样品申请单（2026-11-06）：同一套「一级选二级(确认)人」弹窗
@@ -13349,7 +13553,7 @@ async function onButton(action) {
       }
     } else if (action === '审批驳回') {
       if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
-      if (!IN_APPROVAL.includes(current.value['单据状态'])) return ElMessage.warning(tt('仅审批中或待二级审批状态可审批驳回'))
+      if (!IN_APPROVAL.includes(current.value['单据状态'])) return ElMessage.warning(tt('仅审批中、待二级审批或待批准状态可审批驳回'))
       const no = current.value['编号'] || current.value['单据编号'] || ''
       try {
         const { value } = await ElMessageBox.prompt(
@@ -13396,7 +13600,11 @@ async function onButton(action) {
     // (提交会签同此:需会签/会签人 是头字段,刚填的必须先生效,否则后端按库里的旧值判"没填会签人")
     // 2026-10-17 用户报障「未保存可以直接审核,出现错误」:保存没过必填校验时,提示必须**归因到这次审批动作**
     // (reason=action ⇒「审核前需先保存：请至少添加一行明细」),否则用户只看到一句与审核无关的校验错误。
-    if (['审核', '提交审批', '提交会签'].includes(action) && draftEditable.value) {
+    // 会签通过(2026-11-19):会签人刚在纸面填的本部门意见必须先落库，否则服务端盖章时读到的还是旧内容。
+    const needsSaveBefore = ['审核', '提交审批', '提交会签'].includes(action)
+      ? draftEditable.value
+      : (action === '会签通过' && (draftEditable.value || changeSignoffFillOpen.value))
+    if (needsSaveBefore) {
       const saved = await saveInlineDraft('保存', { silent: true, reason: action })
       if (!saved) return
     }
@@ -13539,7 +13747,12 @@ async function onScanApply(payload) {
   ElMessage.success('识别数据已填入草稿，请核对后保存')
 }
 
+/** 当前 list 属于哪个面板（load 成功时落账；切面板清空 list 时归零）。见 consumeFocusQuery 的时序闸门 */
+let loadedPanelCode = ''
+
 async function load(clamping = false) {
+  // 本次取数对应的面板码：响应回来时若已切走面板，不能把"新面板的 list 已就绪"记错
+  const loadCode = String(panelCode.value)
   delMode.value = false
   delSel.value = []
   archPage.value = 1 // 档案分页随每次载入回到首页
@@ -13570,7 +13783,7 @@ async function load(clamping = false) {
   loading.value = true
   try {
     loadReportTemplates() // 服务端报表入口(该面板有模板才显示;不阻塞列表)
-    const params = { panelCode: panelCode.value, condition: { ...condition }, pageNo: query.pageNo, pageSize: query.pageSize }
+    const params = { panelCode: loadCode, condition: { ...condition }, pageNo: query.pageNo, pageSize: query.pageSize }
     // 供应商门户(2026-10-25):供应商账号看采购订单时,取数**强制**带本供应商编码。
     // 服务端 QueryService 把它解析成 `供应商编码 LIKE 值` 并 AND 进 WHERE(与「查询」弹窗里
     // 选供应商同一口径),页面版式/交互与采购订单面板完全一致,只有数据范围不同。
@@ -13609,6 +13822,9 @@ async function load(clamping = false) {
     reportSums.value = reportMode.value && res && res.sums && typeof res.sums === 'object' ? res.sums : null
     list.value = res.list || []
     total.value = res.totalSize || 0
+    // focus 消费的时序闸门：只有"当前 list 确实属于当前面板"时才让 watch 抢跑消费；
+    // 切面板的深链继续由 panelCode watcher 那趟 load() 消费（详见 consumeFocusQuery 注释）
+    if (String(panelCode.value) === loadCode) loadedPanelCode = loadCode
     // 档案「改动行提交」基线:载入即快照,保存只发改动行(见 archiveBaseline 注释)
     snapshotArchiveBaseline()
     // 页码越界自愈(末页删单/换每页条数/筛选后页码残留):回落到最后一页重取,避免空白页与页码错乱
@@ -13626,7 +13842,9 @@ async function load(clamping = false) {
     //   用户以为单子丢了。只回退一次（第二趟 railStatusTab 已是 all，不会来回跳）。
     const focus = route.query.focus
     if (focus) {
-      const fi = list.value.findIndex((r) => (r['编号'] || r['单据编号'] || r['锭号']) === String(focus))
+      // 单号键序统一走 core/panel/docFocus（编号 → 单据编号 → 锭号），
+      // 与「预览点跳转」的 focus 消费同一套，避免两处各写一份慢慢漂移。
+      const fi = findDocIndex(list.value, String(focus))
       if (fi < 0 && railStatusTabs.value.length && railStatusTab.value !== 'all') {
         railStatusTab.value = 'all'
         query.pageNo = 1
@@ -13798,6 +14016,9 @@ watch(
     // 拆除顺序(2026-09-28):先清行、再清配置 —— 若在仍挂着旧行数据时清 gridTabs,
     // el-table 每删一列都会对全部行重渲染一次(O(列×行),宽表拆除的主长帧来源之一)。
     list.value = []
+    // list 已经不属于这个面板了：focus watcher 的闸门先关掉，深链交给下面这趟 load() 消费
+    // （否则它会抢在"清空之后、重载之前"用旧/空列表消费掉 ?focus=，目标单据就丢了）
+    loadedPanelCode = ''
     total.value = 0
     reportSums.value = null // 整段合计属于上一个面板的查询条件,切面板先清掉(防串味)
     cfgCache.value = null
@@ -13845,7 +14066,7 @@ watch(
     // 找不回就等于还是丢了),取完再把未保存的填写放回那一行。
     const draft = tabDraftStash.get(String(panelCode.value))
     if (draft && draft.pageNo) query.pageNo = draft.pageNo
-    if (applyDocNoQuery()) await load()
+    if (applyDocNoQuery()) await loadDocNoTarget()
     else if (draft) { curIdx.value = 0; await load() }
     else search()
     // 期间又切了面板就别放回了(否则会把上一个面板的行按到当前面板的列表上)
@@ -13864,12 +14085,84 @@ function applyDocNoQuery() {
   router.replace({ path: route.path, query: { ...route.query, docNo: undefined } })
   return true
 }
+/**
+ * 消费 `?docNo=单号` 的定向取数（2026-11-20：样品进度页报障的兜底）。
+ *
+ * <p>docNo 是「按单号打开一张单」的深链（列表先按 `_docNo` 过滤再显示那张单，不受分页/页签影响）。
+ * 但目标如果在当前账号的可见范围外（别人的单 / 已作废 / 不存在 / 前后端版本不一致），
+ * 过滤结果就是 0 行 —— 旧写法会停在一个 0/0 的空白列表页，用户看到的仍然不是所点的那张单。
+ * 这里明确提示并恢复列表，**绝不**静默留在空白页或别的单上。</p>
+ */
+async function loadDocNoTarget() {
+  const no = String(condition['_docNo'] || '').trim()
+  await load()
+  if (!shouldRestoreAfterDocNo(no, list.value)) return
+  delete condition['_docNo']
+  docQueryNo.value = ''
+  ElMessage.warning(tt('未找到该单据（可能已作废或没有查看权限）'))
+  await load()
+}
 // 同一面板内跳另一张单据(panelCode 不变,上面的 watcher 不触发)
 watch(
   () => route.query.docNo,
   (v) => {
     if (!v || Date.now() - lastDocJumpAt < 400) return
-    if (applyDocNoQuery()) load()
+    if (applyDocNoQuery()) loadDocNoTarget()
+  }
+)
+
+/**
+ * 消费 URL 上的 `?focus=单号`（2026-11-20 用户报障：「立项查询」里点跳转回到第一张草稿）。
+ *
+ * <p>时序（报障根因）：预览浮层里点行/「跳转」→ jumpToApprovalDoc 先
+ * {@link closeApprovalPreview}（还原 pageSize 并 load 一次），再 `router.push` 到**同一 path**
+ * 只改 query —— 组件不重挂、panelCode 不变，load **不会再跑**，于是 load() 里那段 focus 定位
+ * 永远轮不到，curIdx 停在 0，看起来就是"回到第一张草稿"。所以同 path 的 focus 必须由
+ * 这条 watch 消费（外部带 ?focus= 进来的深链仍走 load()，两条入口共用同一套键序/定位）。</p>
+ *
+ * <p>定位顺序：① 当前 list 里按 编号/单据编号/锭号 找，命中就 curIdx=下标（不再取数）；
+ * ② 没命中（关闭浮层已把 pageSize 从 200 还原、目标落在后面的页 / 被页签挡住 / keep-alive
+ * 复用的旧列表）⇒ 按 jumpToApprovalDoc 记下的预览下标换算页码、必要时切「全部」页签，
+ * 然后 **load() 一次**（load 里的 focus 段会再定位一次并摘 query）；③ 最后 replace 摘掉 focus，
+ * 避免后退回来又跳一次。整段最多一次 load，route.query.focus 被清后本 watch 不再触发 ⇒ 幂等。</p>
+ *
+ * <p>与切面板深链不打架：panelCode watcher 会先清空 list（并把 loadedPanelCode 归零），
+ * 那条深链由它自己那趟 load() 消费；这里用 loadedPanelCode 闸门主动让路，不抢跑、不白 load。</p>
+ */
+let focusConsuming = false
+async function consumeFocusQuery(no) {
+  const key = String(no || '').trim()
+  if (!key || focusConsuming) return
+  focusConsuming = true
+  try {
+    let fi = findDocIndex(list.value, key)
+    if (fi < 0) {
+      // 目标不在当前 list：被「未完成/已完成」页签挡住时就回退「全部」（与 load() 的深链口径一致）
+      if (railStatusTabs.value.length && railStatusTab.value !== 'all') railStatusTab.value = 'all'
+      // 预览列表是 pageSize=200 一页取全，关闭浮层后分页已还原 ⇒ 用记下的下标换算目标页码；
+      // no 对不上（期间跳了别的单）或没有提示时回第 1 页，绝不把两张单的定位串在一起。
+      const page = pageOfPreviewIndex(previewFocusHint.no === key ? previewFocusHint.index : -1, query.pageSize)
+      if (page !== query.pageNo) query.pageNo = page
+      await load()
+      fi = findDocIndex(list.value, key)
+    }
+    if (fi >= 0) curIdx.value = fi
+    // 定位结束就摘掉 focus（不论是否命中）：否则后退/刷新回来会再跳一次，且 URL 长期留脏参数。
+    // load() 里若有消费会先 replace 一次，这里用 route.query.focus 判空避免重复导航。
+    if (route.query.focus) router.replace({ path: route.path, query: { ...route.query, focus: undefined } })
+  } finally {
+    previewFocusHint = { no: '', index: -1 }
+    focusConsuming = false
+  }
+}
+watch(
+  () => route.query.focus,
+  (v) => {
+    if (!v) return
+    // 切面板的深链由 panelCode watcher 的 load() 消费（它已把 list 清空并归零 loadedPanelCode）；
+    // 这里抢跑只会在旧/空列表上白找一趟，所以让路。
+    if (loadedPanelCode !== String(panelCode.value)) return
+    consumeFocusQuery(v)
   }
 )
 
@@ -13931,9 +14224,9 @@ onMounted(() => {
   }
   // 本实例是当前前台页签(keep-alive 下 onActivated 也会置一次;这里兜住"不在 keep-alive 里"的场景)
   instanceActive.value = true
-  // 从「我的桌面 · 产品开发」矩阵跳转:带 ?docNo= 直接定位到该单据
-  applyDocNoQuery()
-  load()
+  // 从「我的桌面 · 产品开发」矩阵/样品进度页跳转:带 ?docNo= 直接定位到该单据
+  if (applyDocNoQuery()) loadDocNoTarget()
+  else load()
   // 把"未保存状态 + 保存/放弃"登记给页签栏:× 关闭时由它弹三态问句
   // (2026-10-16 用户口径「叉掉时还应该弹窗提示是否保存」;守卫只覆盖"导航离开",覆盖不到点 × 关后台页签)
   unsavedGuard.register(route.path, {
@@ -14237,7 +14530,8 @@ onUnmounted(() => {
   background: #fff7ed;
 }
 .doc-status.生产中,
-.doc-status.审批中 {
+.doc-status.审批中,
+.doc-status.待批准 {
   color: #2f4d75;
   border: 1px solid #bcd2f5;
   background: #f0f6ff;
@@ -14804,6 +15098,158 @@ onUnmounted(() => {
 }
 .as-side-menu-item:hover {
   background: #f2f6fa;
+}
+
+/**
+ * 研发管理（RD_*）侧边栏的**设计库口径**样式（2026-11-23 用户口径：
+ *   「我觉得这个研发管理的侧边栏样式不好看，尝试使用设计库进行优化一下」）。
+ *
+ * 取值全部来自 antd 设计库 token（`kit.mjs token`，light 模式）：
+ *   colorBorder #d9d9d9 / colorBorderSecondary #f0f0f0 / colorText rgba(0,0,0,.88)
+ *   colorTextSecondary rgba(0,0,0,.65) / colorTextTertiary rgba(0,0,0,.45)
+ *   colorBgContainer #fff / colorPrimary #1677ff / colorError #ff4d4f
+ *   controlHeight 32 / borderRadius 6 / colorFillTertiary rgba(0,0,0,.04)
+ *
+ * 设计口径（与 DESIGN-GUIDE 对齐）：8pt 间距、控件高 32、圆角 6、正文 13/20；
+ *   卡片 0 层用边框不用重阴影；分组标题弱化为 12px 三级文字 + 8px 上间距；
+ *   区段之间用一条 colorBorderSecondary 细线分隔，不再用虚线段落。
+ * 范围：只作用于 .approval-side.is-rd —— 其它模块（品质/供应链/WMS）观感保持不变。
+ */
+.approval-side.is-rd {
+  width: 184px;
+  border-color: #d9d9d9;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+.approval-side.is-rd .as-side-btns {
+  gap: 8px;
+  padding: 12px;
+}
+/* 分组标题：12px 三级灰 + 上下留白，替代原来的 11px 字距 2px 虚线 */
+.approval-side.is-rd .as-side-section {
+  font-size: 12px;
+  line-height: 20px;
+  letter-spacing: 0;
+  color: rgba(0, 0, 0, 0.45);
+  padding: 8px 0 4px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.approval-side.is-rd .as-side-section:first-child { padding-top: 0; }
+/* 常规按钮：32px 高、6px 圆角、1px 边框 */
+.approval-side.is-rd .as-side-btn {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fff;
+  color: rgba(0, 0, 0, 0.88);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1;
+}
+.approval-side.is-rd .as-side-btn:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+  background: #fff;
+}
+/* 主按钮：设计库主色实心（原来是自定义深蓝 #3d5a80） */
+.approval-side.is-rd .as-side-btn.primary {
+  background: #1677ff;
+  border-color: #1677ff;
+  color: #fff;
+  font-weight: 500;
+}
+.approval-side.is-rd .as-side-btn.primary:hover {
+  background: #4096ff;
+  border-color: #4096ff;
+  color: #fff;
+}
+/* 次级动作（下拉项）：无边框、悬停浅灰底 */
+.approval-side.is-rd .as-side-btn.sub {
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 13px;
+  font-weight: 400;
+}
+.approval-side.is-rd .as-side-btn.sub:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: rgba(0, 0, 0, 0.88);
+}
+/* 置灰：统一到设计库的禁用观感 */
+.approval-side.is-rd .as-side-btn.disabled,
+.approval-side.is-rd .as-side-btn.disabled:hover {
+  color: rgba(0, 0, 0, 0.25);
+  border-color: #d9d9d9;
+  background: rgba(0, 0, 0, 0.04);
+  cursor: not-allowed;
+}
+.approval-side.is-rd .as-side-btn.primary.disabled,
+.approval-side.is-rd .as-side-btn.primary.disabled:hover {
+  color: rgba(0, 0, 0, 0.25);
+  border-color: #d9d9d9;
+  background: rgba(0, 0, 0, 0.04);
+}
+/* 危险操作：设计库 error 色系（原来是暗红 #a85c5c） */
+.approval-side.is-rd .as-side-del.danger .as-side-btn {
+  color: #ff4d4f;
+  border-color: #ffccc7;
+}
+.approval-side.is-rd .as-side-del.danger .as-side-btn:hover {
+  color: #ff7875;
+  border-color: #ff4d4f;
+  background: #fff2f0;
+}
+.approval-side.is-rd .as-side-del.danger .as-side-caret {
+  color: #ff4d4f;
+  border-color: #ffccc7;
+  box-shadow: none;
+}
+/* 下拉箭头按钮与弹出菜单 */
+.approval-side.is-rd .as-side-caret {
+  border-color: #d9d9d9;
+  border-radius: 6px;
+  box-shadow: none;
+  color: rgba(0, 0, 0, 0.65);
+}
+.approval-side.is-rd .as-side-caret:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+  background: #fff;
+}
+.approval-side.is-rd .as-side-menu {
+  border-color: #f0f0f0;
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  padding: 4px;
+}
+.approval-side.is-rd .as-side-menu-item {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.88);
+  border-radius: 4px;
+  padding: 6px 10px;
+}
+.approval-side.is-rd .as-side-menu-item:hover { background: rgba(0, 0, 0, 0.04); }
+.approval-side.is-rd .as-side-menu-item.danger { color: #ff4d4f; }
+.approval-side.is-rd .as-side-menu-item.danger:hover { background: #fff2f0; }
+/* 步骤徽标 / 提示条：统一到 6px 圆角与设计库灰阶 */
+.approval-side.is-rd .as-side-step {
+  background: rgba(0, 0, 0, 0.04);
+  color: rgba(0, 0, 0, 0.65);
+  border-radius: 4px;
+}
+.approval-side.is-rd .as-side-hint {
+  border-left: 3px solid #1677ff;
+  background: #f5f9ff;
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 12px;
+  line-height: 18px;
+  border-radius: 0 6px 6px 0;
 }
 
 /* ═══════ ② 表头字段区（label 在上、输入在下）═══════ */

@@ -490,6 +490,9 @@ export default {
     '查看单据': 'Open document',
     '编号已复制': 'Document no. copied',
     '复制失败': 'Copy failed',
+    // ---- 单据复制(2026-11-23:4 张单据把当前单复制成一张新草稿)----
+    '复制单据': 'Copy document',
+    '已复制为新草稿：': 'Copied as a new draft: ',
     '单据编号': 'Document no.',
     '编号': 'No.',
     '来源': 'Source',
@@ -2325,6 +2328,7 @@ export default {
     /* ── 功能性滤效:字段编辑 ── */
     '可改列名(别名)与显隐,全用户共享': 'Rename columns (alias) and toggle visibility; shared by all users',
     '不勾选=该列不显示/不导出': 'Unchecked = the column is hidden and not exported',
+    '动态样品列随「样品数」增删，不可隐藏': 'Dynamic sample columns follow Sample Count and cannot be hidden',
     '留空=沿用原名;修改全局生效(所有用户共享)': 'Leave blank to keep the original name; changes apply globally (shared by all users)',
     '字段编辑已保存': 'Column settings saved',
     '点击排序：升序 → 降序 → 取消': 'Click to sort: ascending → descending → clear',
@@ -3972,6 +3976,17 @@ export default {
     '驳回意见（必填）': 'Rejection reason (required)',
     '会签驳回必须填写意见': 'A rejection reason is required',
     '会签中': 'In sign-off',
+    '待批准': 'Pending Final Approval',
+    '会签人可在「三、部门评审意见」填写本部门那一行，保存后再点「会签通过」': 'Signers can fill in their own department row under "III. Department Review Comments", save it, then click "Approve Sign-off"',
+    '本单会签已全部通过，等待管理员批准': 'All sign-offs are complete; awaiting administrator approval',
+    '仅管理员可执行最终批准': 'Only the administrator can perform final approval',
+    '批准后系统自动写入当前登录人的姓名与当天日期，并回填到纸面「批准 / 签字 / 日期」三格，保存与打印都可见。': 'On approval the system automatically fills the current user name and today\'s date into the "Approved by / Signature / Date" cells; both the on-screen sheet and the printout show them.',
+    '（系统自动写入）': '(auto-filled)',
+    '（当天）': '(today)',
+    '批准（产品变更申请单）': 'Final Approval (Product Change Request)',
+    '确认批准': 'Confirm Approval',
+    '审批通过（签字）': 'Approve (signature)',
+    '仅审批中、待二级审批或待批准状态可审批驳回': 'Rejection is only allowed while Pending Approval, Pending 2nd-level Approval, or Pending Final Approval',
     '已生效': 'Effective',
     '变更来源单号': 'Change Source No.',
     '非本部门栏目（只读）': 'Not your department (read-only)',
@@ -5441,6 +5456,21 @@ export default {
     '没有符合条件的供应商': 'No matching suppliers',
     '请选择一个供应商': 'Please select a supplier',
     '加载供应商档案失败': 'Failed to load supplier master',
+    /* ── 研发管理·自制料（2026-11-19）── */
+    '自制料': 'In-house material',
+    '制程记录录入': 'Process record entry',
+    '制程记录查询': 'Process record query',
+    '自制功能料制程记录查询': 'In-house functional material process records',
+    '材料名（支持片段）': 'Material (partial match)',
+    '批次起止': 'Batch range',
+    '没有自制料面板的查看权限': 'No permission to view in-house material records',
+    '没有符合条件的记录': 'No matching records',
+    '二维码': 'QR code',
+    '子批次最多 10 个': 'At most 10 sub-batches',
+    '材料与批次': 'Material and batch',
+    '子批次明细': 'Sub-batch details',
+    '银嘉自制功能材料制程记录': 'YINJIA in-house functional material process record',
+    '仅记录文件名，原文件未入库': 'Only the file name was recorded; the original file is not in the system',
     /* ── 研发管理·样品 → 手填客户（建档打标记）2026-11-18 ── */
     '删除后需要重新填写。': 'It will need to be filled in again.',
 
@@ -5458,6 +5488,8 @@ export default {
     '新增客户': 'New customer',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
     '样品进度跟踪': 'Sample Progress',
+    /* ── 2026-11-20：按单号打开不到（已作废/无权限）时的兜底提示 ── */
+    '未找到该单据（可能已作废或没有查看权限）': 'Document not found (it may be voided or outside your permission scope)',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
     '按外部开发样品单看进展：谁提交、审到第几级、谁在等确认，一屏看完': 'Follow each external development sample request: who submitted it, which approval level it is waiting on, and who needs to act',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
@@ -5473,7 +5505,7 @@ export default {
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
     '等确认人签核': 'Waiting for confirmer',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
-    '已审核归档': 'Reviewed and archived',
+    '审批已通过（已审核/已归档）': 'Approved (audited/archived)',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
     '样品单清单': 'Sample requests',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
@@ -5488,6 +5520,14 @@ export default {
     '没有查看样品进度数据的权限（需要「外部-开发样品」的查看权）': 'No permission to view sample progress (requires view access to "External - Development Sample")',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
     '输入样品单编号 / 客户名称 / 审核人 / 进度描述（支持片段）': 'Search by request no. / customer / reviewer / progress note (partial match)',
+    /* ── 研发管理·样品 → 样品进度跟踪双外部面板(2026-11-20 新增) ── */
+    '外部-开发样品单': 'External - Development Sample Request',
+    '外部-非开发样品单': 'External - Non-Development Sample Request',
+    '按外部非开发样品单看进展：谁提交、谁审核，一屏看完（本单只有一级审批）': 'Follow each external non-development sample request: who submitted it and who reviews it (single-level approval)',
+    '没有查看样品进度数据的权限（需要「外部-非开发样品」的查看权）': 'No permission to view sample progress (requires view access to "External - Non-Development Sample")',
+    '暂无样品单；在「外部-非开发样品」新增后会出现在这里': 'No sample requests yet. They appear here once created under "External - Non-Development Sample"',
+    '本单只有一级审批': 'This document uses single-level approval',
+    '没有查看该面板的权限': 'No permission to view that panel',
     /* ── 研发管理·项目管理 → 产品文件流程管控 /rd/productFlow(2026-11-11 新增) ── */
     '产品文件流程管控': 'Product File Flow Control',
     '按产品看这份开发包走到哪一步：产品信息表 + 4 张受控文件，哪一步还没建单、哪一步卡在开发中':
@@ -6493,6 +6533,9 @@ export default {
     // ---- 样品检验:送样登记表 / 检验委托单(SAMPLE_REG / INSP_COMMISSION,2026-11-15)----
     "样品检验": "Sample Inspection",
     "送样登记表": "Sample Submission Register",
+    // 2026-11-19 用户口径:SAMPLE_REG 明细页签标题「送样登记表明细」→「内部检测目录」
+    // (yj_panel.config 的 detailTabLabel;后端下发中文数据键,显示层由 tt() 翻译 —— ADR-0001)
+    "内部检测目录": "Internal Test Catalog",
     "检验委托单": "Inspection Commission Order",
     // ---- 样品检验:检验委托单纸面 + 送样登记表选择弹窗(InspCommissionSheet / SampleCatalogPickDialog,2026-11-15)----
     "水家电综合检测中心": "Water Appliance Comprehensive Testing Center",
@@ -6749,6 +6792,21 @@ export default {
     '人': 'people',
     '单': 'orders',
     '项': 'items',
+
+    // ---- 测试申请汇总表(2026-11-19:按申请人汇总内部委托/销售端两张测试申请表 + 点单号跳转)----
+    // 数据源 = 测试申请单 RD_DOM_TEST 的两个页签;列序见 TestApplySummary.vue 的 SUMMARY_COLUMNS。
+    '测试申请汇总表': 'Test Application Summary',
+    '按申请人': 'By applicant',
+    '按单据': 'By document',
+    '申请人数': 'Applicants',
+    '申请单据数': 'Applications',
+    '申请类型': 'Application type',
+    '面板码': 'Panel code',
+    '最近申请日期': 'Last application date',
+    '该申请人的测试申请单': "This applicant's test applications",
+    '该单的检测项目明细': 'Test item details of this document',
+    '当前时间范围内没有测试申请单': 'No test applications in this date range',
+    '统计口径：测试申请单的「单据日期」；内部委托与销售端两个页签合并统计；默认不含已作废/已中止的单；本面板暂无金额字段，收费合计按 0.00 显示': 'Basis: the test application "Doc date"; the internal-commission and sales tabs are merged; void or stopped documents are excluded by default; this panel has no amount field yet, so Total fee shows 0.00',
 
   },
 

@@ -9,7 +9,10 @@
          公司名格 | 编号格的**分列照设计原表**:功能性滤效 B2:J2 公司名(9 列)+ K2:L2 编号(2 列),
          列宽(pt,见设计 dump 的 B..L:26.25/13.63/11.25/14.5/12.63/13.63/14.38/15.63/17 | 18.13/20)
          ⇒ 公司名格 138.9 : 编号格 38.13 = 78.46% : 21.54%(原来写死 300px ≈ 25.4%,竖线偏右)。
-         编号格里是**裸编号**("YJ-PD-01",无「编号：」前缀),与设计原值一致 ⇒ 不加前缀标识。 -->
+         编号格（2026-11-20 用户口径「所有数据记录表右上角加一个项目编号前缀，现在只是直接引用编号
+         但是没有前缀标识」）：前缀「项目编号：」只是**展示标签**（12px/#595959/#margin-right 2px，
+         与 RecordSheetPanels 的 .rs-docno-pre 同款），不进 head、不改取数/保存/打印逻辑。
+         上一轮漏了这张，因为它是**手写纸面**、没走 RecordSheetPanels 的模板。 -->
     <table class="rs-t rs-head-t">
       <colgroup><col style="width:78.46%" /><col style="width:21.54%" /></colgroup>
       <tbody>
@@ -19,15 +22,24 @@
             <!-- 文档编号:配置为参照时(数据记录表→立项申请右上角编号)点击弹参照;否则保持纯输入。
                  2026-10-29 用户口径「选择编号的弹窗改为左右两边,左边还是立项申请的项目编号关联,
                  右边加入测试申请单的单据编号」⇒ 数据记录表这格走**左右双源**弹窗。 -->
-            <div v-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openDocNoPick">
-              <span class="rs-ref-text">{{ head['文档编号'] || tt('点击选择') }}</span>
-              <el-icon class="rs-ref-ico"><Search /></el-icon>
+            <!-- 2026-11-20 用户报障「『项目编号：』和编号叠成了上下两行」：前缀是行内 span、
+                 值/参照框是块级 div，原样排就是两行。这里把两者收进一层**单行弹性行**
+                 .rs-docno-line--pre（与 RecordSheetPanels 同一套 class/规则，两处口径不许漂）：
+                 同一行、右对齐、不换行；值过长时朝**左**溢出到公司名右侧的留白，不截断、不省略。 -->
+            <div class="rs-docno-line rs-docno-line--pre">
+              <!-- 2026-11-20 用户口径：前缀是**展示标签**，与其它 7 张数据记录表同款；
+                   打印态照常显示（不要加 .no-print、也不要进 @media print 的隐藏名单）。 -->
+              <span class="rs-docno-pre">{{ tt('项目编号') }}：</span>
+              <div v-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openDocNoPick">
+                <span class="rs-ref-text">{{ head['文档编号'] || tt('点击选择') }}</span>
+                <el-icon class="rs-ref-ico"><Search /></el-icon>
+              </div>
+              <el-input v-else-if="editable" v-model="head['文档编号']" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt('请输入编号')" @input="emit('dirty')" />
+              <!-- 只读兜底:原先写死 'YJ-PD-01'(设计纸面样板号)—— 在线看一张**还没发号**的单时
+                   屏幕上印出假编号,容易被当成"这张单的编号就是它"(2026-10-28 用户口径)。
+                   取不到号就显示「—」,不再编造。 -->
+              <span v-else class="rs-docno-text">{{ head['文档编号'] || head['单据编号'] || '—' }}</span>
             </div>
-            <el-input v-else-if="editable" v-model="head['文档编号']" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt('请输入编号')" @input="emit('dirty')" />
-            <!-- 只读兜底:原先写死 'YJ-PD-01'(设计纸面样板号)—— 在线看一张**还没发号**的单时
-                 屏幕上印出假编号,容易被当成"这张单的编号就是它"(2026-10-28 用户口径)。
-                 取不到号就显示「—」,不再编造。 -->
-            <span v-else class="rs-docno-text">{{ head['文档编号'] || head['单据编号'] || '—' }}</span>
           </td>
         </tr>
         <tr>
@@ -369,7 +381,8 @@
             clearable
             class="fe-alias"
           />
-          <el-checkbox :model-value="row.visible" @update:model-value="(v) => { row.visible = v }" class="fe-vis" :title="tt('不勾选=该列不显示/不导出')" />
+          <!-- 动态样品列(样品N)的显隐开关禁用:列数只跟「样品数」走,不许被字段编辑隐藏 -->
+          <el-checkbox :model-value="row.visible" :disabled="row.dynamic" @update:model-value="(v) => { row.visible = v }" class="fe-vis" :title="row.dynamic ? tt('动态样品列随「样品数」增删，不可隐藏') : tt('不勾选=该列不显示/不导出')" />
         </div>
       </div>
       <div style="margin-top:8px;color:#909399;font-size:12px">{{ tt('留空=沿用原名;修改全局生效(所有用户共享)') }}</div>
@@ -389,11 +402,11 @@ import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import RefPickDialog from './RefPickDialog.vue'
 import DocNoPickDialog from './DocNoPickDialog.vue'
-import { buildColumnPrefsPayload, isColumnHidden, resolveColumnLabel } from '@core/sheet/columnPrefs'
+import { buildColumnPrefsPayload, isColumnHiddenFor, resolveColumnLabel } from '@core/sheet/columnPrefs'
 import { pickExtFields } from '@core/panel/extCols.js'
 // 按样品铺开的字段名单(样品信息/测试装置及编号/样品配方 + 明细三组)—— 减列清空走它,
 // 漏登记一处就只在"减列"时才暴露(2026-09-30 样品配方即因此漏掉),故集中成单一真源
-import { clearSampleColumn } from '@core/sheet/sampleCols'
+import { clearSampleColumn, isDynamicSampleKey, sampleDetailKeys, SAMPLE_SHEET_GROUPS } from '@core/sheet/sampleCols'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -523,15 +536,14 @@ const extColW = (e) => Math.max(64, Math.round((Number(e.w) || 120) * dtScale.va
 /** 样品组列宽:组总宽÷当前列数(再乘压缩系数;下限防过窄) */
 const pressColW = computed(() => Math.max(34, Math.floor((220 * dtScale.value) / sampleCount.value)))
 const outColW = computed(() => Math.max(30, Math.floor((192 * dtScale.value) / sampleCount.value)))
-/** 某样品组的物理列键(1..样品数) */
+/** 某样品组的物理列键(1..样品数);列数恒等于样品数,见 sampleCols.sampleDetailKeys */
 function sampleKeys(prefix) {
-  return Array.from({ length: sampleCount.value }, (_, i) => `${prefix}${i + 1}`)
+  return sampleDetailKeys(prefix, sampleCount.value)
 }
-const DT_GROUPS = {
-  压力: { label: '取样前样品：压力（PSI)/流速（L/min）', prefix: '压力（PSI)样品' },
-  出水: { label: '出水含量（ug/L）', prefix: '出水含量（ug/L）样品' },
-  去除率: { label: '去除率%', prefix: '去除率%样品' },
-}
+/** 组名 → 字段前缀(与 sampleCols.SAMPLE_SHEET_GROUPS 同源;分组标题仍走 i18n) */
+const DT_GROUPS = Object.fromEntries(
+  SAMPLE_SHEET_GROUPS.map((g) => [g.name, { label: g.label, prefix: g.prefix }]),
+)
 /** 数据记录表全部物理列(键=数据键,label=纸面默认表头;样品列到 6,字段编辑可管全部) */
 const DT_COLUMNS = (() => {
   const cols = [
@@ -561,7 +573,9 @@ function dtFieldOf(key) {
   return fieldMap.value.get(key)
 }
 function dtHidden(key) {
-  return isColumnHidden(dtFieldOf(key))
+  // 动态样品列(压力/流速/出水/去除率 样品N)恒显示:必须随样品数增删,
+  // 不受 yj_field.visible / 角色字段视图的隐藏偏好影响(2026-11-20 生产事故,见 columnPrefs.isColumnHiddenFor)
+  return isColumnHiddenFor(key, dtFieldOf(key))
 }
 
 // ── 原水水质条件:指标列清单 + 显示名覆盖(2026-10-29) ──
@@ -636,6 +650,7 @@ function dtLabel(key, fallback) {
   return resolveColumnLabel(dtFieldOf(key), fallback || key)
 }
 function dtGroupSpan(name) {
+  // 分组 colspan = 该组实际渲染列数;动态样品列恒显示 ⇒ 恒等于样品数
   return sampleKeys(DT_GROUPS[name]?.prefix || '').filter((k) => !dtHidden(k)).length
 }
 function dtGroupLabel(name) {
@@ -681,8 +696,11 @@ function openFieldEdit() {
   fieldEditRows.value = DT_COLUMNS.map((col) => {
     const f = dtFieldOf(col.key)
     const alias = f && f.displayName && f.displayName !== f.dataName ? String(f.displayName) : ''
-    const visible = !dtHidden(col.key)
-    return { key: col.key, label: col.label, alias, originalAlias: alias, visible, originalVisible: visible }
+    // 动态样品列(样品N)的显隐开关禁用且恒为勾选:列数只由「样品数」决定,
+    // 历史上把它们勾掉会把加列后的新列永久藏起来(2026-11-20 生产事故)
+    const dynamic = isDynamicSampleKey(col.key)
+    const visible = dynamic ? true : !dtHidden(col.key)
+    return { key: col.key, label: col.label, alias, originalAlias: alias, visible, originalVisible: visible, dynamic }
   })
   fieldEditVisible.value = true
 }
@@ -827,6 +845,57 @@ function removeRow(i) {
   font-size: 14px;
   padding: 6px 14px !important;
   vertical-align: middle;
+}
+/* ═══ 编号格：前缀 + 编号同一行（2026-11-20 用户报障「叠成上下两行」）═══
+   与 RecordSheetPanels 的 .rs-docno-line--pre / .rs-docno-pre **同一套规则**（两处不许漂）。
+   根因：前缀是行内 span、编号值/参照框是块级 div ⇒ 原样排必然分成两行。
+   改法：外层一行 flex + nowrap；值区不缩（flex:0 0 auto），值过长时靠 flex-end 的负剩余
+   空间朝**左**溢出到公司名右侧的留白 —— 不换行、不省略、不截断，也不把前缀挤到上一行。
+   ⚠ flex 只加在这层内层 div，**不加 <td>**：td 一旦不再是 table-cell 会另生匿名格。 */
+.rs-docno-line--pre {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+/* 值区不缩：否则 flex 会把编号压窄，nowrap 的文字溢到相邻格/页边 */
+.rs-docno-line--pre > * {
+  flex: 0 0 auto;
+}
+/* 参照框：有富余时铺满剩余宽度；格子窄时保持整串编号宽度（min-content=max-content）⇒ 整行朝左溢出 */
+.rs-docno-line--pre > .rs-ref-ctl {
+  flex: 1 1 auto;
+  min-width: max-content;
+}
+/* 参照文本默认允许折行（供别的格子），编号格里必须单行 */
+.rs-docno-line--pre .rs-ref-text {
+  white-space: nowrap;
+}
+/* 编号格标签前缀(2026-11-20 用户口径「所有数据记录表右上角加一个项目编号前缀」):
+   与 RecordSheetPanels 的 .rs-docno-pre **同款**(两处值不许各自漂);纯展示,打印态照常显示。
+   间距不写 margin，统一由 .rs-docno-line--pre 的 gap 给。 */
+.rs-docno-pre {
+  flex: none;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #595959;
+}
+/* 打印两条路径（浏览器打印 / 侧栏「打印」按钮）都保持编号单行，不换行、不截断 */
+@media print {
+  .rs-docno-line--pre,
+  .rs-docno-line--pre * {
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+}
+body.approval-printing .rs-docno-line--pre,
+body.approval-printing .rs-docno-line--pre * {
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
 }
 .rs-docno-text {
   display: inline-block;

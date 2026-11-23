@@ -58,6 +58,40 @@ public class PanelRegistry {
             return detailKey == null || detailKey.isBlank() ? "items" : detailKey;
         }
 
+        /**
+         * **明细页签标题的显示覆盖**(yj_panel.config 的 {@code "detailTabLabel"},2026-11-19 起):
+         * <pre>{"detailTabLabel": "内部检测目录"}</pre>
+         *
+         * <p>背景(用户 2026-11-19):送样登记表(SAMPLE_REG)的明细页签标题原来是
+         * 「面板名 + 明细」=「送样登记表明细」,而这一页装的就是**内部检测目录**本身
+         * (不是"某张单的明细")⇒ 要求显示成「内部检测目录」。
+         *
+         * <p>为什么走 config 而不是在 Java 里写 {@code if (code.equals("SAMPLE_REG"))}:
+         * 声明式,与 {@link #uniqueKeys()} / {@link #statusGate()} 同一条规矩 ——
+         * 换面板/换标题只改 {@code yj_panel.config} 一行 JSON,不加代码、不动表结构,
+         * 其它档案面板的标题行为一字不变。
+         *
+         * <p>缺省 / config 为 NULL / 缺键 / 空串 / **值不是 JSON 字符串**(数字、布尔、数组、对象 ——
+         * 手写配置写错的常见形态)⇒ {@code null}(调用方回落到原「面板名 + 明细」);
+         * 解析失败只 {@code warn} 不抛 —— 宁可按老标题显示,也不能因为一段配置把面板打不开。
+         */
+        public String detailTabLabel() {
+            if (config == null || !config.contains("detailTabLabel")) return null;
+            try {
+                com.fasterxml.jackson.databind.JsonNode n =
+                        CONFIG_JSON.readTree(config).path("detailTabLabel");
+                // 只认 JSON 字符串:config 是声明位,写成数字/布尔/数组一律按"没声明"处理(回落原标题)
+                if (!n.isTextual()) return null;
+                String v = n.asText("").trim();
+                return v.isEmpty() ? null : v;
+            } catch (Exception ex) {
+                org.slf4j.LoggerFactory.getLogger(PanelRegistry.class)
+                        .warn("[detailTabLabel] 面板 {} 的 yj_panel.config 解析失败(页签标题按缺省):{}",
+                                code, ex.getMessage());
+                return null;
+            }
+        }
+
         private static final com.fasterxml.jackson.databind.ObjectMapper CONFIG_JSON =
                 new com.fasterxml.jackson.databind.ObjectMapper();
 
