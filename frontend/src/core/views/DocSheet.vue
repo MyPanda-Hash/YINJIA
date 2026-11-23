@@ -1973,6 +1973,37 @@ defineExpose({ focusField })
   padding-top: 2px;
   padding-bottom: 2px;
 }
+
+/* ═══ 纸面下拉的垂直对齐（2026-11-23 用户报障「项目实施计划的保密等级与项目定级的字歪了」）═══
+   根因与 2026-11-19 烧结清单那次是同一个：Element Plus 把选中值 `.el-select__placeholder`
+   设成 **position:absolute**，它因此不参与格子的文档流与行高。纸面格有固定行高时，
+   实测它比 wrapper 的顶边还高 6px（wrapper top=171 / placeholder top=165），字就压在边框上。
+   RecordSheetPanels 里的同一修复只作用于 `td.rs-td`，本组件（DocSheet，`.as-*` 结构）吃不到。 */
+.approval-sheet :deep(.as-info-value .el-select),
+.approval-sheet :deep(.as-fill .el-select) { width: 100%; }
+.approval-sheet :deep(.as-info-value .el-select__wrapper),
+.approval-sheet :deep(.as-fill .el-select__wrapper) {
+  /* 让 wrapper 自己撑满格子高度并垂直居中，不再靠绝对定位的占位符找位置 */
+  min-height: 0;
+  align-items: center;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.approval-sheet :deep(.as-info-value .el-select__placeholder),
+.approval-sheet :deep(.as-fill .el-select__placeholder) {
+  position: static;       /* ← 关键：回到文档流，由 wrapper 的 flex 居中 */
+  transform: none;
+  display: block;
+  line-height: 20px;
+}
+/* 收起态的过滤输入框不占位（点格子依旧可展开/可输入筛选） */
+.approval-sheet :deep(.as-info-value .el-select__input-wrapper),
+.approval-sheet :deep(.as-fill .el-select__input-wrapper) {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
 @media print {
   .approval-sheet :deep(.el-select__selected-item),
   .approval-sheet :deep(.el-select__placeholder) {
