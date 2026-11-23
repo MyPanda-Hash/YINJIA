@@ -151,11 +151,19 @@
           <!-- 一行 = 一个检验项目;每个批次两格(批次号 | 本批结果判断) -->
           <tr v-for="(g, gi) in groups" :key="g.key">
             <td class="c-item">
+              <!-- 2026-11-23 用户口径「文本显示不完全的内容需要能够自动换行」:
+                   原来是**单行** el-input,而检验项目列只有 9%(窄屏 ~54px),
+                   「*抗压强度（裸棒）」「*整体尺寸 （内PP棉、外包布、套网、打端盖）」这类
+                   项目名全被截在格子边(输入框内的字不会换行,只会横向滚动)。
+                   改成与检验方法/检验要求同款的多行域(autosize),按内容自然高度换行;
+                   只读态的 .qr-cell-text 本来就 pre-wrap,两态观感一致。 -->
               <el-input
                 v-if="editable"
                 :model-value="g.name"
+                type="textarea"
+                :autosize="{ minRows: 1, maxRows: 12 }"
                 size="small"
-                class="qr-cell-input"
+                class="qr-cell-input qr-cell-wrap qr-item-input"
                 maxlength="200"
                 @update:model-value="(v) => setItemField(g, '检验项目', v)"
               />
@@ -1288,6 +1296,16 @@ defineExpose({ exportProcInspExcel })
 .qr-grid td.c-item {
   text-align: center;
   vertical-align: top;
+}
+/* 检验项目(多行域):与只读态 .qr-cell-text 同为居中;项目名里没有空格可断,
+   必须按字符断行,否则长项目名会横向溢出格子(2026-11-23 报障)。 */
+.qr-grid td.c-item .qr-cell-wrap :deep(.el-textarea__inner) {
+  text-align: center;
+  padding: 2px;
+  line-height: 18px;
+  resize: none;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 .qr-grid td.c-batchtext {
   color: #1f4e79;
