@@ -15286,6 +15286,24 @@ onUnmounted(() => {
 .query-active-text {
   line-height: 1.6;
 }
+/* 查询对话框(2026-11-23 鼠标实测发现):弹窗内容(12 个条件 + 高级筛选 + 日期范围)比
+   视口还高时，页脚「重置/取消/查询」被顶到视口外，按钮点不到(elementFromPoint 命中 null)。
+   修法 = 弹窗限高 + 内容区滚动 + 页脚固定可见；宽屏观感不变(限高只有在内容超高时才生效)。 */
+:global(.header-query-dialog) {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 32px);
+  margin-top: 16px !important;
+  margin-bottom: 16px !important;
+}
+:global(.header-query-dialog .el-dialog__body) {
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+:global(.header-query-dialog .el-dialog__footer) {
+  flex: none;
+}
 .query-plan-bar {
   display: flex;
   align-items: center;

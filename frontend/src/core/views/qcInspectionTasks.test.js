@@ -83,3 +83,11 @@ test('⑦ 出货检验两张明细表:2 视图 + 2 flat 面板 + 字段/授权/�
   assert.equal(codes[iAsm + 1], 'QC_PROC_INSP_DETAIL')
   assert.equal(codes[iAsm + 2], 'QC_ASM_INSP_DETAIL')
 })
+
+test('查询对话框:内容超高时限高 + 内容区滚动,页脚「查询」不被顶出视口(鼠标实测发现)', () => {
+  // 2026-11-23 鼠标实测:12 个查询条件 + 高级筛选比 656px 视口高,页脚按钮在视口外
+  // (elementFromPoint 命中 null、page.click 报 html intercepts pointer events) ⇒ 点不到「查询」。
+  assert.match(LIST, /:global\(\.header-query-dialog\)[\s\S]*?max-height:\s*calc\(100vh - 32px\)/)
+  assert.match(LIST, /:global\(\.header-query-dialog \.el-dialog__body\)[\s\S]*?overflow-y:\s*auto/)
+  assert.match(LIST, /:global\(\.header-query-dialog \.el-dialog__footer\)[\s\S]*?flex:\s*none/)
+})

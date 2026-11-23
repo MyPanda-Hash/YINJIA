@@ -62,3 +62,24 @@ cd frontend && node --test src/core/qc/qcProcInspGroups.test.js src/core/qc/qcPr
 # 页面取证
 ego-browser nodejs -e "await import('file:///C:/Users/vigna/ego/qc-8fix-20261123/round-24.mjs')"
 ```
+
+## 鼠标实测(2026-11-23 第二轮,用户要求"完成后进行检查实现需要进行模拟鼠标操作")
+
+全部用 ego-browser 的 `page.mouse.click / mouse.move / mouse.wheel` + `keyboard.insertText` 操作
+(不是 `element.click()` 假点)。脚本 `round-29 ~ round-57`。
+
+| 项目 | 鼠标动作 | 结果 | 证据 |
+|---|---|---|---|
+| 7 菜单 | 点「品质管理」→「制程品质」→「出货检验（功能）明细表」 | 打开 `QC_PROC_INSP_DETAIL`，2531 条 | `round-30-menu-detail.png` |
+| 7 查询 | 点工具栏「查询」→ 点「单据编号」输入 → 键盘输入 → 点页脚「查询」 | 过滤生效（查无此单时 0 条） | `round-51-query-click.png` |
+| 1 批次 | 点草稿行 → 点「＋新增检验项」×2 → 点「＋添加批次」→ 横向滚轮 → 点新批次格输入 | 值落在新批次格、行顶对齐 | `round-45-mouse-new-batch.png` |
+| 3 责任人 | 点五段「责任人」输入框→分别输入张三/李四/王五/赵六/钱七→点「保存」 | 库里五列分别落值（验证后已还原） | `round-54/55-bhc-owners-*.png` |
+| 2 看板 | 点「检验状态」下拉 → 选「未检验」「已检验」 | 列表/汇总随筛选变化 | `round-56/57-board-*.png` |
+
+### 鼠标实测发现并修复的缺陷:查询对话框页脚按钮被顶出视口
+
+- 现象:视口 1404×656 时，查询对话框(12 个条件 + 高级筛选)比视口高，
+  页脚「重置/取消/查询」落在 y=656~688(视口外)⇒ `elementFromPoint` 命中 null，
+  ego 报 `<html> intercepts pointer events`，真实鼠标点不到「查询」。
+- 修法(PanelxList.vue):`.header-query-dialog` 限高 `calc(100vh - 32px)` + 内容区滚动 + 页脚不收缩。
+- 复测:页脚「查询」按钮 y=574~606(视口内)，鼠标点选查询后列表从 2531 条过滤到 0 条。
