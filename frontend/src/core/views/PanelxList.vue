@@ -12152,6 +12152,9 @@ function isDisabled(action) {
     多仓库入库: !current.value || st !== '草稿' || !draftEditable.value || inlineSaving.value,
     // PANDA 工具栏动作(列表页语义)
     复制: !current.value,            // 整单复制=另存为一张新草稿
+    // 复制单据(2026-11-23,只有 4 张单据):只要有选中单就能点 —— **任何状态都可复制**
+    // (已归档正是主要场景),不按单据状态/是否可编辑置灰;真闸门在服务端(存在性 + 未作废 + 新增权限)。
+    复制单据: !current.value,
     放弃: false,                     // 丢弃内联草稿修改,恢复最近一次保存
     打印: false, 预览: false, 导出: false,
     发送邮件: false, 退出: false, 表格调整: false, 分类管理: false, 表头调整: false,
@@ -12992,6 +12995,34 @@ async function onButton(action) {
       ElMessage.success('已放弃未保存的修改')
     } else {
       ElMessage.info('当前没有未保存的修改')
+    }
+    return
+  }
+  // 复制单据(2026-11-23 用户口径):4 张单据各一颗侧栏按钮 —— 把**当前这张单**整单复制成新草稿。
+  //   与下面那颗通用的「复制」(PANDA 工具栏整单复制)不是同一件事,必须排在它之前分派:
+  //     · 服务端实现 ButtonService.copyDocToDraft:新单号按新规则取(绝不照搬源单号)、
+  //       签核/审批留痕 + 唯一键 + 附件列一律清空、只留可复用的业务内容;
+  //     · 复制出的新单 = **草稿**且已落库(saved='N'),不进审批;
+  //     · 成功后刷新列表并**定位到新单**(openDocByNo = load + 按单号找,找不到再用 _docNo 精确取一次),
+  //       用户不用自己去列表里翻。
+  if (action === '复制单据') {
+    if (!current.value) return ElMessage.warning(tt('请先选择一张单据'))
+    const srcNo = current.value['编号'] || current.value['单据编号'] || ''
+    if (!srcNo) return ElMessage.warning(tt('请先选择一张单据'))
+    try {
+      const res = await engine.callButton({
+        panelCode: panelCode.value, buttonName: '复制单据', formData: { 编号: srcNo }, buttonParam: {},
+      })
+      // ⚠ 与 directAdd 同一口径:200 + body code≠200 的错误体不会抛,必须自己认
+      if (res && typeof res === 'object' && res.code != null && res.code !== 200) {
+        throw new Error(res.message || ('复制失败（code=' + res.code + '）'))
+      }
+      const newNo = res && (res['编号'] || res.formNo)
+      if (!newNo) return ElMessage.error(tt('复制失败') + '：' + JSON.stringify(res).slice(0, 120))
+      ElMessage.success(tt('已复制为新草稿：') + newNo)
+      await openDocByNo(newNo)
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || tt('复制失败'))
     }
     return
   }

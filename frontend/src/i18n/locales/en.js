@@ -490,6 +490,9 @@ export default {
     '查看单据': 'Open document',
     '编号已复制': 'Document no. copied',
     '复制失败': 'Copy failed',
+    // ---- 单据复制(2026-11-23:4 张单据把当前单复制成一张新草稿)----
+    '复制单据': 'Copy document',
+    '已复制为新草稿：': 'Copied as a new draft: ',
     '单据编号': 'Document no.',
     '编号': 'No.',
     '来源': 'Source',

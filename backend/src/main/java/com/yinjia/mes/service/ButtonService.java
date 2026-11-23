@@ -189,6 +189,11 @@ public class ButtonService {
             case "保存", "提交", "保存新增" -> save(def, formData == null ? new HashMap<>() : formData, true, buttonParam);
             case "保存为草稿" -> save(def, formData == null ? new HashMap<>() : formData, false, buttonParam);
             case "新增流程", "新增" -> save(def, formData == null ? new HashMap<>() : formData, false, buttonParam);
+            // 复制单据(2026-11-23 用户口径):把**当前选中的那张单**整单复制成一张**新草稿**,
+            //   单号按新单规则重新取(绝不照搬源单号)。动作名用「复制单据」而不是列表页通用的
+            //   「复制」,避免和 PANDA 工具栏那颗整单复制混淆;只有 4 张单据被下发这颗按钮
+            //   (见 COPY_DOC_PANELS 与 PanelConfigService 的注入)。
+            case "复制单据" -> copyDocToDraft(def, formData);
             case "审核" -> audit(def, formData);
             case "弃审" -> unaudit(def, formData);
             // 审批流(照搬 light-mes:草稿→提交审批→审批中→通过/驳回;弃审全留痕)
@@ -8477,6 +8482,219 @@ public class ButtonService {
         }
         markDocSaved(panelCode, newNo, true);
         return newNo;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════════════
+    // 复制单据(2026-11-23 用户口径)
+    //
+    // 用户原话:「给立项申请表、产品信息表、外部开发、非开发样品申请单,这 4 个单据都需要一个单据
+    //   复制功能,就是复制单据内容为一个新的草稿,因为很多单据可能是一个客户需要的产品内容,但是
+    //   可能就是改了一点点,所以重新全部填写很麻烦……当然那些自动生成的单据编号这些就还是按新的
+    //   单据规则来生成,而不是把这些也照搬过来」。
+    //
+    // 契约(逐条对应需求,改这里前先读):
+    //   ① 源单 = 当前选中那张(formData 的「编号」/「单据编号」),必须存在且未作废;
+    //      **任何状态都可复制**(已归档是主要场景 —— 用户要复用的正是定稿内容)。
+    //   ② 新单号走 nextDocNoFor(def, user):RD_SAMPLE_EXT 的「账号-日期-序号」由它内部处理,
+    //      绝不照搬源单号。
+    //   ③ 表头逐列拷贝,但按 COPY_DOC_SKIP_LABELS 的**标签**解析成列后清空(不写死物理列名);
+    //      结构列(id/分组列/asp_*)与状态列(单据状态/编号/saved)按列名判。
+    //   ④ 明细:该单全部未作废行,跳 id/分组列/asp_*/行序,落新单号。
+    //   ⑤ 新单 = 草稿(markDocSaved false),不进审批;返回 {编号: newNo}。
+    //   ⑥ 权限:复用「新增」口径(PanelPermissionService.hasAnyPerm add/modify,管理员恒过),
+    //      与「保存」这条建单路径同一把闸门,不自造第二套。
+    // ══════════════════════════════════════════════════════════════════════════════════
+
+    /**
+     * 可复制单据的面板(白名单,与 PanelConfigService 的按钮注入同源)。
+     *
+     * <p>为什么要有白名单:这颗按钮的语义是「整单另存为新草稿」,对每张单据都放开等于给所有面板
+     * 多一条绕过「新增 + 必填」的建单入口。用户只要这 4 张。</p>
+     */
+    public static final java.util.Set<String> COPY_DOC_PANELS = java.util.Set.of(
+            "RD_APPROVAL", "RD_PROD_INFO", "RD_SAMPLE_EXT", "RD_SAMPLE_ND");
+
+    /**
+     * 复制时**必须清空**的表头标签(签核/审批留痕 + 唯一/自动派生键)。
+     *
+     * <p>分三类,来源都是用户口径与库里的既有事实:</p>
+     * <ol>
+     *   <li><b>签核留痕</b>:新单必须空白,审批动作才会回填(取值见 ButtonService 各
+     *       writeSampleSign / applyGrade / 审批回填)—— 照搬会让新单"出生就带着别人的签字";</li>
+     *   <li><b>唯一键</b>:{@code RD_PROD_INFO.产品编号} 有唯一性校验(ensureProductCodeUnique),
+     *       {@code RD_APPROVAL.文档编号} 也做重复校验且由「客户编码 + 日期」自动派生
+     *       (DocSheet.applyApprovalDocNo),复制后必须重算;</li>
+     *   <li><b>附件</b>:附件锚点是「面板 + 单号 + 字段」(AttachmentService 类注释),旧文件不该
+     *       挂到新单上 —— 由 {@link #isAttachField} 按 data_type='附件' 动态判,不写死标签。</li>
+     * </ol>
+     *
+     * <p>⚠ 只按**标签**清,取不到的标签自然跳过(yj_field 没有那一格就不存在物理列)——
+     * 这是需求里「能取到列就清空,取不到跳过」的落地方式。</p>
+     */
+    private static final java.util.Set<String> COPY_DOC_SKIP_LABELS = new java.util.LinkedHashSet<>(java.util.List.of(
+            // ── a/b. 状态与编号(按标签,与按列名判的那几条互为兜底) ──
+            //   「saved」是 yj_doc_status 的保存标记,不在业务表里;这里列出来是为了让
+            //   「状态/编号不得照搬」这条口径一处可读(物理上按列名判,见 copyDocToDraft)。
+            "单据状态", "编号", "单据编号", "saved",
+            // ── c. 签核/审批留痕(新单必须空白,审批后才填) ──
+            "申请立项人", "申请立项日期",
+            "审核人", "确认人",
+            "申请", "审核", "确认",
+            "批准人", "批准签字", "批准日期",
+            "审核人（一级审批人）", "审核人（二级审批人）",
+            "产品负责人", "表单审核人",
+            "编写人", "编辑人", "一级审核人", "二级审核人", "责任人",
+            // ── d. 唯一/自动派生键 ──
+            //   产品编号:RD_PROD_INFO 有唯一约束(ensureProductCodeUnique),必须让用户填新的;
+            //   文档编号:RD_APPROVAL = 客户编码 + 日期自动生成(DocSheet.applyApprovalDocNo),
+            //     且保存时做重复校验(ensureDocNoUnique),复制后应重算 —— 清空即可。
+            "产品编号", "文档编号",
+            // ── e. 立项流程三格(备用1/2/3/4:对接人/项目责任人/责任人确认/确认时间)──
+            //   它们由定级分发 → 确认责任人两步按钮写入;新单还没走流程,留着就是伪造流程状态。
+            //   ⚠ 用**标签**而不是物理列名:这几格在 yj_field 里 label 是「对接人/项目责任人/
+            //     责任人确认/确认收到时间」,物理列才是 备用1..4(AGENTS §5① label ≠ 物理列名)。
+            "对接人", "项目责任人", "责任人确认", "确认收到时间", "项目等级"));
+
+    /** 该 label 对应的 yj_field 是不是附件列(data_type='附件')—— 附件锚点按单号,不能带过去 */
+    private boolean isAttachField(PanelRegistry.PanelDef def, String label) {
+        PanelRegistry.FieldDef f = def.byLabel(label);
+        return f != null && f.dataType() != null && "附件".equals(f.dataType().trim());
+    }
+
+    /**
+     * 复制单据 → 新草稿(按钮「复制单据」的唯一实现)。
+     *
+     * @param def      当前面板(必须 ∈ {@link #COPY_DOC_PANELS})
+     * @param formData 前端载荷,只用里面的「编号」/「单据编号」
+     * @return {@code {编号: 新单号, 源单据编号: 源单号, 单据状态: "草稿", 明细行数: n}}
+     */
+    private Map<String, Object> copyDocToDraft(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!COPY_DOC_PANELS.contains(def.code()))
+            throw new IllegalStateException("该面板不支持复制单据：" + def.name());
+        String user = currentUserName();
+        // 权限:「新增」口径(add/modify 词,管理员恒过)。与 save() 建单同一把闸门 ——
+        // 复制出来的就是一张新单,能建单的人才能复制,不能建单的人复制等于绕过权限建单。
+        if (!panelPermissionService.hasAnyPerm(def.code(), "add", "modify"))
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "当前角色没有该面板的「新增保存/申请修改」权限，无法复制单据");
+        String srcNo = requireCopySourceNo(formData);
+        String headTable = def.hasHeadTable() ? def.headTable() : def.lineTable();
+        if (headTable == null || headTable.isBlank())
+            throw new IllegalStateException("该面板没有单据表，无法复制单据：" + def.name());
+        // 源单必须存在且未作废(任何状态都可以复制,包括已归档 —— 那正是主要场景)
+        Map<String, Object> srcHead;
+        try {
+            srcHead = jdbc.queryForMap("SELECT * FROM " + headTable + " WHERE " + def.groupCol() + " = ?"
+                    + " AND ISNULL(asp_cancel,'N') <> 'Y'", srcNo);
+        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+            throw new IllegalStateException("源单据不存在或已作废：" + srcNo);
+        }
+        String srcStatus = String.valueOf(docStatusOf(def.code(), srcNo).get("status"));
+        String newNo = nextDocNoFor(def, user);
+        // 号池刚发出的号若与残留状态行撞上(历史脏数据),清掉陈旧状态,免得新单继承旧归档标记
+        clearStaleDocStatus(def, newNo);
+        // ── 表头 ──
+        Map<String, Object> headCols = new LinkedHashMap<>();
+        Map<String, String> labelOfCol = new java.util.HashMap<>();
+        for (PanelRegistry.FieldDef f : def.fieldsAt("header")) labelOfCol.putIfAbsent(f.col(), f.label());
+        java.util.Set<String> headPhysical = tableCols(headTable);
+        for (Map.Entry<String, Object> e : srcHead.entrySet()) {
+            String col = e.getKey();
+            if (isCopyStructuralCol(def, col)) continue;
+            // 状态/编号列按列名兜底判(元数据里「单据状态」没有对应物理列,只有 group/code 列)
+            if ("单据状态".equals(col) || "saved".equals(col)) continue;
+            String label = labelOfCol.get(col);
+            if (label != null && COPY_DOC_SKIP_LABELS.contains(label)) continue;
+            if (label != null && isAttachField(def, label)) continue;
+            if (!headPhysical.isEmpty() && !headPhysical.contains(col)) continue;
+            Object v = e.getValue();
+            if (v == null) continue;
+            headCols.put(col, v);
+        }
+        // 新单号落分组列(与 code_col 同值时也写一次,与 save() 的空草稿分支同口径)
+        headCols.put(def.groupCol(), newNo);
+        if (def.codeCol() != null && !def.codeCol().isBlank()
+                && !def.codeCol().equals(def.groupCol())
+                && (headPhysical.isEmpty() || headPhysical.contains(def.codeCol()))) {
+            headCols.put(def.codeCol(), newNo);
+        }
+        // 立项申请:文档编号是 NOT NULL 且「客户编码 + 日期」自动派生 ⇒ 复制后按新日期重算,
+        //   客户编码取不到就写空串(保存时仍可通过,必填校验只在提交口径生效)。
+        //   落点按 yj_field 的 label→col 解析,不写死列名。
+        PanelRegistry.FieldDef docNoF = def.byLabel("文档编号");
+        if (docNoF != null && (headPhysical.isEmpty() || headPhysical.contains(docNoF.col()))) {
+            // 客户编码同样走 label→col(立项申请的「客户编号」物理列就是 客户编号,但别写死)
+            PanelRegistry.FieldDef custF = def.byLabel("客户编号");
+            String custCode = custF == null ? null : str(headCols.get(custF.col()));
+            String ymd = LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd"));
+            headCols.put(docNoF.col(), custCode == null ? "" : custCode + ymd);
+        }
+        // ⚠ 单据日期**照抄源单**,不改成今天 —— 需求是"逐列拷贝,只跳过列出的那几类":
+        //   复制出来的是一份可改的草稿,日期该由用户按实际情况改,不该由系统悄悄替换。
+        insertRow(headTable, headCols, user);
+        // ── 明细 ──
+        int lineCount = 0;
+        String lineTable = def.lineTable();
+        if (lineTable != null && !lineTable.isBlank()) {
+            List<Map<String, Object>> lines = jdbc.queryForList("SELECT * FROM " + lineTable
+                    + " WHERE " + def.groupCol() + " = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", srcNo);
+            java.util.Set<String> linePhysical = tableCols(lineTable);
+            for (Map<String, Object> line : lines) {
+                Map<String, Object> cols = new LinkedHashMap<>();
+                for (Map.Entry<String, Object> e : line.entrySet()) {
+                    String col = e.getKey();
+                    if (isCopyStructuralCol(def, col)) continue;
+                    // 行序让 insertRow 侧重排(与 assignNewLineSeq 同口径:新单从 1 开始连续)
+                    if (isLineSeqCol(def, col)) continue;
+                    if (!linePhysical.isEmpty() && !linePhysical.contains(col)) continue;
+                    if (e.getValue() == null) continue;
+                    cols.put(col, e.getValue());
+                }
+                cols.put(def.groupCol(), newNo);
+                insertRow(lineTable, cols, user);
+                lineCount++;
+            }
+        }
+        // ── 尾账:新单=草稿(不进审批) ──
+        markDocSaved(def.code(), newNo, false);
+        log.info("[复制单据] {} {} → {} (源状态 {}、表头 {} 列、明细 {} 行)",
+                def.code(), srcNo, newNo, srcStatus, headCols.size(), lineCount);
+        Map<String, Object> out = result(newNo, "草稿");
+        out.put("源单据编号", srcNo);
+        out.put("源单据状态", srcStatus);
+        out.put("明细行数", lineCount);
+        return out;
+    }
+
+    /** 源单号:前端 formData 的「编号」/「单据编号」(面板不同键不同,与 requireNo 同口径但更宽) */
+    private String requireCopySourceNo(Map<String, Object> formData) {
+        if (formData == null) throw new IllegalStateException("请先选择一张要复制的单据");
+        String no = str(formData.get("编号"));
+        if (no == null) no = str(formData.get("单据编号"));
+        if (no == null) throw new IllegalStateException("请先选择一张要复制的单据");
+        return no;
+    }
+
+    /**
+     * 复制时要跳过的**结构列**(与业务字段无关的库内建列):
+     * 自增 id / 分组列 / 审计四列 / 作废标记。
+     *
+     * <p>刻意不在这里列业务列 —— 业务列按 yj_field 的 label 判(见 COPY_DOC_SKIP_LABELS 与
+     * isAttachField),避免「物理列名写死」的老毛病(AGENTS §5①)。</p>
+     */
+    private boolean isCopyStructuralCol(PanelRegistry.PanelDef def, String col) {
+        if (col == null) return true;
+        if ("id".equalsIgnoreCase(col)) return true;
+        if (def.groupCol() != null && def.groupCol().equals(col)) return true;
+        if (def.pkCol() != null && def.pkCol().equals(col)) return true;
+        return col.toLowerCase(java.util.Locale.ROOT).startsWith("asp_");
+    }
+
+    /** 明细「行序」列(登记了 行序 字段且物理列存在):复制时跳过,让新单自己从 1 排 */
+    private boolean isLineSeqCol(PanelRegistry.PanelDef def, String col) {
+        PanelRegistry.FieldDef seq = def.byLabel("行序");
+        if (seq == null) return false;
+        return seq.col().equals(col);
     }
 
     /** 变更单审批驳回:通知发起人与**已填写部门**(部门行的签字人 → 账号),让他们知道要重新填 */

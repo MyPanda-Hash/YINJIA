@@ -383,6 +383,16 @@ public class PanelConfigService {
         } else {
             // 无 PANDA 基准(旧单据/派工等):同样遵守 选单在新增后 / 生单在审核后 的固定位置
             buttonGroups.add(group("新增", List.of("新增")));
+            // 复制单据(2026-11-23 用户口径,只有 4 张单据)——
+            //   用户原话:「给立项申请表、产品信息表、外部开发、非开发样品申请单,这 4 个单据都需要一个
+            //   单据复制功能,就是复制单据内容为一个新的草稿……自动生成的单据编号还是按新的单据规则生成」。
+            //   位置:紧挨「新增」之后(单动作组 ⇒ 侧栏渲染成一颗独立按钮,不用展开下拉);
+            //   动作名用「复制单据」而不是列表页通用的「复制」—— 后者是 PANDA 工具栏的整单复制,
+            //   前端 APPROVAL_SIDE_EXCLUDE 也把「复制」排除了,沿用会让文书侧栏永远看不到它。
+            //   判据 = 后端白名单 ButtonService.COPY_DOC_PANELS(两处必须同源,单测钉住)。
+            if (ButtonService.COPY_DOC_PANELS.contains(def.code())) {
+                buttonGroups.add(group("复制单据", List.of("复制单据")));
+            }
             if (SELECT_FLOWS.containsKey(def.code())) {
                 buttonGroups.add(group("选单", List.of("选单")));
             } else {
