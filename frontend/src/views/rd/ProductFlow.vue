@@ -10,17 +10,8 @@
        同一份事实),本页不写库、不触发审批。
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="pfl-page">
-    <header class="pfl-head">
-      <div>
-        <h1 class="pfl-title">{{ tt('产品文件流程管控') }}</h1>
-        <p class="pfl-sub">
-          {{ tt('按产品看这份开发包走到哪一步：产品信息表 + 4 张受控文件，哪一步还没建单、哪一步卡在开发中') }}
-        </p>
-      </div>
-      <p class="pfl-source">
-        {{ tt('数据来源：产品信息表与 4 个文件面板的实时单据状态，本页只读不改单') }}
-      </p>
-    </header>
+    <!-- 2026-11-23 用户口径：「产品文件流程管控这些字样删掉」
+         ⇒ 页头标题/副标题/数据来源三行整体撤除，直接从 KPI 卡片开始（页面标题已由页签给出）。 -->
 
     <section class="pfl-kpis">
       <article v-for="k in kpiCards" :key="k.key" class="pfl-kpi">
@@ -92,6 +83,10 @@
                       <!-- 最后操作时间(2026-11-17 取代原来的「处理人」;取不到显示「-」,不编造) -->
                       <span class="pfl-step-at" :title="tt('最后操作时间')">{{ st.at || '-' }}</span>
                     </div>
+                    <!-- 谁提交 / 谁审批通过（2026-11-23 用户口径「像立项申请表一样，展开能看到
+                         谁提交了单据等待审批中，谁审批通过了，现在只有进行中」）。
+                         有数据才渲染；没有就整行不出现（不占高度、不印「—」凑数）。 -->
+                    <p v-if="approvalLine(st)" class="pfl-step-approval">{{ approvalLine(st) }}</p>
                     <!-- 多单据清单：保留单据编号（区分同类多张单），并补产品编号 / 日期 / 填写人。
                          点单号跳转的行为不变（openDoc 按前缀判面板）。 -->
                     <ul v-if="openDocs.has(st.key) && st.docs && st.docs.length" class="pfl-docs">
@@ -173,8 +168,8 @@ import { tt } from '@/i18n'
 import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import {
-  STEP_STATE, currentStepOf, docMetaOf, filterFlowRows, flowKpisOf, flowStatusOf, flowStepsOf,
-  nextStepOf, stateLabelOf,
+  STEP_STATE, approvalLineOf, currentStepOf, docMetaOf, filterFlowRows, flowKpisOf, flowStatusOf,
+  flowStepsOf, nextStepOf, stateLabelOf,
 } from '@/core/prod/productFlow'
 
 const router = useRouter()
@@ -248,6 +243,8 @@ function currentOf(row) { return currentStepOf(flowStepsOf(row)) }
 function metaOf(row) { return docMetaOf(row) }
 /** 状态文案三档(已完成/进行中/未开始) —— 不再显示「草稿」这种单据状态原文 */
 function stateLabel(st) { return stateLabelOf(st) }
+/** 这一步「谁提交 / 谁审批通过」的一句话（2026-11-23；没有就返回空串，不渲染那一行） */
+function approvalLine(st) { return approvalLineOf(st) }
 /** el-tag 的 type 映射(与项目流程管控的 tagType 同款) */
 function tagTypeOf(tone) {
   if (tone === STEP_STATE.done) return 'success'
@@ -314,10 +311,8 @@ onBeforeUnmount(() => window.removeEventListener('resize', syncWidth))
 /* 版式语言与 ProjectFlow.vue 一致：浅底、白卡片、1px 边框、无阴影；
    间距 8 的倍数；数字列 tabular-nums（这里只有"进度"是数字列）。 */
 .pfl-page { padding: 20px 24px 32px; background: #f5f7fa; min-height: 100%; box-sizing: border-box; }
-.pfl-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 16px; }
-.pfl-title { margin: 0 0 6px; font-size: 20px; line-height: 28px; font-weight: 600; color: #1f2d3d; }
-.pfl-sub { margin: 0; font-size: 13px; line-height: 20px; color: #5c6b7a; }
-.pfl-source { margin: 0; font-size: 12px; color: #8a97a5; max-width: 360px; text-align: right; }
+/* 页头三行已按 2026-11-23 用户口径撤除（.pfl-head/.pfl-title/.pfl-sub/.pfl-source 不再使用），
+   故对应样式一并删除，避免留死样式误导后来者以为还有页头。 */
 
 .pfl-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
 .pfl-kpi { background: #fff; border: 1px solid #e4e8ee; border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
@@ -380,6 +375,8 @@ onBeforeUnmount(() => window.removeEventListener('resize', syncWidth))
 /* 最后操作时间(2026-11-17 取代原来的「处理人」):等宽数字,竖排时逐行对齐好扫 */
 .pfl-step-at { font-size: 12px; color: #5b6b7c; font-variant-numeric: tabular-nums; }
 .pfl-step-detail { margin: 2px 0 0; font-size: 12px; line-height: 1.5; color: #a0641a; }
+/* 提交/审批副行：比主行弱一档（12px 次级灰），只在有数据时出现 */
+.pfl-step-approval { margin: 2px 0 0; font-size: 12px; line-height: 18px; color: #5c6b7a; }
 
 /* 展开行底部「单据信息」区(与 ProjectFlow 的 .pf-meta 同构:虚线分隔 + 横排 label/value) */
 .pfl-meta {
@@ -392,8 +389,6 @@ onBeforeUnmount(() => window.removeEventListener('resize', syncWidth))
 
 @media (max-width: 1100px) {
   .pfl-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pfl-head { flex-direction: column; align-items: flex-start; }
-  .pfl-source { text-align: left; max-width: none; }
 }
 
 /* 窄屏(≤768):表格只留 4 列(见脚本里的 wide);展开行若不限宽,

@@ -126,6 +126,8 @@ public class RdDevProductService {
             //   ⚠ 上一轮(2026-11-19)只给 nodeOf 的 4 个文件节点加了 actor，头表这行漏了 ⇒
             //   前端 flowStepsOf 读 row.actor 恒为空，步骤 ① 永远不显示填写人(生产实测复现)。
             one.put("actor", lastActorOf("RD_PROD_INFO", no));
+            // 2026-11-23：产品信息表这一步同样要显示「谁提交、等谁审批 / 谁已审批通过」
+            one.putAll(approvalInfoOf("RD_PROD_INFO", no));
             Map<String, String> owners = devTaskOwners();
             List<Map<String, Object>> nodes = new ArrayList<>();
             int done = 0;
@@ -227,6 +229,8 @@ public class RdDevProductService {
                 one.put("done", "已归档".equals(dst) || "已审核".equals(dst) || "已生效".equals(dst));
                 one.put("at", lastActionAt(panelCode, dno));
                 one.put("actor", lastActorOf(panelCode, dno));
+                // 2026-11-23：每张单都带「谁提交/谁审批」，展开行才看得出卡在谁手上
+                one.putAll(approvalInfoOf(panelCode, dno));
                 docs.add(one);
             }
             n.put("docs", docs);
@@ -240,10 +244,93 @@ public class RdDevProductService {
             n.put("at", lastActionAt(panelCode, no));
             // 2026-11-19 销售问题汇总 P14：「要跟项目查询一样，增加填写人名字」
             n.put("actor", lastActorOf(panelCode, no));
+            // 2026-11-23：提交/审批两个人两个时间（展开行显示「谁提交、等谁审批 / 谁已审批通过」）
+            n.putAll(approvalInfoOf(panelCode, no));
         } catch (Exception ignore) {
             // 面板/表缺失等一律退化成「未开始」,不因一个节点把整份概览打挂
         }
         return n;
+    }
+
+    /**
+     * 单据的「谁提交、谁审批」两个人两个时间（2026-11-23 用户口径）。
+     *
+     * <p>用户原话：「产品进度查询，提交的单据，应该是要和立项申请表一样，可以再展开查看到
+     * **谁提交了单据等待审批中，谁审批通过了**，现在只有进行中」——
+     * 原先展开行只显示「进行中 / 填写人 / 最后操作时间」，看不出这道审批卡在谁手上、谁已经批过。</p>
+     *
+     * <p>取数口径（与 {@link #lastActorOf} 同源、各取各的，不互相顶替）：</p>
+     * <ul>
+     *   <li><b>提交</b>：{@code yj_form_approval} 最新一条 {@code action='SUBMIT'} 的 operator/create_time；
+     *       老单没留痕时退回 {@code yj_doc_status.pending_by / pending_at}；</li>
+     *   <li><b>审批</b>：{@code yj_doc_status.shr / shsj}（审批通过那一刻写的就是这两列）；
+     *       老单没有时退回留痕里最新一条 {@code APPROVE}。</li>
+     * </ul>
+     *
+     * <p>返回四个键 + {@code pending}：<b>没有就返回空串/false，不编造</b>（前端显示「—」）。</p>
+     */
+    private Map<String, Object> approvalInfoOf(String panelCode, String no) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("submitBy", "");
+        out.put("submitAt", "");
+        out.put("approveBy", "");
+        out.put("approveAt", "");
+        out.put("pending", false);
+        if (panelCode == null || no == null || no.isBlank()) return out;
+        // ① 提交留痕（最准：谁点的提交审批、几点几分）
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT TOP 1 ISNULL(operator,N'') AS op, create_time AS at FROM yj_form_approval"
+                            + " WHERE panel_code = ? AND form_no = ? AND action = N'SUBMIT'"
+                            + " AND ISNULL(operator,'') <> '' ORDER BY id DESC", panelCode, no);
+            if (!rows.isEmpty()) {
+                out.put("submitBy", nullToEmpty(displayName(str(rows.get(0).get("op")))));
+                out.put("submitAt", fmtObj(rows.get(0).get("at")));
+            }
+        } catch (Exception ignore) { /* 留痕表缺 ⇒ 退回状态表 */ }
+        // ② 状态表：pending / pending_by / pending_at / shr / shsj
+        try {
+            List<Map<String, Object>> rs = jdbc.queryForList(
+                    "SELECT pending, pending_by, pending_at, shr, shsj FROM yj_doc_status"
+                            + " WHERE panel_code = ? AND doc_no = ?", panelCode, no);
+            if (!rs.isEmpty()) {
+                Map<String, Object> r = rs.get(0);
+                out.put("pending", "Y".equalsIgnoreCase(str(r.get("pending"))));
+                if (String.valueOf(out.get("submitBy")).isEmpty()) {
+                    out.put("submitBy", nullToEmpty(displayName(str(r.get("pending_by")))));
+                }
+                if (String.valueOf(out.get("submitAt")).isEmpty()) {
+                    out.put("submitAt", fmtObj(r.get("pending_at")));
+                }
+                out.put("approveBy", nullToEmpty(displayName(str(r.get("shr")))));
+                out.put("approveAt", fmtObj(r.get("shsj")));
+            }
+        } catch (Exception ignore) { /* 状态表缺 ⇒ 留下面兜底 */ }
+        // ③ 终审人还是没有 ⇒ 用留痕里最新一条 APPROVE（老单只写了留痕的情况）
+        if (String.valueOf(out.get("approveBy")).isEmpty()) {
+            try {
+                List<Map<String, Object>> rows = jdbc.queryForList(
+                        "SELECT TOP 1 ISNULL(operator,N'') AS op, create_time AS at FROM yj_form_approval"
+                                + " WHERE panel_code = ? AND form_no = ? AND action = N'APPROVE'"
+                                + " AND ISNULL(operator,'') <> '' ORDER BY id DESC", panelCode, no);
+                if (!rows.isEmpty()) {
+                    out.put("approveBy", nullToEmpty(displayName(str(rows.get(0).get("op")))));
+                    out.put("approveAt", fmtObj(rows.get(0).get("at")));
+                }
+            } catch (Exception ignore) { /* 取不到就留空 */ }
+        }
+        return out;
+    }
+
+    private static String nullToEmpty(String v) { return v == null ? "" : v; }
+
+    /** 各种时间类型统一成 yyyy-MM-dd HH:mm（与 {@link #fmt} 同口径；null 返回空串） */
+    private String fmtObj(Object v) {
+        if (v == null) return "";
+        if (v instanceof java.sql.Timestamp t) return fmt(t);
+        if (v instanceof java.time.LocalDateTime d) return fmt(java.sql.Timestamp.valueOf(d));
+        String s = String.valueOf(v);
+        return s.length() >= 16 ? s.substring(0, 16) : s;
     }
 
     /**

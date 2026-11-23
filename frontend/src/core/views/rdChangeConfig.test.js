@@ -190,12 +190,18 @@ test('RD_CHANGE:大标题**固定**为「产品变更申请表」(2026-11-11 推
   assert.equal(cfg.titleKeyPh, undefined, 'titleKey 已去掉，提示词一并清理')
 })
 
-test('RD_PROD_INFO:大标题格是 产品名称 输入框(titleKey),且该键能定位到页(否则高亮不生效)', () => {  const cfg = recordSheetConfigs.RD_PROD_INFO
-  assert.equal(cfg.titleKey, '产品名称', '左上角大标题要绑 产品名称')
-  assert.equal(cfg.titleKeyPh, '产品名称', '背景提示词要是 产品名称')
-  assert.equal(cfg.staticTitle, '产品信息表', 'staticTitle 保留:只读态字段为空时回落显示表单名')
-  // 缺必填时 focusField 要先找到该键所在页;找不到就直接 return false(高亮根本不出现)
-  assert.equal(pageOfKeyIn(cfg, '产品名称'), 0, '产品名称 必须能定位到第 0 页,否则保存报错时不高亮')
+/**
+ * 2026-11-23 用户口径：「这个产品名称已经固定了，但是必填没有取消」。
+ *
+ * 演变：2026-10-16 把左上角大标题改成「产品名称」输入框（titleKey）并把该字段置必填；
+ * 2026-11-19 用户改口径「左上角的大的产品名称固定为产品信息表」⇒ titleKey 撤掉、纸面没有输入口。
+ * ⇒ 大标题恒为「产品信息表」，且该字段不再是必填（迁移 migrate-prodinfo-notrequired-20261123.sql）。
+ * 本条原先还在断言 titleKey='产品名称'，是改版前的旧口径，已随用户口径更新。
+ */
+test('RD_PROD_INFO:大标题固定显示 产品信息表（titleKey 已撤，不再绑 产品名称 输入框）', () => {
+  const cfg = recordSheetConfigs.RD_PROD_INFO
+  assert.equal(cfg.titleKey, undefined, 'titleKey 必须已撤（纸面上没有产品名称输入框）')
+  assert.equal(cfg.staticTitle, '产品信息表', '大标题固定为 产品信息表')
   const rec = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
   assert.match(rec, /v-if="editable && cfg\.titleKey"[\s\S]{0,220}?:placeholder="tt\(cfg\.titleKeyPh \|\| cfg\.titleKey\)"/,
     '标题格要按 titleKey 渲染输入框 + 提示词')

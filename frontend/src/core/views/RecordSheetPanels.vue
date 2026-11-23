@@ -2118,8 +2118,18 @@ const emptyMark = computed(() => String(cfg.value?.emptyMark || ''))
  */
 const docStatusNow = computed(() => String(props.head?.['单据状态'] || ''))
 /** 纸面值格文本：命中 signoffVisibility 且状态未到 ⇒ 空串（不显示历史值） */
+/** 只读态纸面显示文本：审批人门禁 → 空值补占位符。
+ *
+ *  <p>2026-11-23 用户口径：「产品信息表的非必填未填写项在保存之后没有 / 占位显示」。
+ *  原先 emptyMark 只挂在**可编辑**输入框的 placeholder 上（`c.ph ? tt(c.ph) : emptyMark`），
+ *  一保存转只读就落到 AnnotatedText，空格子什么都看不到 —— 与纸面表单（空格填「/」）的观感不一致。
+ *  这里在只读分支补齐：有值照常显示，空值且该面板配了 emptyMark（目前只有产品信息表 = '/'）才补。
+ *  ⚠ 只影响**显示**：不往 head 里写值，保存报文与库里的 NULL 都不变（写值会被当成真实数据存下去）。</p>
+ */
 function paperCellText(key, value) {
-  return signoffPaperText(cfg.value, key, value, docStatusNow.value)
+  const text = signoffPaperText(cfg.value, key, value, docStatusNow.value)
+  if (String(text ?? '').trim() !== '') return text
+  return emptyMark.value
 }
 
 const docNoKey = computed(() => docNoKeyFor(props.head, effHead.value))

@@ -74,7 +74,12 @@ public class RdProjectFlowService {
                         + " AND s.doc_no = rd_approval.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')"
                         + (kw.isEmpty() ? "" : " AND ([单据编号] LIKE ? OR ISNULL([文档编号],N'') LIKE ?"
                         + " OR ISNULL([机型及应用位置],N'') LIKE ? OR ISNULL([客户名],N'') LIKE ?)")
-                        + " ORDER BY [单据编号] DESC",
+                        // 2026-11-23 用户口径：「项目进度查询和产品进度查询都应该是新增的项目内容在最顶上，
+                        //   最老的在最下边」。
+                        //   ⚠ 原来按 [单据编号] DESC 排 —— 那是**字符串**序，LXA-… 与 C-… 混在一起时
+                        //     与建单先后完全无关（生产实测第一行 LXA-2026-11-0033、第二行 C-10920261123）；
+                        //   改按自增主键 id 倒序 = 真正的新建先后（越晚建 id 越大）。
+                        + " ORDER BY id DESC",
                 kwArr(kw, 4));
         if (approvals.isEmpty()) {
             Map<String, Object> empty = new LinkedHashMap<>();

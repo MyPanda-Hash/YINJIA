@@ -75,23 +75,24 @@ function fullProject(over = {}) {
 const stepOf = (flow, key) => flow.steps.find((s) => s.key === key)
 const stateOf = (flow, key) => stepOf(flow, key).state
 
-test('环节清单固定 10 步,顺序与业务链一致', () => {
+test('环节清单固定 9 步,顺序与业务链一致（2026-11-23 填写与提交审批已合并）', () => {
   assert.deepEqual(STAGES.map((s) => s.key), [
-    'applyFill', 'applySubmit', 'applyApprove', 'gradeDispatch', 'confirmOwner',
+    'applyFilled', 'applyApprove', 'gradeDispatch', 'confirmOwner',
     'ownerAck', 'planFill', 'planSubmit', 'planArchive', 'progressSync',
   ])
-  assert.equal(STAGES[0].name, '立项申请填写')
-  assert.equal(STAGES[9].name, '进入项目进度查询')
+  assert.equal(STAGES[0].name, '立项申请填写提交单据')
+  assert.equal(STAGES[8].name, '进入项目进度查询')
 })
 
-test('① 只填了立项申请(草稿未提交):卡在"提交审批",待办人=申请立项人', () => {
+test('① 只填了立项申请(草稿未提交):卡在合并步,待办人=申请立项人,且**不写建草稿时间**', () => {
   const f = buildFlow(ap(), {}, NOW)
-  assert.equal(f.currentKey, 'applySubmit')
-  assert.equal(stateOf(f, 'applyFill'), 'done')
-  assert.equal(stateOf(f, 'applySubmit'), 'active')
+  assert.equal(f.currentKey, 'applyFilled')
+  assert.equal(stateOf(f, 'applyFilled'), 'active')
   assert.equal(stateOf(f, 'applyApprove'), 'todo')
   assert.equal(f.pendingWith.name, '张三')
-  assert.equal(f.stuckDays, 10, '2026-10-10 09:00 → 2026-10-20 15:00 = 10 天')
+  // 合并后这一步的日期 = 提交审批时间；草稿没提交 ⇒ 空（以前这里吐的是 asp_time1 建草稿时间）
+  assert.equal(stepOf(f, 'applyFilled').at, '')
+  assert.match(stepOf(f, 'applyFilled').detail, /待张三填写并提交/)
 })
 
 test('② 已提交待审批:卡在"审批通过",并落出提交人与提交时间', () => {
@@ -100,9 +101,9 @@ test('② 已提交待审批:卡在"审批通过",并落出提交人与提交时
     trail: [t('SUBMIT', '2026-10-19 09:00:00', 'zhangsan')],
   }), { zhangsan: '张三' }, NOW)
   assert.equal(f.currentKey, 'applyApprove')
-  assert.equal(stateOf(f, 'applySubmit'), 'done')
-  assert.equal(stepOf(f, 'applySubmit').at, '2026-10-19 09:00:00')
-  assert.match(stepOf(f, 'applySubmit').actor, /张三/)
+  assert.equal(stateOf(f, 'applyFilled'), 'done')
+  assert.equal(stepOf(f, 'applyFilled').at, '2026-10-19 09:00:00')
+  assert.match(stepOf(f, 'applyFilled').actor, /张三/)
   assert.equal(f.pendingWith.name, '审批人', '审批人还没落定 → 交给"有审批权的角色"')
   assert.equal(f.stuckDays, 1)
 })
@@ -212,9 +213,9 @@ test('⑨ 计划已提交待审批 / 已审批归档但没进进度查询:两步
   assert.match(stepOf(archived, 'progressSync').detail, /同步/)
 })
 
-test('⑩ 全链路走完:10 步全 done,headline 说已完成,停留 0 天', () => {
+test('⑩ 全链路走完:9 步全 done,headline 说已完成,停留 0 天', () => {
   const f = buildFlow(fullProject(), { cp: '陈秀丽', admin: '冯总' }, NOW)
-  assert.equal(f.doneCount, 10)
+  assert.equal(f.doneCount, 9)
   assert.equal(f.currentKey, '')
   assert.match(f.headline, /完成/)
   assert.equal(f.stuckDays, 0, '2026-10-12 10:00 → 2026-10-20 15:00 超过 8 天:已完成的项目不再算"卡住天数"')
@@ -227,7 +228,7 @@ test('⑪ 老单没有审批留痕(功能上线前走的):靠 yj_doc_status 的 
     approvalStatus: st({ shr: 'admin', shsj: '2026-09-01 10:00:00', archived: 'Y', archivedAt: '2026-09-01 10:00:00' }),
     trail: [],
   }), { admin: '冯总', cp: '陈秀丽' }, NOW)
-  assert.equal(stateOf(f, 'applySubmit'), 'done')
+  assert.equal(stateOf(f, 'applyFilled'), 'done')
   assert.equal(stateOf(f, 'applyApprove'), 'done')
   assert.equal(stepOf(f, 'applyApprove').at, '2026-09-01 10:00:00')
   assert.equal(f.currentKey, 'confirmOwner')
@@ -261,7 +262,7 @@ test('⑭ 状态没落库但后序已完成(实测 HSDZ_MES LXA-2026-10-0011):�
       t('SUBMIT', '2026-10-12 09:30:00', 'cp', 'RD_PLAN'), t('APPROVE', '2026-10-12 10:00:00', 'admin', 'RD_PLAN')],
   }), { cp: '陈秀丽' }, NOW)
   assert.equal(withTrail.currentKey, '')
-  assert.equal(withTrail.doneCount, 10)
+  assert.equal(withTrail.doneCount, 9)
 })
 
 test('⑮ 旧单据:实施计划的『文档编号』没填立项单号时,给出"疑似计划"而不是一句"尚未建单"', () => {
@@ -280,12 +281,13 @@ test('⑮ 旧单据:实施计划的『文档编号』没填立项单号时,给�
   assert.match(detail, /LXA-2026-10-0100/, '要告诉用户把文档编号填成哪个立项单号')
 })
 
-test('⑯ 最老的单据(除单号外什么都缺)不抛异常,按 1/10 如实显示', () => {
+test('⑯ 最老的单据(除单号外什么都缺)不抛异常,按 1/9 如实显示', () => {
   const f = buildFlow({ approvalNo: 'LXA-2025-01-0001' }, {}, NOW)
   assert.equal(Array.isArray(f.steps), true)
-  assert.equal(f.steps.length, 10)
-  assert.equal(f.currentKey, 'applySubmit')
-  assert.equal(f.doneCount, 1)
+  assert.equal(f.steps.length, 9)
+  assert.equal(f.currentKey, 'applyFilled')
+  // 合并后这一步要「已提交」才算走完；只有单号、没提交 ⇒ 0 步完成（旧口径按"有单就算填了"= 1）
+  assert.equal(f.doneCount, 0)
   assert.equal(f.stuckDays, 0, '没有任何时间 → 停留 0 天,不显示 NaN')
 })
 

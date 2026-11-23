@@ -49,8 +49,18 @@ export function flowStepsOf(row) {
     state: String(d.state || ''),
     at: String(d.at || ''),
     actor: String(d.actor || ''),
+    // 2026-11-23：每张单都带「谁提交 / 谁审批」（后端 approvalInfoOf 下发）
+    ...approvalOf(d),
     productCode,
   })) : [])
+  /** 提交/审批两人两时间的透传（键名与 ProjectFlow 的留痕口径对齐：submitBy/approveBy/…） */
+  const approvalOf = (o) => ({
+    submitBy: String((o && o.submitBy) || ''),
+    submitAt: String((o && o.submitAt) || ''),
+    approveBy: String((o && o.approveBy) || ''),
+    approveAt: String((o && o.approveAt) || ''),
+    pending: !!(o && o.pending),
+  })
   const head = {
     key: 'RD_PROD_INFO',
     label: '产品信息表',
@@ -70,6 +80,9 @@ export function flowStepsOf(row) {
     actor: String(row.actor || row['填写人'] || ''),
     // 2026-11-19：同类多张数据记录表（同一项目编号反复测试）——全部单号列在这里
     docs: docsOf(row.docs),
+    // 2026-11-23 用户口径：「提交的单据，应该是要和立项申请表一样，可以再展开查看到
+    //   谁提交了单据等待审批中，谁审批通过了」⇒ 产品信息表这一步也带提交/审批信息
+    ...approvalOf(row),
     state: String(row.state || ''),
     tone: String(row.state || '') === '已归档' ? STEP_STATE.done
       : (String(row.state || '').trim() && String(row.state) !== '草稿' ? STEP_STATE.doing : STEP_STATE.none),
@@ -87,10 +100,33 @@ export function flowStepsOf(row) {
     actor: String(n.actor || ''),
     // 同类多张数据记录表：同样上一轮漏映射 ⇒「· N 张」永远不出现。这里一并透传。
     docs: docsOf(n.docs),
+    ...approvalOf(n),
     state: String(n.state || ''),
     tone: stepStateOf(n),
     reaudited: !!n.reaudited,
   }))]
+}
+
+/**
+ * 该步骤的「谁提交 / 谁审批」一句话（2026-11-23 用户口径）。
+ *
+ * <p>用户要的是像项目流程管控那样，展开就能看到「谁提交了单据等待审批中，谁审批通过了」。
+ * 这里把后端下发的两组人/时间拼成一句话，**没有就不编造**（返回空串，界面不渲染这一行）：</p>
+ *
+ * <ul>
+ *   <li>已审批通过：`提交 张三 2026-11-23 17:21 · 审批通过 admin 2026-11-23 17:30`</li>
+ *   <li>审批中：`提交 张三 2026-11-23 17:21 · 等待审批`</li>
+ *   <li>还没提交：空串（步骤行已经写了「未开始」）</li>
+ * </ul>
+ */
+export function approvalLineOf(step) {
+  if (!step) return ''
+  const join = (who, at) => [who, at].filter(Boolean).join(' ')
+  const parts = []
+  if (step.submitBy || step.submitAt) parts.push(`提交 ${join(step.submitBy, step.submitAt)}`.trim())
+  if (step.approveBy || step.approveAt) parts.push(`审批通过 ${join(step.approveBy, step.approveAt)}`.trim())
+  else if (step.pending) parts.push('等待审批')
+  return parts.join(' · ')
 }
 
 /**

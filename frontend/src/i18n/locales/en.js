@@ -5685,8 +5685,9 @@ export default {
     '全部完成': 'All steps completed ',
     '已弃审/作废，退回': 'Cancelled / voided, back to ',
     '加载项目流程失败': 'Failed to load the project flow',
-    '立项申请填写': 'Application filled in',
-    '立项申请提交审批': 'Application submitted',
+    // 2026-11-23：立项申请的「填写」与「提交审批」已合并为一步（用户口径），
+    // 旧的两个词条（立项申请填写 / 立项申请提交审批）不再产生，一并替换成合并后的名字。
+    '立项申请填写提交单据': 'Application filled in and submitted',
     '立项申请审批通过': 'Application approved',
     '定级分发（等级 + 对接人）': 'Grade & dispatch (level + liaison)',
     '确认项目责任人': 'Confirm project owner',
@@ -6326,6 +6327,7 @@ export default {
     '批量转ERP完成：成功{ok}，已转跳过{skip}，失败{fail}': 'Batch push to ERP finished: succeeded {ok}, already pushed and skipped {skip}, failed {fail}',
     '转ERP请求超时：服务端可能仍在推送，请稍后刷新列表确认「是否已转ERP」后再操作，不要立刻重复点': 'ERP push timed out: the server may still be pushing. Refresh the list later and check "Pushed to ERP" before acting again — do not click again right away.',
     '该单据正在转ERP（正在连金蝶推送，通常十几秒），请勿重复点击；完成后列表会自动显示 ERP 单号': "This document is being pushed to ERP (connecting to Kingdee, usually 10-20 seconds). Please do not click again; the ERP number will appear in the list when it finishes",
+    '尚未配置 ERP 对接，转ERP 暂不可用：请联系管理员接入金蝶或通用 HTTP 适配器': "No ERP integration is configured, so the Transfer-to-ERP action is unavailable. Please ask your administrator to connect Kingdee or the generic HTTP adapter",
     '确认弃审该单据？本单已转过ERP（{no}）：请先在金蝶删除那张单据，再修改 → 审核 → 重新转ERP，否则金蝶侧会有两张': "Un-approve this document? It was already pushed to ERP ({no}): first delete that document in Kingdee, then edit → approve → push again — otherwise Kingdee will hold two.",
     '批量转ERP正在执行，请等待本批完成，勿重复点击': "Batch push to ERP is running; wait for this batch to finish and do not click again",
     '制程检验单(成型产出)': 'Process inspection (moulding output)',

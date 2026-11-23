@@ -88,7 +88,10 @@ export const approvalSheetCfg = {
     // 行高 = 设计磅值 × 4/3(96dpi),来源「立项申请表.xlsx」行高
     // [33,24,18.75,20.25,33.75,38.25,33,null,null,41.25,75.75,157.5,70.5,41.25,41.25,33]
     { num: '一', label: '客户名', key: '客户名', max: 0, h: 45, kind: 'input' },
-    { num: '二', label: '立项背景', key: '立项背景', max: 250, h: 133, kind: 'textarea' },
+    // 2026-11-23 用户口径：「立项申请表的这两个红框的空间可以适当小一点，把空间留给项目开发目标」
+    //   —— 二「立项背景」133→100、六「项目输出」94→70，腾出的 33+24 全部给五「项目开发目标」210→267。
+    //   三者之和保持不变(133+94+210 = 100+70+267)，整张纸的总高不因这次调整而变。
+    { num: '二', label: '立项背景', key: '立项背景', max: 250, h: 100, kind: 'textarea' },
     { num: '三', label: '机型及应用位置', key: '机型及应用位置', max: 50, h: 55, kind: 'textarea' },
     // 2026-10-16 用户口径:「把尺寸格式示例：33*12*110 写进去背景提示词」——
     // 这一格是**唯一手输规格的入口**,格式统一了产品的「产品整体尺寸」与「炭棒外径/内径/长度」
@@ -96,8 +99,8 @@ export const approvalSheetCfg = {
     // DocSheet 的 input/textarea 分支本批补上了 row.hint 占位词(此前只有 select 分支认 hint)。
     { num: '四', label: '滤芯/炭棒规格或结构', key: '滤芯/炭棒规格或结构', max: 100, h: 101, kind: 'textarea',
       hint: '例：33*12*110（外径*内径*长度）' },
-    { num: '五', label: '项目开发目标', key: '项目开发目标', max: 250, h: 210, kind: 'textarea' },
-    { num: '六', label: '项目输出', key: '项目输出', max: 100, h: 94, kind: 'textarea' },
+    { num: '五', label: '项目开发目标', key: '项目开发目标', max: 250, h: 267, kind: 'textarea' },
+    { num: '六', label: '项目输出', key: '项目输出', max: 100, h: 70, kind: 'textarea' },
     { num: '七', label: '开发周期要求', key: '开发周期要求', max: 50, h: 55, kind: 'textarea' },
     { num: '八', label: '其它要求', key: '其它要求', max: 250, h: 55, kind: 'textarea' },
   ],
