@@ -5052,3 +5052,7 @@ migrate-sample-ext-attach-20261118.sql
 # 2026-11-18 产品信息表新版式收尾：① 立项编号/立项名称/整体外径/整体内径/整体长度 补 10 语种译名；
 #   ② 旧聚合格「产品整体尺寸」required 归 0（纸面已改三内格，避免必填挡提交）
 migrate-prodinfo-i18n-required-20261118.sql
+
+# 2026-11-23 采购订单明细显示金蝶「已入库/未入库」数量：只放开 yj_field 两列可见性(visible=1、hidden 不动)
+#   + 角色视图 cksh 同步放开 + 两个新标签补 en 译名；不改业务流程、不改表结构；幂等，两账套
+migrate-po-erp-qty-cols-20261123.sql
