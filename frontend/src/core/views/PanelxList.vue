@@ -338,7 +338,7 @@
         </div>
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
 
-        <div class="approval-side" :class="{ collapsed: sideCollapsed, 'preview-on': previewInSide }">
+        <div class="approval-side" :class="{ collapsed: sideCollapsed, 'preview-on': previewInSide, 'is-rd': isRdPanel }">
           <!-- ═══ 单据预览：**替换**右侧栏（2026-11-13 用户口径）────────────────────────
                用户原话：「把侧边栏换成右边展开，使用的时候替换右边栏，要有返回按钮」。
                形态：点「单据预览」→ 右栏整体换成「单据预览」面板（表格列表 + 返回按钮）；
@@ -15098,6 +15098,158 @@ onUnmounted(() => {
 }
 .as-side-menu-item:hover {
   background: #f2f6fa;
+}
+
+/**
+ * 研发管理（RD_*）侧边栏的**设计库口径**样式（2026-11-23 用户口径：
+ *   「我觉得这个研发管理的侧边栏样式不好看，尝试使用设计库进行优化一下」）。
+ *
+ * 取值全部来自 antd 设计库 token（`kit.mjs token`，light 模式）：
+ *   colorBorder #d9d9d9 / colorBorderSecondary #f0f0f0 / colorText rgba(0,0,0,.88)
+ *   colorTextSecondary rgba(0,0,0,.65) / colorTextTertiary rgba(0,0,0,.45)
+ *   colorBgContainer #fff / colorPrimary #1677ff / colorError #ff4d4f
+ *   controlHeight 32 / borderRadius 6 / colorFillTertiary rgba(0,0,0,.04)
+ *
+ * 设计口径（与 DESIGN-GUIDE 对齐）：8pt 间距、控件高 32、圆角 6、正文 13/20；
+ *   卡片 0 层用边框不用重阴影；分组标题弱化为 12px 三级文字 + 8px 上间距；
+ *   区段之间用一条 colorBorderSecondary 细线分隔，不再用虚线段落。
+ * 范围：只作用于 .approval-side.is-rd —— 其它模块（品质/供应链/WMS）观感保持不变。
+ */
+.approval-side.is-rd {
+  width: 184px;
+  border-color: #d9d9d9;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+.approval-side.is-rd .as-side-btns {
+  gap: 8px;
+  padding: 12px;
+}
+/* 分组标题：12px 三级灰 + 上下留白，替代原来的 11px 字距 2px 虚线 */
+.approval-side.is-rd .as-side-section {
+  font-size: 12px;
+  line-height: 20px;
+  letter-spacing: 0;
+  color: rgba(0, 0, 0, 0.45);
+  padding: 8px 0 4px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.approval-side.is-rd .as-side-section:first-child { padding-top: 0; }
+/* 常规按钮：32px 高、6px 圆角、1px 边框 */
+.approval-side.is-rd .as-side-btn {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fff;
+  color: rgba(0, 0, 0, 0.88);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1;
+}
+.approval-side.is-rd .as-side-btn:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+  background: #fff;
+}
+/* 主按钮：设计库主色实心（原来是自定义深蓝 #3d5a80） */
+.approval-side.is-rd .as-side-btn.primary {
+  background: #1677ff;
+  border-color: #1677ff;
+  color: #fff;
+  font-weight: 500;
+}
+.approval-side.is-rd .as-side-btn.primary:hover {
+  background: #4096ff;
+  border-color: #4096ff;
+  color: #fff;
+}
+/* 次级动作（下拉项）：无边框、悬停浅灰底 */
+.approval-side.is-rd .as-side-btn.sub {
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 13px;
+  font-weight: 400;
+}
+.approval-side.is-rd .as-side-btn.sub:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: rgba(0, 0, 0, 0.88);
+}
+/* 置灰：统一到设计库的禁用观感 */
+.approval-side.is-rd .as-side-btn.disabled,
+.approval-side.is-rd .as-side-btn.disabled:hover {
+  color: rgba(0, 0, 0, 0.25);
+  border-color: #d9d9d9;
+  background: rgba(0, 0, 0, 0.04);
+  cursor: not-allowed;
+}
+.approval-side.is-rd .as-side-btn.primary.disabled,
+.approval-side.is-rd .as-side-btn.primary.disabled:hover {
+  color: rgba(0, 0, 0, 0.25);
+  border-color: #d9d9d9;
+  background: rgba(0, 0, 0, 0.04);
+}
+/* 危险操作：设计库 error 色系（原来是暗红 #a85c5c） */
+.approval-side.is-rd .as-side-del.danger .as-side-btn {
+  color: #ff4d4f;
+  border-color: #ffccc7;
+}
+.approval-side.is-rd .as-side-del.danger .as-side-btn:hover {
+  color: #ff7875;
+  border-color: #ff4d4f;
+  background: #fff2f0;
+}
+.approval-side.is-rd .as-side-del.danger .as-side-caret {
+  color: #ff4d4f;
+  border-color: #ffccc7;
+  box-shadow: none;
+}
+/* 下拉箭头按钮与弹出菜单 */
+.approval-side.is-rd .as-side-caret {
+  border-color: #d9d9d9;
+  border-radius: 6px;
+  box-shadow: none;
+  color: rgba(0, 0, 0, 0.65);
+}
+.approval-side.is-rd .as-side-caret:hover {
+  border-color: #1677ff;
+  color: #1677ff;
+  background: #fff;
+}
+.approval-side.is-rd .as-side-menu {
+  border-color: #f0f0f0;
+  border-radius: 6px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  padding: 4px;
+}
+.approval-side.is-rd .as-side-menu-item {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.88);
+  border-radius: 4px;
+  padding: 6px 10px;
+}
+.approval-side.is-rd .as-side-menu-item:hover { background: rgba(0, 0, 0, 0.04); }
+.approval-side.is-rd .as-side-menu-item.danger { color: #ff4d4f; }
+.approval-side.is-rd .as-side-menu-item.danger:hover { background: #fff2f0; }
+/* 步骤徽标 / 提示条：统一到 6px 圆角与设计库灰阶 */
+.approval-side.is-rd .as-side-step {
+  background: rgba(0, 0, 0, 0.04);
+  color: rgba(0, 0, 0, 0.65);
+  border-radius: 4px;
+}
+.approval-side.is-rd .as-side-hint {
+  border-left: 3px solid #1677ff;
+  background: #f5f9ff;
+  color: rgba(0, 0, 0, 0.65);
+  font-size: 12px;
+  line-height: 18px;
+  border-radius: 0 6px 6px 0;
 }
 
 /* ═══════ ② 表头字段区（label 在上、输入在下）═══════ */
