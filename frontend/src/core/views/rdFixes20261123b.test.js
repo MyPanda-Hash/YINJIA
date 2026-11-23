@@ -21,7 +21,8 @@ test('① 阶段日期框给足宽度 + 收字号（内部 input 不再被裁）
   const m = docSheet.match(/\.as-phase-date \{[^}]*\}/)
   assert.ok(m, '缺 .as-phase-date 样式')
   assert.match(m[0], /min-width:\s*1[6-9]\dpx/, '必须给最小宽度，否则 2026-11-30 会被裁')
-  assert.match(docSheet, /\.as-phase-date \.el-input__inner \{ font-size: 12px/)
+  // ⚠ 子组件内部元素必须用 :deep()，否则 scoped 会编译成 `.el-input__inner[data-v-x]` 永远不匹配
+  assert.match(docSheet, /\.as-phase-date :deep\(\.el-input__inner\) \{ font-size: 12px/)
   const inp = docSheet.match(/\.as-phase-input \{[^}]*\}/)
   assert.ok(inp && /max-width:\s*2\d\dpx/.test(inp[0]), '日期/文本输入的最大宽要放开到 200+')
 })
@@ -56,4 +57,13 @@ test('⑦ 产品进度查询页头字样仍是删掉的状态（防回潮）', (
   const tpl = productFlow.slice(0, productFlow.indexOf('<script'))
   assert.ok(!tpl.includes("tt('产品文件流程管控')"))
   assert.ok(!tpl.includes('数据来源：产品信息表与 4 个文件面板'))
+})
+
+test('①/② 补充：日期框必须定宽 + 子组件样式必须走 :deep()；标签列顶部对齐（长行不居中漂浮）', () => {
+  const d = docSheet.match(/\.as-phase-date \{[^}]*\}/)
+  assert.ok(d, '缺 .as-phase-date')
+  assert.match(d[0], /min-width:\s*190px/, '日期框要定宽（100% 会跟着父容器一起窄）')
+  assert.match(docSheet, /\.as-phase-date :deep\(\.el-input__inner\)/, '子组件内部元素必须用 :deep()，否则 scoped 选择器匹配不到')
+  const n = docSheet.match(/\.as-name \{[^}]*\}/)
+  assert.match(n[0], /align-items:\s*flex-start/, '标签列要顶部对齐（1232px 高的行居中会把字甩到行中间）')
 })

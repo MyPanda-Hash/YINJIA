@@ -2284,9 +2284,11 @@ defineExpose({ focusField })
   font-size: 16px;
   line-height: 1.35;
   display: flex;
-  align-items: center;
+  /* 2026-11-23：改**顶部对齐** —— 测试计划那一行实测 1232px 高，居中会把「测试计划」
+     甩到行的正中间（离行首几百 px），看上去就是"字体没对上框" */
+  align-items: flex-start;
   justify-content: center;
-  padding: 2px 8px;
+  padding: 6px 8px;
   text-align: center;
 }
 /* 校验定位闪烁:琥珀高亮约3秒(保存必填缺失时) */
@@ -2549,10 +2551,13 @@ defineExpose({ focusField })
   display: flex; align-items: center;
 }
 /* 2026-11-23 用户口径「第一个时间没有显示全」：
-   实测 el-date-picker 外层 191px、内部 input 只有 161px，而 value 的滚动宽度是 186px ⇒ 后半截被裁掉
-   （2026-11-30 显示成 2026-11-3）。给足可用宽度 + 把日期框字号收到 12px，两项一起才稳。 */
-.as-phase-date { width: 100%; min-width: 170px; }
-.as-phase-date .el-input__inner { font-size: 12px; letter-spacing: 0; }
+   实测 el-date-picker 内部 input 可视宽只有 132~161px，而 value 的滚动宽度是 186px ⇒ 后半截被裁
+   （2026-11-30 显示成 2026-11-3x）。两处一起改才有效，缺一不可：
+     ① 日期框**定宽**（不是 100%，父容器窄时 100% 也跟着窄）；
+     ② 内部 input 收字号到 12px —— ⚠必须用 :deep()：el-input__inner 是子组件内部元素，
+        scoped 的普通后代选择器会编译成 `.el-input__inner[data-v-x]`，永远匹配不到（首版就栽在这）。 */
+.as-phase-date { width: 190px; min-width: 190px; max-width: 190px; }
+.as-phase-date :deep(.el-input__inner) { font-size: 12px; letter-spacing: 0; }
 .as-phase-input { max-width: 220px; }
 .as-phase-text {
   font-size: 12px; color: #444; line-height: 24px;
