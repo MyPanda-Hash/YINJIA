@@ -1601,7 +1601,12 @@ public class ButtonService {
      * 命中 col_name 或 label 任一即跳过。
      */
     private static final java.util.Set<String> REQUIRED_SYS_FIELDS =
-            java.util.Set.of("单据编号", "单据日期", "创建时间", "更新时间", "编辑人", "编辑日期", "规格书种类", "编号");
+            java.util.Set.of("单据编号", "单据日期", "创建时间", "更新时间", "编辑人", "编辑日期", "规格书种类", "编号",
+                    // 2026-11-23 用户口径：「申请立项人不需要自己填，谁填写的就是谁」
+                    //   ⇒ 该格由系统写入（新增时带当前登录人、提交审批时按**提交人**回写，
+                    //     见 doSubmitApproval / submitApproval 两处 UPDATE），不是用户必填项。
+                    //   留在 required 会卡住提交（实测报「申请立项人不能为空」），故归入系统字段跳过。
+                    "申请立项人");
 
     /**
      * 该字段是否**真的要拦必填** —— 所有必填闸门(保存两道 + 状态推进那道)共用的唯一口径。

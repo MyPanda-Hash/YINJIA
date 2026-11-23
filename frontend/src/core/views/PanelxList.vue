@@ -11428,7 +11428,8 @@ function validateInlineDraft() {
         cur.value[key] = todayStr()
         continue
       }
-      if (key === '单据编号' || key === '规格书种类') continue
+      // 2026-11-23：申请立项人由系统写入（新增带当前人、提交审批按提交人回写），不拦必填
+      if (key === '单据编号' || key === '规格书种类' || key === '申请立项人') continue
       missing.push({ key, text: headerFieldLabel(field) + '不能为空' })
     }
   }
