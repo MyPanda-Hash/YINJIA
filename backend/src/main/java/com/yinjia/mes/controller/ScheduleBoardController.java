@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -56,13 +58,16 @@ public class ScheduleBoardController {
     private final SchedulePreplanService preplanService;
     /** 报工审核钩子/产成品入库补生成(2026-11-13):finishInBackfill 复用按钮服务的多批次入库草稿逻辑 */
     private final com.yinjia.mes.service.ButtonService buttons;
+    /** 看板行 → 过程检验单跳转(2026-11-24):按产品计划判该出哪几张 + 带出最新一张存活单据 */
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     public ScheduleBoardController(ScheduleBoardService service, PanelPermissionService perm,
                                    WorkOrderTransferService transferService, ProcessTaskService processTask,
                                    ExternalReportAbsorbService absorbService,
                                    WorkOrderDayPlanService dayPlanService,
                                    SchedulePreplanService preplanService,
-                                   com.yinjia.mes.service.ButtonService buttons) {
+                                   com.yinjia.mes.service.ButtonService buttons,
+                                   org.springframework.jdbc.core.JdbcTemplate jdbc) {
         this.service = service;
         this.perm = perm;
         this.transferService = transferService;
@@ -71,6 +76,7 @@ public class ScheduleBoardController {
         this.dayPlanService = dayPlanService;
         this.preplanService = preplanService;
         this.buttons = buttons;
+        this.jdbc = jdbc;
     }
 
     /** 待排产池(已审核·未指派产线);9.29 批次③:车间账号看不到池(池内行无产线 ⇒ 无车间判据)
@@ -420,5 +426,60 @@ public class ScheduleBoardController {
 
     private static String str(Object o) {
         return o == null ? null : String.valueOf(o);
+    }
+
+    /**
+     * 工单排产看板 →「检验单」跳转入口(2026-11-24 用户口径)。
+     *
+     * <p>用户原话:「当前生产工单看板无转跳到对应的出货检验(功能)单据的实现。需要增加,可以将三个检验单
+     * 增加转跳到当前这里,针对当前的存在对应检验计划的就显示那些,只要功能就只显示功能,只有表观就只显示表观,
+     * 都没有就不显示。」</p>
+     *
+     * <p>判据 = {@link com.yinjia.mes.service.ProcessInspPlanGate}(与自动出单/入库门禁同一份):
+     * 首件看《成型工艺清单》、功能看计划 1PCS、表观看计划 1%;返回每一类「要不要」+ 同工单行最新一张
+     * 存活单据的单号/状态(没有单 = 未开单,前端跳面板列表让品质去开)。</p>
+     */
+    @PostMapping("/inspLinks")
+    public ApiResult<Map<String, Object>> inspLinks(@RequestBody Map<String, Object> body) {
+        perm.requirePanelViewAny(PagePanelRegistry.WORK_ORDER_BOARD, PagePanelRegistry.WORK_ORDER_LIST);
+        String wo = body.get("工单号") == null ? "" : String.valueOf(body.get("工单号")).trim();
+        int xc = body.get("工单行号") == null ? 0 : (int) Double.parseDouble(String.valueOf(body.get("工单行号")).trim());
+        if (wo.isEmpty() || xc <= 0) return ApiResult.error(400, "请先勾选一行工单(工单号 + 工单行号)");
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT TOP 1 ISNULL(p.dm,N'') AS code FROM dbo.plang p"
+                        + " WHERE p.pl_no=? AND ISNULL(p.pl_xc,0)=? AND ISNULL(p.asp_cancel,'N')<>'Y'", wo, xc);
+        String code = rows.isEmpty() ? "" : String.valueOf(rows.get(0).get("code")).trim();
+        com.yinjia.mes.service.ProcessInspPlanGate.Needs needs =
+                com.yinjia.mes.service.ProcessInspPlanGate.of(jdbc, code);
+        List<Map<String, Object>> items = new ArrayList<>();
+        addInspLink(items, "首件", needs.first(), "QC_FIRST_INSP", "qc_first_insp_head", wo, xc);
+        addInspLink(items, "功能", needs.func(), "QC_PROC_INSP", "qc_proc_insp_head", wo, xc);
+        addInspLink(items, "表观", needs.look(), "QC_ASM_INSP", "qc_asm_insp_head", wo, xc);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("产品编码", code);
+        out.put("items", items);
+        return ApiResult.ok(out);
+    }
+
+    /** 一类检验单:需要才追加;有存活单就带单号+状态,没有就留空(前端显示「未开单」) */
+    private void addInspLink(List<Map<String, Object>> items, String label, boolean need,
+                             String panel, String table, String wo, int xc) {
+        if (!need) return;
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("label", label);
+        m.put("panelCode", panel);
+        List<Map<String, Object>> doc = jdbc.queryForList(
+                "SELECT TOP 1 h.[单据编号] AS no,"
+                        + " CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废'"
+                        + "      WHEN ISNULL(s.stopped,'N')='Y' THEN N'已中止'"
+                        + "      WHEN ISNULL(s.pending,'N')='Y' THEN N'审批中'"
+                        + "      WHEN s.shr IS NOT NULL THEN N'已审核' ELSE N'草稿' END AS st"
+                        + " FROM dbo." + table + " h LEFT JOIN dbo.yj_doc_status s"
+                        + "   ON s.panel_code=? AND s.doc_no=h.[单据编号]"
+                        + " WHERE h.[工单号]=? AND ISNULL(h.[工单行号],0)=? AND ISNULL(h.asp_cancel,'N')<>'Y'"
+                        + " ORDER BY h.id DESC", panel, wo, xc);
+        m.put("docNo", doc.isEmpty() ? "" : String.valueOf(doc.get(0).get("no") == null ? "" : doc.get(0).get("no")));
+        m.put("status", doc.isEmpty() ? "" : String.valueOf(doc.get(0).get("st") == null ? "" : doc.get(0).get("st")));
+        items.add(m);
     }
 }

@@ -133,6 +133,19 @@
               <el-button size="small" type="primary" plain :disabled="checkedSched.length !== 1" @click="openTrace">
                 {{ tt('追溯') }}
               </el-button>
+              <!-- 检验单跳转(2026-11-24 用户口径):勾一行 → 只列「该产品计划里有的」那几张;
+                   有单直接定位,没单跳面板列表去开。都没有就整组不显示。 -->
+              <el-dropdown v-if="inspLinks.length" size="small" trigger="click" @visible-change="loadInspLinks">
+                <el-button size="small" type="success" plain :disabled="checkedSched.length !== 1">
+                  {{ tt('检验单') }}
+                  <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-item v-for="it in inspLinks" :key="it.panelCode" @click="openInspLink(it)">
+                    {{ tt(it.label) }}检验单 · {{ it.docNo || tt('未开单') }}{{ it.status ? ' · ' + tt(it.status) : '' }}
+                  </el-dropdown-item>
+                </template>
+              </el-dropdown>
               <el-dropdown v-if="canDo('print')" split-button size="small" type="success" plain :disabled="!checkedSched.length"
                            @click="printTask('成型生产任务单')" @command="printTask">
                 {{ tt('打印工单') }}（{{ checkedSched.length }}）
@@ -373,7 +386,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { printWorkTaskSheet, printSchedPlanSheet, pickPlanSheetRows, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS, moldPlanQty } from '@/business/print-formats'
-import { Setting } from '@element-plus/icons-vue'
+import { Setting, ArrowDown } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleQuickEditDialog from './ScheduleQuickEditDialog.vue'
@@ -1190,6 +1203,32 @@ function openTrace(noParam) {
   traceNo.value = no
   traceRowId.value = obj?.['行id'] ?? checkedSched.value[0]?.['行id'] ?? null
   traceVisible.value = true
+}
+
+/* ── 检验单跳转(2026-11-24)────────────────────────────────────────────────
+ * 勾选一行 → 向 /px/scheduleBoard/inspLinks 要「该产品计划里有的检验单」(首件/功能/表观各自判),
+ * 有单直接 /panelx/list/<面板>?docNo=<单号> 定位;没单就跳面板列表,由品质「选生产工单」开。
+ * 一张都没有 ⇒ inspLinks 为空 ⇒ 按钮整组不渲染(用户口径「都没有就不显示」)。 */
+const inspLinks = ref([])
+
+async function loadInspLinks() {
+  const row = checkedSched.value[0]
+  if (!row) { inspLinks.value = []; return }
+  try {
+    const res = await request.post('/px/scheduleBoard/inspLinks', {
+      工单号: row['加工单号'] ?? row['工单号'] ?? '',
+      工单行号: row['工单行号'] ?? 0,
+    })
+    inspLinks.value = res?.data?.items ?? []
+  } catch (e) {
+    inspLinks.value = []
+  }
+}
+
+function openInspLink(it) {
+  if (!it?.panelCode) return
+  const q = it.docNo ? `?docNo=${encodeURIComponent(it.docNo)}` : ''
+  router.push(`/panelx/list/${it.panelCode}${q}`)
 }
 
 // ── 排单计划纸表(2026-10-31 起;2026-11-04 标题/车间列头按工序产线动态) ──
