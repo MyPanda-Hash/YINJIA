@@ -36,7 +36,7 @@
       </div>
       <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
            该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感。
-           2026-11-19 报工记录(WO_REPORT_LIST)例外:它是平表,「导出报表」改为**按勾选行导出 Excel**
+           2026-11-24 报工记录(WO_REPORT_LIST)例外:它是平表,「导出报表」改为**按勾选行导出 Excel**
            (无 .jrxml 模板;权限=面板可见,不再要求管理员)。 -->
       <span
         v-if="(reportListSelectable || reportTemplates.length || user.isAdmin) && !docOutputHiddenSet.has('导出报表')"
@@ -602,7 +602,7 @@
                 <div v-if="['草稿', '修改中'].includes(curDocStatus) && cur['需会签'] === '是' && isChangeInitiator"
                      class="as-side-btn primary" @click="onSideAction('提交会签')">{{ tt('提交会签') }}</div>
                 <template v-if="curDocStatus === '会签中'">
-                  <!-- 2026-11-19 用户口径：「现在会签人只能点会签通过，但是不能填对应的部门评审意见」
+                  <!-- 2026-11-24 用户口径：「现在会签人只能点会签通过，但是不能填对应的部门评审意见」
                        ⇒ 会签中只放开「三、部门评审意见」的本部门行；点会签通过前会自动保存一次。 -->
                   <div v-if="changeSignoffFillOpen" class="as-side-hint">{{ tt('会签人可在「三、部门评审意见」填写本部门那一行，保存后再点「会签通过」') }}</div>
                   <div v-if="iAmChangeSigner" class="as-side-btn primary" @click="onSideAction('会签通过')">{{ tt('会签通过') }}</div>
@@ -880,7 +880,7 @@
         @selection-change="(rows) => (reportChecked = rows)"
         @expand-change="onMcExpand"
       >
-        <!-- 报工记录勾选行(2026-11-19 用户口径「可以选择出所选行导出 Excel」):
+        <!-- 报工记录勾选行(2026-11-24 用户口径「可以选择出所选行导出 Excel」):
              勾选列只在 WO_REPORT_LIST 出;勾选后「导出报表 → 导出 Excel（勾选行）」按这些行出表。
              其它报表/条码面板不受影响(qrKey 的勾选列是另一套)。 -->
         <el-table-column v-if="reportListSelectable" type="selection" width="42" fixed="left" />
@@ -1381,7 +1381,7 @@
                  导入商品数据,然后勾选商品里面的数据进行一个批量导入」⇒ 同一颗按钮点开是两项菜单。
                  ⚠ 只有声明过商品导入的面板(当前 = WLBOM)才下拉,其余面板保持原来的一击加行,
                    免得一次无人要求的按钮改版波及全部单据面板。
-                 🔴 2026-11-19:两个分支都改判 canAddDetailRow(b) = 单据可编辑 ∧ 面板「新增保存」(add)词。
+                 🔴 2026-11-24:两个分支都改判 canAddDetailRow(b) = 单据可编辑 ∧ 面板「新增保存」(add)词。
                    取消该面板的 add 词后按钮即消失;下拉里的「导入商品数据」同样是加行,一并受控
                    (真闸门在后端 ButtonService.saveArchive 的新增行校验)。 -->
             <el-dropdown
@@ -1776,6 +1776,14 @@
       :merge="genMerge"
       @generated="onGenerateDone"
     />
+    <!-- 合单选单弹窗(2026-11-24):点「合单生单」先弹它选采购订单,确定后才开合单页面 ——
+         金蝶 ERP 选单口径(只列已审核 + 还有未送量 + 同一供应商) -->
+    <MergePickDocsDialog
+      v-model="mergePickVisible"
+      :source-panel="panelCode"
+      :target-panel="pushTargets[mergePickAction] || ''"
+      @confirm="onMergeDocsPicked"
+    />
 
     <!-- 下拉框字段弹窗模式(>20 条):字典项搜索选择 -->
     <el-dialog v-model="dictPickVisible" :title="tt('选择') + '：' + (dictPickField ? headerFieldLabel(dictPickField) : '')" width="440px" append-to-body :close-on-click-modal="false">
@@ -2056,7 +2064,7 @@
     </el-dialog>
 
     <!-- ═══ 对外正式报表(后端 JasperReports 模板):业务只选格式,版式由 IT 的 .jrxml 决定 ═══
-         2026-11-19 报工记录(WO_REPORT_LIST):平表没有 .jrxml,导出改为**前端按勾选行生成 Excel**
+         2026-11-24 报工记录(WO_REPORT_LIST):平表没有 .jrxml,导出改为**前端按勾选行生成 Excel**
          (当前列设置 + 当前排序/筛选结果),两个入口:勾选行 / 全部当前结果。 -->
     <el-dialog v-model="reportVisible" :title="tt('导出报表')" width="460px" append-to-body>
       <template v-if="reportListSelectable">
@@ -2978,6 +2986,7 @@ import { BARCODE_PANELS, barcodeLabelsOf } from '@core/panel/barcodeLabel'
 import RefPickDialog from './RefPickDialog.vue'
 import BatchSendDialog from './BatchSendDialog.vue'
 import GenerateLinesDialog from './GenerateLinesDialog.vue'
+import MergePickDocsDialog from './MergePickDocsDialog.vue'
 import NewVoucherDialog from './NewVoucherDialog.vue'
 import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
 import SelectVoucherDialog from './SelectVoucherDialog.vue'
@@ -3138,7 +3147,7 @@ const changeDeptFillOpen = computed(() => String(panelCode.value) === 'RD_CHANGE
   && (changeDeptRows.value || []).length > 0)
 
 /**
- * 会签中「会签人填本部门那一行」模式(2026-11-19 用户口径)。
+ * 会签中「会签人填本部门那一行」模式(2026-11-24 用户口径)。
  *
  * <p>用户原话：「现在会签人只能点会签通过，但是不能填对应的部门评审意见」。
  * 与服务端 ButtonService.allowChangeSignoffFill 同口径：面板 + 会签中 + 本单待签会签人 +
@@ -4173,7 +4182,7 @@ function onHeaderRefSelectChange(field, v) {
 
 const reportMode = computed(() => cfgCache.value?.metadata?.report === true || cfgCache.value?.metadata?.panelCategory === '报表')
 /**
- * 报工记录(WO_REPORT_LIST)专属:平表勾选行 + 导出 Excel(2026-11-19 用户口径)。
+ * 报工记录(WO_REPORT_LIST)专属:平表勾选行 + 导出 Excel(2026-11-24 用户口径)。
  * 只给它开勾选列/报表式导出弹窗,其它报表面板(库存台账/收发存汇总…)行为零变化。
  */
 const reportListSelectable = computed(() => String(panelCode.value || '') === 'WO_REPORT_LIST')
@@ -4425,7 +4434,7 @@ const reportColumns = computed(() => gridTabs.value[0]?.columns || [])
 // ── 报表表头筛选与排序补丁:栏目显隐 / 表头筛选 / 升降序 / 后端持久化 ──
 const reportCols = useReportColumns(panelCode, reportColumns, list)
 const reportList = reportCols.sortedRows          // 排序+筛选后的报表数据(模板顶层引用以自动解包)
-/** 报工记录当前页勾选行(2026-11-19:导出报表 → 导出 Excel（勾选行）的数据源) */
+/** 报工记录当前页勾选行(2026-11-24:导出报表 → 导出 Excel（勾选行）的数据源) */
 const reportChecked = ref([])
 /** 勾选行里仍属于当前结果的那些:切页/改筛选后 el-table 可能留着旧对象,导出与计数都以本列表为准 */
 const reportCheckedRows = computed(() => (reportChecked.value || [])
@@ -5220,7 +5229,7 @@ const canPreviewSide = computed(() => !canFullPreview.value && PREVIEW_SIDE_PANE
 const SAMPLE_PANELS = new Set(['RD_SAMPLE_EXT', 'RD_SAMPLE_INT', 'RD_SAMPLE_ND'])
 
 /**
- * 「单据预览」按钮/浮层的**按面板命名**（2026-11-19 销售问题汇总）：
+ * 「单据预览」按钮/浮层的**按面板命名**（2026-11-24 销售问题汇总）：
  *   产品信息表 P11「改为：产品搜索」、P12 预览页标题「改为：产品信息查询」；
  *   立项申请  P16/P17「改为：立项查询」（按钮与标题同名）。
  * 未登记的面板仍叫「单据预览」—— 其它 20 多个面板的文案一个字不动。
@@ -5304,7 +5313,7 @@ async function openApprovalPreview() {
 }
 
 /**
- * 关闭全屏预览（2026-11-19 用户报障：「单据预览的查询的数据不对」）：
+ * 关闭全屏预览（2026-11-24 用户报障：「单据预览的查询的数据不对」）：
  * 打开时把 pageSize 拉到 200 一次取全，**关闭必须还原**并重新取数 ——
  * 原来只把 open 置 false，分页/查询条件就永久停在"取 200 条、第 1 页"的状态，
  * 用户再点查询看到的结果与分页都不对（正是这个报障）。
@@ -5330,7 +5339,7 @@ async function jumpToApprovalDoc(row) {
   //   产品信息表的 group_col 是「单据编号」，历史面板可能只有 编号/锭号 ——
   //   别让「跳转」因为取错键拿到空单号而静默不跳。
   const no = docNoOf(row)
-  // 2026-11-19 用户报障：「跳转对应单据功能不对」——
+  // 2026-11-24 用户报障：「跳转对应单据功能不对」——
   //   原来写死 /panelx/list/RD_APPROVAL，产品信息表点「跳转」会跑到立项申请列表。
   //   现在跳**当前面板**并带 ?focus=单号（focus 定位逻辑见 load() 里的 route.query.focus）。
   // 2026-11-20 用户报障：「跳转回到第一张草稿」——
@@ -5396,7 +5405,7 @@ const previewCards = computed(() => {
     const no = String(row['单据编号'] || row['编号'] || '')
     const sum = previewSummaryFor(row)
     const kw = previewKw.value.trim().toLowerCase()
-    // 2026-11-19 销售问题汇总 P7：「搜索还是一样的问题，要跟产品信息和立项申请一样的搜索」——
+    // 2026-11-24 销售问题汇总 P7：「搜索还是一样的问题，要跟产品信息和立项申请一样的搜索」——
     //   侧栏「单据预览查找」原来只匹配**单号 + 摘要里的几个字段**，样品单想按客户/规格找单就搜不到。
     //   改成整行字段一起匹配（与列表页模糊搜索、全屏预览搜索同一口径）。
     const rowHay = Object.keys(row || {})
@@ -5500,7 +5509,7 @@ const isStandardFlowSheet = computed(() => Object.prototype.hasOwnProperty.call(
  *   (此前这两张单只有管理员直审入口,没有提交审批这一步)。后端权威清单 = ButtonService.QC_DOC_PREPARER
  *   (= ADMIN_L2_PANELS);**两处必须同步**,否则会出现"前端给了按钮、后端按直审/非两级审批拒掉"的错位。
  *
- * ⚠ 2026-11-19(取代上面 11-06 段):用户口径「没有二级审核,只需要审核人就行,去掉批准人」——
+ * ⚠ 2026-11-24(取代上面 11-06 段):用户口径「没有二级审核,只需要审核人就行,去掉批准人」——
  *   首件检验单纸面表尾去掉 2026-11-06 补的第四格「批准」(QcFirstInspSheet.vue / firstInspExport.js /
  *   reports/qc_first_insp.jrxml 三处同步),表尾回到「检验结果|检验人|审核人」。
  *   审批形态本身 2026-11-09 起就是**单级**(SINGLE_LEVEL_INSP_PANELS:提交审批 → 审批通过 → 已审核),
@@ -5577,7 +5586,7 @@ const hasApprovalBtns = computed(() => isStandardFlowSheet.value
  *   全部由上面的统一审批组与危险操作段承担(弃审在⑤危险操作,仅已审核可点)。
  *   保留本常量与 canDirectAuditHere 计算:将来若某个工序检验单确要走直审,只把面板码加回来即可。
  *
- * ⚠ 2026-11-19(用户口径「没有二级审核,只需要审核人就行,去掉批准人」,**再次取代** 10-18 / 11-06 段):
+ * ⚠ 2026-11-24(用户口径「没有二级审核,只需要审核人就行,去掉批准人」,**再次取代** 10-18 / 11-06 段):
  *   首件检验单纸面表尾的第四格「批准」删除(三处同源:QcFirstInspSheet.vue / firstInspExport.js /
  *   reports/qc_first_insp.jrxml);审批仍走 2026-11-09 起的**单级**形态(提交审批 → 审批通过 → 已审核),
  *   侧栏按钮组不变。保留本段只为记录历史,别再照 11-06 段把批准格加回来。
@@ -6424,11 +6433,11 @@ const batchGenerateItems = computed(() => {
 const railSelectable = computed(() => !!docRailCfg.value && batchGenerateItems.value.length > 0 && !reportMode.value)
 
 /**
- * **合单生单**(2026-11-13 用户口径):多张同供应商采购订单 → 一张送料暂收单。
+ * **合单生单**入口(2026-11-24 用户口径改版):不再靠左栏勾选,改成金蝶 ERP 式的「选单」窗口。
  *
- * 只有**采购订单**这一跳有(用户原话「采购订单新增一个合单生单在生单按钮下面」);
- * 入口放在「生单 ▼」下拉里(与「批量生单」并列),选单方式沿用左栏勾选 —— 少一个"再选一次单"的弹窗。
- * 生单动作取该面板唯一的生单动作(采购订单 = 生成送料暂收单)。
+ * 点「合单生单」→ 先弹 MergePickDocsDialog 选采购订单(只列已审核 + 还有未送量的、同一供应商)→
+ * 确定后才打开合单页面;合单页面里还有一个「选择单据」按钮可以继续补单(见 GenerateLinesDialog)。
+ * 后端仍是 /px/push/merge:行级「采购单号」= 合单前的订单号,占用用合单后的暂收行 id。
  */
 const MERGE_GENERATE_ACTION = '合单生单'
 const MERGE_GENERATE_PANELS = new Set(['PU_ORDER', 'SUPPLIER_PU_ORDER'])
@@ -6436,6 +6445,21 @@ const canMergeGenerate = computed(() => MERGE_GENERATE_PANELS.has(String(panelCo
   && generatableActions.value.length > 0 && !!docRailCfg.value && !reportMode.value)
 /** 合单走哪个生单动作(采购订单 → 生成送料暂收单;取第一个已登记链路) */
 const genMergeAction = computed(() => generatableActions.value[0] || '')
+/** 选单弹窗(合单第一步) */
+const mergePickVisible = ref(false)
+const mergePickAction = ref('')
+/**
+ * 选单确定 → 打开合单页面。
+ * 少于两张不放到合单页面里(后端 generateMerged 同口径要求 ≥2):当场说清,别让用户填完才被拒。
+ */
+function onMergeDocsPicked({ nos }) {
+  const list = (nos || []).filter(Boolean)
+  if (list.length < 2) {
+    ElMessage.warning(`${tt('合单生单至少要两张采购订单，当前只有')} ${list.length} ${tt('张单据')}`)
+    return
+  }
+  openGenerateDialog(mergePickAction.value, list, true)
+}
 /** 左栏勾选(单号数组;PanelxList 是唯一真源,翻页/切换当前单都不丢) */
 const railChecked = ref([])
 /** 勾选归属的面板 —— 切面板必须清零:单号是上一个面板的,留着会拿错单去生单 */
@@ -6890,7 +6914,7 @@ const DOC_RAIL_PANELS = {
   //                              值由生产领料按工单带入;左栏列必须跟着换,否则按旧键 生产车间 取不到值)
   //   FINISH_IN    → 加工单号  :产成品入库的来源工单(1/1 有值;其 生产车间/业务类型/仓库 均 0/1 恒空)
   // 🔴 2026-10-15 第二轮(用户口径):销售出库单还要显示「销售订单号」+「ERP单」——
-  //   它是从销售订单生单/选单过来的,左栏要能一眼看到来源订单;材料出库单同样要 ERP单。
+  //   它是从销售订单生单/选单过来的,左栏要能一眼看到来源订单;生产领料单同样要 ERP单。
   //   列序 = 单号 | 日期 | 销售订单号 | 客户 | ERP单 | 审核状态(销售出库);
   //   ERP单 复用采购入库同款**派生列**(已转/未转 彩色标签),不是新字段 ——
   //   两张单的 ERP单号/是否已转ERP 实测都已在 yj_field 且可见,故直接可派生。
@@ -8620,7 +8644,7 @@ function closeCtx() {
 const APPROVE_ACTIONS = ['审批通过', '审批驳回']
 
 /** 处于审批流程中的状态(2026-09-20 两级审批:一级「审批中」/二级「待二级审批」) */
-// 2026-11-19：产品变更申请表会签全过后进入「待批准」（admin 终审），同样属于审批在途状态。
+// 2026-11-24：产品变更申请表会签全过后进入「待批准」（admin 终审），同样属于审批在途状态。
 const IN_APPROVAL = ['审批中', '待二级审批', '待批准']
 
 // ---------- 二级审核人选取(2026-09-20 两级审批:一级通过时必须选人) ----------
@@ -8855,10 +8879,10 @@ async function confirmDomApprove() {
     domApvBusy.value = false
   }
 }
-/* ── 产品变更申请表：审批通过 / 管理员最终批准（2026-11-11 建立，2026-11-19 改口径）──
+/* ── 产品变更申请表：审批通过 / 管理员最终批准（2026-11-11 建立，2026-11-24 改口径）──
  * 2026-11-11 用户口径：「审批的时候弹出弹窗，审批人可以进行批准，还有签字，把信息回填进这里面，
  *   还有日期」——那时弹窗可手填签字/日期。
- * 2026-11-19 用户口径更新：「点批准时自动写入 admin 的姓名（系统管理员）+ 当天日期」⇒
+ * 2026-11-24 用户口径更新：「点批准时自动写入 admin 的姓名（系统管理员）+ 当天日期」⇒
  *   弹窗只展示"将回填的姓名/日期"（不可改）+ 可填审批意见；服务端 writeChangeApprovalSign
  *   也不再接受「批准签字/批准日期」载荷，三格只有服务端一个真源。
  * 「待批准」节点只有 admin 能看到该按钮（见 approvalBtnsVisible / canFinalApprove）。 */
@@ -10532,9 +10556,9 @@ async function downloadReport(fmt) {
 }
 
 /**
- * 报工记录「导出报表 → 导出 Excel」(2026-11-19 用户口径;2026-11-20 加表格样式)。
+ * 报工记录「导出报表 → 导出 Excel」(2026-11-24 用户口径;2026-11-20 加表格样式)。
  *
- * <p>用户口径 2026-11-19:「报工记录需要可以选择出所选行导出 Excel,就是当前的导出报表需要实现,
+ * <p>用户口径 2026-11-24:「报工记录需要可以选择出所选行导出 Excel,就是当前的导出报表需要实现,
  * 但是需要增加勾选行。」⇒ 平表没有 .jrxml 模板,导出走前端 xlsx:</p>
  * <ul>
  *   <li>列 = **当前列设置后的可见列**(reportColumnTree 的叶子,与屏幕表头同源);</li>
@@ -10965,7 +10989,7 @@ function detailEditable(b) {
 }
 
 /**
- * 明细「新增数据」闸门(2026-11-19 用户口径)。
+ * 明细「新增数据」闸门(2026-11-24 用户口径)。
  *
  * 需求原话:「送样登记表明细页签工具栏的绿色『+ 新增数据』按钮,其『新增』要能在
  * 组织架构 → 角色与面板权限里去掉:取消该面板的『新增保存』(add 词)后,按钮应消失;
@@ -11063,7 +11087,7 @@ function onDetailCellDblclick(row, column, event, b) {
   const field = fieldDefOf(column?.property)
   // 明细行双击**只**服务「参照触发=双击」的字段(如存货:双击弹参照选择器);其余情况什么都不做。
   // 🔴 2026-10-15 用户口径:原实现在非草稿态还会 `openForm(cur.value)` —— 即双击明细行弹出整单卡片
-  //    (VoucherFormDialog),采购入库单/材料出库单…所有单据面板都一样,用户明确要求双击不要再弹。
+  //    (VoucherFormDialog),采购入库单/生产领料单…所有单据面板都一样,用户明确要求双击不要再弹。
   //    随后用户进一步确认「不需要能打开这个卡片」⇒ 卡片与工具栏「修改」入口**全部删除**(见 openForm 处注释)。
   if (detailEditable(b) && isReferenceField(field) && detailRefTrigger(field) === 'dblclick') {
     event?.stopPropagation?.()
@@ -11079,7 +11103,7 @@ function newDetailRow(tabKey) {
 }
 
 function addInlineDetailRow(b) {
-  // 加行闸门(2026-11-19):不只隐藏按钮,函数自身也拦 —— 占位行点击/下拉命令等其它入口
+  // 加行闸门(2026-11-24):不只隐藏按钮,函数自身也拦 —— 占位行点击/下拉命令等其它入口
   // 都汇到这里;判据见 canAddDetailRow(面板「新增保存」add 词)。
   if (!canAddDetailRow(b)) return
   const tabKey = activeTab(b).key
@@ -11133,7 +11157,7 @@ function canImportProducts(b) {
 
 /** 「新增数据」下拉的命令分发:加一行 / 打开商品导入弹窗(两个命令都属"加行",同一 add 词闸门) */
 function onAddDetailCommand(cmd, b) {
-  // 2026-11-19:下拉在模板层已由 canAddDetailRow 控制显隐,这里再挡一次 ——
+  // 2026-11-24:下拉在模板层已由 canAddDetailRow 控制显隐,这里再挡一次 ——
   // 命令分发是"加行"的唯一入口(含「导入商品数据」批量追加行),不能只靠按钮 v-if。
   if (!canAddDetailRow(b)) return
   if (cmd === 'importProduct') {
@@ -12680,7 +12704,7 @@ function isDisabled(action) {
     撤回删除申请: !current.value || st !== '删除申请中',
     撤回修改申请: !current.value || st !== '修改申请中',
     // 2026-11-11：已生效/已归档时，会签人仍可「填本部门那一行」并保存（changeDeptFillOpen）
-    // 2026-11-19：会签中同样放开（changeSignoffFillOpen）—— 只放「保存」这一个动作，
+    // 2026-11-24：会签中同样放开（changeSignoffFillOpen）—— 只放「保存」这一个动作，
     //   保存为草稿/保存新增仍按原口径（草稿才有意义）。
     保存: (!draftEditable.value && !changeRowEditOpen.value) || inlineSaving.value,
     保存为草稿: !draftEditable.value || inlineSaving.value,
@@ -13209,24 +13233,16 @@ async function onButton(action) {
     purInMultiWhVisible.value = true
     return
   }
-  // **合单生单**(2026-11-13 用户口径:「采购订单新增一个合单生单在生单按钮下面,可以选择同一供应商的单据,
-  //   进行合单,合成一张送料暂收单」):
-  //   · 选单方式与「批量生单」一致(左栏勾多张采购订单),但**必须同一供应商** —— 这里先按供应商分组,
-  //     混了多家直接拦下并点名,不让用户到对话框里才发现(后端 generateMerged 同口径再校验一次);
-  //   · 出的是**一张**送料暂收单:行级「采购单号」= 合单前的订单号、「采购订单行号」= 合单前的订单行号,
-  //     暂收单自己的行 id 才是合单后的行号(下游占用/反查用它)。
+  // **合单生单**(2026-11-24 用户口径改版:「合单生单添加一个弹窗选择,不再是勾选了,而是点击合单生单
+  //   弹出一个窗口,这个窗口可以选择单据,选择单据后,加入到现在的合单生单页面……参考金蝶erp选单的设计逻辑」):
+  //   ① 点「合单生单」→ **选单弹窗**(MergePickDocsDialog,金蝶式:只列已审核 + 还有未送量的采购订单);
+  //   ② 勾单 → 确定 → 打开合单页面(GenerateLinesDialog,merge),行并进**一张**送料暂收单;
+  //   ③ 合单页面里还能再点「选择单据」补单,已加入的明细只补没有的行;行/单都能删。
+  //   左栏勾选不再参与这条链路(它只服务「批量生单」)。
   if (action === MERGE_GENERATE_ACTION) {
-    const rows = list.value.filter((r) => railChecked.value.includes(docNoOfRow(r)))
-    if (rows.length < 2) return ElMessage.warning(tt('合单生单请先在左侧勾选至少两张采购订单'))
-    const audited = rows.filter((r) => String(r['单据状态'] || '') === '已审核')
-    if (audited.length !== rows.length) {
-      return ElMessage.warning(tt('合单生单只能勾「已审核」的采购订单：勾选里有草稿/审批中的单据'))
-    }
-    const suppliers = [...new Set(audited.map((r) => String(r['供应商'] || '').trim()))]
-    if (suppliers.length > 1) {
-      return ElMessage.warning(`${tt('合单生单只能选同一供应商的采购订单，当前勾了')}：${suppliers.join('、')}`)
-    }
-    openGenerateDialog(genMergeAction.value, audited.map(docNoOfRow), true)
+    if (!genMergeAction.value) return ElMessage.warning(tt('该面板没有可合单生单的下游链路'))
+    mergePickAction.value = genMergeAction.value
+    mergePickVisible.value = true
     return
   }
   // 批量生单(2026-10-31 用户口径):左栏勾多张来源单 → 统一生单对话框(勾行 + 本次数量)
@@ -14140,7 +14156,7 @@ async function onButton(action) {
     // (提交会签同此:需会签/会签人 是头字段,刚填的必须先生效,否则后端按库里的旧值判"没填会签人")
     // 2026-10-17 用户报障「未保存可以直接审核,出现错误」:保存没过必填校验时,提示必须**归因到这次审批动作**
     // (reason=action ⇒「审核前需先保存：请至少添加一行明细」),否则用户只看到一句与审核无关的校验错误。
-    // 会签通过(2026-11-19):会签人刚在纸面填的本部门意见必须先落库，否则服务端盖章时读到的还是旧内容。
+    // 会签通过(2026-11-24):会签人刚在纸面填的本部门意见必须先落库，否则服务端盖章时读到的还是旧内容。
     const needsSaveBefore = ['审核', '提交审批', '提交会签'].includes(action)
       ? draftEditable.value
       : (action === '会签通过' && (draftEditable.value || changeSignoffFillOpen.value))

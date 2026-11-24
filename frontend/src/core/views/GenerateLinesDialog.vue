@@ -31,6 +31,12 @@
         <span class="gl-chip">{{ tt('来源单据') }}: {{ docs.length }} {{ tt('张') }}</span>
         <!-- 合单模式(2026-11-13):N 张来源单 → 一张目标单;必须同一供应商 -->
         <span v-if="merge" class="gl-chip gl-merge">{{ tt('合单生单：这些行会合成一张单据（行级「采购单号」保留合单前的订单号）') }}</span>
+        <!-- 选单入口(2026-11-24 用户口径「在合单生单页面多一个选择单据的按钮」):
+             金蝶式选单 —— 点开 → 勾采购订单 → 明细加进来;已经在页面上的明细只补没有的行 -->
+        <el-button v-if="merge" type="primary" size="small" @click="pickVisible = true">
+          {{ tt('选择单据') }}
+        </el-button>
+        <span v-if="merge" class="gl-tip">{{ tt('选单加入合单：已加入的明细只补还没进来的行，不会重复') }}</span>
         <!-- 超送比例**只有采购订单这一跳有**(用户口径 2026-10-31:「除了采购订单,别的生单没有超送比例」)——
              送料暂收→检验/入库、销售订单→销售出库单 等一律不显示,上限就是剩余量 -->
         <span v-if="showOverRatio" class="gl-ratio">
@@ -61,6 +67,11 @@
             <el-button v-if="showWhBin" link type="primary" size="small"
                        :title="tt('把本单第一行填好的仓库与仓位套用到本单所有行')"
                        @click="applyWhBinToAll(doc)">{{ tt('仓库仓位应用到所有行') }}</el-button>
+            <!-- 删除整单(2026-11-24 用户口径「又删除按钮，可以删除掉不需要单据的明细」):
+                 合单页面上"这张订单不要了"要能整段撤掉,不必逐行删 -->
+            <el-button v-if="merge" link type="danger" size="small"
+                       :title="tt('把这张单据整单从合单页面移除')"
+                       @click="removeDoc(doc)">{{ tt('删除本单') }}</el-button>
             <span class="gl-picked">{{ tt('已选') }} {{ (pickedByDoc[doc.sourceNo] || []).length }} {{ tt('行') }}</span>
           </span>
         </div>
@@ -135,6 +146,15 @@
               </el-tag>
             </template>
           </el-table-column>
+          <!-- 删除行(2026-11-24 用户口径「可以删除掉不需要单据的明细」):
+               只挂合单模式 —— 批量生单是"逐张各出一张单",删行没有语义 -->
+          <el-table-column v-if="merge" :label="tt('操作')" width="86" align="center">
+            <template #default="{ row }">
+              <el-button link type="danger" size="small"
+                         :title="tt('把这一行从本次合单里移除')"
+                         @click="removeLine(doc, row)">{{ tt('删除行') }}</el-button>
+            </template>
+          </el-table-column>
         </el-table>
       </div>
 
@@ -152,6 +172,17 @@
         {{ merge ? tt('确定合单生单') : tt('确定生单') }}
       </el-button>
     </template>
+
+    <!-- 选单弹窗(2026-11-24):合单页面里"再加几张订单"用;已经加入的明细只补没有的行 -->
+    <MergePickDocsDialog
+      v-model="pickVisible"
+      :source-panel="sourcePanel"
+      :target-panel="meta.targetPanel"
+      :source-name="meta.sourceName"
+      :added-nos="addedNos"
+      :supplier="mergeSupplier"
+      @confirm="onDocsPicked"
+    />
   </el-dialog>
 </template>
 
@@ -168,6 +199,8 @@ import {
 import { binsOfWarehouse, defaultBinOf, loadWhBinSources, whBinPayload } from '@core/selection/genWhBin'
 // 未勾选的行置灰 + 不可填(2026-11-17 客户口径;四个打印/生单弹窗共用同一份,见该模块头注释)
 import { pickRowClass, pickRowLocked } from '@core/selection/pickRowStyle'
+// 合单的「选单」弹窗(2026-11-24 用户口径:合单生单不再靠左栏勾选,改成金蝶式选单窗口)
+import MergePickDocsDialog from './MergePickDocsDialog.vue'
 
 const engine = usePanelRuntime()
 
@@ -190,7 +223,7 @@ const emit = defineEmits(['update:modelValue', 'generated'])
 
 const loading = ref(false)
 const saving = ref(false)
-const meta = reactive({ targetPanel: '', targetName: '', batchFlow: false, overRatio: 0 })
+const meta = reactive({ targetPanel: '', targetName: '', sourceName: '', batchFlow: false, overRatio: 0 })
 /** 服务端候选:每条 = 一张来源单(头 + 行 + 批次预告) */
 const docs = ref([])
 /** 本次超送比例(百分数;改了只影响本次上限,不写系统参数 —— 写系统参数在分批送料对话框里) */
@@ -203,6 +236,16 @@ const pickedByDoc = reactive({})
 const qtyOf = reactive({})
 /** 上一次提交的失败清单(留在底部提示,重试前看得见原因) */
 const failed = ref([])
+
+/* ── 选单(2026-11-24 用户口径「在合单生单页面多一个选择单据的按钮,选择后单据明细会添加进来,
+      已经有的明细就只补没有的就行」)────────────────────────────────
+   选单弹窗只回"单据号",明细仍由 /px/push/lines 取(与首次打开时同一份行契约),
+   于是"补进来的行"与"本来就在的行"字段、上限、仓库仓位默认值完全同源。 */
+const pickVisible = ref(false)
+/** 已在页面上的单据号:选单弹窗据此把这几张标「已添加」并禁止再选 */
+const addedNos = computed(() => docs.value.map((d) => d.sourceNo))
+/** 合单锁定的供应商(取第一张单据):换一家=不能合,弹窗只列这一家的订单 */
+const mergeSupplier = computed(() => String((docs.value[0]?.header || {})['供应商'] || '').trim())
 
 /* ── 仓库 / 仓位按行预填(2026-11-13 用户口径)─────────────────────────
    只在**采购链头一跳**(采购订单 → 送料暂收单)出这两列:
@@ -323,6 +366,30 @@ function clearAll() {
   for (const key of Object.keys(qtyOf)) qtyOf[key] = 0
 }
 
+/**
+ * 一行来源明细的默认值(数量/仓库/仓位)—— **首次打开**与**选单补进来**共用这一份,
+ * 否则"补进来的行"会缺仓库仓位默认值,生单时落到别处。
+ */
+function initLineRow(row) {
+  qtyOf[row.lineKey] = Number(row.剩余数量) > 0 ? Number(row.剩余数量) : 0
+  if (!showWhBin.value) return
+  // 来源行本身带了仓库/仓位就继承(采购订单行可以手工填过),否则留空由用户选;
+  // 有仓库没仓位时按该仓默认仓位预填(与后端 presetBinFor 同一口径)。
+  const wh = String(row['仓库'] || row['仓库编码'] || '').trim()
+  if (wh) whOf[row.lineKey] = wh
+  const bin = String(row['仓位'] || row['仓位编码'] || '').trim()
+  binOf[row.lineKey] = bin || (wh ? defaultBinOf(whSrc.bins, wh) : '')
+}
+
+/** 把一条来源单整段纳入本对话框(新单据:行 + 批次号 + 默认勾选) */
+function adoptDoc(src) {
+  for (const row of src.lines || []) initLineRow(row)
+  docs.value.push(src)
+  batchNoOf[src.sourceNo] = String(src.nextBatchNo || '')
+  // 默认勾选:只勾有剩余的**订单行**;已打印隔离行必须显式勾(用户口径)
+  pickedByDoc[src.sourceNo] = defaultPickKeys(src.lines || [])
+}
+
 async function load() {
   if (!props.sourcePanel || !props.action || !props.sourceNos?.length) return
   loading.value = true
@@ -334,6 +401,7 @@ async function load() {
     })
     meta.targetPanel = res?.targetPanel || ''
     meta.targetName = res?.targetName || ''
+    meta.sourceName = res?.sourceName || ''
     meta.batchFlow = !!res?.batchFlow
     meta.overRatio = Number(res?.overRatio || 0)
     // 超送比例只对**采购订单这一跳**生效;其余链路(暂收→检验/入库、销售订单→销售出库单)
@@ -345,28 +413,14 @@ async function load() {
     for (const k of Object.keys(batchNoOf)) delete batchNoOf[k]
     for (const k of Object.keys(whOf)) delete whOf[k]
     for (const k of Object.keys(binOf)) delete binOf[k]
-    docs.value = (res?.docs || []).map((d) => ({ ...d, lines: d.lines || [] }))
+    docs.value = []
     // 仓库/仓位档案(只在采购订单这一跳需要):取一次,失败也不阻断生单
     if (showWhBin.value) {
       const src = await loadWhBinSources(engine)
       whSrc.warehouses = src.warehouses
       whSrc.bins = src.bins
     }
-    for (const doc of docs.value) {
-      batchNoOf[doc.sourceNo] = String(doc.nextBatchNo || '')
-      for (const row of doc.lines) {
-        qtyOf[row.lineKey] = Number(row.剩余数量) > 0 ? Number(row.剩余数量) : 0
-        if (!showWhBin.value) continue
-        // 来源行本身带了仓库/仓位就继承(采购订单行可以手工填过),否则留空由用户选;
-        // 有仓库没仓位时按该仓默认仓位预填(与后端 presetBinFor 同一口径)。
-        const wh = String(row['仓库'] || row['仓库编码'] || '').trim()
-        if (wh) whOf[row.lineKey] = wh
-        const bin = String(row['仓位'] || row['仓位编码'] || '').trim()
-        binOf[row.lineKey] = bin || (wh ? defaultBinOf(whSrc.bins, wh) : '')
-      }
-      // 默认勾选:只勾有剩余的**订单行**;已打印隔离行必须显式勾(用户口径)
-      pickedByDoc[doc.sourceNo] = defaultPickKeys(doc.lines)
-    }
+    for (const d of res?.docs || []) adoptDoc({ ...d, lines: d.lines || [] })
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('生单数据加载失败'))
   } finally {
@@ -374,7 +428,102 @@ async function load() {
   }
 }
 
+/* ── 选单补单 / 删除(2026-11-24 用户口径)──────────────────────────── */
+
+/**
+ * 选单确定:把勾选单据的明细**只补没有的**行加进来。
+ *
+ * 口径(用户原话「已经有的明细就只补没有的就行」):
+ *   · 已在页面上的单据 → 按 lineKey 去重,只追加还没加入的行(删掉过的行可以靠它补回来);
+ *   · 新单据 → 整段纳入(数量/仓库仓位/默认勾选走 adoptDoc,与首次打开同源);
+ *   · 供应商不一致 → 拦下并点名(后端 generateMerged 同口径再校验一次)。
+ */
+async function onDocsPicked({ nos }) {
+  const want = (nos || []).filter(Boolean)
+  if (!want.length) return
+  loading.value = true
+  try {
+    const res = await engine.pushFlowLines({
+      panelCode: props.sourcePanel, action: props.action, sourceNos: want,
+    })
+    let newDocs = 0
+    let newLines = 0
+    for (const d of res?.docs || []) {
+      const src = { ...d, lines: d.lines || [] }
+      if (!src.sourceNo) continue
+      const sup = String((src.header || {})['供应商'] || '').trim()
+      if (mergeSupplier.value && sup && sup !== mergeSupplier.value) {
+        ElMessage.warning(`${tt('合单生单只能选同一供应商的采购订单，当前勾了')}：${mergeSupplier.value}、${sup}`)
+        continue
+      }
+      const exist = docs.value.find((x) => x.sourceNo === src.sourceNo)
+      if (!exist) {
+        adoptDoc(src)
+        newDocs++
+        newLines += src.lines.length
+        continue
+      }
+      // 同一张单再选一次:只补"页面上还没有"的行(行键 = 单号#行id,稳定)
+      const have = new Set(exist.lines.map((r) => r.lineKey))
+      for (const row of src.lines) {
+        if (have.has(row.lineKey)) continue
+        initLineRow(row)
+        exist.lines.push(row)
+        // 补进来的行与"首次打开时默认勾选"同一口径:有剩余的订单行自动勾上
+        // (已打印隔离行仍要用户显式勾,见 defaultPickKeys)
+        if (defaultPickKeys([row]).length) {
+          pickedByDoc[src.sourceNo] = [...(pickedByDoc[src.sourceNo] || []), row.lineKey]
+        }
+        newLines++
+      }
+    }
+    if (!newDocs && !newLines) {
+      ElMessage.info(tt('该单据的明细已全部在合单页面中，无需重复添加'))
+    } else {
+      ElMessage.success(`${tt('已加入')} ${newDocs} ${tt('张单据')} · ${tt('新增明细')} ${newLines} ${tt('行')}`)
+    }
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('选单明细加载失败'))
+  } finally {
+    loading.value = false
+  }
+}
+
+/** 清掉某张单据在对话框里的全部临时状态(勾选/数量/仓库/批次号) */
+function dropDocState(no) {
+  for (const key of Object.keys(qtyOf)) if (String(key).startsWith(`${no}#`)) delete qtyOf[key]
+  for (const key of Object.keys(whOf)) if (String(key).startsWith(`${no}#`)) delete whOf[key]
+  for (const key of Object.keys(binOf)) if (String(key).startsWith(`${no}#`)) delete binOf[key]
+  delete pickedByDoc[no]
+  delete batchNoOf[no]
+}
+
+/** 删除整单(用户口径「可以删除掉不需要单据的明细」)—— 点错可再点「选择单据」把它选回来 */
+function removeDoc(doc) {
+  const i = docs.value.findIndex((d) => d.sourceNo === doc.sourceNo)
+  if (i < 0) return
+  dropDocState(doc.sourceNo)
+  docs.value.splice(i, 1)
+}
+
+/** 删除一行;该单删空了就连单据一起撤掉(否则会留一段没有行的空表) */
+function removeLine(doc, row) {
+  const i = (doc?.lines || []).findIndex((r) => r.lineKey === row.lineKey)
+  if (i < 0) return
+  doc.lines.splice(i, 1)
+  delete qtyOf[row.lineKey]
+  delete whOf[row.lineKey]
+  delete binOf[row.lineKey]
+  pickedByDoc[doc.sourceNo] = (pickedByDoc[doc.sourceNo] || []).filter((k) => k !== row.lineKey)
+  if (!doc.lines.length) removeDoc(doc)
+}
+
 async function confirm() {
+  // 合单至少要两张单(后端 generateMerged 同口径):删到只剩一张时先说清,别让用户填完才被拒
+  if (props.merge && docs.value.length < 2) {
+    ElMessage.warning(`${tt('合单生单至少要两张采购订单，当前只有')} ${docs.value.length} ${tt('张单据')}`)
+    return
+  }
   // 超送比例调小后可能低于已填数量 → 收敛到新上限,避免提交被后端拒
   for (const doc of docs.value) {
     for (const row of doc.lines || []) {

@@ -151,7 +151,7 @@ export default {
     "产品编号：": "Product No.:",
     // ---- 扫码领料(条码管理 → 扫码领料,2026-10-18)----
     "扫码领料": "Scan to Issue",
-    "扫标签（存货编码|批号）→ 核对批号级可用量 → 加入清单 → 生成材料出库单草稿":
+    "扫标签（存货编码|批号）→ 核对批号级可用量 → 加入清单 → 生成生产领料单草稿":
       "Scan a label (item code|batch) → check batch-level availability → add to list → create a material issue draft",
     "扫描或输入条码（存货编码|批号）": "Scan or type a barcode (item code|batch)",
     "请扫描或输入条码": "Please scan or type a barcode",
@@ -170,10 +170,10 @@ export default {
     "无批次": "No batch",
     "移除": "Remove",
     "清空": "Clear",
-    "生成材料出库单": "Create Material Issue Draft",
-    "已生成材料出库单草稿，请到材料出库单里审核":
+    "生成生产领料单": "Create Material Issue Draft",
+    "已生成生产领料单草稿，请到生产领料单里审核":
       "Material issue draft created — review it in Material Issue",
-    "生成材料出库单失败": "Failed to create the material issue draft",
+    "生成生产领料单失败": "Failed to create the material issue draft",
     // ---- 首件检验单(QC_FIRST_INSP,2026-10-15)----
     "首件检验单": "First Article Inspection Sheet",
     // ---- 出厂检验报告(QC_OQC_REPORT,2026-10-30)----
@@ -310,7 +310,7 @@ export default {
     "炭棒表观出现严重粘模或明显脱粉情况，需马上停止生产，已生产的产品暂时隔离标示（红色）。": "If severe sticking or obvious powder removal appears on the carbon rod, stop production immediately and mark produced items as temporarily isolated (red).",
     "测试样品需保留至本班次生产完成。": "Keep test samples until this shift's production is finished.",
     "C-95客户相关产品脱模后立马进行首件检验。": "For C-95 customer products, perform first article inspection immediately after demolding.",
-    // 2026-11-19 首件检验单《相关要求》按受控表单原文换十条(旧六条里第 1/2/3 条已随原文替换退场)
+    // 2026-11-24 首件检验单《相关要求》按受控表单原文换十条(旧六条里第 1/2/3 条已随原文替换退场)
     "首件在脱模时取前2架模具内炭棒8支测试数据，并进行判定。": "At demolding, take 8 carbon rods from the first 2 molds for the first-article test data and make the judgment.",
     "测试判定标准依据工艺管控清单。": "Test judgment criteria follow the process control sheet.",
     "表观及脱粉8支全检，记录2支数据。": "Inspect all 8 rods for appearance and powder removal; record data for 2 rods.",
@@ -744,7 +744,7 @@ export default {
       'Button logs carry a WO line no. since 2026-10-15 (yj_usage_log.工单行号), so a line view shows only that line\u2019s actions;',
     '结案等工单级动作、以及 2026-10-15 前没有行键的老留痕,按「整单」显示(每条都标了范围,不会混着看不出)':
       'order-level actions (close, etc.) and pre-2026-10-15 logs without a line key are shown as "Whole WO" (each row is labelled, so they are not silently mixed in)',
-    '按材料出库单**单头**的 工单行号 收敛(2026-10-15 改;原来错查明细行的加工单号 —— 该列全空,这一段一直是空的)。':
+    '按生产领料单**单头**的 工单行号 收敛(2026-10-15 改;原来错查明细行的加工单号 —— 该列全空,这一段一直是空的)。':
       'Scoped by the picking order HEAD\u2019s WO line no. (changed 2026-10-15; it used to filter on the detail row\u2019s MO no., which is always blank \u2014 so this block was always empty).',
     '单头 工单行号 空/0 的老单属整单,每行都显示;领料单已开但材料还没补填时,该单也会出现(材料列空)。':
       'Legacy orders with a blank/0 line no. belong to the whole WO and show for every line; an order whose materials are not filled in yet still shows (material columns blank).',
@@ -937,7 +937,7 @@ export default {
     '家族(按根行聚合)': 'Family (aggregated by root line)',
     '按钮留痕只记工单号(yj_usage_log.doc_no),没有工单行维度 ⇒ 天生是工单级口径': 'Action logs record only the work order number (yj_usage_log.doc_no) with no line dimension, so this section is inherently order-level',
     '只显示本行的调拨;2026-10-15 之前的老记录没有工单行键,只在「整单」口径里出现(不回填、不猜)': 'Only transfers of this line are shown; records older than 2026-10-15 carry no line key and appear only in the Whole Order scope (never backfilled or guessed)',
-    '材料出库单没有生产行键:加工单号为空、批号是 ERP 批号口径(≠生产批次号)、源单行号空 ⇒ 无法按行收敛,如实按整单显示': 'Material issue notes carry no production line key: 加工单号 is empty, the lot number follows the ERP convention (≠ production batch), and the source line no. is empty — so this section stays order-level, reported as-is',
+    '生产领料单没有生产行键:加工单号为空、批号是 ERP 批号口径(≠生产批次号)、源单行号空 ⇒ 无法按行收敛,如实按整单显示': 'Material issue notes carry no production line key: 加工单号 is empty, the lot number follows the ERP convention (≠ production batch), and the source line no. is empty — so this section stays order-level, reported as-is',
     // 本文件历史遗留缺词(2026-10-15 补齐,使 WorkOrderTraceDialog 词条 0 缺失)
     '工单详情 · 追溯': 'Work Order Detail · Trace',
     '绿=已完工': 'Green = Completed',
@@ -1639,7 +1639,7 @@ export default {
     '请先填写父目录名称': 'Please fill in the parent group name first',
     '请把子目录1、子目录2 都填上': 'Please fill in both sub-column 1 and sub-column 2',
     '两个子目录不能同名': 'The two sub-columns cannot have the same name',
-    // 检测结果的可增删列(2026-11-19 用户口径「检验结果改成可以新增列的形式,不要固定5格了」):
+    // 检测结果的可增删列(2026-11-24 用户口径「检验结果改成可以新增列的形式,不要固定5格了」):
     // 数据键仍是中文 结果1..结果20;纸面格子只标 1..n,这里给列表/元数据等显示层用
     '结果1': 'Result 1',
     '结果2': 'Result 2',
@@ -1669,7 +1669,7 @@ export default {
     '减少检测结果列将清空该列已填数据，确定减少吗？':
       'Removing result columns clears the data already filled in those columns. Continue?',
     '减少检测结果列': 'Remove result columns',
-    // 2026-11-19 第二轮:加列入口挪到「检测结果」表头 + 增行条(用户报「怎么还是这样」——
+    // 2026-11-24 第二轮:加列入口挪到「检测结果」表头 + 增行条(用户报「怎么还是这样」——
     // 分区条里那个 16px 的 ＋ 太小、找不到);每列表头另有 × 删掉指定那一列
     '新增列': 'Add column',
     '新增检测结果列': 'Add result column',
@@ -2089,7 +2089,7 @@ export default {
     '生单': 'Generate',
     '生成进货单': 'Generate purchase receipt',
     '生成销货单': 'Generate delivery note',
-    '生成材料出库单（直接退料）': 'Generate material issue (direct return)',
+    '生成生产领料单（直接退料）': 'Generate material issue (direct return)',
     '生成产成品入库单（自制退库）': 'Generate FG receipt (in-house return)',
     '生成委外发料单': 'Generate outsourcing issue',
     '列表': 'List',
@@ -2546,6 +2546,27 @@ export default {
     '合单生单请先在左侧勾选至少两张采购订单': 'Select at least two purchase orders on the left first',
     '合单生单只能勾「已审核」的采购订单：勾选里有草稿/审批中的单据': 'Only audited purchase orders can be merged — the selection contains drafts or documents under approval',
     '合单生单只能选同一供应商的采购订单，当前勾了': 'Only purchase orders of the same supplier can be merged; currently selected:',
+    /* ── 合单生单的「选单」弹窗(2026-11-24):金蝶 ERP 式先选单、再进合单页面 ── */
+    '选择单据': 'Select documents',
+    '选择采购订单': 'Select purchase orders',
+    '删除本单': 'Remove document',
+    '把这张单据整单从合单页面移除': 'Remove this whole document from the merge sheet',
+    '把这一行从本次合单里移除': 'Remove this line from the merge',
+    '选单加入合单：已加入的明细只补还没进来的行，不会重复': 'Pick documents to merge: only lines not yet on the sheet are added, never duplicated',
+    '可送数量': 'Shippable qty',
+    '可加入': 'Available',
+    '已添加': 'Added',
+    '本页': 'On this page',
+    '加入合单': 'Add to merge',
+    '只能选同一供应商的采购订单': 'Only purchase orders of the same supplier',
+    '请先勾选要加入合单的采购订单': 'Select the purchase orders to add first',
+    '没有可加入的已审核采购订单': 'No audited purchase order with shippable quantity',
+    '候选单据加载失败': 'Failed to load candidate documents',
+    '选单明细加载失败': 'Failed to load the selected document lines',
+    '该单据的明细已全部在合单页面中，无需重复添加': 'All lines of this document are already on the merge sheet',
+    '新增明细': 'new line(s) added',
+    '合单生单至少要两张采购订单，当前只有': 'Merging needs at least two purchase orders; currently',
+    '该面板没有可合单生单的下游链路': 'This panel has no merge target',
     '连续选择': 'Continuous select',
     '已选': 'Selected',
     '行': 'row(s)',
@@ -2845,7 +2866,7 @@ export default {
     '产成品入库单': 'Finished goods receipt',
     '其他入库单': 'Other receipt',
     '销售出库单': 'Sales issue',
-    '材料出库单': 'Material issue',
+    '生产领料单': 'Production Picking Slip',
     '生产领料': 'Production Picking',
     '其他出库单': 'Other issue',
     '请购单': 'Purchase requisition',
@@ -3226,13 +3247,13 @@ export default {
     '产成品入库单明细表': 'FG Receipt Details',
     '其他入库单明细表': 'Other Receipt Details',
     '销售出库单明细表': 'Sales Issue Details',
-    '材料出库单明细表': 'Material Issue Details',
+    '生产领料单明细表': 'Production Picking Slip Details',
     '其他出库单明细表': 'Other Issue Details',
     '采购入库单统计表': 'Purchase Receipt Statistics',
     '产成品入库单统计表': 'FG Receipt Statistics',
     '其他入库单统计表': 'Other Receipt Statistics',
     '销售出库单统计表': 'Sales Issue Statistics',
-    '材料出库单统计表': 'Material Issue Statistics',
+    '生产领料单统计表': 'Production Picking Slip Statistics',
     '其他出库单统计表': 'Other Issue Statistics',
     '生产加工单明细表': 'Work Order Details',
     '生产加工单统计表': 'Work Order Statistics',
@@ -3385,7 +3406,7 @@ export default {
     /* ── 实验室使用记录表 4 面板(RecordSheetPanels plain 版式)静态词条 ── */
     '测试设备使用登记表': 'Test Equipment Usage Log',
     '实验室仪器使用记录表': 'Lab Instrument Usage Log',
-    // 2026-11-19「使用记录汇总」页签已撤除(2026-11-20 用户「不要这个页签」)⇒ 改为**独立页面**
+    // 2026-11-24「使用记录汇总」页签已撤除(2026-11-20 用户「不要这个页签」)⇒ 改为**独立页面**
     //   「仪器使用汇总表」(views/modules/rd/InstrSummary.vue,页面级面板 INSTR_SUMMARY),
     //   与样品检验汇总表同构:时间区间 + 统计条 + 记录表(可勾选)+ 导出 Excel。
     '仪器使用汇总表': 'Instrument Usage Summary',
@@ -4537,7 +4558,7 @@ export default {
     '停用字段「': 'Retire field "',
     '」?已录入数据将保留,重新绑定同名标签即可恢复显示。': '"? Entered data is kept; rebind the same label to restore.',
     /* ── 生产工单·转领料单(2026-10-07:列表按钮由「打印领料单」改为转单 ——
-       按工单号生成「材料出库单(领料单)」草稿,加工单号=工单号,明细留空由仓库补,审核后回写工单领料单号)。
+       按工单号生成「生产领料单(领料单)」草稿,加工单号=工单号,明细留空由仓库补,审核后回写工单领料单号)。
        2026-10-14 双顶层 biz 块已合并(tools/archive/_merge-dup-biz-blocks.cjs):
        原第二块条目拼接在本块末尾,latter-wins 语义不变;本块为唯一 biz 块 ── */
     '转领料单': 'To Pick List',
@@ -4546,13 +4567,13 @@ export default {
     // 2026-10-09 粒度修正:唯一键 = 工单号 + 工单行号(同一张工单的不同行各转各的)
     '个工单行转领料单': 'work order line(s)?',
     '已生成领料单': 'Pick lists created',
-    '材料明细请在材料出库单里补填,审核后自动回写工单领料单号': 'Add the material lines in the material issue slip; the picking no. is written back to the WO after audit',
+    '材料明细请在生产领料单里补填,审核后自动回写工单领料单号': 'Add the material lines in the material issue slip; the picking no. is written back to the WO after audit',
     '同一工单行可继续再转多张': 'The same work-order line can have more pick lists',
     // 2026-10-18 先排产后领料(用户口径):未排入产线的行直接点名拦下,先给出可读提示
     '以下工单行未排产(未排入产线),请先在「快速排产」排入产线后再转领料单':
       'These work-order lines are not scheduled (no production line yet); assign a line in Quick Scheduling before creating pick lists',
     '未转成功': 'Not converted',
-    '领料单已生成,现在去「材料出库单」补材料明细吗?': 'Pick list(s) created. Open the material issue slip to add material lines now?',
+    '领料单已生成,现在去「生产领料单」补材料明细吗?': 'Pick list(s) created. Open the material issue slip to add material lines now?',
     '去补明细': 'Add lines',
     '稍后': 'Later',
     '转领料单失败': 'Transfer to pick list failed',
@@ -4803,7 +4824,7 @@ export default {
     '已排产行': 'Scheduled rows',
     '已完工': 'Completed',
     '排产数量': 'Scheduled qty',
-    '材料出库单': 'Material issue',
+    '生产领料单': 'Production Picking Slip',
     '待排产笔数': 'Waiting to schedule',
     '今日排产(张)': 'Scheduled today (docs)',
     '今日排产(量)': 'Scheduled today (qty)',
@@ -5281,10 +5302,10 @@ export default {
     '退到仓库': 'Return to warehouse',
     '请选择退到哪个仓库': 'Select the warehouse to return to',
     '请选择仓库': 'Select a warehouse',
-    // 2026-11-19 其他退料可自选仓库
+    // 2026-11-24 其他退料可自选仓库
     '库存仓': 'Stock warehouse',
     '仓库档案没加载出来，请返回重进': 'Warehouse list failed to load — please go back and reopen',
-    // 2026-11-19 补齐本页此前漏译的三条(单测 scanOther.test.js 已加守卫)
+    // 2026-11-24 补齐本页此前漏译的三条(单测 scanOther.test.js 已加守卫)
     '加入清单': 'Add to list',
     '还没有扫码加入的物料': 'No materials scanned yet',
     '该批号可用量为 0': 'This lot has no available quantity',
@@ -5354,15 +5375,15 @@ export default {
     '可用量不足,缺': 'Not enough stock, short by',
     '领料清单': 'Pick list',
     '还没有物料': 'No materials yet',
-    '生成材料出库单': 'Create material issue',
+    '生成生产领料单': 'Create production picking slip',
     '请先扫描或输入工单号': 'Scan or enter the work order no. first',
     '该工单不存在或未排产': 'Work order not found or not scheduled',
     '查询工单失败': 'Failed to load work order',
     '请先扫描或输入物料编码': 'Scan or enter the material no. first',
     '该物料没有可用库存': 'No available stock for this material',
     '查询可用量失败': 'Failed to query available stock',
-    '已生成材料出库单草稿,请到材料出库单里审核': 'Material issue draft created — review it in Material Issue',
-    '生成材料出库单失败': 'Failed to create material issue',
+    '已生成生产领料单草稿,请到生产领料单里审核': 'Material issue draft created — review it in Material Issue',
+    '生成生产领料单失败': 'Failed to create material issue',
     '该工单未排产(排产数量为 0),请先快速排产': 'This work order is not scheduled (qty is 0) — schedule it first',
     '先扫工单码:领料会挂到该工单行上,审核后回写领料单号': 'Scan the work order first: picks attach to that line and the pick-list no. is written back on approval',
     // ── 手机扫码 · 扫码混料(/panelx/list/MOBILE_MIX_SCAN;建页时漏了译名,2026-11-17 全部补齐)──
@@ -5495,7 +5516,7 @@ export default {
     '没有符合条件的供应商': 'No matching suppliers',
     '请选择一个供应商': 'Please select a supplier',
     '加载供应商档案失败': 'Failed to load supplier master',
-    /* ── 研发管理·自制料（2026-11-19）── */
+    /* ── 研发管理·自制料（2026-11-24）── */
     '自制料': 'In-house material',
     '制程记录录入': 'Process record entry',
     '制程记录查询': 'Process record query',
@@ -5855,9 +5876,9 @@ export default {
     '可退单据': 'Returnable slips',
     '选这张退料': 'Return this slip',
     '扫领料单码 / 工单号,或输入后点打开': 'Scan slip / work order no., or type it and tap Open',
-    '这张单还不能退:需要先完成领料、且材料出库单被仓管审核': 'This slip cannot be returned yet: finish picking and get its material-issue slip approved by the warehouse first.',
+    '这张单还不能退:需要先完成领料、且生产领料单被仓管审核': 'This slip cannot be returned yet: finish picking and get its material-issue slip approved by the warehouse first.',
     '查询单据 → 扫码定位 → 扫物料码 → 提交退料': 'Query documents → scan to locate → scan material → submit return',
-    '只列已领料且材料出库单已审核的单据': 'Only slips already picked and approved by the warehouse are listed',
+    '只列已领料且生产领料单已审核的单据': 'Only slips already picked and approved by the warehouse are listed',
     '扫领料单纸面二维码 → 直接打开对应那张(混料/组装);扫工单码 → 弹窗选混料还是组装。': 'Scan the slip QR to open that slip directly (mixing / assembly); scanning a work order code asks you to choose one.',
     '扫领料单纸面二维码 → 直接打开对应那张(混料/组装);扫工单码 → 弹窗选混料还是组装;': 'Scan the slip QR to open that slip (mixing / assembly); scanning a work order code asks you to choose;',
     '自动打印': 'Auto Print',
@@ -5903,14 +5924,14 @@ export default {
     '没有明细': 'No lines',
     '全部明细已领完,可以提交': 'All lines picked — ready to submit',
     '当前不是先进先出,已写进明细备注': 'Not FIFO — noted on the line remark',
-    '提交转材料出库单': 'Submit as Material Issue',
+    '提交转生产领料单': 'Submit as Production Picking Slip',
     '提交确认': 'Confirm submission',
     '确定提交': 'Submit',
-    '提交后领料单会审核过账成材料出库单。确定提交?': 'After submitting, the picking slip is approved and posted as a material issue. Continue?',
-    '提交后领料单会审核过账成材料出库单;本次没有退料,那张退料单会一起作废(不产生其他入库单)。确定提交?': 'After submitting, the picking slip is approved and posted. No return this time, so the return slip is voided (no other-inbound created). Continue?',
+    '提交后领料单会审核过账成生产领料单。确定提交?': 'After submitting, the picking slip is approved and posted as a material issue. Continue?',
+    '提交后领料单会审核过账成生产领料单;本次没有退料,那张退料单会一起作废(不产生其他入库单)。确定提交?': 'After submitting, the picking slip is approved and posted. No return this time, so the return slip is voided (no other-inbound created). Continue?',
     '提交失败': 'Submit failed',
     '已提交': 'Submitted',
-    '已提交:材料出库单已生成': 'Submitted: material issue created',
+    '已提交:生产领料单已生成': 'Submitted: production picking slip created',
     '退料默认 0': 'Returns default 0',
     '退料默认数量为 0:不退料就不用管本页签,提交时这张退料单会一起作废,不产生其他入库单': 'Return quantity defaults to 0: skip this tab if you return nothing — the slip is voided on submit and no other-inbound is created',
     '退料提交在领料页签': 'Return submission is on the picking tab',
@@ -6204,7 +6225,7 @@ export default {
     '已出纸': 'Printed',
     '已生成 PDF': 'PDF created',
     '浏览器打印': 'Browser print',
-    '生产领料单': 'Picking slip',
+    '生产领料单': 'Production Picking Slip',
     '输出方式': 'Output method',
     '自动 = 有打印机就出纸,打不出来自动存 PDF': 'Auto = print when a printer is available, otherwise save a PDF',
     '自动(推荐)': 'Auto (recommended)',
@@ -6578,7 +6599,7 @@ export default {
     // ---- 样品检验:送样登记表 / 检验委托单(SAMPLE_REG / INSP_COMMISSION,2026-11-15)----
     "样品检验": "Sample Inspection",
     "送样登记表": "Sample Submission Register",
-    // 2026-11-19 用户口径:SAMPLE_REG 明细页签标题「送样登记表明细」→「内部检测目录」
+    // 2026-11-24 用户口径:SAMPLE_REG 明细页签标题「送样登记表明细」→「内部检测目录」
     // (yj_panel.config 的 detailTabLabel;后端下发中文数据键,显示层由 tt() 翻译 —— ADR-0001)
     "内部检测目录": "Internal Test Catalog",
     "检验委托单": "Inspection Commission Order",
@@ -6782,8 +6803,8 @@ export default {
     '领料类型': 'Picking type',
     '领料单号 / 工单号 / 产品名称': 'Picking no. / work order / product name',
     '查询单据 → 进单据明细 → 扫物料码退料 → 提交': 'Find note → open detail → scan material → submit',
-    '只列已领料且材料出库单已审核的单据,点一行进单据明细里扫物料码退料': 'Only fully picked documents whose material issue note is approved are listed; tap a line to scan materials in the document detail',
-    '没有可退的领料单（需要先领料、且材料出库单被仓管审核）': 'No returnable picking note (pick first, and the material issue note must be approved by the warehouse keeper)',
+    '只列已领料且生产领料单已审核的单据,点一行进单据明细里扫物料码退料': 'Only fully picked documents whose material issue note is approved are listed; tap a line to scan materials in the document detail',
+    '没有可退的领料单（需要先领料、且生产领料单被仓管审核）': 'No returnable picking note (pick first, and the material issue note must be approved by the warehouse keeper)',
     '查询可退单据失败': 'Failed to load returnable documents',
     '查询可退数量失败': 'Failed to check the returnable quantity',
     '没有找到这个工单/单据': 'Work order / document not found',
@@ -6792,7 +6813,7 @@ export default {
     '没有识别到二维码,请重试;也可以直接用扫码枪扫进下面的输入框': 'No code recognised, please retry; you can also scan into the input box with a scanner',
     '没有指定单据:请从「生产退料」列表点进来': 'No document specified: open it from the "Production Return" list',
     '这张领料单还没完成:请先把料领完并提交,提交之后才能对已领的料退料': 'This picking note is not completed yet: finish picking and submit first, then you can return picked materials',
-    '材料出库单还没审批,暂时不能退料:请先让仓管在「材料出库单」里审核通过(审核才扣库存)': 'The material issue note is not approved yet, so returning is not possible: ask the warehouse keeper to approve it under "Material Issue Note" (stock is deducted on approval)',
+    '生产领料单还没审批,暂时不能退料:请先让仓管在「生产领料单」里审核通过(审核才扣库存)': 'The material issue note is not approved yet, so returning is not possible: ask the warehouse keeper to approve it under "Material Issue Note" (stock is deducted on approval)',
     '这张单的料已经全部退完了,没有可退的物料': 'All materials on this document have been returned; nothing left to return',
     '扫物料码解锁:只有这张领料单里的物料才能退;数量默认填可退数量,可改': 'Scan a material code to unlock it: only materials on this picking note can be returned; the quantity defaults to the returnable amount and can be edited',
     '确认后重新锁回扫码状态,再扫下一个物料;没打算退的料不用扫': 'After confirming, the field locks again for the next material; skip materials you are not returning',
@@ -6842,7 +6863,7 @@ export default {
     '单': 'orders',
     '项': 'items',
 
-    // ---- 2026-11-19 工单排产·未完成数量框 + 报工记录勾选行导出 Excel ----
+    // ---- 2026-11-24 工单排产·未完成数量框 + 报工记录勾选行导出 Excel ----
     '未完成数量': 'Unfinished quantity',
     '勾选该车间（左侧生产线），右下角按勾选车间合计未完成数量':
       'Check this workshop (left production line); the bottom-right total sums the checked workshops',
@@ -6913,7 +6934,7 @@ export default {
     '成型出首件检验单与出货检验（功能），组装出出货检验（表观）；切炭/混料/装箱不出检验单':
       'Moulding produces the first-article and outgoing functional inspection sheets; assembly produces the outgoing appearance inspection sheet; cutting, mixing and packing produce none',
     '出货检验（功能）(成型产出)': 'Outgoing functional inspection (moulding output)',
-    // ---- 测试申请汇总表(2026-11-19:按申请人汇总内部委托/销售端两张测试申请表 + 点单号跳转)----
+    // ---- 测试申请汇总表(2026-11-24:按申请人汇总内部委托/销售端两张测试申请表 + 点单号跳转)----
     // 数据源 = 测试申请单 RD_DOM_TEST 的两个页签;列序见 TestApplySummary.vue 的 SUMMARY_COLUMNS。
     '测试申请汇总表': 'Test Application Summary',
     '按申请人': 'By applicant',

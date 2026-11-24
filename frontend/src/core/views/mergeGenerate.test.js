@@ -1,17 +1,25 @@
 /**
- * mergeGenerate.test.js —— 「合单生单」的钉子(2026-11-13 用户口径)
+ * mergeGenerate.test.js —— 「合单生单」的钉子(2026-11-13 建立,2026-11-24 按选单改版重钉)
  *
- * 【用户原话】
+ * 【用户原话·初版(2026-11-13)】
  *   「采购订单新增一个合单生单在生单按钮下面,可以选择同一供应商的单据,进行合单,合成一张送料暂收单。
  *    并且要注意后面的逻辑(对应的行号有的是对应采购订单行号,是合单前的行号。有些对应行号的送料暂收后
  *    的行号是送料暂收的行号,是合单后的行号)」
  *
- * 【要钉住的四件事】(少一处就会出"合单后溯源断链"或"挂错金蝶源单"):
- *   ① 入口:只有**采购订单**的「生单 ▼」里多出「合单生单」,且必须同一供应商(前端先拦,不给到后端才发现);
- *   ② 出单:合单走 /px/push/merge,**一张**目标单(docs 全部并进去,不是逐张);
- *   ③ 行号:行级「采购单号」= 合单**前**的订单号(逐行不同),「采购订单行号」= 合单**前**的订单行号;
+ * 【用户原话·改版(2026-11-24,本次)】
+ *   「和单生单添加一个弹窗选择,不再是勾选了,而是点击合单生单弹出一个窗口,这个窗口可以选择单据,
+ *    选择单据后,加入到现在的合单生单页面。然后又删除按钮,可以删除掉不需要单据的明细。也可以重新添加,
+ *    在合单生单页面多一个选择单据的按钮,选择后单据明细会添加进来,已经有的明细就只补没有的就行。
+ *    参考金蝶erp选单的设计逻辑。」
+ *
+ * 【要钉住的六件事】(少一处就会出"合单后溯源断链"或"选单进不去/加重复行"):
+ *   ① 入口:只有**采购订单**的「生单 ▼」多出「合单生单」,点了先弹**选单窗口**(不再靠左栏勾选);
+ *   ② 选单窗:金蝶式 —— 只列已审核 + 还有未送量的源单,同一供应商锁定,已加入的标「已添加」不可再选;
+ *   ③ 出单:合单走 /px/push/merge,**一张**目标单(docs 全部并进去,不是逐张);
+ *   ④ 行号:行级「采购单号」= 合单**前**的订单号(逐行不同),「采购订单行号」= 合单**前**的订单行号;
  *      暂收单自己的行 id / source_line_key 才是合单**后**的行号(占用用它);
- *   ④ 下游:检验/退回/入库逐行带「采购单号」,转ERP 行级 src_bill_no 用它(表头合单串不能当源单号)。
+ *   ⑤ 删改:合单页面上整单/整行都能删,删完还能再选单补回来,补的时候**只补没有的行**;
+ *   ⑥ 下游:检验/退回/入库逐行带「采购单号」,转ERP 行级 src_bill_no 用它(表头合单串不能当源单号)。
  *
  * 单测跑不了运行时,按仓库既有做法读源码钉住(同 approvalSeparation.test.js)。
  */
@@ -21,6 +29,7 @@ import { readFileSync } from 'node:fs'
 
 const panelx = readFileSync(new URL('./PanelxList.vue', import.meta.url), 'utf8')
 const glDialog = readFileSync(new URL('./GenerateLinesDialog.vue', import.meta.url), 'utf8')
+const pickDialog = readFileSync(new URL('./MergePickDocsDialog.vue', import.meta.url), 'utf8')
 const engine = readFileSync(new URL('../../business/engine.js', import.meta.url), 'utf8')
 const pushHandler = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/panel/PushGenerateHandler.java', import.meta.url), 'utf8')
 const pxController = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/controller/PxController.java', import.meta.url), 'utf8')
@@ -28,19 +37,49 @@ const buttonService = readFileSync(new URL('../../../../backend/src/main/java/co
 const kingdee = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/service/KingdeePushService.java', import.meta.url), 'utf8')
 const en = readFileSync(new URL('../../i18n/locales/en.js', import.meta.url), 'utf8')
 
-test('① 入口:只有采购订单的「生单 ▼」多出「合单生单」,并且先按供应商分组拦截', () => {
+/** 取 onButton 里「合单生单」那一层分支(到「批量生单」那一段为止) */
+function mergeBranch() {
+  const at = panelx.indexOf('if (action === MERGE_GENERATE_ACTION)')
+  assert.ok(at > 0, 'onButton 里缺「合单生单」分支')
+  const end = panelx.indexOf("// 批量生单(2026-10-31 用户口径)", at)
+  assert.ok(end > at, '找不到「合单生单」分支的结束位置(下一个分支)')
+  return panelx.slice(at, end)
+}
+
+test('① 入口:只有采购订单的「生单 ▼」多出「合单生单」,点了先开**选单窗口**', () => {
   assert.match(panelx, /const MERGE_GENERATE_ACTION = '合单生单'/)
   assert.match(panelx, /const MERGE_GENERATE_PANELS = new Set\(\['PU_ORDER', 'SUPPLIER_PU_ORDER'\]\)/,
     '只挂采购订单(含供应商门户副本)')
   assert.match(panelx, /if \(canMergeGenerate\.value\) extra\.push\(MERGE_GENERATE_ACTION\)/,
     '下拉项由 canMergeGenerate 决定,别的地板面板不能出现')
-  const branch = panelx.slice(panelx.indexOf("if (action === MERGE_GENERATE_ACTION)"))
-  assert.match(branch.slice(0, 1400), /suppliers\.length > 1/, '前端先按「供应商」分组,混了多家直接拦')
-  assert.match(branch.slice(0, 1400), /openGenerateDialog\(genMergeAction\.value, audited\.map\(docNoOfRow\), true\)/,
-    '合单要走 merge=true 的对话框(第三参)')
+  const branch = mergeBranch()
+  assert.match(branch, /mergePickAction\.value = genMergeAction\.value/, '先把生单动作记下来')
+  assert.match(branch, /mergePickVisible\.value = true/, '点它就弹选单窗口(金蝶 ERP 选单口径)')
+  assert.ok(!/railChecked/.test(branch), '合单不再依赖左栏勾选(那条只服务「批量生单」)')
+  // 选单窗确定 → 才打开合单页面(第三参 merge=true)
+  assert.match(panelx, /function onMergeDocsPicked\(\{ nos \}\)/, '选单窗要回一个单据号清单')
+  assert.match(panelx, /openGenerateDialog\(mergePickAction\.value, list, true\)/,
+    '选单确定后走 merge=true 的对话框(第三参)')
+  // 少于两张当场说清,不要等填完才被后端拒
+  assert.match(panelx, /list\.length < 2/, '合单至少要两张(后端 generateMerged 同口径)')
 })
 
-test('① 后端:合单也校验同一供应商,且**先**校验供应商再校验数量', () => {
+test('② 选单窗:金蝶口径 —— 已审核+有未送量、同一供应商锁定、已加入的不可再选', () => {
+  // 数据源与生单页面/后端校验同一份口径(行级剩余量),不是"只查单据头"的通用列表接口
+  assert.match(pickDialog, /engine\.purchaseFlowSources\(/, '候选单必须走 /px/voucherFlow/sources(带剩余量)')
+  assert.match(pickDialog, /condition\['供应商'\] = lockSupplier\.value/, '锁了供应商就把条件带上(服务端过滤)')
+  assert.match(pickDialog, /const lockSupplier = computed\(\(\) => String\(props\.supplier \|\| chosenSupplier\.value \|\| ''\)\.trim\(\)\)/,
+    '供应商锁:父组件给了用父组件的(合单页已有单据),否则由本次第一张勾选锁定')
+  assert.match(pickDialog, /function selectableRow\(row\)/, '选择列的可用判据要**只**看供应商锁')
+  assert.ok(!/if \(addedOf\(row\)\) return false/.test(pickDialog),
+    '已在合单里的单也要能再选(用户口径「也可以重新添加」)—— 去重由合单页面按 lineKey 做')
+  assert.match(pickDialog, /tt\('已添加'\)/, '列表里要标出哪几张已经在合单页面里了')
+  assert.match(glDialog, /@confirm="onDocsPicked"/, '合单页面里要能接着选单(用户口径「也可以重新添加」)')
+  // 勾了多家供应商当场拦(金蝶选单:必须先按往来单位筛)
+  assert.match(pickDialog, /合单生单只能选同一供应商的采购订单，当前勾了/, '混了多家供应商要有一句明确的话')
+})
+
+test('③ 后端:合单也校验同一供应商,且**先**校验供应商再校验数量', () => {
   const body = pushHandler.slice(pushHandler.indexOf('public Map<String, Object> generateMerged'))
   assert.match(body, /合单生单只允许\*\*同一供应商\*\*的单据/, '供应商不一致要有一句明确的话')
   assert.match(body, /至少要两张来源单据/, '合单至少两张')
@@ -49,7 +88,7 @@ test('① 后端:合单也校验同一供应商,且**先**校验供应商再校�
   assert.ok(supplierAt > 0 && capAt > supplierAt, '供应商校验要在数量校验之前(否则先报"某行超量",看不出是合单选错了)')
 })
 
-test('② 出单:合单只出**一张**目标单(docs 全部并进去),走 /px/push/merge', () => {
+test('③ 出单:合单只出**一张**目标单(docs 全部并进去),走 /px/push/merge', () => {
   assert.match(engine, /export async function pushFlowMerge\(\{ panelCode, action, docs, batchNo \}\)/, '引擎要有合单接口')
   assert.match(engine, /request\.post\('\/px\/push\/merge'/, '后端入口 /px/push/merge')
   assert.match(pxController, /@PostMapping\("\/push\/merge"\)/, '控制器要有 /push/merge')
@@ -62,7 +101,7 @@ test('② 出单:合单只出**一张**目标单(docs 全部并进去),走 /px/p
   assert.match(confirmBody, /合单来源/, '提示里带上"哪几张订单合的"')
 })
 
-test('③ 行号:行级「采购单号」= 合单前的订单号;占用仍用合单后的暂收行 id', () => {
+test('④ 行号:行级「采购单号」= 合单前的订单号;占用仍用合单后的暂收行 id', () => {
   const body = pushHandler.slice(pushHandler.indexOf('public Map<String, Object> generateMerged'))
   assert.match(body, /if \(rowHasPoNo\) row\.put\("采购单号", p\.sourceNo\(\)\)/,
     '每一行写自己的来源订单号(合单前的号),不能只写在表头')
@@ -72,7 +111,32 @@ test('③ 行号:行级「采购单号」= 合单前的订单号;占用仍用合
   assert.match(body, /p\.lineKey\(\)/, '占用按来源行键记(合单前那一行的已送量),两种行号各司其职')
 })
 
-test('④ 下游:检验/退回逐行带采购单号;入库行用它落「源单编号」;转ERP 行级 src_bill_no 用它', () => {
+test('⑤ 合单页面:能选单补单(只补没有的明细),也能删整单/删整行', () => {
+  // 选单按钮在合单页面顶部(用户口径「在合单生单页面多一个选择单据的按钮」)
+  const bar = glDialog.slice(glDialog.indexOf('class="gl-bar"'), glDialog.indexOf('class="gl-doc"'))
+  assert.match(bar, /v-if="merge"/, '选单按钮只在合单模式出现(批量生单是逐张出单,没有选单语义)')
+  assert.match(bar, /tt\('选择单据'\)/, '顶部要有「选择单据」按钮')
+  assert.match(glDialog, /<MergePickDocsDialog[\s\S]{0,400}?@confirm="onDocsPicked"/,
+    '合单页面要挂选单弹窗,选完把明细补进来')
+  assert.match(glDialog, /:added-nos="addedNos"/, '已在页面上的单据要传给选单窗(标「已添加」)')
+  assert.match(glDialog, /:supplier="mergeSupplier"/, '供应商锁定要传给选单窗(合单只允许同一家)')
+
+  // 只补没有的明细:按 lineKey 去重(已有行一律跳过)
+  const addBody = glDialog.slice(glDialog.indexOf('async function onDocsPicked'))
+  assert.match(addBody, /const have = new Set\(exist\.lines\.map\(\(r\) => r\.lineKey\)\)/, '已有行键集合')
+  assert.match(addBody, /if \(have\.has\(row\.lineKey\)\) continue/, '已有的明细不许重复加进来')
+  assert.match(addBody, /adoptDoc\(src\)/, '新单据整段纳入(默认值/勾选与首次打开同源)')
+  assert.match(addBody, /该单据的明细已全部在合单页面中，无需重复添加/, '全都在了就说明白,不要静默什么都不做')
+
+  // 删除:整单 + 整行
+  assert.match(glDialog, /function removeDoc\(doc\)/, '要能删整张单据')
+  assert.match(glDialog, /function removeLine\(doc, row\)/, '要能删单行明细')
+  assert.match(glDialog, /tt\('删除本单'\)/, '单据行头要有「删除本单」')
+  assert.match(glDialog, /tt\('删除行'\)/, '明细行尾要有「删除行」')
+  assert.match(glDialog, /if \(!doc\.lines\.length\) removeDoc\(doc\)/, '删空了就整单撤掉,别留一段空表')
+})
+
+test('⑥ 下游:检验/退回逐行带采购单号;入库行用它落「源单编号」;转ERP 行级 src_bill_no 用它', () => {
   assert.match(buttonService, /if \(r\.get\("采购单号"\) != null\) line\.put\("采购单号", r\.get\("采购单号"\)\)/,
     '检验审核自动生的退回行要带行级采购单号')
   assert.match(buttonService, /if \(r\.get\("采购单号"\) != null\) line\.put\("源单编号", r\.get\("采购单号"\)\)/,
@@ -83,13 +147,28 @@ test('④ 下游:检验/退回逐行带采购单号;入库行用它落「源单�
   assert.match(kingdee, /e\.put\("src_bill_no", hit\.billNo\(\)\)/, 'src_bill_no 写解析到的金蝶真实号')
 })
 
-test('多语言:合单相关文案都有英文译文', () => {
+test('多语言:合单 + 选单相关文案都有英文译文', () => {
   for (const k of ['合单生单', '确定合单生单', '已合单生成', '张采购订单合成一张',
-    '合单生单请先在左侧勾选至少两张采购订单',
-    '合单生单只能选同一供应商的采购订单，当前勾了']) {
+    '合单生单只能选同一供应商的采购订单，当前勾了',
+    // 2026-11-24 选单改版新增
+    '选择单据', '选择采购订单', '删除本单', '删除行', '加入合单', '已添加', '可送数量',
+    '只能选同一供应商的采购订单', '该单据的明细已全部在合单页面中，无需重复添加',
+    '合单生单至少要两张采购订单，当前只有', '没有可加入的已审核采购订单',
+    '把这张单据整单从合单页面移除', '把这一行从本次合单里移除',
+    '选单加入合单：已加入的明细只补还没进来的行，不会重复']) {
     const rx = new RegExp(`'${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}':\\s*'([^']*)'`)
     const m = en.match(rx)
     assert.ok(m, `en.js 缺词条:${k}`)
     assert.ok(!/[\u4e00-\u9fa5]/.test(m[1]), `en.js 的 ${k} 译文不应含中文`)
+  }
+})
+
+test('多语言:选单窗与合单页面新增的中文全部走 tt()', () => {
+  for (const src of [pickDialog, glDialog]) {
+    const tpl = src.slice(0, src.indexOf('</template>')).replace(/<!--[\s\S]*?-->/g, '')
+    const bare = tpl.split('\n')
+      .filter((line) => /[\u4e00-\u9fa5]/.test(line))
+      .filter((line) => !line.includes('tt('))
+    assert.deepEqual(bare, [], '模板里出现未走 tt() 的中文:\n' + bare.join('\n'))
   }
 })
