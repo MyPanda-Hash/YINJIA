@@ -4,12 +4,17 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 采购订单分批送料:批次台账 / 送料量统计 / **批次号取号与自洽**(P0,2026-09-20)。
@@ -39,6 +44,8 @@ import java.util.Map;
  */
 @Service
 public class BatchService {
+
+    private static final Logger log = LoggerFactory.getLogger(BatchService.class);
 
     /** 系统参数键:收料超送比例 */
     public static final String KEY_OVER_RATIO = "receive_over_ratio";
@@ -587,8 +594,139 @@ public class BatchService {
         return rows.isEmpty() ? null : rows.get(0);
     }
 
-    // ==================== 行级数量统计 ====================
+    // ==================== 占用自洽(2026-11-24) ====================
 
+    /** 送料暂收单行表(分批送料链的头一跳) */
+    private static final String RECV_LINE_TABLE = "sl_recv_detail";
+    /** 暂收单行的数量列(= 本次送料量的事实) */
+    private static final String RECV_LINE_QTY_COL = "数量";
+
+    /**
+     * 把「采购订单 → 送料暂收单」的**占用**与单据实际数量对齐(2026-11-24 客户报障修复)。
+     *
+     * <p><b>病根</b>:占用({@code form_flow_link.linked_quantity})和批次台账({@code yj_doc_batch.batch_qty})
+     * 只在**生单那一刻**按「本次送料量」写一次(见 {@link VoucherFlowService#linkBatch})。
+     * 之后在草稿里把暂收单行的「数量」改掉(或多送改少送),**没有任何路径回写占用** ⇒
+     * 该订单行的「已送」永远停在生单时的数,「剩余」被吃光。
+     * 生产实例:订单 {@code YJ-20261103-06} 行6 二十寸纸箱,生单 4000 后单据被改成 200,
+     * 结果对话框显示「数量 4000 / 已送 4000 / 剩余 0」,而暂收单 {@code SL-2026-11-0028}
+     * 和入库单 {@code PI-2026-11-0034} 都只有 200 —— 客户看到的就是"生单 4000,这里只有 200"。</p>
+     *
+     * <p><b>口径</b>(每次保存暂收单后跑一遍,幂等):
+     * <ol>
+     *   <li>该单每条 ACTIVE 占用 → 行还在:占用 = 行「数量」;行已软删/不存在 ⇒ 占用置 RELEASED(释放额度);</li>
+     *   <li>涉及的批次台账 {@code batch_qty} 重算 = 该批次所有 ACTIVE 占用对应行的数量合计
+     *       (台账语义就是"这一批实际送了多少",改单后必须跟着走)。</li>
+     * </ol>
+     * 只碰 {@code target_panel_code='QC_RECV'} 的占用;**不动**「检验→入库/退回」那条链的占用语义
+     * (那是合格/不合格数量,由检验单审核侧维护)。</p>
+     *
+     * @return 被修正的占用行数(0 = 本来就一致,不产生任何写入)
+     */
+    @Transactional
+    public int syncReceiptLinks(String docNo, String user) {
+        if (docNo == null || docNo.isBlank()) return 0;
+        List<Map<String, Object>> links;
+        try {
+            links = jdbc.queryForList("SELECT id, target_line_key, linked_quantity, batch_id"
+                    + " FROM form_flow_link WHERE target_panel_code='QC_RECV' AND target_form_no=?"
+                    + " AND link_status='ACTIVE'", docNo);
+        } catch (RuntimeException e) {
+            log.warn("[分批送料自洽] {} 读占用失败(跳过):{}", docNo, e.getMessage());
+            return 0;
+        }
+        if (links.isEmpty()) return 0;
+        int fixed = 0;
+        Set<Integer> batchIds = new LinkedHashSet<>();
+        for (Map<String, Object> link : links) {
+            Object batchIdObj = link.get("batch_id");
+            if (batchIdObj instanceof Number n) batchIds.add(n.intValue());
+            Long rowId = rowIdOfLineKey(str(link.get("target_line_key")));
+            if (rowId == null) continue;
+            Double qty = null;
+            try {
+                List<Map<String, Object>> rows = jdbc.queryForList(
+                        "SELECT [" + RECV_LINE_QTY_COL + "] AS qty, ISNULL(asp_cancel,'N') AS cx"
+                                + " FROM " + RECV_LINE_TABLE + " WHERE id=?", rowId);
+                if (!rows.isEmpty() && !"Y".equalsIgnoreCase(str(rows.get(0).get("cx")))) {
+                    qty = num(rows.get(0).get("qty"));
+                }
+            } catch (RuntimeException e) {
+                log.warn("[分批送料自洽] {} 行 {} 读数量失败(跳过):{}", docNo, rowId, e.getMessage());
+                continue;
+            }
+            if (qty == null) {
+                // 行已删除/作废:把占用还回去,否则这条订单行的额度被永久占死
+                int n = jdbc.update("UPDATE form_flow_link SET link_status='RELEASED', release_time=SYSDATETIME()"
+                        + " WHERE id=? AND link_status='ACTIVE'", link.get("id"));
+                if (n > 0) {
+                    fixed++;
+                    log.info("[分批送料自洽] {} 行 {} 已删除 → 释放占用", docNo, rowId);
+                }
+                continue;
+            }
+            double linked = num(link.get("linked_quantity"));
+            if (Math.abs(linked - qty) <= 0.00005) continue;
+            jdbc.update("UPDATE form_flow_link SET linked_quantity=? WHERE id=?", qty, link.get("id"));
+            fixed++;
+            log.info("[分批送料自洽] {} 行 {} 占用 {} → {}(按单据实际数量回写,操作人 {})",
+                    docNo, rowId, linked, qty, user);
+        }
+        for (Integer batchId : batchIds) syncBatchQty(batchId, docNo);
+        return fixed;
+    }
+
+    /** 批次台账 batch_qty = 该批次下所有 ACTIVE 占用对应的暂收行数量合计(改单后重算) */
+    private void syncBatchQty(Integer batchId, String docNo) {
+        if (batchId == null) return;
+        try {
+            List<Map<String, Object>> links = jdbc.queryForList(
+                    "SELECT target_line_key FROM form_flow_link WHERE batch_id=? AND link_status='ACTIVE'"
+                            + " AND target_panel_code='QC_RECV'", batchId);
+            if (links.isEmpty()) return;
+            double sum = 0d;
+            for (Map<String, Object> link : links) {
+                Long rowId = rowIdOfLineKey(str(link.get("target_line_key")));
+                if (rowId == null) continue;
+                List<Map<String, Object>> rows = jdbc.queryForList(
+                        "SELECT [" + RECV_LINE_QTY_COL + "] AS qty FROM " + RECV_LINE_TABLE
+                                + " WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'", rowId);
+                if (!rows.isEmpty()) sum += num(rows.get(0).get("qty"));
+            }
+            Double cur = jdbc.queryForObject("SELECT ISNULL(CAST(batch_qty AS decimal(18,4)),0)"
+                    + " FROM yj_doc_batch WHERE id=?", Double.class, batchId);
+            if (cur != null && Math.abs(cur - sum) <= 0.00005) return;
+            jdbc.update("UPDATE yj_doc_batch SET batch_qty=? WHERE id=?", sum, batchId);
+            log.info("[分批送料自洽] {} 批次台账 {} batch_qty {} → {}(按该批次实际送料量重算)",
+                    docNo, batchId, cur, sum);
+        } catch (RuntimeException e) {
+            log.warn("[分批送料自洽] {} 批次台账 {} 重算失败(跳过):{}", docNo, batchId, e.getMessage());
+        }
+    }
+
+    /** 「单号#行id」→ 行 id;格式不符返回 null(不猜、不抛) */
+    private static Long rowIdOfLineKey(String key) {
+        if (key == null) return null;
+        int i = key.lastIndexOf('#');
+        if (i < 0 || i >= key.length() - 1) return null;
+        try {
+            return Long.valueOf(key.substring(i + 1).trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private static double num(Object v) {
+        if (v == null) return 0d;
+        if (v instanceof Number n) return n.doubleValue();
+        try {
+            return Double.parseDouble(String.valueOf(v).trim());
+        } catch (NumberFormatException e) {
+            return 0d;
+        }
+    }
+
+    // ==================== 行级数量统计 ====================
     /** 该来源单各来源行的**已送量**:form_flow_link.source_line_key → Σlinked_quantity(仅 ACTIVE) */
     public Map<String, Double> sentByLineKey(String srcPanel, String srcNo) {
         Map<String, Double> out = new LinkedHashMap<>();
