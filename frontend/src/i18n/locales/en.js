@@ -6805,6 +6805,10 @@ export default {
     '这张单还没有退料单号': 'This document has no return note number yet',
     // ---- 样品检验汇总表 INSP_SUMMARY(2026-11-17:按时间范围看「谁送了什么样品、要测什么」+ 导出 Excel)----
     '样品检验汇总表': 'Sample Inspection Summary',
+    '纸面缩放': 'Paper zoom',
+    '适应宽度': 'Fit width',
+    '放大': 'Zoom in',
+    '缩小': 'Zoom out',
     '按送样人': 'By sender',
     '按委托单': 'By commission',
     '按委托单/样品': 'By commission / sample',
