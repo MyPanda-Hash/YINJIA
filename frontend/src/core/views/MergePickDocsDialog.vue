@@ -72,8 +72,12 @@
         <el-table-column :label="tt('单据日期')" width="110">
           <template #default="{ row }">{{ dateOf(row) }}</template>
         </el-table-column>
-        <el-table-column :label="tt('供应商')" min-width="170" show-overflow-tooltip>
+        <el-table-column :label="tt('供应商')" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ supplierOf(row) }}</template>
+        </el-table-column>
+        <!-- 物料摘要:模糊搜「物料名」时一眼能看出命中在哪张单上(否则只能看单号猜) -->
+        <el-table-column :label="tt('物料名称')" min-width="170" show-overflow-tooltip>
+          <template #default="{ row }">{{ itemsText(row) }}</template>
         </el-table-column>
         <el-table-column :label="tt('行数')" width="70" align="right">
           <template #default="{ row }">{{ itemsOf(row).length }}</template>
@@ -171,6 +175,12 @@ function itemsOf(row) {
   if (!detail || typeof detail !== 'object') return []
   const key = Object.keys(detail).find((k) => Array.isArray(detail[k]))
   return key ? detail[key] : []
+}
+/** 明细摘要(前两个物料名 + 等 N 行):模糊搜「物料」时一眼看出命中在哪张单 */
+function itemsText(row) {
+  const items = itemsOf(row)
+  const names = items.slice(0, 2).map((it) => it?.['物料名称'] || it?.['存货名称'] || it?.['物料编码'] || '').filter(Boolean)
+  return names.join('、') + (items.length > 2 ? ` ${tt('等')} ${items.length} ${tt('行')}` : '')
 }
 /** 这张订单还能送多少(行级剩余量合计)—— 一眼判断值不值得加入 */
 function remainOf(row) {
