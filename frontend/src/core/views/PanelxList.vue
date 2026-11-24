@@ -333,8 +333,18 @@
              FIXED_SHEET_W),窄窗装不下时**在纸面区自己横向滚动**,右侧操作栏不被挤出去
              (此前纸面是 flex:1 弹性宽,永远不会溢出,所以从来没有这个容器)。 -->
         <div v-else class="sheet-scroll">
+          <!-- 纸面缩放条(2026-11-24 用户报障「面板看起来有点小…也调不大」)：
+               定死纸宽的面板窄窗会被自动缩到 0.7 左右且无法放大 ⇒ 给一个手动缩放入口
+               （适应宽度 / 缩小 / 放大，最大 150%），按面板记住选择。口径见 sheetZoom.js。 -->
+          <div v-if="sheetZoomEnabled" class="sheet-zoom-bar no-print">
+            <span class="szb-title">{{ tt('纸面缩放') }}</span>
+            <el-button class="szb-btn" size="small" text :disabled="!canSheetZoomOut" :title="tt('缩小')" @click="sheetZoomOut">－</el-button>
+            <span class="szb-val" :class="{ 'is-auto': sheetZoomUser === null }">{{ sheetZoomLabel }}</span>
+            <el-button class="szb-btn" size="small" text :disabled="!canSheetZoomIn" :title="tt('放大')" @click="sheetZoomIn">＋</el-button>
+            <el-button class="szb-btn szb-fit" size="small" text :disabled="sheetZoomUser === null" @click="sheetZoomFit">{{ tt('适应宽度') }}</el-button>
+          </div>
           <DocSheet ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable && !annOn" :attach-can-edit="attachEditable"
-                :can-edit-others="canEditOtherRowsHere" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" @progress-save="onProgressSave" />
+                :can-edit-others="canEditOtherRowsHere" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" :user-zoom="sheetZoomUser" @zoom-change="onSheetZoomChange" @dirty="markInlineDirty" @term-changed="onTermChanged" @progress-save="onProgressSave" />
         </div>
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
 
@@ -2928,7 +2938,8 @@ import {
 } from './changeCosign'
 import QcInspReqSheet from './QcInspReqSheet.vue'
 import { isQcInspReqPanel } from './qcInspReqConfig'
-import { approvalSheetCfg, planSheetCfg, qcSheetCfgs, sampleExtSheetCfg, sampleIntSheetCfg, sampleNdSheetCfg } from './docSheetConfigs'
+import { approvalSheetCfg, planSheetCfg, qcSheetCfgs, sampleExtSheetCfg, sampleIntSheetCfg, sampleNdSheetCfg, fixedSheetWidth } from './docSheetConfigs'
+import { MAX_SHEET_ZOOM, MIN_SHEET_ZOOM, ZOOM_STEP, clampZoom, clearStoredZoom, loadStoredZoom, saveStoredZoom } from './sheetZoom'
 import ImportDialog from './ImportDialog.vue'
 import BomImportDialog from './BomImportDialog.vue'
 import ProductImportDialog from './ProductImportDialog.vue'
@@ -9000,6 +9011,43 @@ function onGroupAction(a) {
 const sideCollapsed = ref(false)
 // ══════════ 文书式面板:导出 = 整张文书打印/存PDF(浏览器原生,所见即所得) ══════════
 const approvalSheetRef = ref(null)
+
+/* ── 纸面缩放(2026-11-24) ────────────────────────────────────────────────
+ * 用户报障:「面板看起来有点小，其他人都没有就他有，也调不大」。
+ * 根因:定死纸宽的面板(立项申请 1242px)在窄窗被**自动**等比缩小(下限 0.6),
+ * 而自动缩放封顶 1 且没有手动入口 ⇒ 窄屏用户只能看着纸面变小。
+ * 处置:保「适应宽度」为默认,另给 缩小/放大(10% 一档,最大 150%),按面板记在 localStorage。
+ * 口径(纯函数)见 sheetZoom.js;屏幕专用 —— 导出/打印会把 zoom 归 1。 */
+const sheetZoomUser = ref(null)      // null = 适应宽度
+const sheetZoomEffective = ref(1)    // DocSheet 算出来的实际值(自动模式下显示成百分比)
+const sheetZoomPaperW = computed(() => fixedSheetWidth(panelCode.value))
+/** 只有定死纸宽的面板才有「缩放」这回事(自适应宽的纸本来就不缩放) */
+const sheetZoomEnabled = computed(() => sheetZoomPaperW.value > 0)
+const sheetZoomBase = computed(() => (sheetZoomUser.value === null ? sheetZoomEffective.value : sheetZoomUser.value))
+/** 始终显示实际百分比:自动模式也报数(灰字),不然会与右侧「适应宽度」按钮重复 */
+const sheetZoomLabel = computed(() => Math.round((sheetZoomEffective.value || 1) * 100) + '%')
+const canSheetZoomIn = computed(() => sheetZoomBase.value < MAX_SHEET_ZOOM - 0.001)
+const canSheetZoomOut = computed(() => sheetZoomBase.value > MIN_SHEET_ZOOM + 0.001)
+function onSheetZoomChange(v) {
+  sheetZoomEffective.value = Number(v) || 1
+}
+function sheetZoomIn() {
+  sheetZoomUser.value = clampZoom(sheetZoomBase.value + ZOOM_STEP)
+}
+function sheetZoomOut() {
+  sheetZoomUser.value = clampZoom(sheetZoomBase.value - ZOOM_STEP)
+}
+/** 回到「适应宽度」:清掉记住的值 */
+function sheetZoomFit() {
+  sheetZoomUser.value = null
+}
+// 换面板就换成那张纸记住的值(各面板互不影响)
+watch(panelCode, (code) => { sheetZoomUser.value = loadStoredZoom(code) }, { immediate: true })
+// 用户改了就记住;回到适应宽度则清除
+watch(sheetZoomUser, (v) => {
+  if (v === null) clearStoredZoom(panelCode.value)
+  else saveStoredZoom(panelCode.value, v)
+})
 /** 删除组下拉动作:收起菜单后走统一入口(删除带整单确认) */
 function pickDelAction(a) {
   openDelMenu.value = false
@@ -14827,6 +14875,42 @@ onUnmounted(() => {
   align-items: flex-start;
   gap: 8px;
   margin: 12px 0 0;
+/* 纸面缩放条(2026-11-24):贴纸面区左上角,不参与纸张排版、不进导出件。
+   横向随纸面区一起滚动(absolute 定在容器内),纵向吸顶,长纸翻看时也点得到。 */
+.sheet-zoom-bar {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 6px 0 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--t-border, #e4e7ed);
+  border-radius: 6px;
+  background: var(--t-bg-1, #fff);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  font-size: 12px;
+  color: var(--t-text-3, #909399);
+  user-select: none;
+}
+.sheet-zoom-bar .szb-title { margin-right: 2px; }
+.sheet-zoom-bar .szb-btn {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 4px;
+  font-size: 13px;
+  line-height: 1;
+}
+.sheet-zoom-bar .szb-val {
+  min-width: 52px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--t-text-1, #303133);
+}
+.sheet-zoom-bar .szb-val.is-auto { color: var(--t-text-3, #909399); }
+.sheet-zoom-bar .szb-fit { margin-left: 2px; font-size: 12px; }
   padding: 8px 12px;
   border: 1px solid #f0d9a0;
   border-left: 3px solid #e6a23c;

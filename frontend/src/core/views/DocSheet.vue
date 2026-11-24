@@ -960,6 +960,7 @@ import { usePanelRuntime } from '@core/panel-runtime'
 import { useRouter } from 'vue-router'
 import { hasPhaseContent } from '@core/progress/stageProgress'
 import { fixedSheetWidth, docnoLabel } from './docSheetConfigs'
+import { fitZoom, resolveZoom } from './sheetZoom'
 import { resolveCustomerCode } from './approvalCustomerCode'
 
 const props = defineProps({
@@ -985,8 +986,13 @@ const props = defineProps({
    * 真闸门在 ButtonService.applySampleIntRowRules(同一份 yj_role_panel.perms)。
    */
   canEditOthers: { type: Boolean, default: false },
+  /**
+   * 用户手动设定的纸面缩放（null = 适应宽度，见 sheetZoom.js）。
+   * 只影响**屏幕**显示：截图导出路径会把内联 zoom 归 1，原生打印另算 --print-zoom。
+   */
+  userZoom: { type: Number, default: null },
 })
-const emit = defineEmits(['dirty', 'term-changed', 'progress-save'])
+const emit = defineEmits(['dirty', 'term-changed', 'progress-save', 'zoom-change'])
 
 /**
  * 备注栏旁的附件入口(元数据驱动):从下发的 fields 里发现 dataType='附件' 的字段。
@@ -1106,7 +1112,6 @@ function gotoLink(row) {
  * <p>⚠ 打印不受影响:`@media print` 的 `body.approval-printing .approval-sheet{width:100%!important}`
  * 带 !important,压得过这里写进 style 的 zoom;而且打印前会另算 `--print-zoom`。</p>
  */
-const MIN_FIT_ZOOM = 0.6
 const sheetRef = ref(null)
 /** 纸面可用宽(容器内宽 - 两侧留白),0 = 还没量到 */
 const availWidth = ref(0)
@@ -1130,13 +1135,14 @@ onBeforeUnmount(() => {
 const sheetZoom = computed(() => {
   const paperW = fixedSheetWidth(props.panelCode)
   if (!paperW) return 1                 // 自适应宽的纸不缩放
-  const avail = availWidth.value
-  if (!avail) return 1                  // 还没量到 ⇒ 先按原样
-  // 两侧各留 8px,免得滚动条/边框把纸挤掉 1px 又触发横向滚动
-  const usable = avail - 16
-  // 先封底(再小就看不清)再封顶(装得下时比例会 >1,但不许放大)
-  return Math.min(1, Math.max(MIN_FIT_ZOOM, usable / paperW))
+  // 适应宽度:可用宽 ÷ 纸宽(封顶 1、封底 0.6,两侧各留 8px 给滚动条/边框)
+  const fit = fitZoom(availWidth.value, paperW)
+  // 用户手动缩放优先(2026-11-24 用户口径:可放大到 150%),否则按自适应
+  return resolveZoom(props.userZoom, fit)
 })
+
+/** 把生效缩放报给外层:缩放条要显示当前百分比,并「从当前值起踏步」 */
+watch(sheetZoom, (v) => emit('zoom-change', v), { immediate: true })
 
 const sheetStyle = computed(() => {
   const w = fixedSheetWidth(props.panelCode)
@@ -3065,6 +3071,12 @@ defineExpose({ focusField })
    *     733 / 938 = 78.15% ⇒ 1340 × 78.15% ≈ 1047px < 1062px 可打印高 ⇒ **一页放得下**。
    *   (不用 transform:scale —— 它不影响布局盒尺寸,分页仍按未缩放的 1340px 切,照样两页。)
    * 其它文书式面板(非固定宽)不受影响:它们本就没有 938px 设计基准,保持 width:100%。 */
+  /* 手动缩放(2026-11-24)只服务屏幕:打印按设计纸宽另行计算。
+     截图导出路径已把 clone 的 zoom 归 1;这里兜住用户直接按 Ctrl+P 的情况。
+     ⚠ 品质系(body.approval-printing … :has(.q-vrows))另有更高的 !important 规则,不受本行影响。 */
+  @media print {
+    .approval-sheet { zoom: 1 !important; }
+  }
   body.approval-printing .approval-sheet {
     visibility: visible !important;
     position: absolute !important;
