@@ -5198,3 +5198,8 @@ migrate-progress-grade-principle-20261123.sql
 #   判据很窄：项目名称同时含 * 或 × 且含 mm，且对应立项的立项背景有值 ⇒ 只有 1 行命中。
 #   幂等 + 事务内自检（失败整体回滚）。两账套都执行。
 migrate-plan-wrong-project-name-20261123.sql
+
+# 2026-11-24 合并 origin/main 带入的两个上游新增字段补 en 译名(上游漏登记):
+#   RD_APPROVAL.客户编号、RD_PROGRESS.项目定级原则 —— 英文界面不再显示中文,DbNormAudit 第 9 项回落到 215。
+#   只插 yj_translation,不碰字段/表结构;幂等 + 自检。两账套均执行。
+migrate-i18n-upstream-newfields-20261124.sql
