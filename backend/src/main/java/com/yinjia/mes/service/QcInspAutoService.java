@@ -357,7 +357,10 @@ public class QcInspAutoService {
         // 自动出单在这里写默认值;人工建单/保存走 ButtonService.save() 的"空值兜底默认"(不覆盖用户改过的值)。
         // 两处各一处字面量(本类被 ButtonService 依赖、不能反向引用那边),改口径两处一起改。
         head.put("检验方案", "出货控制计划执行");
-        head.put("detail", Map.of("items", List.of()));
+        // 2026-11-24 用户口径「自动生成单据后需要能将对应的检验项目也自动带入了」:
+        //   功能单按《出货检验计划》里**含 1PCS** 的项预铺明细(表观单早已按 1% 预铺,同一份规则取互补两半)。
+        AsmInspItems.Result procItems = AsmInspItems.load(jdbc, str(p.get("dm")), "1PCS");
+        head.put("detail", Map.of("items", procItems.rows()));
         return head;
     }
 

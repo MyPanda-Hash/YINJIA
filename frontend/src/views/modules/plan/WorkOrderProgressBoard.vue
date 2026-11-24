@@ -102,7 +102,7 @@
         <i class="lg lg-idle">{{ tt('灰=未开始') }}</i>
       </span>
       <!-- 2026-11-13(契约 §5):汇总条右侧提示改成「行 / 工序 / 检验标记」三处可点的完整说明 -->
-      <span class="wpb-tip">{{ tt('点击行可跳转到生产工单并定位该工单；点击工序跳转到该工序排产，点击检验标记打开检验单') }}</span>
+      <span class="wpb-tip">{{ tt('点击工单号可跳转到生产工单并定位该工单；点击工序跳转到该工序排产，点击检验标记打开检验单') }}</span>
     </div>
 
     <!-- 刷新失败但仍有旧数据:保留数据,顶部给一条可读提示(既有数据不清空) -->
@@ -133,15 +133,15 @@
           <p class="wpb-state-title">{{ tt('没有符合条件的工单行') }}</p>
           <p class="wpb-state-sub">{{ tt('调整筛选条件后重试') }}</p>
         </div>
-        <div v-for="row in rows" :key="rowKey(row)" class="wpb-grid wpb-grid-row"
-             role="button" tabindex="0" :title="tt('点击查看工单详情')"
-             @click="openRow(row)"
-             @keydown.enter.prevent="openRow(row)"
-             @keydown.space.prevent="openRow(row)">
+        <!-- 2026-11-24 用户口径「需要点击对应的工单号才跳转而不是点击这一行就跳转」:
+             整行不再可点,只有工单号本身是链接(其余区域可正常选择/点工序) -->
+        <div v-for="row in rows" :key="rowKey(row)" class="wpb-grid wpb-grid-row">
           <!-- ① 生产工单:工单号 + 生产状态 / 工单行号 + 当前工序 / 生产线 / 订单号(带 #行号) -->
           <div class="wpb-cell">
             <div class="wpb-no-row">
-              <span class="wpb-no" :title="row['工单号']">{{ row['工单号'] || '-' }}</span>
+              <span class="wpb-no is-link" role="link" tabindex="0" :title="`${row['工单号'] || ''} · ${tt('点击查看工单详情')}`"
+                    @click.stop="openRow(row)" @keydown.enter.prevent="openRow(row)"
+                    @keydown.space.prevent="openRow(row)">{{ row['工单号'] || '-' }}</span>
               <!-- 已完工/已结案行的生产状态 tag 按质检结果着色(合格绿/不合格红/待检验橙),见 metaOf() -->
               <span class="wpb-status" :class="'tone-' + metaOf(row).tone">{{ tt(metaOf(row).label) }}</span>
               <!-- 行级质检徽标(2026-11-08 第4轮):生产状态 tag 旁 -->
@@ -226,7 +226,7 @@
     <section v-else class="wpb-list">
       <div class="wpb-table-wrap">
         <el-table :data="rows" size="small" border height="100%" class="wpb-table" :row-key="rowKey"
-                  :row-class-name="rowClass" @row-click="openRow">
+                  :row-class-name="rowClass">
           <template #empty>
             <div class="wpb-list-empty">
               <p class="wpb-list-empty-title">{{ error ? tt('加载失败') : tt('没有符合条件的工单行') }}</p>
@@ -236,7 +236,8 @@
           </template>
           <el-table-column :label="tt('工单编号')" min-width="170">
             <template #default="{ row }">
-              <div class="wpb-l-no">{{ row['工单号'] || '-' }}</div>
+              <div class="wpb-l-no is-link" role="link" tabindex="0"
+                   @click.stop="openRow(row)" @keydown.enter.prevent="openRow(row)">{{ row['工单号'] || '-' }}</div>
               <div class="wpb-l-sub">{{ tt('工单行号') }} {{ row['工单行号'] ?? '-' }}</div>
             </template>
           </el-table-column>
@@ -982,7 +983,6 @@ onBeforeUnmount(() => {
   min-height: 112px;
   padding: 8px 14px;
   border-bottom: 1px solid #f0f2f3;
-  cursor: pointer;
   outline: none;
   transition: background-color 0.15s ease;
 }
@@ -996,6 +996,20 @@ onBeforeUnmount(() => {
 .wpb-cell {
   min-width: 0;
 }
+/* 2026-11-24:只有工单号可点(整行不再跳转) */
+.wpb-no.is-link,
+.wpb-l-no.is-link {
+  color: #409eff;
+  cursor: pointer;
+  text-decoration: none;
+}
+.wpb-no.is-link:hover,
+.wpb-l-no.is-link:hover,
+.wpb-no.is-link:focus-visible,
+.wpb-l-no.is-link:focus-visible {
+  text-decoration: underline;
+}
+
 .wpb-no-row {
   display: flex;
   flex-wrap: wrap;

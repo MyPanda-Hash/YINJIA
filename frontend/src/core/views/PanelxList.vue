@@ -6922,7 +6922,7 @@ const DOC_RAIL_PANELS = {
   //   两处 v-bind 的是同一份 railBind,不用再各写一套。
   QC_PROC_INSP: ['工单号', '产品编码'],
   QC_FIRST_INSP: ['工单号', '产品名称'],
-  QC_ASM_INSP: ['工单号', '产品名称'],
+  QC_ASM_INSP: ['工单号', '产品编码'],   // 2026-11-24 用户口径「出货检验表观的侧边栏也把产品名称修改为产品编号」(与功能单同款)
   // 出厂检验报告(2026-11-01 用户口径「和首件检验单相同的形式」):
   //   面板改成纸面 approval-layout 后,左侧也补同款「单据选择」栏(单号 | 日期 | 中间两列 | 审核状态);
   //   中间列 = **工单号 + 产品名称**,与首件/制程检验单同款:
@@ -11453,6 +11453,23 @@ async function onInlineDetailChange(tabKey, row, field) {
   //   (以免打断输入),故本行只影响选择器/日期/开关三类。
   archVersion.value++
   calculateDetailRow(tabKey, row)
+  // 2026-11-24 用户口径「当前产成品入库填写的不合格数量没有影响实收数量」:
+  //   产成品入库明细的「实收数量」= 生产数量 − 不合格数量,改任一格都**即时**重算(后端保存时还会再算一次)。
+  //   生产数量为空的老行(金蝶同步/历史单)不动,保持手工填写。
+  if (panelCode.value === 'FINISH_IN' && row) {
+    const changed = field?.dataName || field?.label
+    if (changed === '生产数量' || changed === '不合格数量') {
+      const prod = row['生产数量']
+      if (prod !== undefined && prod !== null && prod !== '') {
+        const ng = Number(row['不合格数量'] ?? 0) || 0
+        const next = Math.max(0, Math.round(((Number(prod) || 0) - ng) * 10000) / 10000)
+        row['实收数量'] = next
+        if (activeCell.value && activeCell.value.row === row && activeCell.value.prop === '实收数量') {
+          activeCellEcho.value = next
+        }
+      }
+    }
+  }
   if (['存货编码', '存货名称', '产品编码', '产品名称', '材料编码', '材料名称', '仓库', '预出仓库', '出库仓库'].includes(field?.dataName)) {
     try { await engine.fillCurrentStock(row) } catch (error) { ElMessage.error(engine.errMsg(error) || '现存量刷新失败') }
   }

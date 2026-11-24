@@ -6286,6 +6286,7 @@ export default {
     '点击工序跳转到该工序排产': 'Click a process to open it in work order scheduling',
     '点击查看检验单': 'Click to view the inspection sheet',
     '已定位': 'Located',
+    '点击工单号可跳转到生产工单并定位该工单；点击工序跳转到该工序排产，点击检验标记打开检验单': 'Click the WO no. to open the work order and locate that line; click a process to open its scheduling; click the inspection badge to open the inspection sheet',
     '点击行可跳转到生产工单并定位该工单；点击工序跳转到该工序排产，点击检验标记打开检验单': 'Click a row to open the work order; click a process to open its scheduling; click the inspection badge to open the inspection sheet',
     // ---- 订单结转·备品超订单(2026-11-08:本次转单数量允许超过订单数量) ----
     '超订单': 'Over order',

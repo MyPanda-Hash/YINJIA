@@ -49,8 +49,26 @@ public final class AsmInspItems {
      */
     public record Result(String planNo, List<Map<String, Object>> rows) {}
 
-    /** 按产品编码取最新一张存活计划里「检查频率含 1%」的检验项(查不到 = 空结果,不算错) */
+    /**
+     * 按产品编码取最新一张存活计划里「检查频率含 1%」的检验项(表观单默认口径)。
+     * 查不到 = 空结果,不算错。
+     */
     public static Result load(JdbcTemplate jdbc, String productCode) {
+        return load(jdbc, productCode, APPEARANCE_FREQ_MARK);
+    }
+
+    /**
+     * 按**频率标记**取检验项(2026-11-24 新增:功能单也要自动带入检验项)。
+     *
+     * <p>用户口径:「自动生成单据后需要能将对应的检验项目也自动带入了。」
+     * 表观单 = {@code 1%}、功能单 = {@code 1PCS},同一条规则取互补两半
+     * (与前端 {@code shipPlanDefaults.isFunctionalRow} 同一口径)。</p>
+     *
+     * @param freqMark 频率标记(按包含判;{@code 1%} 不是 LIKE 通配,这里用 CHARINDEX)
+     */
+    public static Result load(JdbcTemplate jdbc, String productCode, String freqMark) {
+        String mark = freqMark == null ? "" : freqMark.trim().toUpperCase();
+        if (mark.isEmpty()) return new Result(null, List.of());
         String code = productCode == null ? "" : productCode.trim();
         if (code.isEmpty()) return new Result(null, List.of());
         List<Map<String, Object>> plans = jdbc.queryForList(
@@ -71,8 +89,9 @@ public final class AsmInspItems {
 
         List<Map<String, Object>> rows = new ArrayList<>();
         for (Map<String, Object> r : raw) {
-            // 表观口径:检查频率含「1%」(2026-11-22 用户口径;1PCS / 型式检验 不预铺)
-            if (!str(r.get("freq")).contains(APPEARANCE_FREQ_MARK)) continue;
+            // 频率口径:表观=含「1%」、功能=含「1PCS」(2026-11-22 + 2026-11-24);
+            // 「型式检验」/空频率两边都不带。用 contains 而不是 LIKE(1% 里的 % 是通配符)
+            if (!str(r.get("freq")).toUpperCase().contains(mark)) continue;
             String item = str(r.get("item"));
             if (item.isEmpty()) continue;                          // 没有项目名的行不是检验项
             if (rows.size() >= MAX_ROWS) break;

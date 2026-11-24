@@ -212,11 +212,16 @@ public class OrderConvertService {
                         // 排序(2026-10-18 用户口径「新的在上、旧的在下面」):此前按单据日期升序,
                         // 新单据沉在列表底部;现改**日期倒序 → 单据编号倒序 → 行id 升序**
                         // (同一张单内行号仍从上到下,不因倒序把 1/2/3 行翻过来)。
-                        + PENDING_FROM + PENDING_DATE_RANGE + PENDING_KEYWORD
+                        // 2026-11-24 用户口径「使用这个查询条件的时候不需要管日期范围」:
+                        //   填了关键字(订单号/客户/物料)就**不做日期过滤**,在全历史里找;
+                        //   关键字为空时仍按日期范围收口(避免一进页面拉全表)。
+                        + PENDING_FROM + (kw.isEmpty() ? PENDING_DATE_RANGE : "") + PENDING_KEYWORD
                         + " ORDER BY o.[单据日期] DESC, o.[单据编号] DESC, l.[id]",
                         // ⚠ 日期参数必须显式给空串:JDBC null 会让 `? = ''` 求值成 NULL(既非真也非假)
                         //   ⇒ 整个 WHERE 不成立 ⇒ **一行都查不出来**。2026-10-06 探针实测踩到并修正。
-                        arg(from), arg(from), arg(to), arg(to), kw, like, like, like, like);
+                        kw.isEmpty()
+                                ? new Object[]{arg(from), arg(from), arg(to), arg(to), kw, like, like, like, like}
+                                : new Object[]{kw, like, like, like, like});
     }
 
     /**
@@ -232,8 +237,10 @@ public class OrderConvertService {
         return jdbc.queryForMap(
                 "SELECT COUNT(*) AS cnt, COUNT(DISTINCT l.[存货编码]) AS styles,"
                         + " SUM(ISNULL(l.[数量],0)) AS qty, MAX(o.[单据日期]) AS latest"
-                        + PENDING_FROM + PENDING_DATE_RANGE + PENDING_KEYWORD,
-                arg(from), arg(from), arg(to), arg(to), kw, like, like, like, like);
+                        + PENDING_FROM + (kw.isEmpty() ? PENDING_DATE_RANGE : "") + PENDING_KEYWORD,
+                kw.isEmpty()
+                        ? new Object[]{arg(from), arg(from), arg(to), arg(to), kw, like, like, like, like}
+                        : new Object[]{kw, like, like, like, like});
     }
 
     /**

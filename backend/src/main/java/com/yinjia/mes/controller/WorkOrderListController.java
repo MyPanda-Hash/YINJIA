@@ -134,11 +134,16 @@ public class WorkOrderListController {
         Map<String, Object> b = body == null ? Map.of() : body;
         List<Object> args = new ArrayList<>();
         StringBuilder w = new StringBuilder(" WHERE ISNULL(p.asp_cancel,'N') <> 'Y'");
-        if (b.get("日期从") != null && !String.valueOf(b.get("日期从")).isBlank()) {
+        // 2026-11-24 用户口径「使用这个查询条件的时候不需要管日期范围」:
+        //   填了关键字(工单号/物料/客户/产品/订单号)就在**全历史**里找,日期范围不生效;
+        //   关键字为空时仍按日期范围收口(默认最近 15 天,防单据累积后卡)。
+        String kw = b.get("keyword") == null ? "" : String.valueOf(b.get("keyword")).trim();
+        boolean dateScoped = kw.isEmpty();
+        if (dateScoped && b.get("日期从") != null && !String.valueOf(b.get("日期从")).isBlank()) {
             w.append(" AND p.pl_date >= ?");
             args.add(String.valueOf(b.get("日期从")));
         }
-        if (b.get("日期到") != null && !String.valueOf(b.get("日期到")).isBlank()) {
+        if (dateScoped && b.get("日期到") != null && !String.valueOf(b.get("日期到")).isBlank()) {
             // pl_date 是 datetime,「到」含当日全天(< 次日零点),对齐旧 date 型列的 <= 语义
             w.append(" AND p.pl_date < DATEADD(day, 1, ?)");
             args.add(String.valueOf(b.get("日期到")));
@@ -150,7 +155,6 @@ public class WorkOrderListController {
         }
         // 单框模糊搜索(2026-09-26 用户拍板):关键字在 工单号/物料编码/产品名称/客户代码/客户名称 多列 OR
         // 2026-10-31 补「订单号」:工单带订单追溯后,按销售订单号反查生产工单是现场常见用法
-        String kw = b.get("keyword") == null ? "" : String.valueOf(b.get("keyword")).trim();
         if (!kw.isEmpty()) {
             String like = "%" + kw + "%";
             w.append(" AND (p.pl_no LIKE ? OR p.dm LIKE ? OR p.mc LIKE ? OR p.khdm LIKE ? OR ISNULL(dk.mc,N'') LIKE ?"
