@@ -83,7 +83,7 @@ export const approvalSheetCfg = {
   ],
   // 设计右侧是可填的「备注」区(F5 标签 + F6:G15 合并填写区)⇒ 渲染成真的备注列,
   // 不再是 deco 装饰虚线(2026-09-22 对齐设计;rd_approval.备注 列本就存在,只是没登记字段)
-  remark: { label: '备注', key: '备注', max: 1000 },
+  remark: { label: '备注', key: '备注', max: 500 },
   rows: [
     // 行高 = 设计磅值 × 4/3(96dpi),来源「立项申请表.xlsx」行高
     // [33,24,18.75,20.25,33.75,38.25,33,null,null,41.25,75.75,157.5,70.5,41.25,41.25,33]
@@ -91,18 +91,18 @@ export const approvalSheetCfg = {
     // 2026-11-23 用户口径：「立项申请表的这两个红框的空间可以适当小一点，把空间留给项目开发目标」
     //   —— 二「立项背景」133→100、六「项目输出」94→70，腾出的 33+24 全部给五「项目开发目标」210→267。
     //   三者之和保持不变(133+94+210 = 100+70+267)，整张纸的总高不因这次调整而变。
-    { num: '二', label: '立项背景', key: '立项背景', max: 250, h: 100, kind: 'textarea' },
-    { num: '三', label: '机型及应用位置', key: '机型及应用位置', max: 50, h: 55, kind: 'textarea' },
+    { num: '二', label: '立项背景', key: '立项背景', max: 1000, h: 100, kind: 'textarea' },
+    { num: '三', label: '机型及应用位置', key: '机型及应用位置', max: 200, h: 55, kind: 'textarea' },
     // 2026-10-16 用户口径:「把尺寸格式示例：33*12*110 写进去背景提示词」——
     // 这一格是**唯一手输规格的入口**,格式统一了产品的「产品整体尺寸」与「炭棒外径/内径/长度」
     // 才能被「开发产品」按 外径*内径*长度 自动拆出来(见 @core/progress/devProduct.parseCarbonSize)。
     // DocSheet 的 input/textarea 分支本批补上了 row.hint 占位词(此前只有 select 分支认 hint)。
-    { num: '四', label: '滤芯/炭棒规格或结构', key: '滤芯/炭棒规格或结构', max: 100, h: 101, kind: 'textarea',
+    { num: '四', label: '滤芯/炭棒规格或结构', key: '滤芯/炭棒规格或结构', max: 400, h: 101, kind: 'textarea',
       hint: '例：33*12*110（外径*内径*长度）' },
-    { num: '五', label: '项目开发目标', key: '项目开发目标', max: 250, h: 267, kind: 'textarea' },
-    { num: '六', label: '项目输出', key: '项目输出', max: 100, h: 70, kind: 'textarea' },
-    { num: '七', label: '开发周期要求', key: '开发周期要求', max: 50, h: 55, kind: 'textarea' },
-    { num: '八', label: '其它要求', key: '其它要求', max: 250, h: 55, kind: 'textarea' },
+    { num: '五', label: '项目开发目标', key: '项目开发目标', max: 1000, h: 267, kind: 'textarea' },
+    { num: '六', label: '项目输出', key: '项目输出', max: 400, h: 70, kind: 'textarea' },
+    { num: '七', label: '开发周期要求', key: '开发周期要求', max: 200, h: 55, kind: 'textarea' },
+    { num: '八', label: '其它要求', key: '其它要求', max: 1000, h: 55, kind: 'textarea' },
   ],
   signCells: [
     { label: '申请立项人', key: '申请立项人', w: 202, type: 'text', flex: 53 },
@@ -128,7 +128,7 @@ export const planSheetCfg = {
   rows: [
     // 行高 = 设计磅值 × 4/3(96dpi),来源「项目实施计划.xlsx」行高
     // [20.15,27.75,27.75,27.75,33.75,33.75,32.1,77.1,60.95,39.95,39.95,39.95,68.25,30]
-    { num: '1', label: '项目名称', key: '项目名称', max: 50, h: 45, kind: 'input' },
+    { num: '1', label: '项目名称', key: '项目名称', max: 100, h: 45, kind: 'input' },
     // 下拉口径必须与库字典一致:RD_PLAN.项目定级 已被 migrate-approval-level.sql(2026-09-21)
     // 补入「一级」(下游承接立项申请的 项目等级 一~四级),少一级会让参照带入的值选不中
     { num: '2', label: '项目定级', key: '项目定级', max: 0, h: 45, kind: 'select',
@@ -152,9 +152,9 @@ export const planSheetCfg = {
     {
       num: '6', label: '测试方案', h: 160,
       subs: [
-        { label: '测试条件', key: '测试条件', max: 150 },
-        { label: '测试方法', key: '测试方法', max: 150 },
-        { label: '测试标准', key: '测试标准', max: 150 },
+        { label: '测试条件', key: '测试条件', max: 500 },
+        { label: '测试方法', key: '测试方法', max: 500 },
+        { label: '测试标准', key: '测试标准', max: 500 },
       ],
     },
     // 测试计划:10 个阶段框(默认全显示;每个框可隐藏/显示,隐藏后下方自动接上;导出按实际显示)
@@ -335,11 +335,11 @@ export const qcSheetCfgs = {
         checks: ['返工达到规定要求', '让步使用', '报废', '筛选合格品留用'] },
       { kind: 'section', label: '五．相关部门处理意见', h: 34 },
       { kind: 'dept', label: '产品开发部意见', h: 130, subs: [
-        { label: '性能', key: '产品开发部性能意见', checks: ['同意使用', '不同意使用'], max: 250 },
-        { label: '工艺', key: '产品开发部工艺意见', checks: ['同意使用', '不同意使用'], max: 250 },
+        { label: '性能', key: '产品开发部性能意见', checks: ['同意使用', '不同意使用'], max: 500 },
+        { label: '工艺', key: '产品开发部工艺意见', checks: ['同意使用', '不同意使用'], max: 500 },
       ] },
       { kind: 'dept', label: '销售部意见', h: 80, subs: [
-        { key: '销售部意见', checks: ['同意使用', '不同意使用'], max: 250 },
+        { key: '销售部意见', checks: ['同意使用', '不同意使用'], max: 500 },
       ] },
       { kind: 'section', label: '六、改善效果验证（如有返工处理需填写）', key: '改善效果验证', h: 90, max: 1000, dateKey: '单据日期', sign: '责任人', signKey: '改善效果验证责任人' },
       { kind: 'section', label: '七．损失成本', h: 46 },
@@ -408,8 +408,8 @@ export const qcSheetCfgs = {
       // 行高与子区比例(性能 101 / 工艺 124)、品质/销售/研发 124/122/92 均取原图实测;
       // signKey/dateKey=会签签名与年月日可填(各落一列,hidden 字段,不进通用表单)
       { kind: 'dept', label: '产品开发部意见', h: 225, nameW: 170, signKey: '产品开发部签名', dateKey: '产品开发部日期', subs: [
-        { label: '性能', key: '产品开发部性能意见', max: 250, rows: 1, flex: 101 },
-        { label: '工艺', key: '产品开发部工艺意见', max: 250, rows: 1, flex: 124 },
+        { label: '性能', key: '产品开发部性能意见', max: 500, rows: 1, flex: 101 },
+        { label: '工艺', key: '产品开发部工艺意见', max: 500, rows: 1, flex: 124 },
       ] },
       // 品质部意见(2026-10-19 用户口径 task 5:「品质部意见生成特采要带检验数据记录单号的链接,可以跳转」):
       // 小字标题后面挂一条**可点的检验数据记录单号**(link.key = 头字段「检验数据记录单号」,
@@ -417,9 +417,9 @@ export const qcSheetCfgs = {
       // 号为空(手工特采/老单)时链接整条不渲染)。渲染与跳转在 DocSheet 的 docLinkNo/gotoLink。
       { kind: 'dept', label: '品质部意见', h: 124, nameW: 170, signKey: '品质部签名', dateKey: '品质部日期',
         link: { key: '检验数据记录单号', panel: 'QC_INSP_REC', label: '检验数据记录' },
-        subs: [{ key: '品质部意见', max: 250, rows: 1, flex: 1 }] },
-      { kind: 'dept', label: '销售部意见', h: 122, nameW: 170, signKey: '销售部签名', dateKey: '销售部日期', subs: [{ key: '销售部意见', max: 250, rows: 1, flex: 1 }] },
-      { kind: 'dept', label: '研发意见', h: 92, nameW: 170, signKey: '研发签名', dateKey: '研发日期', subs: [{ key: '研发意见', max: 250, rows: 1, flex: 1 }] },
+        subs: [{ key: '品质部意见', max: 500, rows: 1, flex: 1 }] },
+      { kind: 'dept', label: '销售部意见', h: 122, nameW: 170, signKey: '销售部签名', dateKey: '销售部日期', subs: [{ key: '销售部意见', max: 500, rows: 1, flex: 1 }] },
+      { kind: 'dept', label: '研发意见', h: 92, nameW: 170, signKey: '研发签名', dateKey: '研发日期', subs: [{ key: '研发意见', max: 500, rows: 1, flex: 1 }] },
       // 原图:先一条整宽标题带,再一行整宽勾选(正常使用/管控使用/挑选使用,左起均匀铺开)
       { kind: 'section', label: '二．最终处理结果', h: 36 },
       { kind: 'pairs', h: 71, cells: [
@@ -452,8 +452,8 @@ export const qcSheetCfgs = {
       { kind: 'section', label: '四．不合格品处理意见', key: '处理意见', h: 70, dateKey: '单据日期', sign: '品质部', signKey: '责任人',
         checks: ['返工达到规定要求', '让步使用', '报废', '筛选合格品留用'] },
       { kind: 'section', label: '五．相关部门处理意见', h: 34 },
-      { kind: 'dept', label: '研发部意见', h: 85, subs: [{ key: '研发部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
-      { kind: 'dept', label: '产品开发部意见', h: 85, subs: [{ key: '产品开发部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
+      { kind: 'dept', label: '研发部意见', h: 85, subs: [{ key: '研发部意见', checks: ['同意使用', '不同意使用'], max: 500 }] },
+      { kind: 'dept', label: '产品开发部意见', h: 85, subs: [{ key: '产品开发部意见', checks: ['同意使用', '不同意使用'], max: 500 }] },
       { kind: 'section', label: '六、改善效果验证（如有返工处理需填写）', key: '改善效果验证', h: 90, max: 1000, dateKey: '单据日期', sign: '责任人', signKey: '责任人' },
       { kind: 'section', label: '七．成本损失', h: 46 },
       { kind: 'pairs', cells: [
@@ -496,10 +496,10 @@ export const qcSheetCfgs = {
         sign: '责任人', signKey: '责任人', dateKey: '单据日期' },
       { kind: 'section', label: '二．相关部门处理意见', h: 34 },
       { kind: 'dept', label: '产品开发部意见', h: 130, subs: [
-        { label: '性能', key: '产品开发部性能意见', checks: ['同意使用', '不同意使用'], max: 250 },
-        { label: '工艺', key: '产品开发部工艺意见', checks: ['同意使用', '不同意使用'], max: 250 },
+        { label: '性能', key: '产品开发部性能意见', checks: ['同意使用', '不同意使用'], max: 500 },
+        { label: '工艺', key: '产品开发部工艺意见', checks: ['同意使用', '不同意使用'], max: 500 },
       ] },
-      { kind: 'dept', label: '品质部意见', h: 80, subs: [{ key: '品质部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
+      { kind: 'dept', label: '品质部意见', h: 80, subs: [{ key: '品质部意见', checks: ['同意使用', '不同意使用'], max: 500 }] },
       // 2026-11-17 用户口径(截图红框「三．检测结果 → 这一行删除」):该行整行下线;
       //   qc_jjf.[检测结果] 物理列保留(历史值不丢),yj_field 登记已随迁移删除。
     ],
@@ -526,9 +526,9 @@ export const qcSheetCfgs = {
       { kind: 'section', label: '一．材料来源描述（可附图片，必要时另附问题品）', key: '材料来源描述', h: 110, max: 2000, dateKey: '单据日期', sign: '责任人', signKey: '责任人', attach: '附件' },
       { kind: 'section', label: '二．测试结果', key: '测试结果', h: 110, max: 2000, dateKey: '单据日期', sign: '责任人', signKey: '责任人' },
       { kind: 'section', label: '三．相关部门处理意见', h: 34 },
-      { kind: 'dept', label: '研发部意见', h: 80, subs: [{ key: '研发部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
-      { kind: 'dept', label: '产品开发部意见', h: 80, subs: [{ key: '产品开发部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
-      { kind: 'dept', label: '品质部意见', h: 80, subs: [{ key: '品质部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
+      { kind: 'dept', label: '研发部意见', h: 80, subs: [{ key: '研发部意见', checks: ['同意使用', '不同意使用'], max: 500 }] },
+      { kind: 'dept', label: '产品开发部意见', h: 80, subs: [{ key: '产品开发部意见', checks: ['同意使用', '不同意使用'], max: 500 }] },
+      { kind: 'dept', label: '品质部意见', h: 80, subs: [{ key: '品质部意见', checks: ['同意使用', '不同意使用'], max: 500 }] },
     ],
     signKind: 'plain',
     signCells: qcSignStd('责任人'),
@@ -554,8 +554,8 @@ export const qcSheetCfgs = {
       ] },
       { kind: 'section', label: '一．异常描述（可附图片，必要时另附问题品）', key: '异常描述', h: 110, max: 2000, dateKey: '单据日期', sign: '责任人', signKey: '编制人', attach: '附件' },
       { kind: 'section', label: '二、异常原因分析', h: 150, subs: [
-        { label: '供应商原因', key: '供应商原因', max: 500 },
-        { label: '内部原因（无则填无）', key: '内部原因', max: 500 },
+        { label: '供应商原因', key: '供应商原因', max: 1000 },
+        { label: '内部原因（无则填无）', key: '内部原因', max: 1000 },
       ] },
       { kind: 'section', label: '三、处理方式（品质部）', key: '处理方式', h: 60, dateKey: '单据日期', sign: '签名', signKey: '编制人',
         checks: ['整批退货', '全检挑选', '让步接收'] },
