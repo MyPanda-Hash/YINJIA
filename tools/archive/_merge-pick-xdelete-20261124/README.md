@@ -29,3 +29,8 @@
 ![点叉后少一行](round-11-after-x.png)
 
 复跑:`ego-browser nodejs -e "await import('file:///<本目录>/round-11.mjs')"`
+
+## 第二轮(样式定稿)
+
+`round-12` 复验最终样式:叉为 20×20 圆形、常态 `rgb(152,165,176)`、`font-size:14px`、`cursor:pointer`,
+两张单 8+6 行共 14 个叉,收尾取消不生成单据。截图 `round-12-final.png`。
