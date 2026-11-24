@@ -715,7 +715,8 @@ async function confirm() {
     const printFn = res['打印版式'] === '无金额' ? engine.printPuOrderNoAmount : engine.printPuOrder
     let afterPrint = null
     let printDone = false   // onDone 可能比下面的赋值先到(打印被拒/层摘得快)
-    const ok = printFn(doc.value, printRows, {
+    // await:无金额版(送货单)要现算二维码(2026-11-24 送货单带码)⇒ 已改成 async;有金额版返回布尔,await 同样成立
+    const ok = await printFn(doc.value, printRows, {
       // 需方联系人/联系方式 = 弹窗里选的那一组(2026-11-11);无金额(送货单)不印签章框,给了也不用
       buyer: buyerOf(),
       onDone: () => { printDone = true; if (afterPrint) afterPrint() },
@@ -797,7 +798,8 @@ async function doTwin(row) {
     const printFn = res['打印版式'] === '无金额' ? engine.printPuOrderNoAmount : engine.printPuOrder
     let afterPrint = null
     let printDone = false
-    const ok = printFn(doc.value, printRows, {
+    // await:无金额版(送货单)要现算二维码(2026-11-24 送货单带码)⇒ 已改成 async;有金额版返回布尔,await 同样成立
+    const ok = await printFn(doc.value, printRows, {
       buyer: buyerOf(),
       onDone: () => { printDone = true; if (afterPrint) afterPrint() },
     })

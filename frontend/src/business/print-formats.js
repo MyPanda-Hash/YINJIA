@@ -2,6 +2,8 @@
  * print-formats.js — 固定版式纸质单据打印(2026-09-23)
  * 现有版式:
  *   ① 银嘉采购订单(用户截图,PU_ORDER 打印):头部信息+物料行表+总计+注意事项+供/需方签章框;
+ *      ⚠ 无金额版 = **送货单**,2026-11-24 起页头右上角带**一个二维码**,内容 = 全部行的
+ *      `订单编号@物料编码@数量` 用 `;` 串联(见 deliveryNoteQrText);
  *   ② 退货单(用户截图,QC_RETURN 暂收退料单 打印):公司抬头+供应商/退货日期+行表+说明+签章行;
  *   ③ 二维码标签(2026-09-24,INV 勾选即打):75×100mm 七字段标签;
  *     ③b 仓位标识卡(2026-09-28 建为「库位标识卡」,2026-10-08 正名):同款 75×100mm,
@@ -214,6 +216,12 @@ const PU_SHEET_CSS = '<style>'
   + '.sum td{background:#fafafa;font-weight:600}'
   + '.notes{margin:10px 0 8px;font-size:11px;line-height:1.55}'
   + '.notes .t{font-weight:700;font-size:12px;margin-bottom:2px}'
+  // 页头行(2026-11-24 送货单二维码):信息区左、二维码右上 —— 二维码按物理尺寸出纸(A4 纵向 26mm),
+  //   信息区占剩余宽度、允许收缩(.info 的值 .v 里 min-width 180px 仍在,整体不够就靠 word-break 兜底)
+  + '.head{display:flex;gap:6mm;align-items:flex-start;margin:0 0 10px}'
+  + '.head .info{flex:1;min-width:0;margin:0}'
+  + '.head .hdqr{flex:none;width:26mm;text-align:center}'
+  + '.head .hdqr img{width:26mm;height:26mm;display:block}'
   + '.sign{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:8px}'
   + '.sign .box{border:1px solid #444;min-height:110px;padding:6px 10px;font-size:12px;line-height:1.9}'
   + '.sign .box .t{text-align:center;font-weight:600;letter-spacing:8px;margin-bottom:4px}'
@@ -284,17 +292,44 @@ export function printPuOrder(doc, lines, opts) {
 }
 
 /**
+ * 送货单二维码内容(2026-11-24 用户口径):
+ *   「图片的送货单要带二维码」+ 扫码口径 **订单编号+物料编码+物料数量**,且「一个二维码显示全部行」。
+ *
+ * 形态:**一行物料一条记录** `订单编号@物料编码@数量`,多条记录用 `;` 串起来,整张单只印一个码。
+ *   例(2 行):`YJ-20261116-03@YJ-KBL-028@1440;YJ-20261116-03@YJ-KBL-029@200`
+ *
+ * ⚠ 为什么记录间用 `;` 而不是换行:现场扫码枪是**键盘仿真**,码里的换行等于敲回车,
+ *   一串记录会被拆成多次输入(收货端只拿到第一行);`@` 沿用标识卡/工单码既有分段口径。
+ * ⚠ 数量取**本张纸上的数量**(送货单打印的是「本次送货数量」快照行,不是订单原始数量)。
+ *
+ * @param {object} doc   头数据(单据编号/单号/编号)
+ * @param {any[]}  lines 行数据(物料编码/数量)
+ * @returns {string} 空串 = 没有带编码/数量的行(此时不出二维码)
+ */
+export function deliveryNoteQrText(doc, lines) {
+  const no = String(doc?.['单据编号'] ?? doc?.['单号'] ?? doc?.['编号'] ?? '').trim()
+  return (Array.isArray(lines) ? lines : [])
+    .filter((l) => l && (l['物料编码'] || l['物料名称']))
+    .map((l) => [no, String(l['物料编码'] ?? '').trim(), fmtNum(l['数量'])].join('@'))
+    .filter((rec) => rec.replace(/@/g, '') !== '')
+    .join(';')
+}
+
+/**
  * 采购订单·无金额版 = **送货单**(2026-09-28 是"采购订单另一种版式",2026-11-11 用户改名):
  *   「打印无金额的采购订单报表名字改为送货单。送货单下方不需要写供方和需方。」
  *   ⇒ ① 纸面标题 `送货单`(打印层文档名也改);② **不印供方/需方签章框**;
  *   其余与采购订单同款:品牌行、信息区(付款方式/是否含税)、注意事项;行表无 单价/小计,
  *   总计行只留数量合计。
+ *   2026-11-24:「图片的送货单要带二维码」⇒ 页头右上角一个二维码,内容见 {@link deliveryNoteQrText}
+ *   (全部行的 订单编号@物料编码@数量)。二维码要现算(qrcode 异步出图)⇒ 本函数改成 **async**,
+ *   调用方一律 `await`(与 printProductionTask 同款)。
  * @param doc  头数据(同 printPuOrder)
  * @param lines 行数据(同 printPuOrder:物料编码/物料名称/规格型号/单价/单位/数量/金额/预计到货日期/备注)
  * @param {{onDone?:Function}} [opts] 打印层摘掉后回调一次(同 printPuOrder)
- * @return {boolean} true=已交给打印层
+ * @return {Promise<boolean>} true=已交给打印层
  */
-export function printPuOrderNoAmount(doc, lines, opts) {
+export async function printPuOrderNoAmount(doc, lines, opts) {
   const rows = (Array.isArray(lines) ? lines : []).filter((l) => l && (l['物料编码'] || l['物料名称']))
   const pad = Math.max(0, 4 - rows.length)
   const tax = rows.some((l) => Number(l['税率%']) > 0) ? '是' : '否'
@@ -305,16 +340,28 @@ export function printPuOrderNoAmount(doc, lines, opts) {
     + `<td>${esc(fmtDate(l['预计到货日期']) || fmtDate(doc['交货日期']))}</td>`
     + `<td>${esc(l['备注'])}</td></tr>`).join('')
     + Array.from({ length: pad }, () => '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>').join('')
+  // 二维码(2026-11-24):出图失败不挡出纸 —— 纸面其余内容照打,控制台留 warn
+  const qrText = deliveryNoteQrText(doc, rows)
+  let qr = ''
+  if (qrText) {
+    try {
+      const lib = qrLib()
+      if (!lib) throw new Error('qrcode lib unavailable')
+      qr = await lib.toDataURL(qrText, { margin: 1, errorCorrectionLevel: 'M' })
+    } catch (e) { console.warn('[print-formats] 送货单二维码生成失败:', e?.message || e) }
+  }
   const body = PU_SHEET_CSS
     + PU_BRAND_HTML
     + '<h1>送货单</h1>'
-    + '<div class="info">'
+    + '<div class="head"><div class="info">'
     + `<span class="f">订单编号：<span class="v">${esc(doc['单据编号'])}</span></span>`
     + `<span class="f">下单日期：<span class="v">${esc(fmtDate(doc['单据日期']))}</span></span>`
     + `<span class="f">供应商编号：<span class="v">${esc(doc['供应商编码'])}</span></span>`
     + `<span class="f">供应商名称：<span class="v">${esc(doc['供应商'])}</span></span>`
     + `<span class="f">付款方式：<span class="v s">${esc(doc['付款方式'])}</span></span>`
     + `<span class="f">是否含税：<span class="v s">${tax}</span></span>`
+    + '</div>'
+    + (qr ? `<div class="hdqr"><img src="${qr}" alt=""/></div>` : '')
     + '</div>'
     + '<table><thead><tr>'
     + ['物料编码', '物料名称', '粉料规格及要求', '单位', '数量', '交期要求', '备注']
@@ -391,11 +438,22 @@ export function printQcReturn(doc, lines) {
  * 带批号=公司代码@物料编码@批号(如 0@XH-SX80250SX@20060908,采购入库单行);
  * 不带批号=公司代码@物料编码(如 0@XH-SX80250SX,商品档案行/无批次行)。规格·数量不再进码。
  * 公司代码取旧系统 plang.comm(全库唯一 '0'),常量见 COMPANY.companyCode。
- * @param rows [{编码, 规格, 数量?, 批次?, 订单编号?, 供应商名称?, 生产日期?}]
+ * 2026-11-24 用户口径「标识卡的二维码要带每箱数量」⇒ 有每箱数量时补**第 4 段**:
+ *   公司代码@物料编码@批号@每箱数量(如 0@YJ-KBL-028@20261021@200)。
+ *   ⚠ 第 4 段必须在**第 3 段(批号)非空**时才加 —— 三段码的第 3 段会被扫码端当成批号,
+ *     批号空着补段会变成「0@编码@200」把每箱数量误读成批号(材料码打印的批次号本来就必填,
+ *     MaterialLabelDialog 会拦空);不带每箱数量的老入口(商品档案/采购入库单)仍是 2/3 段码,不变。
+ * @param rows [{编码, 规格, 数量?, 批次?, 每箱数量?, 订单编号?, 供应商名称?, 生产日期?}]
  */
-/** 标识卡二维码内容:公司代码@物料编码[@批号](批号空→两段;2026-09-28 旧系统扫码口径) */
+/** 标识卡二维码内容:公司代码@物料编码[@批号[@每箱数量]](批号空→两段;2026-09-28 旧系统扫码口径) */
 export function productCardQrText(card, companyCode = COMPANY.companyCode) {
-  return [companyCode, card['编码'], card['批次'] || ''].filter((s) => s !== '' && s != null).join('@')
+  const code = card['编码']
+  const batch = card['批次'] || ''
+  const box = Number(card['每箱数量'])
+  const segs = [companyCode, code, batch]
+  // 每箱数量(2026-11-24):只在批号段就位时才补,避免「第 4 段」挤成「第 3 段」被误读成批号
+  if (batch && Number.isFinite(box) && box > 0) segs.push(fmtNum(box))
+  return segs.filter((s) => s !== '' && s != null).join('@')
 }
 
 export async function printProductCards(rows, opts) {

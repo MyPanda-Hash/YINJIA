@@ -585,6 +585,9 @@ function cardsOf(res) {
       订单编号: props.orderNo,
       供应商名称: head.value['供应商'] || '',
       生产日期: date,
+      // 每箱数量(2026-11-24 用户口径「标识卡的二维码要带每箱数量」):二维码多加第 4 段
+      //   公司代码@物料编码@批号@每箱数量(print-formats.productCardQrText);0=历史单未填 ⇒ 码不加这一段
+      每箱数量: box,
     }
     if (!(box > 0)) { out.push({ ...base, 数量: qty }); continue }
     const { full, rem } = cardsOfQty(qty, box)

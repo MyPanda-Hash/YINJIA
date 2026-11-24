@@ -13407,7 +13407,8 @@ async function onButton(action) {
       // 头单号键随面板而异(PU_ORDER=单据编号,QC_RETURN=单号/编号,见 PxController 纸张右上角注释)
       if (!doc['单据编号'] && !doc['单号'] && !doc['编号']) return ElMessage.warning(tt('未取到单据数据'))
       if (action === '打印采购订单') printPuOrder(doc, lines)
-      else if (action === '打印订单无金额') printPuOrderNoAmount(doc, lines)
+      // 无金额版 = 送货单:2026-11-24 起页头要带二维码(现算 qrcode,异步)⇒ 必须 await
+      else if (action === '打印订单无金额') await printPuOrderNoAmount(doc, lines)
       else printQcReturn(doc, lines)
     } catch (e) {
       ElMessage.error(engine.errMsg(e) || tt('打印失败'))

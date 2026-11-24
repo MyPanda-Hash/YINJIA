@@ -22,22 +22,30 @@ import { COMPANY_CODE } from '../core/panel/companyCode.js'
  *      与标识卡/工单码同一公司代码前缀。改动原因见 barcodeLabel.barcodeQrText。
  *   ② 旧式/半成品/成品标签 = `存货编码|批号`(条码管理另两个面板仍出这种码)。
  * 只认**公司代码开头**的 @ 形式,别把供应商贴码的 `编码@数量` 误当公司码(首段不是公司代码)。
- * 批号可能为空(不分批物料),但不允许出现第三段 —— 那通常说明扫到了别的码,
- * 必须当场拦下而不是猜。
+ * 批号可能为空(不分批物料),但**最多到第 4 段** —— 第 4 段 = 每箱数量(2026-11-24 用户口径
+ * 「标识卡的二维码要带每箱数量」,标识卡码变成 公司代码@存货编码@批号@每箱数量);
+ * 第 4 段不是正数(比如扫到了别的码)仍按 too-many 拦下,第 5 段及以后一律 too-many。
  *
  * @param {string} raw 扫码枪或手工输入的原串
- * @returns {{ ok: boolean, code: string, batch: string, reason?: 'empty'|'no-code'|'too-many' }}
+ * @returns {{ ok: boolean, code: string, batch: string, boxQty?: number, reason?: 'empty'|'no-code'|'too-many' }}
+ *          boxQty 只在码里真的带了「每箱数量」时存在(三段以内的老码不带这个键,行为与以前一致)
  */
 export function parseBarcode(raw) {
   const text = String(raw == null ? '' : raw).trim()
   if (!text) return { ok: false, code: '', batch: '', reason: 'empty' }
-  // ① 公司代码前缀式(材料仓条码 2026-10-21):公司代码@存货编码[@批号]
+  // ① 公司代码前缀式(材料仓条码 2026-10-21):公司代码@存货编码[@批号][@每箱数量]
   if (text.startsWith(COMPANY_CODE + '@')) {
     const parts = text.split('@').map((p) => p.trim())
-    if (parts.length > 3) return { ok: false, code: parts[1] || '', batch: '', reason: 'too-many' }
+    if (parts.length > 4) return { ok: false, code: parts[1] || '', batch: '', reason: 'too-many' }
     const code = parts[1] || ''
     if (!code) return { ok: false, code: '', batch: '', reason: 'no-code' }
-    return { ok: true, code, batch: parts[2] || '' }
+    const res = { ok: true, code, batch: parts[2] || '' }
+    if (parts.length > 3) {
+      const box = Number(parts[3])
+      if (!Number.isFinite(box) || box <= 0) return { ok: false, code, batch: res.batch, reason: 'too-many' }
+      res.boxQty = box
+    }
+    return res
   }
   // ② 旧式:存货编码|批号
   const parts = text.split('|')

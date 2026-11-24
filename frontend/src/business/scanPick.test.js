@@ -25,6 +25,19 @@ test('码内容:公司代码式异常形态 → no-code / too-many', () => {
   assert.equal(parseBarcode('0@A@B@C').reason, 'too-many')
 })
 
+// 2026-11-24 用户口径「标识卡的二维码要带每箱数量」:标识卡码变 公司代码@存货编码@批号@每箱数量。
+// 老的三段码不许带 boxQty 键(deepEqual 会炸),新的四段码才多这一项。
+test('码内容:标识卡第 4 段 = 每箱数量(2026-11-24)', () => {
+  assert.deepEqual(parseBarcode('0@Y-S-Z@20261021004@200'),
+    { ok: true, code: 'Y-S-Z', batch: '20261021004', boxQty: 200 }, '四段码拆出每箱数量')
+  assert.deepEqual(parseBarcode('0@Y-S-Z@20261021004@12.5'),
+    { ok: true, code: 'Y-S-Z', batch: '20261021004', boxQty: 12.5 }, 'kg 类物料每箱数量带小数')
+  assert.deepEqual(parseBarcode('0@Y-S-Z@20261021004'),
+    { ok: true, code: 'Y-S-Z', batch: '20261021004' }, '三段老码不变(没有 boxQty 键)')
+  assert.equal(parseBarcode('0@A@B@0').reason, 'too-many', '第 4 段为 0/非正数 ⇒ 当扫错码拦下')
+  assert.equal(parseBarcode('0@A@B@200@9').reason, 'too-many', '第 5 段 ⇒ 仍然是扫错码')
+})
+
 test('码内容:只有编码(不分批物料)也算合法', () => {
   assert.deepEqual(parseBarcode('M-001'), { ok: true, code: 'M-001', batch: '' })
 })

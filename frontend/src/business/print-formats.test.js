@@ -53,6 +53,7 @@ globalThis.requestAnimationFrame = (cb) => { cb(); return 1 }
 globalThis.alert = () => { throw new Error('不应触发打印失败告警') }
 
 const { printProductCards, productCardQrText, printPuOrder, printPuOrderNoAmount, printLocationCards, locationCardQrText,
+  deliveryNoteQrText,
   schedPlanSheetHtml, planSheetDates, printSchedPlanSheet, pickPlanSheetRows, planSheetShop, planSheetTitle, planSheetDatesFromRows, planSheetWindow, ymdAddDays, MAX_SHEET_DAYS, planSheetPrintDates, PLAN_SHEET_DEFAULT_DAYS, PLAN_SHEET_MAX_PRINT_DAYS, planSheetUnreportedQty, pickSlipHtml, mixSheetHtml, printWoQr, moldPlanQty } = await import('./print-formats.js')
 
 test('单据行(带可选键):订单编号/供应商/数量/批次/生产日期填充进卡面', async () => {
@@ -107,6 +108,40 @@ test('空行/无编码行:直接返回 false,不开打印窗', async () => {
   assert.equal(await printProductCards([{ 规格: '无编码行' }]), false)
 })
 
+// ── 2026-11-24 用户口径「标识卡的二维码要带每箱数量」────────────────────────────────
+//   码 = 公司代码@物料编码@批号@每箱数量(第 4 段);没填每箱数量的老入口(商品档案/采购入库单)仍是 2/3 段。
+const qrMod = await import('qrcode')
+const qrToDataURL = qrMod?.toDataURL || qrMod?.default?.toDataURL
+/** 期望的二维码 data URL(与 print-formats 内部同参数调用,qrcode 出图是确定性的) */
+const qrDataUrl = (text) => qrToDataURL(text, { margin: 1, errorCorrectionLevel: 'M' })
+
+test('标识卡二维码:带每箱数量时补第 4 段(公司代码@物料编码@批号@每箱数量)', () => {
+  assert.equal(productCardQrText({ 编码: 'YJ-KBL-028', 批次: '20261021', 每箱数量: 200 }),
+    '0@YJ-KBL-028@20261021@200', '四段式:第 4 段=每箱数量')
+  assert.equal(productCardQrText({ 编码: 'YJ-KBL-028', 批次: '20261021' }), '0@YJ-KBL-028@20261021',
+    '没填每箱数量 ⇒ 三段不变(老纸老码老口径)')
+  assert.equal(productCardQrText({ 编码: 'YJ-KBL-028', 批次: '20261021', 每箱数量: 0 }), '0@YJ-KBL-028@20261021',
+    '0=历史打印单未填 ⇒ 不加第 4 段')
+  assert.equal(productCardQrText({ 编码: 'X-1', 批次: 'B-1', 每箱数量: 12.5 }), '0@X-1@B-1@12.5',
+    'kg 类物料的每箱数量带小数,按原值印')
+  assert.equal(productCardQrText({ 编码: 'YJ-KBL-028', 每箱数量: 200 }), '0@YJ-KBL-028',
+    '无批号时不补第 4 段 —— 否则每箱数量会占掉第 3 段被扫码端当成批号')
+})
+
+test('打印标识卡:每箱数量真的进了纸上那个二维码(不只是算了个字符串)', async () => {
+  await printProductCards([{
+    编码: 'YJ-KBL-028', 规格: '13*36cm', 数量: 200, 批次: '20261021', 每箱数量: 200,
+    订单编号: 'YJ-20261116-03', 供应商名称: '惠州市康佰利包装材料有限公司',
+  }])
+  const html = captured.html
+  assert.ok(/数　　量：<\/span><span class="v">200/.test(html), '卡面数量 = 每箱数量(2026-11-11 口径不变)')
+  assert.ok(html.includes(await qrDataUrl('0@YJ-KBL-028@20261021@200')),
+    '纸上二维码 = 0@物料编码@批号@每箱数量')
+  // 不带每箱数量时仍印三段码(回归)
+  await printProductCards([{ 编码: 'YJ-KBL-028', 批次: '20261021' }])
+  assert.ok(captured.html.includes(await qrDataUrl('0@YJ-KBL-028@20261021')), '无每箱数量 ⇒ 三段码不变')
+})
+
 // ═══ 仓位标识卡(WHLOC 仓位档案「二维码标签」,2026-09-28 建为库位卡,2026-10-08 库位→仓位):同款 75×100mm,卡面只放仓位字段 ═══
 
 test('仓位标识卡:卡面=仓库/仓位地址/仓位编码,二维码=仓库编码@仓位编码(固定两段)', async () => {
@@ -146,8 +181,8 @@ const PU_LINES = [
   { 物料编码: 'M-002', 物料名称: '物料B', 规格型号: 'Φ25', 单价: 2, 单位: '支', 数量: 5, 金额: 10, 备注: '加急' },
 ]
 
-test('打印订单无金额 = 送货单(2026-11-11 用户口径:报表名改送货单、下方不写供方/需方)', () => {
-  printPuOrderNoAmount(PU_DOC, PU_LINES)
+test('打印订单无金额 = 送货单(2026-11-11 用户口径:报表名改送货单、下方不写供方/需方)', async () => {
+  await printPuOrderNoAmount(PU_DOC, PU_LINES)
   const html = captured.html
   // ① 标题改名
   assert.ok(html.includes('<h1>送货单</h1>'), '标题=送货单(2026-11-11 改名)')
@@ -164,11 +199,46 @@ test('打印订单无金额 = 送货单(2026-11-11 用户口径:报表名改送�
   assert.ok(/总　计<\/td><td class="r">15<\/td><td><\/td><td><\/td>/.test(html), '总计=仅数量合计(15),无金额单元格')
 })
 
-test('打印订单无金额:仍不带金额列(单价/小计不出现)', () => {
-  printPuOrderNoAmount(PU_DOC, PU_LINES)
+test('打印订单无金额:仍不带金额列(单价/小计不出现)', async () => {
+  await printPuOrderNoAmount(PU_DOC, PU_LINES)
   const html = captured.html
   assert.ok(!html.includes('<th>单价</th>'), '不得有单价列')
   assert.ok(!html.includes('<th>小计</th>'), '不得有小计列')
+})
+
+// ── 2026-11-24 用户口径「图片的送货单要带二维码」+ 扫码口径「订单编号+物料编码+物料数量」──
+//   弹窗定「一个二维码显示全部行」⇒ 一个码里按行串起来(记录间用 `;`,换行会被扫码枪当回车拆串)。
+test('送货单二维码内容:一个码装全部行,订单编号@物料编码@数量,记录间用 ;', () => {
+  assert.equal(deliveryNoteQrText(PU_DOC, PU_LINES),
+    'PO-2026-09-0001@M-001@10;PO-2026-09-0001@M-002@5', '两行 ⇒ 两条记录')
+  // 头单号键随面板而异(采购订单=单据编号,暂收单类=单号/编号)
+  assert.equal(deliveryNoteQrText({ 单据编号: 'YJ-20261116-03' }, [{ 物料编码: 'YJ-KBL-028', 数量: 1440 }]),
+    'YJ-20261116-03@YJ-KBL-028@1440', '用户截图那张单的真实口径')
+  // 没有编码/数量的行不算记录(否则二维码里出现空记录)
+  assert.equal(deliveryNoteQrText(PU_DOC, [{ 物料编码: 'M-1', 数量: 0 }, { 备注: '只有备注' }]),
+    'PO-2026-09-0001@M-1@0', '数量为 0 仍留在这条记录里(数量位印 0);完全没编码的行丢掉')
+  assert.equal(deliveryNoteQrText(PU_DOC, []), '', '没有行 ⇒ 空串(不出二维码)')
+})
+
+test('送货单:页头右上角出 1 个二维码,内容 = deliveryNoteQrText;没有行时不出码', async () => {
+  const before = captured.printed
+  await printPuOrderNoAmount(PU_DOC, PU_LINES)
+  assert.equal(captured.printed, before + 1, '走页面内打印(window.print 一次)')
+  const html = captured.html
+  assert.equal((html.match(/class="hdqr"/g) || []).length, 1, '整张单只印一个二维码')
+  assert.ok(html.includes(await qrDataUrl(deliveryNoteQrText(PU_DOC, PU_LINES))),
+    '纸上二维码内容 = 全部行的 订单编号@物料编码@数量')
+  assert.ok(/class="head"><div class="info">/.test(html), '页头行:信息区 + 二维码并排')
+  assert.ok(!html.includes('undefined'), '不得漏出 undefined')
+
+  // 单行单(用户截图形态):一个码、一条记录
+  await printPuOrderNoAmount({ 单据编号: 'YJ-20261116-03', 供应商: '惠州市康佰利包装材料有限公司' },
+    [{ 物料编码: 'YJ-KBL-028', 物料名称: '1025气泡袋', 规格型号: '13*36cm', 单位: '个', 数量: 1440 }])
+  assert.ok(captured.html.includes(await qrDataUrl('YJ-20261116-03@YJ-KBL-028@1440')), '单行单也带码')
+
+  // 没有可印的行 ⇒ 没有码(不印个空框)
+  await printPuOrderNoAmount({ 单据编号: 'YJ-EMPTY' }, [])
+  assert.ok(!captured.html.includes('class="hdqr"'), '没有行 ⇒ 不出二维码,纸面其余照旧')
 })
 
 test('打印采购订单:供方单位名称带入供应商名称 + 需方联系人/联系方式按 opts.buyer 印(2026-11-11)', () => {
@@ -213,10 +283,10 @@ const PU_EDIT_LINES = [
   { id: 12, 行号: '2', 物料编码: 'M-002', 物料名称: '物料B', 单位: '支', 数量: 10, 单价: 10, 金额: 80 },
 ]
 
-test('打印采购订单/无金额版:返回 true = 已交给页面内打印层(弹窗据此决定保留/撤销打印记录)', () => {
+test('打印采购订单/无金额版:返回 true = 已交给页面内打印层(弹窗据此决定保留/撤销打印记录)', async () => {
   const doc = { 单据编号: 'PO-EDIT-1', 供应商: '某供应商' }
   assert.equal(printPuOrder(doc, PU_EDIT_LINES), true, '有金额版返回 true')
-  assert.equal(printPuOrderNoAmount(doc, PU_EDIT_LINES), true, '无金额版返回 true')
+  assert.equal(await printPuOrderNoAmount(doc, PU_EDIT_LINES), true, '无金额版返回 true(异步:要先算二维码)')
   const html = captured.html
   assert.ok(html.includes('M-001') && html.includes('M-002'), '两行都在纸面上')
 })
