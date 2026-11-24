@@ -15,6 +15,12 @@
     (父组件负责「未排产 / 未到达」提示与跳工单排产);环下检验徽标可点 → emit('insp-click', step)
     (父组件负责选单并跳检验单面板)。组件仍是纯展示:只发事件,不取数、不跳转、不弹提示。
     两处都 @click.stop(别把父级整行点击带起来),cursor:pointer + 轻量 hover 反馈 + title 提示。
+
+  🔴 2026-11-24(用户口径「这个待检验需要能制作的更加明显」;第二轮澄清「检验不卡整体的工单流程」):
+    只把环下检验徽标升到**与页面其它状态标签同规格**(11px / 18px 高 / radius 10,同 .wpb-qc),
+    位置、浅底配色、文案(待检验/待审核/合格/不合格/需检)一律不动。
+    明确不做:整环染色 / 光环 / 「!」角标 / 实心色块 / 工序之间的关卡节点 / 「待开单」这类新状态词 ——
+    检验与工序并行、不阻断流转,看板这里只是一条信息,不是闸门。
 -->
 <template>
   <!-- 整环(工序名 + 环 + 数字)可点:点工序 → 该工序排产 -->
@@ -318,15 +324,18 @@ const insTitle = computed(() => (insTip.value ? `${insTip.value}\n${tt('点击�
   color: #909399;
 }
 
-/* 检验徽标(环下):系统色 —— 待检验/待审核橙 · 合格绿 · 不合格红 · 未开始灰「需检」 */
+/* 检验徽标(环下):系统色 —— 待检验/待审核橙 · 合格绿 · 不合格红 · 未开始灰「需检」
+   2026-11-24(用户口径「待检验要更明显,但检验不阻断工单流程,不要关卡/告警式表达」):
+   只把徽标升到**与页面其它状态标签同规格**(11px / 18px 高 / radius 10px,同 .wpb-qc / .wpb-status),
+   位置、浅底配色、文案一律不动 —— 不染色、不加角标、不新增状态词。 */
 .wpr-ins {
   max-width: 100%;
-  margin-top: 1px;
+  margin-top: 2px;
   overflow: hidden;
-  padding: 0 5px;
-  border-radius: 8px;
-  font-size: 10px;
-  line-height: 14px;
+  padding: 0 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
