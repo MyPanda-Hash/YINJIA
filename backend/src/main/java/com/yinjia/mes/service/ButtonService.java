@@ -981,6 +981,16 @@ public class ButtonService {
                                         boolean markSaved, boolean systemDraft) {
         // 纸样「委托单编号 可调整」⇒ 草稿阶段允许改号(见 adoptEditedDocNo)
         no = adoptEditedDocNo(def, head, no, user);
+        // 产成品入库明细(2026-11-24 用户口径):「生产数量」= 接受报工的数量,「实收数量」= 生产数量 − 不合格数量。
+        // 保存时后端统一重算,前端改哪一格都落到实收;生产数量为空的老行(金蝶同步/历史单)保持原样不动。
+        if ("FINISH_IN".equals(def.code()) && items != null) {
+            for (java.util.Map<String, Object> it : items) {
+                if (it == null) continue;
+                Object prod = it.get("生产数量");
+                if (prod == null || String.valueOf(prod).trim().isEmpty()) continue;
+                it.put("实收数量", Math.max(0d, roundQty(numOr(prod) - numOr(it.get("不合格数量")))));
+            }
+        }
         // 工序检验三单:检验人员默认当前电脑端登录人(2026-10-21;空值/历史 system 占位才填)
         defaultQcInspector(def, head, user);
         boolean split = def.hasHeadTable();
@@ -3120,17 +3130,17 @@ public class ButtonService {
 
     // ══════════════════════════════════════════════════════════════════════════════════
     // 产成品入库单(FINISH_IN)与两张出货检验单的**关联门禁**(2026-11-12 立;2026-11-13 放宽;
-    //   2026-11-18 按商品「是否过程检验」开关放开)
+    //   2026-11-18 按商品开关放开;2026-11-24 改按出货检验计划判)
     //   2026-11-12 用户原话:「修改当前的产成品入库,让他需要关联当前的出货检验功能记录表和出货检验表观,
     //   当这两个完成后按照每天的批次实现对这个产成品入库单的入库数量进行填写和创建。」
     //   2026-11-13 用户口径:「门禁口径保持不变(仍要求两张检验单都已审核+全合格)这个只需要保持两个单据
     //   已审核即可,不需要实现全合格。」⇒ 现口径:
-    //     ⓪ **2026-11-18 新增豁免**(用户口径「当前物料如果没有选择是否过程检验就不强制这个实现了」):
-    //        本单明细商品在商品档案里**都没有勾「是否过程检验=是」** ⇒ 整条门禁跳过,提交审批/审核直接放行
-    //        (这类商品本来就不会自动出两张检验单,强求单号只会把产成品入库卡死);只要有一行勾了 = 是,
-    //        本单仍按下面 ①②③ 执行(表头两个单号是整单口径,不能只对部分行查)。判据见 finishInNeedsInsp。
-    //     ① 表头「出货检验功能单号」「出货检验表观单号」必填;
-    //     ② 两张检验单都必须**已审核**;
+    //     ⓪ **2026-11-24 改判据**(用户口径「存在对应的检验需要完成情况下才需要阻拦……都没有就可以
+    //        直接入库了」):要不要某张检验单 = 该产品《出货检验计划》最新版明细里有没有「1PCS」(功能单)/
+    //        「1%」(表观单),判据唯一实现在 ProcessInspPlanGate(与自动出单同一份),本类见 finishInInspNeeds;
+    //        两张都不需要 ⇒ 整条门禁跳过(可直接入库)。旧的商品档案「是否过程检验」开关已整列删除。
+    //     ① 需要的那张,表头对应单号必填(功能/表观各自判,不再强制两张都填);
+    //     ② 需要的那张必须**已审核**;
     //     ③ **不再**校验本单批次是否出现在检验单明细「内部批次」、**不再**要求该批次每行判「合格」。
     //   ⚠ 只门禁 MES 自建单(外部单据号为空):金蝶导入的历史入库单没有这两张检验单,不追溯。
     //   ⚠ 只在 提交审批/审批通过/审核 三个**真正产生库存**的入口校验;保存草稿不拦(仓库可边填边存)。
@@ -3161,50 +3171,59 @@ public class ButtonService {
                 log.warn("[FINISH_IN] 单据 {} 提交前按不合格数量下调失败(不阻断门禁): {}", no, e.getMessage());
             }
         }
-        // 2026-11-18 用户口径「当前物料如果没有选择是否过程检验就不强制这个实现了」:
-        //   商品档案没勾「是否过程检验=是」的入库单不强制关联两张检验单(判据见 finishInNeedsInsp)。
-        if (!finishInNeedsInsp(no, wo, xc)) {
-            log.info("[FINISH_IN] 单据 {} 的商品未勾「是否过程检验」,跳过两张出货检验单门禁", no);
+        // 2026-11-24 用户口径「存在对应的检验需要完成情况下才需要阻拦……都没有就可以直接入库了」:
+        //   要不要某张检验单,按该产品《出货检验计划》最新版明细判(ProcessInspPlanGate,与自动出单同一份):
+        //   有「1PCS」行才要功能单、有「1%」行才要表观单;都没有 ⇒ 整条门禁跳过,直接入库。
+        boolean[] needs = finishInInspNeeds(no, wo, xc);
+        boolean needFunc = needs[0];
+        boolean needLook = needs[1];
+        if (!needFunc && !needLook) {
+            log.info("[FINISH_IN] 单据 {} 的产品出货检验计划里没有 1PCS/1% 行,跳过两张出货检验单门禁", no);
             return;
         }
-        if (func.isEmpty() && !wo.isEmpty()) {
+        if (needFunc && func.isEmpty() && !wo.isEmpty()) {
             String auto = latestInsp("QC_PROC_INSP", "qc_proc_insp_head", wo, xc);
             if (!auto.isEmpty()) {
                 func = auto;
                 jdbc.update("UPDATE bd_finish_in SET 出货检验功能单号=? WHERE 单据编号=? AND ISNULL(出货检验功能单号,N'')=N''", auto, no);
             }
         }
-        if (look.isEmpty() && !wo.isEmpty()) {
+        if (needLook && look.isEmpty() && !wo.isEmpty()) {
             String auto = latestInsp("QC_ASM_INSP", "qc_asm_insp_head", wo, xc);
             if (!auto.isEmpty()) {
                 look = auto;
                 jdbc.update("UPDATE bd_finish_in SET 出货检验表观单号=? WHERE 单据编号=? AND ISNULL(出货检验表观单号,N'')=N''", auto, no);
             }
         }
-        if (func.isEmpty() || look.isEmpty())
-            throw new IllegalStateException("产成品入库单必须关联「出货检验功能单号」和「出货检验表观单号」后才能提交审批/审核(本单商品「是否过程检验」为是;等两张检验单审核完成后自动带入)");
-        // 2026-11-13:只要求两张检验单已审核(不再按批次比明细、不再要求全合格)
-        checkInspAudited("出货检验（功能）", "QC_PROC_INSP", func);
-        checkInspAudited("出货检验（表观）", "QC_ASM_INSP", look);
+        if (needFunc && func.isEmpty())
+            throw new IllegalStateException("本单产品在《出货检验计划》里有「1PCS」项:产成品入库单必须关联「出货检验功能单号」后才能提交审批/审核(检验单审核后自动带入)");
+        if (needLook && look.isEmpty())
+            throw new IllegalStateException("本单产品在《出货检验计划》里有「1%」项:产成品入库单必须关联「出货检验表观单号」后才能提交审批/审核(检验单审核后自动带入)");
+        // 2026-11-13:只要求对应检验单已审核(不再按批次比明细、不再要求全合格)
+        if (needFunc) checkInspAudited("出货检验（功能）", "QC_PROC_INSP", func);
+        if (needLook)        checkInspAudited("出货检验（表观）", "QC_ASM_INSP", look);
     }
 
     /**
-     * 本单是否**需要**走上面的两张出货检验单门禁(2026-11-18 用户口径:
-     * 「当前物料如果没有选择是否过程检验就不强制这个实现了」)。
+     * 本单**需要哪几张**出货检验单(2026-11-24 用户口径,取代 2026-11-18 的商品档案开关)。
      *
-     * <p>判据 = 本单明细产品编码对应的商品档案 {@code bs_inv.[是否过程检验]}(列见
-     * {@code tools/migrate-inv-process-inspection-20261114.sql};与自动出单
-     * {@code QcInspAutoService.processInspectionOn} 同一口径:只有明确 = 是才算):</p>
+     * <p>用户原话:「产成品的门禁需要修改,就是存在对应的检验需要完成情况下才需要阻拦,就比如当前产品
+     * 没有功能检验就不需要功能的检验单,没有表观内容就可以没有表观的检验单,都没有就可以直接入库了。」</p>
+     *
+     * <p>判据 = 本单明细产品编码对应的《出货检验计划》**最新一张存活计划**的明细:「检测频率」含 1PCS
+     * ⇒ 需要功能单;含 1% ⇒ 需要表观单。唯一实现在 {@link ProcessInspPlanGate},与自动出单同一份,
+     * 禁止各写一份 SQL(否则「出不出单」与「入库拦不拦」会漂移)。</p>
+     *
      * <ul>
-     *   <li>明细里**只要有一行**商品勾了「是否过程检验=是」 ⇒ 需要门禁;</li>
-     *   <li>全部未勾(否 / NULL / 档案里查不到该编码) ⇒ **不强制**,提交审批/审核直接放行;</li>
-     *   <li>明细没有产品编码(极少见)⇒ 回退按 加工单号 + 工单行号 取工单行产品;</li>
-     *   <li>取数异常 / 连产品都定位不到 ⇒ 保持门禁(fail-closed:不能因为一次查询失败就放行)。</li>
+     *   <li>明细里**只要有一行**商品的计划含 1PCS / 1% ⇒ 该张单需要;</li>
+     *   <li>全部没有(或该产品根本没有出货检验计划)⇒ 两张都不需要,门禁整体跳过;</li>
+     *   <li>明细没有产品编码时回退按 加工单号 + 工单行号 取工单行产品;</li>
+     *   <li>取数异常 / 连产品都定位不到 ⇒ **fail-closed**(两张都要),不能因一次查询失败就放行。</li>
      * </ul>
-     * <p>为什么不按"有没有检验单"判:开关只管自动出单,商品勾了是但检验单还没做/手工建单时
-     * 门禁仍要生效;开关只管"这批货本来该不该走检验",与单据是否存在解耦。</p>
+     *
+     * @return {需要功能单, 需要表观单}
      */
-    private boolean finishInNeedsInsp(String no, String wo, int xc) {
+    private boolean[] finishInInspNeeds(String no, String wo, int xc) {
         try {
             java.util.Set<String> codes = new java.util.LinkedHashSet<>();
             for (String c : jdbc.queryForList(
@@ -3221,20 +3240,19 @@ public class ButtonService {
                 }
             }
             if (codes.isEmpty()) {
-                log.warn("[FINISH_IN] 单据 {} 定位不到明细产品编码(工单 {} 行 {}),门禁按需要检验处理", no, wo, xc);
-                return true;
+                log.warn("[FINISH_IN] 单据 {} 定位不到明细产品编码(工单 {} 行 {}),门禁按两张检验单都需要处理", no, wo, xc);
+                return new boolean[]{true, true};
             }
+            boolean func = false, look = false;
             for (String code : codes) {
-                Integer yes = jdbc.queryForObject(
-                        "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.bs_inv i"
-                                + "   WHERE LTRIM(RTRIM(i.[存货编码]))=? AND ISNULL(i.[是否过程检验],0)=1)"
-                                + " THEN 1 ELSE 0 END", Integer.class, code);
-                if (yes != null && yes == 1) return true;
+                ProcessInspPlanGate.Needs n = ProcessInspPlanGate.of(jdbc, code);
+                func |= n.func();
+                look |= n.look();
             }
-            return false;
+            return new boolean[]{func, look};
         } catch (RuntimeException e) {
-            log.warn("[FINISH_IN] 单据 {} 判定商品「是否过程检验」失败,门禁按需要检验处理: {}", no, e.getMessage());
-            return true;
+            log.warn("[FINISH_IN] 单据 {} 判定出货检验计划失败,门禁按两张都需要处理: {}", no, e.getMessage());
+            return new boolean[]{true, true};
         }
     }
 
@@ -3809,10 +3827,14 @@ public class ButtonService {
             double total = numOr(b.get("qty"));
             double got = lockedQty.getOrDefault(batch, 0d);
             double ng = ngByBatch.getOrDefault(batch, 0d);
-            double qty = roundQty(total - got - ng);
-            if (batch.isEmpty() || (qty <= 0.0001 && ng <= 0.0001)) continue;
+            // 2026-11-24 用户口径:明细「生产数量」= 接受报工的数量(= 该批完工报工量 − 已锁定批次量),
+            //   「实收数量」= 生产数量 − 不合格数量(自动算,下限 0);不再把报工量直接写进实收数量。
+            double produced = roundQty(total - got);
+            double qty = roundQty(produced - ng);
+            if (batch.isEmpty() || (qty <= 0.0001 && produced <= 0.0001 && ng <= 0.0001)) continue;
             java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
             item.put("batch", batch);
+            item.put("produced", Math.max(0d, produced));
             item.put("qty", Math.max(0d, qty));
             item.put("ng", ng);
             need.add(item);
@@ -3846,26 +3868,31 @@ public class ButtonService {
                 String batch = str(item.get("batch"));
                 double qty = numOr(item.get("qty"));
                 double ng = numOr(item.get("ng"));
+                double produced = numOr(item.get("produced"));
                 java.util.List<java.util.Map<String, Object>> exists = jdbc.queryForList(
-                        "SELECT id, ISNULL(实收数量,0) AS qty FROM dbo.bl_finish_in WHERE 单据编号=? AND ISNULL(批号,N'')=?"
+                        "SELECT id, ISNULL(生产数量,0) AS produced, ISNULL(实收数量,0) AS qty FROM dbo.bl_finish_in"
+                                + " WHERE 单据编号=? AND ISNULL(批号,N'')=?"
                                 + " AND ISNULL(asp_cancel,'N')<>'Y'", openNo, batch);
                 if (exists.isEmpty()) {
                     Integer seq = jdbc.queryForObject(
                             "SELECT ISNULL(MAX(序号),0)+1 FROM dbo.bl_finish_in WHERE 单据编号=?", Integer.class, openNo);
                     jdbc.update("INSERT INTO dbo.bl_finish_in (单据编号, 序号, 产品编码, 产品名称, 规格型号, 计量单位,"
-                                    + " 批号, 实收数量, 不合格数量, 仓库, asp_cancel, asp_user1, asp_time1)"
-                                    + " VALUES (?,?,?,?,?,?,?,?,?,?,N'N',?,GETDATE())",
-                            openNo, seq, inv, invName, spec, unit, batch, qty, ng, wh, user);
+                                    + " 批号, 生产数量, 实收数量, 不合格数量, 仓库, asp_cancel, asp_user1, asp_time1)"
+                                    + " VALUES (?,?,?,?,?,?,?,?,?,?,?,N'N',?,GETDATE())",
+                            openNo, seq, inv, invName, spec, unit, batch, produced, qty, ng, wh, user);
                 } else {
-                    // onlyLower:只下调(用户手工改小的实收数量不被抬回去)
-                    double finalQty = qty;
-                    if (onlyLower) finalQty = Math.min(qty, numOr(exists.get(0).get("qty")));
-                    jdbc.update("UPDATE dbo.bl_finish_in SET 实收数量=?, 不合格数量=?, 仓库=?,"
+                    // onlyLower:只下调「生产数量」(用户手工改小的数量不被抬回去);
+                    // 实收数量始终 = 生产数量 − 不合格数量(2026-11-24 口径,自动算)
+                    double curProduced = numOr(exists.get(0).get("produced"));
+                    double finalProduced = (onlyLower && curProduced > 0.0001)
+                            ? Math.min(produced, curProduced) : produced;
+                    double finalQty = Math.max(0d, roundQty(finalProduced - ng));
+                    jdbc.update("UPDATE dbo.bl_finish_in SET 生产数量=?, 实收数量=?, 不合格数量=?, 仓库=?,"
                                     + " 产品编码=CASE WHEN ISNULL(产品编码,N'')=N'' THEN ? ELSE 产品编码 END,"
                                     + " 产品名称=CASE WHEN ISNULL(产品名称,N'')=N'' THEN ? ELSE 产品名称 END,"
                                     + " 规格型号=CASE WHEN ISNULL(规格型号,N'')=N'' THEN ? ELSE 规格型号 END,"
                                     + " 计量单位=CASE WHEN ISNULL(计量单位,N'')=N'' THEN ? ELSE 计量单位 END"
-                                    + " WHERE id=?", finalQty, ng, wh, inv, invName, spec, unit, exists.get(0).get("id"));
+                                    + " WHERE id=?", finalProduced, finalQty, ng, wh, inv, invName, spec, unit, exists.get(0).get("id"));
                 }
                 out.put("更新明细", (int) numOr(out.get("更新明细")) + 1);
             }
@@ -3900,6 +3927,7 @@ public class ButtonService {
             if (!spec.isEmpty()) line.put("规格型号", spec);
             if (!unit.isEmpty()) line.put("计量单位", unit);
             line.put("批次号", str(item.get("batch")));
+            line.put("生产数量", numOr(item.get("produced")));
             line.put("实收数量", numOr(item.get("qty")));
             if (numOr(item.get("ng")) > 0.0001) line.put("不合格数量", numOr(item.get("ng")));
             line.put("仓库", wh);

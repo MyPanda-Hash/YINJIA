@@ -5203,3 +5203,5 @@ migrate-plan-wrong-project-name-20261123.sql
 #   RD_APPROVAL.客户编号、RD_PROGRESS.项目定级原则 —— 英文界面不再显示中文,DbNormAudit 第 9 项回落到 215。
 #   只插 yj_translation,不碰字段/表结构;幂等 + 自检。两账套均执行。
 migrate-i18n-upstream-newfields-20261124.sql
+migrate-finish-in-produced-qty-20261124.sql
+migrate-drop-inv-process-inspection-20261124.sql

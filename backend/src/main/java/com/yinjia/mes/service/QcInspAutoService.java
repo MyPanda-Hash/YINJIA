@@ -30,12 +30,11 @@ import java.util.Map;
  *   <li>MES 报工单审核 {@code ButtonService.woInspGenerate} —— 审核后按同一判据出单。</li>
  * </ol>
  *
- * <h3>商品开关闸(2026-11-14)</h3>
- * <p>商品档案 {@code bs_inv.是否过程检验} = 是 才自动出单;否 / 空 / 档案里查不到 = **不自动出单**
- * (默认否,用户 2026-11-14 拍板)。该开关**只管自动生成**:三张单的手工新增入口
- * ({@code QcFirstInspController} / {@code QcProcInspController} / {@code QcAsmInspController})
- * 不经过本类,因此不受影响 —— 用户原话「如果那个工单需要被手工新增检验单也是可以手动新增的,
- * 就是自动生成不进行了」。判据见 {@link #processInspectionOn(String)}。</p>
+ * <h3>出单判据(2026-11-24,取代 2026-11-14 的商品档案开关)</h3>
+ * <p>判据**全部按产品编码**、收在 {@link ProcessInspPlanGate} 一处(三张单 + 产成品入库门禁共用):
+ * 首件 = 《成型工艺清单》有该产品;出货检验(功能)= 《出货检验计划》最新版明细含 {@code 1PCS};
+ * 出货检验(表观)= 同一计划明细含 {@code 1%}。三样都没有 ⇒ 不出过程检验单(仍可手工建单),
+ * 产成品入库也不再要求检验单号(用户 2026-11-24 口径)。</p>
  * 本类**只判定 + 组装单头**(纯查询,无写库),保存与占用链由调用方做 —— 这样它不依赖
  * {@code ButtonService}(那边依赖本类,反向依赖会成环)。
  *
@@ -167,17 +166,24 @@ public class QcInspAutoService {
         long rowId = (long) num(p.get("id"));
         if (xc == 0) xc = (int) num(p.get("pl_xc"));
 
-        // ── ⓪ 商品开关闸(2026-11-14):bs_inv.是否过程检验 = 是 才自动出单 ──
-        //    用户口径:「在商品中增加是否过程检验……确定是否走过程检验流程;但是如果那个工单需要被
-        //    手工新增检验单也是可以手动新增的,就是自动生成不进行了。」
-        //    ⇒ 只管自动生成,三张单的手工入口不经过本类(见类头「商品开关闸」)。
-        //    取**工单行**的产品编码(plang.dm)为准:检验单是给这个工单行生产的商品开的;
-        //    报工行 wzdm 老数据可能指向别的行(实测同工单多行重复行号),只作兜底。
+        // ── ⓪ 出单判据(2026-11-24 用户口径,取代 2026-11-14 的商品档案「是否过程检验」开关)──
+        //    用户原话:「需要实现当前产品编码存在对应的出货检验计划就出什么单:存在 1PCS 就出功能,
+        //    存在 1% 出表观,而不是在商品中选择对这个商品选择是或否」;
+        //    「首件检验单……选取的是成型工艺清单,也是当前存在对应的产品编码就产生」。
+        //    ⇒ 判据全部收在 ProcessInspPlanGate 一处(与产成品入库门禁共用,禁止各写一份 SQL)。
+        //    ⚠ 三张单的手工入口不经过本类,判据不满足时仍可手工建单。
         String productCode = firstNonBlank(str(p.get("dm")), str(r.get("产品编码")));
-        if (!processInspectionOn(productCode)) {
+        ProcessInspPlanGate.Needs needs;
+        try {
+            needs = ProcessInspPlanGate.of(jdbc, productCode);
+        } catch (RuntimeException e) {
+            // 判据查询失败不连坐报工审核:本次不出单,原因写回执(放行的是「不打断报工」,不是「照旧出单」)
+            return new Result(List.of(), "过程检验判据查询失败(不阻断报工):" + e.getMessage(), op, 0, 0);
+        }
+        if (needs.none()) {
             String shown = productCode.isBlank() ? "(空)" : "「" + productCode + "」";
             return new Result(List.of(),
-                    "商品" + shown + "「是否过程检验」未设为是,按商品设置不自动生成检验单"
+                    "产品" + shown + "没有成型工艺清单、出货检验计划也没有 1PCS/1% 行 ⇒ 不出过程检验单"
                             + "(需要时可在检验单界面手工新增)", op, 0, 0);
         }
 
@@ -192,7 +198,9 @@ public class QcInspAutoService {
         //    ⇒ 不再等「成型累计达计划量」(2026-10-18 口径);日期取**报工日期**
         //    (sc_date → wgsj → asp_time1,与 WorkOrderDayPlanService.actualByDate 同一口径),
         //    同一工单行同一天已有存活单就不重复出(次日再报会再出一张)。
-        if (FIRST_OP.equals(op)) {
+        if (FIRST_OP.equals(op) && !needs.first()) {
+            reasons.add("出货检验计划/成型工艺清单:该产品没有《成型工艺清单》,不出首件检验单");
+        } else if (FIRST_OP.equals(op)) {
             String day = str(r.get("报工日期"));
             if (day.isBlank()) day = LocalDate.now().toString();
             if (existsLiveOnDay(FIRST_PANEL, wo, xc, day)) {
@@ -205,7 +213,9 @@ public class QcInspAutoService {
 
         // ── ② 制程检验单(成型):累计已审报工 ≥ 该道计划量(2026-10-18 口径;2026-11-12「制程先不处理」)──
         List<String> panels = OP_PANELS.get(op);
-        if (panels != null && !panels.isEmpty()) {
+        if (panels != null && !panels.isEmpty() && !needs.func()) {
+            reasons.add("出货检验计划最新版明细里没有「1PCS」行,不出出货检验(功能)单");
+        } else if (panels != null && !panels.isEmpty()) {
             opPlan = planQty(wo, rowId, op, p);
             opDone = WoInspGate.reportedQty(jdbc, wo, rowId, op);
             boolean reached = opPlan <= 0 ? opDone > 0 : opDone + 0.0001 >= opPlan;
@@ -227,7 +237,9 @@ public class QcInspAutoService {
         // ── ③ 出货检验表观:进入**末道工序**即出(2026-11-18 口径;判据在 AsmInspEntry)──
         //    与①②互不绑定:切炭报工把量流进组装/组装装箱时会出;末道自己报工也会出(此时①②本来就没有这张单)。
         AsmInspEntry.Status asm = AsmInspEntry.of(jdbc, rowId);
-        if (asm.entered()) {
+        if (asm.entered() && !needs.look()) {
+            reasons.add("出货检验计划最新版明细里没有「1%」行,不出出货检验(表观)单");
+        } else if (asm.entered()) {
             if (existsLive(ASM_PANEL, wo, xc)) {
                 skipped.add(ASM_PANEL);
             } else {
@@ -419,37 +431,6 @@ public class QcInspAutoService {
     }
 
     // ────────────────────────────── 取数 ──────────────────────────────
-
-    /**
-     * 商品档案「是否过程检验」开关(2026-11-14,列见
-     * {@code tools/migrate-inv-process-inspection-20261114.sql})。
-     *
-     * <p>用户口径:「商品中增加是否过程检验,确定是否走过程检验流程;但是那个工单需要被手工新增
-     * 检验单也是可以手动新增的,就是自动生成不进行了。」⇒ <b>只管自动出单</b>。</p>
-     *
-     * <p><b>取值口径</b>:只有明确 = 是(bit=1)才自动出单;否 / NULL / 商品档案里没有该编码
-     * ⇒ 不自动出单(默认否,2026-11-14 用户拍板)。</p>
-     *
-     * <p><b>为什么异常时返回 true(按旧行为出单)</b>:自动出单是报工审核/吸收链路上的**附带动作**,
-     * 不能让一次"开关列还没迁移 / 表临时不可读"的失败把报工审核整体回滚(报工审核那条路出单失败
-     * 会连带回滚审核);宁可这次照旧出单,也不能把生产报工卡死。日常判据不受影响。</p>
-     */
-    private boolean processInspectionOn(String productCode) {
-        if (productCode == null || productCode.isBlank()) return false;
-        try {
-            // 一次 EXISTS 查询同时解决两件事:① 编码两侧历史空格(比较前 TRIM);② 同一编码在档案里
-            // 有多行时(实测 bs_inv 有 1 组重复码)只要有一行 = 是就算「是」——不会因为 TOP 1 随机取到
-            // 另一行而把该商品静默排除在自动出单之外。
-            Integer yes = jdbc.queryForObject(
-                    "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.bs_inv"
-                            + "   WHERE LTRIM(RTRIM(存货编码)) = ? AND ISNULL([是否过程检验], 0) = 1)"
-                            + " THEN 1 ELSE 0 END",
-                    Integer.class, productCode.trim());
-            return yes != null && yes == 1;
-        } catch (Exception e) {
-            return true;
-        }
-    }
 
     private Map<String, Object> loadReportRow(long scjlId) {
         List<Map<String, Object>> rows = jdbc.queryForList(
