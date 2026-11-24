@@ -65,6 +65,31 @@ test('实施计划没有备注区（设计该表无此块，不该被顺带加�
   assert.ok(!planSheetCfg.remark)
 })
 
+// ── ③b 字数上限必须对齐物理列容量（2026-11-24 用户报障）─────────────────────
+// 用户原话：「红框的位置这个单据没有办法进行一个修改，输入内容，但是其他的比如测试单据框就可以进行一个填写输入」，
+// 追问确认「只有这一个单据现在不能进行修改，其他的单据的对应的框还是能够进行修改的」。
+// 根因：库列 rd_plan.测试产品打样要求 = nvarchar(500)，而纸面配置写的是 max:100 ⇒
+// 那一张单的内容正好写满 100 字（实测 id=21 恰好 100 字），textarea 的 maxlength 顶格后
+// **再输入任何字符都无反应**，表现为「这一格不能改」；其它单据没写满，看起来正常。
+// 这条钉住「纸面上限 = 列容量」：只要有人把 max 改小，内容写满的单据就会再次锁死。
+test('实施计划「测试产品打样要求」上限 = 库列容量 500（写小会把写满的单据锁死）', () => {
+  const row = planSheetCfg.rows.find((r) => r.label === '测试产品打样要求')
+  assert.ok(row, '必须有 测试产品打样要求 行')
+  assert.equal(row.kind, 'textarea')
+  // 物理列：rd_plan.测试产品打样要求 = nvarchar(500)（生产实测 sys.columns max_length/2 = 500）
+  assert.equal(row.max, 500, '纸面上限必须等于列容量 500，否则写到上限就再也输不进去')
+})
+
+test('实施计划其余长文本上限也不得小于库列容量（同类锁死风险）', () => {
+  // rd_plan：测试内容 500 / 测试目标 100（生产实测）
+  const cap = { 测试内容: 500, 测试目标: 100 }
+  for (const [label, dbCap] of Object.entries(cap)) {
+    const row = planSheetCfg.rows.find((r) => r.label === label)
+    assert.ok(row, '必须存在 ' + label + ' 行')
+    assert.ok(row.max <= dbCap, label + ' 上限不得超过列容量 ' + dbCap + '（否则保存报截断）')
+  }
+})
+
 // ── ④ 实施计划第 8 行承载「负责人 + 编制日期」（设计 B15/C15/F15）──────────
 test('实施计划第 8 行 = 负责人 + 编制日期（设计末行，不再落到底部签名区）', () => {
   const row = planSheetCfg.rows.find((r) => String(r.num) === '8')
