@@ -1,0 +1,2 @@
+﻿SET NOCOUNT ON;
+SELECT 单据编号, 来料检验单号, 物料名称 FROM qc_insp_rec WHERE 单据编号 IN ('JYSJ-2026-09-0048','JYSJ-2026-09-0044','JYSJ-2026-09-0032');

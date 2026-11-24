@@ -1058,6 +1058,14 @@
                     class="doc-no-link"
                     :title="tt('点击跳转到该单据')"
                     @click.stop="openReportLink(row, column.prop)">{{ row[column.prop] }}</span>
+              <!-- 检验数据记录明细表(2026-11-24 用户口径「明细表也可以直接索引」):检验数据记录单号 /
+                   来料检验单号 两个单号列**点号即跳转**(不要图标、不要二次确认),目标面板由
+                   qcInspRecDetail.js 的 QC_REC_DETAIL_LINKS 决定(检验数据记录 / 来料检验单)。
+                   与上面出货检验明细表那条互斥:两者按面板码分别登记,同一列不会同时命中。 -->
+              <span v-else-if="reportDocLinkPanel(column.prop) && reportDocLinkNo(row, column.prop)"
+                    class="doc-no-link"
+                    :title="tt('点击跳转到该单据')"
+                    @click.stop="openReportDocLink(row, column.prop)">{{ row[column.prop] }}</span>
               <span v-else>{{ row[column.prop] }}</span>
             </template>
             <template #header>
@@ -2979,6 +2987,10 @@ import {
 } from './changeCosign'
 import QcInspReqSheet from './QcInspReqSheet.vue'
 import { isQcInspReqPanel } from './qcInspReqConfig'
+// 检验数据记录明细表(QC_INSP_REC_DETAIL)的单号直索引:两列 → 目标面板(2026-11-24 用户口径
+// 「明细表也可以直接索引」⇒ 点单号即跳转,不要图标、不要二次确认)。常量本就写在这张表的契约文件里,
+// 此前只有常量、没有渲染方 —— 这里接上。
+import { QC_REC_DETAIL_PANEL, QC_REC_DETAIL_LINKS } from '@/core/qc/qcInspRecDetail'
 import { approvalSheetCfg, planSheetCfg, qcSheetCfgs, sampleExtSheetCfg, sampleIntSheetCfg, sampleNdSheetCfg } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import BomImportDialog from './BomImportDialog.vue'
@@ -7900,6 +7912,37 @@ function gotoDocNo() {
   }
   docNoDlg.value.visible = false
   router.push({ path: '/panelx/list/' + panel, query: no ? { focus: no } : {} })
+}
+
+/**
+ * 报表(flat)面板的「单号直索引」(2026-11-24 用户口径:「明细表也可以直接索引」)。
+ *
+ * 只有登记过的面板/列才渲染成可点单号 —— 目前唯一消费者 = 检验数据记录明细表
+ * (QC_INSP_REC_DETAIL)的「检验数据记录单号 → 检验数据记录」「来料检验单号 → 来料检验单」,
+ * 映射真源是 qcInspRecDetail.js 的 QC_REC_DETAIL_LINKS(那份常量此前没有任何渲染方)。
+ * 点号**直接** router.push 到目标面板并用 `?docNo=` 定位那一张单,不弹窗、不加图标。
+ *
+ * 跳转必须过面板权限(canViewPanel,与条码三面板的单号弹窗同一口径):报表不能当跳板绕过授权。
+ */
+const reportDocLinks = computed(() =>
+  String(panelCode.value) === QC_REC_DETAIL_PANEL ? QC_REC_DETAIL_LINKS : null)
+/** 该列是「可点单号列」时返回目标面板编码,否则空串 */
+function reportDocLinkPanel(prop) {
+  return reportDocLinks.value?.[prop] || ''
+}
+/** 该行这一列的单号(空号不渲染成链接) */
+function reportDocLinkNo(row, prop) {
+  return String(row?.[prop] ?? '').trim()
+}
+function openReportDocLink(row, prop) {
+  const target = reportDocLinkPanel(prop)
+  const no = reportDocLinkNo(row, prop)
+  if (!target || !no) return
+  if (!canViewPanel({ isAdmin: user.isAdmin, visiblePanels: user.visiblePanels }, target)) {
+    ElMessage.warning(tt('无查看该面板的权限') + ':' + tt(prop))
+    return
+  }
+  router.push({ path: `/panelx/list/${target}`, query: { docNo: no } })
 }
 
 /** 报表模式(flat)的当前页勾选状态:与 blocks 那套同口径,只是数据源是 reportList */
@@ -14512,8 +14555,45 @@ async function loadDocNoTarget() {
   if (!shouldRestoreAfterDocNo(no, list.value)) return
   delete condition['_docNo']
   docQueryNo.value = ''
-  ElMessage.warning(tt('未找到该单据（可能已作废或没有查看权限）'))
+  ElMessage.warning(await missingDocHint(no))
   await load()
+}
+
+/**
+ * 「按单号打开」落空时给一句**能照着办**的提示（2026-11-24 用户报障）。
+ *
+ * <p>用户原话：「索引无法查找到对应的单据，当前转跳为空表」。实测（待检验目录的 ↗ →
+ * 来料检验单 IJ-2026-11-0002）根因是**那张单已被作废**：作废走的是
+ * yj_doc_status.canceled='Y'，单据行仍在库里，但列表按其口径过滤掉 ⇒ 深链 0 行。
+ * 旧文案把「已作废 / 已删除 / 无权限 / 版本不一致」混成一句「可能已作废或没有查看权限」，
+ * 用户不知道该找谁、也不知道该改什么。</p>
+ *
+ * <p>这里回查一次单据抬头（{@code getFormDescriptor} 对**作废单仍返回抬头**，2026-11-24
+ * 在生产实测：IJ-2026-11-0002 → 单据状态=已作废）：
+ * ① 抬头只是「空壳」（只有 编号 / 单据状态 / saved 这些壳字段，没有任何业务字段有值）⇒ 说明接口
+ *    对**不存在的单号**合成了一张新单默认抬头（实测 `IJ-2099-01-9999` 返回「草稿」）⇒ 不采信它的
+ *    状态，直接走通用兜底文案；
+ * ② 有业务字段且状态含「作废」⇒ 直接说已作废、作废单不进列表（这是绝大多数情形）；
+ * ③ 有业务字段、其它非空状态 ⇒ 带出真实状态，便于判断是不是被页签/范围挡住。</p>
+ */
+async function missingDocHint(no) {
+  const label = `${tt('单据')} ${no}`
+  const generic = tt('未找到该单据（可能已作废或没有查看权限）') + `：${no}`
+  /** 空抬头的壳字段:出现它们**不**代表单据存在(见上面 ①) */
+  const SHELL_KEYS = ['编号', 'saved', '单据状态', '状态', '二级审核人']
+  try {
+    const fd = await engine.getFormDescriptor({ panelCode: panelCode.value, code: no })
+    const head = (fd && fd.data) || {}
+    const hasBizField = Object.keys(head).some((k) => !SHELL_KEYS.includes(k)
+      && head[k] !== null && head[k] !== undefined && String(head[k]).trim() !== '')
+    if (!hasBizField) return generic
+    const status = String(head['单据状态'] || head['状态'] || '').trim()
+    if (status.includes('作废')) return `${label} ${tt('该单据已作废,作废单不进入列表')}`
+    if (status) return `${label} ${tt('当前状态为')}「${status}」`
+  } catch (e) {
+    /* 取不到抬头(不存在/无权限):走下面的兜底文案 */
+  }
+  return generic
 }
 // 同一面板内跳另一张单据(panelCode 不变,上面的 watcher 不触发)
 watch(

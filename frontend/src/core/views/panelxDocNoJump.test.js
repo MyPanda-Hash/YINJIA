@@ -35,7 +35,8 @@ test('?docNo= 定向取数 0 行：清筛选 + 恢复列表 + 明确提示（不
   assert.match(seg, /shouldRestoreAfterDocNo\(no, list\.value\)/, '用纯函数判定是否回退（docFocus.js 已单测）')
   assert.match(seg, /delete condition\['_docNo'\]/, '回退要撤掉定向筛选')
   assert.match(seg, /docQueryNo\.value = ''/, '「查询单据」输入框同步清空')
-  assert.match(seg, /ElMessage\.warning\(tt\('未找到该单据/, '必须给用户明确说明')
+  // 2026-11-24:提示改由 missingDocHint() 按**真实单据状态**说清原因(已作废/不存在),不再是一句笼统文案
+  assert.match(seg, /ElMessage\.warning\(await missingDocHint\(no\)\)/, '必须给用户明确说明')
   const loads = [...seg.matchAll(/await load\(/g)].length
   assert.equal(loads, 2, `定向取数一次 + 回退后恢复一次，共 2 次 load；实际 ${loads} 次`)
 })
