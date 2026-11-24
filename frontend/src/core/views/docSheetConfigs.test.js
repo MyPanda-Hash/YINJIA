@@ -80,13 +80,13 @@ test('实施计划「测试产品打样要求」上限 = 库列容量 500（写�
   assert.equal(row.max, 500, '纸面上限必须等于列容量 500，否则写到上限就再也输不进去')
 })
 
-test('实施计划其余长文本上限也不得小于库列容量（同类锁死风险）', () => {
-  // rd_plan：测试内容 500 / 测试目标 100（生产实测）
+test('实施计划其余长文本上限 = 库列容量（写小同样会把写满的单据锁死）', () => {
+  // rd_plan 物理列（生产实测 sys.columns max_length/2）：测试内容 500 / 测试目标 100
   const cap = { 测试内容: 500, 测试目标: 100 }
   for (const [label, dbCap] of Object.entries(cap)) {
     const row = planSheetCfg.rows.find((r) => r.label === label)
     assert.ok(row, '必须存在 ' + label + ' 行')
-    assert.ok(row.max <= dbCap, label + ' 上限不得超过列容量 ' + dbCap + '（否则保存报截断）')
+    assert.equal(row.max, dbCap, label + ' 上限必须等于列容量 ' + dbCap + '（写小 ⇒ 内容写满后无法继续输入）')
   }
 })
 
