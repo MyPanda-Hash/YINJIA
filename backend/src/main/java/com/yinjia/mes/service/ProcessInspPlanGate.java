@@ -72,14 +72,29 @@ public final class ProcessInspPlanGate {
                 planHasFreq(jdbc, code, LOOK_FREQ_MARK));
     }
 
-    /** 首件判据:《成型工艺清单》里有没有该产品编码的存活单据 */
+    /**
+     * 首件判据:《成型工艺清单》里有没有该产品编码的存活单据。
+     *
+     * <p>⚠ 2026-10-27 起清单的产品编号带 {@code -tb} 后缀(选产品编号后自动加),而调用方拿到的是
+     * 工单/产品侧**原始编码** ⇒ 这里两种形态都认(与 {@code FirstInspItems.load} 同一套匹配规则):
+     * 原值、原值+{@code -tb};入参本身带后缀时另加去后缀的原值。</p>
+     */
     public static boolean hasMoldProc(JdbcTemplate jdbc, String productCode) {
-        String code = productCode == null ? "" : productCode.trim();
-        if (code.isEmpty()) return false;
+        String raw = productCode == null ? "" : productCode.trim();
+        if (raw.isEmpty()) return false;
+        String base = raw.replaceAll("(?i)-tb$", "").trim();
+        java.util.LinkedHashSet<String> codes = new java.util.LinkedHashSet<>();
+        if (!base.isEmpty()) {
+            codes.add(base);
+            codes.add(base + "-tb");
+        }
+        codes.add(raw);
+        String in = String.join(",", java.util.Collections.nCopies(codes.size(), "?"));
         Integer yes = jdbc.queryForObject(
                 "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.rd_mold_proc_head h"
-                        + "   WHERE LTRIM(RTRIM(ISNULL(h.[产品编号],N'')))=? AND ISNULL(h.asp_cancel,'N')<>'Y')"
-                        + " THEN 1 ELSE 0 END", Integer.class, code);
+                        + "   WHERE LTRIM(RTRIM(ISNULL(h.[产品编号],N''))) IN (" + in + ")"
+                        + "   AND ISNULL(h.asp_cancel,'N')<>'Y') THEN 1 ELSE 0 END",
+                Integer.class, codes.toArray());
         return yes != null && yes == 1;
     }
 

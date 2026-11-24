@@ -51,11 +51,14 @@ public class InspGateProbe {
     }
 
     static boolean hasMold(Connection c, String code) throws SQLException {
+        String base = code.replaceAll("(?i)-tb$", "").trim();
         try (PreparedStatement p = c.prepareStatement(
                 "SELECT CASE WHEN EXISTS (SELECT 1 FROM dbo.rd_mold_proc_head h"
-                        + " WHERE LTRIM(RTRIM(ISNULL(h.[产品编号],N'')))=? AND ISNULL(h.asp_cancel,'N')<>'Y')"
+                        + " WHERE LTRIM(RTRIM(ISNULL(h.[产品编号],N''))) IN (?,?,?) AND ISNULL(h.asp_cancel,'N')<>'Y')"
                         + " THEN 1 ELSE 0 END")) {
-            p.setString(1, code);
+            p.setString(1, base);
+            p.setString(2, base + "-tb");
+            p.setString(3, code);
             try (ResultSet r = p.executeQuery()) { return r.next() && r.getInt(1) == 1; }
         }
     }
