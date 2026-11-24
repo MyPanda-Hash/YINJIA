@@ -60,11 +60,16 @@ test('点不动时给出人话原因(已提交审批 → 请用审批通过)', (
   assert.match(en, /'审核：一步到位（草稿 → 已审核），不需要再走提交审批':/)
 })
 
-test('服务端:audit() 由 requireApprover 把门,自审豁免与「审批通过」同一份 canSelfAudit', () => {
+test('服务端:audit() 由「审批权 ∪ 本人自审」条件式把门,与「审批通过」同一份 canSelfAudit', () => {
   const start = buttonService.indexOf('private Map<String, Object> audit(PanelRegistry.PanelDef def')
   assert.ok(start > 0, '找不到 audit()')
   const body = buttonService.slice(start, start + 9000)
-  assert.match(body, /requireApprover\(def\.code\(\)\);/, '权限 = 该面板 can_approve ∪ 管理员(与审批通过同口径)')
+  // 2026-11-13 用户口径「本人自审权限绑定审核按钮」:闸门由「无条件 requireApprover」
+  //   改为条件式 —— 有审批权(∪管理员)照旧;无审批权但本面板授了本人自审且是本人制的单放行。
+  assert.match(body, /boolean hasApprove = canApprove\(auditor, def\.code\(\)\)/,
+    '权限 = 该面板 can_approve ∪ 管理员(与审批通过同口径)')
+  assert.match(body, /if \(!hasApprove && !selfGranted\)/,
+    '无审批权且不满足本人自审时必须拒(勾了自审也不能审别人的单)')
   assert.ok(!/仅管理员可直接审核/.test(body), '「仅管理员可直接审核」的硬拒必须去掉')
   assert.ok(!/仅管理员可直接审核/.test(buttonService), '整份 ButtonService 都不该再留那句硬拒')
   assert.match(body, /canSelfAudit\(auditor, def\.code\(\)\)/, '自填自审角色靠它豁免「编制与审批分离」')

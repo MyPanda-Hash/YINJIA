@@ -94,7 +94,10 @@ test('查 head 表的地方用 IN (?, ?) 兜两种形态(老单据存原值、�
   assert.match(status, /productCodeForms\(productCode\)/, 'statusAndDocNo 必须取两种形态')
   assert.match(status, /IN \(\?, \?\) AND ISNULL\(h\.asp_cancel,'N'\) <> 'Y'/, 'statusAndDocNo 的 SQL 必须是 IN (?, ?)')
 
-  const node = region(rdDev, 'private Map<String, Object> nodeOf(String panelCode, String label, String productCode)')
+  // 2026-11-24:nodeOf 在 11-19/11-23 又长出「多单据列表 + 提交/审批人」两段,
+  //   查 head 的 SQL 落到默认 1600 字窗之外(实测偏移 1590)⇒ 显式给 2600。
+  //   行为没变(仍是 IN (?, ?) 兜两种形态),只是切片窗口不够了。
+  const node = region(rdDev, 'private Map<String, Object> nodeOf(String panelCode, String label, String productCode)', 2600)
   assert.match(node, /DevTaskService\.productCodeForms\(productCode\)/, 'nodeOf 必须取两种形态')
   assert.match(node, /AND h\.\[产品编号\] IN \(\?, \?\)/, 'nodeOf 的 SQL 必须是 IN (?, ?)')
 })
