@@ -54,7 +54,18 @@
 
 证据：`round-18-detail.png`（两列变蓝可点）、`round-18-jump-insp.png`、`round-18-jump-rec.png`。
 
-## 四、待办（本次未动）
+> rebase 到最新 `origin/main`（本地落后 74 个提交）之后复跑：`round-21`（两列仍是可点链接）、
+> `round-22`（两个单号列各自点到正确单据、已作废提示不变）。`frontend` 全量单测 2537 passed /
+> 2 failed（均为既有失败：`goodsPick` ⑬、`RD_` archive 面板数），四单回归闸 `FourDocAudit HSDZ_MES` = `[PASS]`。
+
+## 五、与上游同类机制的共存
+
+上游 2026-11-23 给**出货检验明细表**（`QC_PROC_INSP_DETAIL` / `QC_ASM_INSP_DETAIL`）做了同款"点单号跳单据"，
+契约在 `core/qc/qcInspDetailLinks.js`（`reportLinkKind` / `openReportLink`，含"工单号 → 生产工单页"）。
+本单号直索引是**第二张明细表**（`QC_INSP_REC_DETAIL`，两个不同目标面板），按面板码分别登记，
+模板里两条 `v-else-if` 互斥（`round-20` 已确认两者可共存：出货检验那条保持原样）。
+
+## 六、待办（本次未动）
 
 - 「取消完成」：`QcCatalogService.assertLinkedRowNotCompleted` 的提示语指向「检验数据记录明细表」行内按钮，
   但该按钮在这张表上**还没有渲染方**（`QC_REC_DETAIL_REOPEN` 同样只有常量）—— 属于另一条独立缺陷。
