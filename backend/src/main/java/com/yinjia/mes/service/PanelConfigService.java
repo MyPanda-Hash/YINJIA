@@ -1011,7 +1011,7 @@ public class PanelConfigService {
     }
 
     /** 参照带回的排除标签:档案/来源单的**落库留痕**不该写到本单上。
-     *  2026-09-28 实测踩到:材料出库单「计量单位」改参照 UOM 后,refMap 里冒出
+     *  2026-09-28 实测踩到:生产领料单「计量单位」改参照 UOM 后,refMap 里冒出
      *  创建时间→创建时间 / 修改时间→修改时间 / 创建人→创建人 / 修改人→修改人 ——
      *  原因是 UOM 面板(计量单位档案)也有这几个同名字段,而同名带回是无条件的;
      *  照此带过去,选个单位就把**单位档案的**创建/修改留痕写进了单据行。
@@ -1068,7 +1068,7 @@ public class PanelConfigService {
             // 计划按「文档编号」参照立项申请时自动把等级带过来 —— 等级因此成为后续立项/进度流程的属性
             // (2026-09-21 用户口径:全链路一/二/三/四级)
             Map.entry("项目等级", List.of("项目定级")),
-            // 职员档案(EMP)整串带回:员工编码 → 单据的 经手人编码(2026-09-28,材料出库单字段关联)。
+            // 职员档案(EMP)整串带回:员工编码 → 单据的 经手人编码(2026-09-28,生产领料单字段关联)。
             // 转ERP 要推金蝶 emp_number,而单据头上只有「经手人/领用人」(存名称)+空着的「经手人编码」;
             // 让选人时把编码一起带出来,省得再按名称回查档案。已存在 经手人编码 文本列的面板
             // (采购入库/销售出库/材料出库…)一并受益,不会覆盖任何已填值。
@@ -1340,7 +1340,7 @@ public class PanelConfigService {
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
-                    // 生单组已随 BOM 下架移除(2026-10-04):原「生成领料单」按默认 BOM 展开生成材料出库单草稿
+                    // 生单组已随 BOM 下架移除(2026-10-04):原「生成领料单」按默认 BOM 展开生成生产领料单草稿
                     // (WoPickingHandler,已删),本面板现无任何推式生单链路,不再登记生单按钮
                     new String[]{"标签", "打印工单二维码", "打印产品二维码"},
                     new String[]{"查找", "查找", "刷新"},
@@ -1414,8 +1414,8 @@ public class PanelConfigService {
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"导入", "导入"})),
-            // 材料出库单:选单=生产工单;生单灰(PANDA:生成材料出库单（直接退料）)
-            // 转ERP(2026-09-28):材料出库单 → 金蝶「生产领料单」/jdy/v2/scm/inv_pick
+            // 生产领料单:选单=生产工单;生单灰(PANDA:生成生产领料单（直接退料）)
+            // 转ERP(2026-09-28):生产领料单 → 金蝶「生产领料单」/jdy/v2/scm/inv_pick
             java.util.Map.entry("MATERIAL_OUT", List.of(
                     new String[]{"新增", "新增"},
                     new String[]{"选单", "选单", "选生产工单"},
@@ -1423,15 +1423,15 @@ public class PanelConfigService {
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
-                    new String[]{"生单", "生成材料出库单（直接退料）"},
+                    new String[]{"生单", "生成生产领料单（直接退料）"},
                     new String[]{"转ERP", "转ERP", "批量转ERP"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"修改", "修改"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"导入", "导入"})),
-            // 生产退料单(2026-11-13 新增,与材料出库单同形):
-            // 表单/表/面板字段由 tools/migrate-return-docs-20261113.sql 按金蝶 inv_pick_ret 键集克隆材料出库单而来
+            // 生产退料单(2026-11-13 新增,与生产领料单同形):
+            // 表单/表/面板字段由 tools/migrate-return-docs-20261113.sql 按金蝶 inv_pick_ret 键集克隆生产领料单而来
             // (金蝶生产退料单是生产领料单的**严格子集**,故只隐藏 MES 独有的领料类型/领料用途/单据标签);
             // 转ERP 推金蝶「生产退料单」/jdy/v2/scm/inv_pick_ret(见 KingdeePushService 的 isPickRet 分支)。
             java.util.Map.entry("MATERIAL_RET", List.of(
@@ -1450,7 +1450,7 @@ public class PanelConfigService {
             // (业务类型 trans_type_id 真实账套=13)。委外三单(OUTSOURCE_*)仍保持 2026-10-08 下架状态。
             java.util.Map.entry("OTHER_OUT", List.of(
                     new String[]{"新增", "新增"},
-                    // 选单(2026-10-14 补,与材料出库单同形):来源 = SELECT_FLOWS 的 MANU_ORDER
+                    // 选单(2026-10-14 补,与生产领料单同形):来源 = SELECT_FLOWS 的 MANU_ORDER
                     new String[]{"选单", "选单", "选生产工单"},
                     new String[]{"保存", "保存", "保存新增", "保存为草稿"},
                     new String[]{"删除", "删除", "删除单据"},
@@ -1552,8 +1552,8 @@ public class PanelConfigService {
     private static final Map<String, String> SELECT_FLOWS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.ofEntries(
             java.util.Map.entry("PURCHASE_IN", "QC_RECV"),           // 送料暂收单 → 采购入库单(2026-09-22:原 采购订单,
                                                                      //   免检直达已取消,来源收敛到暂收单;见 PUSH_TARGETS 注释)
-            // 2026-10-28 生产加工单 MANU_ORDER 下架:材料出库单 / 产成品入库单 / 工序派工单 不再以它作选单来源 ——
-            //   材料出库单由生产工单列表「转领料单」直接生成;产成品入库单由组装成品检验单审核自动生成;
+            // 2026-10-28 生产加工单 MANU_ORDER 下架:生产领料单 / 产成品入库单 / 工序派工单 不再以它作选单来源 ——
+            //   生产领料单由生产工单列表「转领料单」直接生成;产成品入库单由组装成品检验单审核自动生成;
             //   工序派工单(DISPATCH)菜单早已下架。这四条来源面板在改造后一直是 0 行,选单弹窗本来就是空的。
             java.util.Map.entry("OUTSOURCE_ORDER", "SO_ORDER"),      // 销售订单 → 委外加工单
             // OUTSOURCE_ISSUE / OUTSOURCE_IN 两条「委外加工单 → 委外发料单/入库单」已随两张面板下架移除(2026-10-08)
@@ -1568,7 +1568,7 @@ public class PanelConfigService {
    // 2026-10-14 其他入库重建后补选单(用户口径「没有将面板的全部实现与产成品入库单对齐,如左侧的订单选择栏目」):
    //   其他入库 ← 采购订单(与采购入库单同源:客供/采购到货类入库)。
    //   ⚠ 这是**按同族面板的最近邻**取的默认口径,若业务上另有来源,改 SELECT_FLOWS 这一行即可(选单按钮由它派生)。
-   //   其他出库原 ← MANU_ORDER,随 2026-10-28 生产加工单下架一并移除(与材料出库单同源,来源已不存在)。
+   //   其他出库原 ← MANU_ORDER,随 2026-10-28 生产加工单下架一并移除(与生产领料单同源,来源已不存在)。
    , java.util.Map.entry("OTHER_IN", "PU_ORDER")
             // 2026-10-18 调拨单/盘点单:来源不是单据,而是**库存可用量**(批号级 kucun 视图 v_stock_pick)。
             // 用户口径「功能和界面要和出入库单对齐」—— 出入库单的「选单」挑的是上游单据,这两张单挑的是"货",

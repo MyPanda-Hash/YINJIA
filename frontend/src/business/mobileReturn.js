@@ -38,11 +38,14 @@ export function toReturnRows(lines) {
     const returned = round4(l?.已退数量)
     const can = round4(Math.max(0, picked - returned))
     return {
+      // 行号是**行标识**:2026-11-24 起同一物料可能有多行(不同 仓库/批号),不能再用物料编码当键
       行号: String(l?.行号 ?? i + 1),
       编码: String(l?.编码 ?? '').trim(),
       名称: String(l?.名称 ?? '').trim(),
       规格: String(l?.规格 ?? '').trim(),
       单位: String(l?.单位 ?? '').trim(),
+      仓库: String(l?.仓库 ?? '').trim(),
+      仓库编码: String(l?.仓库编码 ?? '').trim(),
       批号: String(l?.批号 ?? '').trim(),
       已领: picked,
       已退: returned,
@@ -54,13 +57,18 @@ export function toReturnRows(lines) {
 }
 
 /**
- * 确认一项:把数量**写进该明细行**(覆盖,不是累加)。
+ * 确认一项:把数量写进该物料的明细行(覆盖,不是累加)。
  *
  * <p>与「生产领料」的写入、「混料」的确认同一语义:同一物料再确认一次以最后一次输入为准。
  * 数量必须 0 < qty ≤ 可退,超了不猜、直接拒(后端提交时也会再校一次)。
  *
+ * <p>🔴 2026-11-24 用户口径「出库单和入库单要做到不同批次号和仓库是分开记录明细的」:
+ * 领料单明细拆行后,**同一物料可能有多行**(每行一个 仓库+批号)。这里按行序(批号先进先出)
+ * 把数量分摊到各行上 —— 与后端 {@code submitReturn} 的分摊顺序一致,所以页面上看到
+ * "哪一批退多少"就是提交后真落库的那些行。扫到的码带批号时,那一批排最前。
+ *
  * @param {any[]} rows {@link toReturnRows} 的结果(就地更新 本次退)
- * @param {{ code: string, qty: number }} p
+ * @param {{ code: string, qty: number, batch?: string, warehouse?: string }} p
  * @returns {{ ok: boolean, reason?: 'miss'|'no-qty'|'over', row?: any, index?: number }}
  */
 export function applyReturn(rows, p) {
@@ -69,12 +77,30 @@ export function applyReturn(rows, p) {
   if (!code) return { ok: false, reason: 'miss' }
   if (!(qty > 0)) return { ok: false, reason: 'no-qty' }
   const list = Array.isArray(rows) ? rows : []
-  const idx = list.findIndex((r) => String(r?.编码 || '').trim() === code)
-  if (idx < 0) return { ok: false, reason: 'miss' }
-  const row = list[idx]
-  if (qty > round4(row.可退)) return { ok: false, reason: 'over', row, index: idx }
-  row.本次退 = qty
-  return { ok: true, row, index: idx }
+  // 该物料的全部明细行(可能有多批)
+  const targets = list.filter((r) => String(r?.编码 || '').trim() === code)
+  if (!targets.length) return { ok: false, reason: 'miss' }
+  const canAll = round4(targets.reduce((s, r) => s + round4(r.可退), 0))
+  if (qty > round4(canAll)) return { ok: false, reason: 'over', row: targets[0], index: list.indexOf(targets[0]) }
+
+  // 扫到的码带批号/仓库 ⇒ 那一行排最前(其余保持先进先出)
+  const batch = String(p?.batch || '').trim()
+  const warehouse = String(p?.warehouse || '').trim()
+  const order = targets.slice()
+  if (batch || warehouse) {
+    const rank = (r) => ((!batch || r.批号 === batch) && (!warehouse || r.仓库 === warehouse) ? 0 : 1)
+    order.sort((a, b) => rank(a) - rank(b))
+  }
+
+  for (const r of targets) r.本次退 = 0
+  let left = qty
+  for (const r of order) {
+    if (left <= 0) break
+    const take = round4(Math.min(left, round4(r.可退)))
+    r.本次退 = take
+    left = round4(left - take)
+  }
+  return { ok: true, row: order[0], index: list.indexOf(order[0]) }
 }
 
 /** 清空本次退料(全部行归 0) */
@@ -93,9 +119,16 @@ export function clearReturnQty(rows) {
  */
 export function returnProgress(rows) {
   const arr = Array.isArray(rows) ? rows : []
-  const items = arr
-    .filter((r) => round4(r.本次退) > 0)
-    .map((r) => ({ code: String(r.编码 || '').trim(), qty: round4(r.本次退) }))
+  // 同一物料可能有多行(不同 仓库/批号)⇒ 提交项按**物料编码聚合**,数量为各批之和
+  // (后端 submitReturn 再按出库行先进先出分摊,顺序与本页 applyReturn 一致)
+  const byCode = new Map()
+  for (const r of arr) {
+    const q = round4(r.本次退)
+    if (q <= 0) continue
+    const code = String(r.编码 || '').trim()
+    byCode.set(code, round4((byCode.get(code) || 0) + q))
+  }
+  const items = [...byCode].map(([code, qty]) => ({ code, qty }))
   const totalQty = round4(items.reduce((s, x) => s + x.qty, 0))
   const canTotal = round4(arr.reduce((s, r) => s + round4(r.可退), 0))
   return {

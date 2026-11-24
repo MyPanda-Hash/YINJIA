@@ -25,7 +25,7 @@ import java.util.Map;
  *
  * <h3>本类负责什么 / 不负责什么</h3>
  * 只负责 {@code wo_pick_doc} 这张**配对台账**的读写与状态机(未完成 → 已完成 / 已作废)。
- * <b>不写任何库存</b>:库存只由 {@link StockLedgerService} 在材料出库单 / 其他入库单**审核**时
+ * <b>不写任何库存</b>:库存只由 {@link StockLedgerService} 在生产领料单 / 其他入库单**审核**时
  * 按 {@code kucun(物料,仓库,批号)} 写入。台账只记单号与进度,不碰数量与批次
  * (所以它不改变 `docs/development/上线前必验-库存批次追溯.md` §五 的任何验收口径)。
  *
@@ -217,7 +217,7 @@ public class WoPickDocService {
      * @param done  已领到数量的物料项数
      * @param total 按 BOM 展开的物料项数
      * @return 更新后的状态(仍由 {@link #STATE_OPEN} 保持 —— **领满不等于完成**,
-     *         用户口径是「全部领料完成后才可以提交转成材料出库单」,完成态由提交那一刻置)
+     *         用户口径是「全部领料完成后才可以提交转成生产领料单」,完成态由提交那一刻置)
      */
     public void updateProgress(long id, int done, int total, String user) {
         jdbc.update("UPDATE dbo.wo_pick_doc SET 已领项数 = ?, 物料项数 = ?,"

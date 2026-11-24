@@ -2,9 +2,9 @@
   MobilePick.vue — 移动端扫码领料(2026-10-20)
 
   【为什么单独一页】
-  小程序扫码领料是**直连数据库写 outh**,绕开了单据链(没有材料出库单 ⇒ 金蝶推不上去、
+  小程序扫码领料是**直连数据库写 outh**,绕开了单据链(没有生产领料单 ⇒ 金蝶推不上去、
   工单追溯看不到、ll_no2 回写不亮)。改由 MES 自己的手机网页领料,走
-  「扫工单 → 扫物料 → 填数量 → 生成材料出库单草稿 → 审核 → 写流水」这一条唯一过账入口,
+  「扫工单 → 扫物料 → 填数量 → 生成生产领料单草稿 → 审核 → 写流水」这一条唯一过账入口,
   库存才会正常变化。
 
   【规范(按 docs/design/补充设计-V2.0.md §4.4 与 docs/frontend/前端面板设计.md §10)】
@@ -240,7 +240,7 @@
         :disabled="!lines.length || !wo || woBlocked"
         @click="submit"
       >
-        {{ tt('生成材料出库单') }}
+        {{ tt('生成生产领料单') }}
       </el-button>
     </div>
   </div>
@@ -374,7 +374,7 @@ let scanTarget = null
  * 把扫到的码按**目标**解析后填进去(2026-10-21 用户口径):
  *
  *   工单码 `0@GD-2026-10-0221@1001` → 工单号 GD-2026-10-0221 + **工单行号 1**
- *     (1001 = 固定前缀 1000 + 行号;行号要一起填,材料出库单上也要显示)
+ *     (1001 = 固定前缀 1000 + 行号;行号要一起填,生产领料单上也要显示)
  *   物料码 `0@YJ-ZZ-001`            → 物料编码,不带批次 ⇒ 列出该物料**全部批次**供勾选
  *   物料码 `0@YJ-ZZ-001@20261021`   → 物料编码 + 批次 ⇒ 同上,并把该批次**标亮**
  */
@@ -451,7 +451,7 @@ watch(lines, () => { errText.value = '' })
  *
  * @param {number} [line] 扫工单码解出的**工单行号**(1001→1);给了就**只取这一行** ——
  *   一张工单可能有多行(不同产品/不同排产),领料必须落到扫的那一行上,
- *   否则材料出库单的「工单行号」写错、后续回写 plang.ll_no2 也会错行。
+ *   否则生产领料单的「工单行号」写错、后续回写 plang.ll_no2 也会错行。
  */
 async function loadWo(line) {
   const kw = String(woText.value || '').trim()
@@ -680,7 +680,7 @@ function reset() {
   errText.value = ''
 }
 
-/** 生成材料出库单草稿(带 加工单号 + 工单行号:追溯与回写都靠这两列) */
+/** 生成生产领料单草稿(带 加工单号 + 工单行号:追溯与回写都靠这两列) */
 async function submit() {
   if (!wo.value || !lines.value.length) return
   // 兜底:未排产的工单不允许生成领料草稿(按钮本该是灰的,这里再拦一次并把原因写到顶部)
@@ -697,7 +697,7 @@ async function submit() {
       woNo: wo.value.工单号,
       // 工单行号(2026-10-21):优先用扫工单码解出来的行号,其次工单行自带的行号
       woLine: woLine.value || wo.value.工单行号,
-      // 生产线:材料出库单的「生产线」(原「生产车间」)只读,只能由这里按工单带过去
+      // 生产线:生产领料单的「生产线」(原「生产车间」)只读,只能由这里按工单带过去
       prodLine: wo.value.生产线,
       // 领用人:登录扫码人
       picker: pickerName.value,
@@ -705,10 +705,10 @@ async function submit() {
       warehouseCode: wh ? lines.value[0].warehouseCode : '',
     })
     await callButton({ panelCode: 'MATERIAL_OUT', buttonName: '保存', formData })
-    ElMessage.success(tt('已生成材料出库单草稿,请到材料出库单里审核'))
+    ElMessage.success(tt('已生成生产领料单草稿,请到生产领料单里审核'))
     lines.value = []
   } catch (e) {
-    errText.value = errMsg(e) || tt('生成材料出库单失败')
+    errText.value = errMsg(e) || tt('生成生产领料单失败')
   } finally {
     saving.value = false
     // PDA 连扫(2026-11-16):提交完回工单扫码框,下一张工单直接扫

@@ -167,7 +167,16 @@ public class StockWarnService {
                 }
             }
         }
-        BigDecimal after = bal.subtract(done);
+        BigDecimal after = bal;
+        // 🔴 2026-11-24 修「二次扣减」:本方法由 {@code StockFlowService.post} 调用,而那里是在
+        //   {@code StockLedgerService.apply} **已经扣完 kucun 之后**才写流水的(apply 先动结存、
+        //   再 postFlow)。所以这里读到的 bal 本身就是**出库后余额**,再减一次本单已出量(done)
+        //   等于把同一笔出库扣两遍:
+        //     · 该批次余额 600、本行出 400 ⇒ 读到的 bal 已是 200,再减 400 = -200 ⇒ 误报"出库后余额 -200";
+        //     · 只要「该批次出了之后还剩一点、但剩余量 < 本行数量」就必踩 —— 一次领料按批号/仓库
+        //       拆成多行后几乎必然命中(2026-11-24 拆行改造时实测踩到)。
+        //   ⇒ 判据改成直接比 bal(真正的出库后余额);done 只留在提示文案里说明"本单该批次已出多少"。
+        //   ⚠ 库存不会因此变负:不足时 {@code applyOutAggregated} 自己的守卫(汇总余额 < 本次出库)先抛错。
         if (!HIST_BACKFILL && after.compareTo(warn) < 0) {
             throw new IllegalStateException("单据 " + no + " 出库审批失败:存货 " + wzdm + " / 仓库 " + ckdm
                     + " / 批次号 " + (l.isEmpty() ? "(无批次号)" : l)

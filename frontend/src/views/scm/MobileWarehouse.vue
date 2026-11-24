@@ -49,7 +49,7 @@ const docs = [
   { code: 'FINISH_IN', label: '产成品入库单' },
   // 2026-10-08 下架:其他入库单 OTHER_IN / 其他出库单 OTHER_OUT(面板+表+视图整体删除)
   { code: 'SALE_OUT', label: '销售出库单' },
-  { code: 'MATERIAL_OUT', label: '材料出库单' },
+  { code: 'MATERIAL_OUT', label: '生产领料单' },
   { code: 'TRANSFER', label: '调拨单' },
   { code: 'STOCK_CHECK', label: '库存盘点单' },
   { code: 'LOCATION_ADJUST', label: '货位调整单' },

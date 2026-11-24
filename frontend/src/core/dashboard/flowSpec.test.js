@@ -105,7 +105,7 @@ test('链路汇总能点出阻断节点(顶部卡点条之外的链路级提示)
 
 test('生产链顺序按业务流:排产 → 领料 → 报工 → 检验 → 入库', () => {
   // 2026-10-18 用户口径:「生产应该是先排产再领料,等报工完成之后再检验最后入库」。
-  // 原排布把「材料出库单」放在排产之前,视觉上等于先领料后排产,与本口径相反。
+  // 原排布把「生产领料单」放在排产之前,视觉上等于先领料后排产,与本口径相反。
   const prod = CHAINS.find((c) => c.key === 'prod')
   assert.deepEqual(prod.lanes.map((l) => l.key), ['plan', 'release', 'exec', 'qcput'], '生产链四段:接单计划 → 排产 → 领料报工 → 品质入库')
   const laneCodes = (k) => (prod.lanes.find((l) => l.key === k)?.nodes || []).map((n) => n.code)

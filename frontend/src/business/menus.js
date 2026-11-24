@@ -284,14 +284,14 @@ export const menuTree = [
               // 面板/表/字段由 tools/migrate-return-docs-20261113.sql 按 sal_in_bound 键集克隆销售出库单;
               // 紧跟销售出库单(一出一进配成对,找单的人不会跑错组)。
               { code: 'saleIn', title: '销售退货单', path: '/panelx/list/SALE_IN', icon: 'RefreshLeft', panelCode: 'SALE_IN', operationName: '新增流程' },
-              { code: 'materialOut', title: '材料出库单', path: '/panelx/list/MATERIAL_OUT', icon: 'Upload', panelCode: 'MATERIAL_OUT', operationName: '新增流程' },
-              // 生产退料单(2026-11-13 新增):金蝶 inv_pick_ret,MES 侧与材料出库单成对(领/退同组)。
+              { code: 'materialOut', title: '生产领料单', path: '/panelx/list/MATERIAL_OUT', icon: 'Upload', panelCode: 'MATERIAL_OUT', operationName: '新增流程' },
+              // 生产退料单(2026-11-13 新增):金蝶 inv_pick_ret,MES 侧与生产领料单成对(领/退同组)。
               { code: 'materialRet', title: '生产退料单', path: '/panelx/list/MATERIAL_RET', icon: 'RefreshLeft', panelCode: 'MATERIAL_RET', operationName: '新增流程' },
               // ══════════ 2026-11-17:生产领料明细表 / 生产退料明细表 已移到「库存明细」组 ══════════
               // 用户口径:「图二红框的两个明细表要放在库存明细里面」——
               //   PROD_PICK_LIST(生产领料明细表)与 PROD_RET_LIST(生产退料明细表)
               //   是**只读明细报表**,与「库存明细」组的其它明细表同类,不该混在「库存核算」的单据里。
-              //   ⇒ 入口搬到下方 invDetail 组(紧挨 材料出库单明细表 / 生产退料单明细表),
+              //   ⇒ 入口搬到下方 invDetail 组(紧挨 生产领料单明细表 / 生产退料单明细表),
               //     面板码 / 路径 / 数据源 / 权限行 / 叶子 code 一个字节没动。
               // 2026-10-14 恢复:其他出库单(OTHER_OUT)—— 同其他入库单;委外发料单(OUTSOURCE_ISSUE)仍保持下架。
               { code: 'otherOut', title: '其他出库单', path: '/panelx/list/OTHER_OUT', icon: 'Upload', panelCode: 'OTHER_OUT', operationName: '新增' },
@@ -316,12 +316,12 @@ export const menuTree = [
           { code: 'otherOutDetail', title: '其他出库单明细表', path: '/panelx/list/OTHER_OUT_DETAIL', panelCode: 'OTHER_OUT_DETAIL', icon: 'List' },
           { code: 'saleOutDetail', title: '销售出库单明细表', path: '/panelx/list/SALE_OUT_DETAIL', panelCode: 'SALE_OUT_DETAIL', icon: 'List' },
           { code: 'saleInDetail', title: '销售退货单明细表', path: '/panelx/list/SALE_IN_DETAIL', panelCode: 'SALE_IN_DETAIL', icon: 'List' },
-          { code: 'materialOutDetail', title: '材料出库单明细表', path: '/panelx/list/MATERIAL_OUT_DETAIL', panelCode: 'MATERIAL_OUT_DETAIL', icon: 'List' },
+          { code: 'materialOutDetail', title: '生产领料单明细表', path: '/panelx/list/MATERIAL_OUT_DETAIL', panelCode: 'MATERIAL_OUT_DETAIL', icon: 'List' },
           // 生产领料明细表(2026-10-22 建面板,2026-11-16 改名,2026-11-17 由「库存核算」移入本组):
           //   只读报表,形态对齐「混料记录」—— flat + 报表,面板码 PROD_PICK_LIST,
           //   数据源 = 包装视图 v_prod_pick_list(dbo.outh 里 src=6「材料出库」且未删除的行,
           //   即 SCLL-* 生产领料单)。面板/视图/译名/授权见 tools/migrate-prod-pick-outh-20261022.sql。
-          //   位置钉在「材料出库单明细表」之后:领料明细与材料出库明细本来就是同一批单的一体两面。
+          //   位置钉在「生产领料单明细表」之后:领料明细与材料出库明细本来就是同一批单的一体两面。
           { code: 'prodPickList', title: '生产领料明细表', path: '/panelx/list/PROD_PICK_LIST', icon: 'List', panelCode: 'PROD_PICK_LIST' },
           { code: 'materialRetDetail', title: '生产退料单明细表', path: '/panelx/list/MATERIAL_RET_DETAIL', panelCode: 'MATERIAL_RET_DETAIL', icon: 'List' },
           // 生产退料明细表(2026-11-16 新增,2026-11-17 由「库存核算」移入本组):数据源 = 包装视图 v_prod_ret_list,
@@ -348,7 +348,7 @@ export const menuTree = [
           { code: 'otherOutStats', title: '其他出库单统计表', path: '/panelx/list/OTHER_OUT_STATS', panelCode: 'OTHER_OUT_STATS', icon: 'Histogram' },
           { code: 'saleOutStats', title: '销售出库单统计表', path: '/panelx/list/SALE_OUT_STATS', panelCode: 'SALE_OUT_STATS', icon: 'Histogram' },
           { code: 'saleInStats', title: '销售退货单统计表', path: '/panelx/list/SALE_IN_STATS', panelCode: 'SALE_IN_STATS', icon: 'Histogram' },
-          { code: 'materialOutStats', title: '材料出库单统计表', path: '/panelx/list/MATERIAL_OUT_STATS', panelCode: 'MATERIAL_OUT_STATS', icon: 'Histogram' },
+          { code: 'materialOutStats', title: '生产领料单统计表', path: '/panelx/list/MATERIAL_OUT_STATS', panelCode: 'MATERIAL_OUT_STATS', icon: 'Histogram' },
           { code: 'materialRetStats', title: '生产退料单统计表', path: '/panelx/list/MATERIAL_RET_STATS', panelCode: 'MATERIAL_RET_STATS', icon: 'Histogram' },
           // 2026-10-18 新增:调拨单/盘点单统计表(视图 v_transfer_stats / v_stocktake_stats)
           { code: 'transferStats', title: '调拨单统计表', path: '/panelx/list/TRANSFER_STATS', panelCode: 'TRANSFER_STATS', icon: 'Histogram' },
@@ -440,7 +440,7 @@ export const menuTree = [
           // 生产退料(2026-11-18 独立成面板)。用户口径:「我还想生产退料独立出来,就是已经领料且审核的
           //   领料单据,来扫码退料。其实就是独立出来一个面版,让生产领料不用负责那么多功能,操作也方便。」
           //   ⇒ 生产领料单据页里的退料入口**已删掉**,退料只在这里做:
-          //     列出「已完成 + 材料出库单已审核」的领料单 → 扫物料码 → 填退料数量 → 提交(生成生产退料单)。
+          //     列出「已完成 + 生产领料单已审核」的领料单 → 扫物料码 → 填退料数量 → 提交(生成生产退料单)。
           //   放在「生产领料」之后:先领后退,现场按作业顺序找菜单。
           { code: 'mobileReturn', title: '生产退料', path: '/panelx/list/MOBILE_RETURN', panelCode: 'MOBILE_RETURN', icon: 'RefreshLeft' },
           // 其他领料 / 其他退料(2026-11-16 新增)。用户口径:「手机端再做一个其他领料和其他退料……

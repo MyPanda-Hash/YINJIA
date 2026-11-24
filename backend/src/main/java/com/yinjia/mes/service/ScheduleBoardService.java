@@ -1691,7 +1691,7 @@ public class ScheduleBoardService {
                                 + " LEFT JOIN yj_doc_status s ON s.panel_code=N'FINISH_IN' AND s.doc_no=f.[单据编号]"
                                 + " WHERE f.[加工单号]=? AND ISNULL(f.asp_cancel,'N')<>'Y'"
                                 + " ORDER BY f.[单据编号], d.[序号]", doc);
-        // 领料数据:材料出库单(领料单)—— **按 工单号+工单行号 收敛**(2026-10-15,用户口径)。
+        // 领料数据:生产领料单(领料单)—— **按 工单号+工单行号 收敛**(2026-10-15,用户口径)。
         // 🔴 原实现 `WHERE m.[加工单号]=?` 查的是**明细行** bl_material_out.[加工单号] —— 该列**实测全为空**
         //   (转领料单只写单头,明细由仓库补填)⇒ 这一段永远返回空,用户看到的就是"领料数据没有"。
         //   行键在**单头**:bd_material_out 有 [加工单号] + [工单行号](转领料单按行写入)。

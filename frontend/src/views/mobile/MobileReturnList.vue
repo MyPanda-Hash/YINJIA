@@ -56,7 +56,7 @@
       </div>
       <div class="mr-hint">
         {{ tt('扫领料单纸面二维码 → 直接打开对应那张(混料/组装);扫工单码 → 弹窗选混料还是组装;') }}
-        {{ tt('只列已领料且材料出库单已审核的单据,点一行进单据明细里扫物料码退料') }}
+        {{ tt('只列已领料且生产领料单已审核的单据,点一行进单据明细里扫物料码退料') }}
       </div>
     </section>
 
@@ -70,7 +70,7 @@
       </div>
 
       <template v-if="openOpen">
-        <div v-if="!list.length" class="mr-empty">{{ tt('没有可退的领料单（需要先领料、且材料出库单被仓管审核）') }}</div>
+        <div v-if="!list.length" class="mr-empty">{{ tt('没有可退的领料单（需要先领料、且生产领料单被仓管审核）') }}</div>
         <div
           v-for="d in list"
           :key="d.id"
@@ -80,6 +80,11 @@
           <div class="mr-doc-l1">
             <span class="mr-doc-no mono">{{ d.领料单号 }}</span>
             <span class="mr-tag">{{ tt(d.领料类型 || '组装') }}</span>
+            <!-- 最近一次退料单号(2026-11-24 用户口径「生产退料要补单号」:
+                 生产领料有领料单号,生产退料也要让人看到退料单号) -->
+            <span v-if="d.最近退料单号 || d.退料单号" class="mr-doc-backno mono">
+              {{ tt('退料单号') }} {{ d.最近退料单号 || d.退料单号 }}
+            </span>
             <span class="mr-doc-can num">{{ tt('可退') }} {{ fmtQty(d.可退数量) }}</span>
           </div>
           <div class="mr-doc-l2">
@@ -107,7 +112,7 @@
  * 同一套顶栏、同一块「查询 + 扫码定位」、同样可展开收起的分组、同样的卡片三行结构。
  * 本页**不发任何写请求**:点一行进 {@code MobileReturnDoc.vue},退料都在那一页做。
  *
- * 数据:GET /px/mobilePick/returnables(只列已完成 + 材料出库单已审核的领料单)。
+ * 数据:GET /px/mobilePick/returnables(只列已完成 + 生产领料单已审核的领料单)。
  */
 import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -151,7 +156,7 @@ function showErr(msg) {
   try { window.scrollTo({ top: 0, behavior: 'smooth' }) } catch { /* 老 WebView 没有 options */ }
 }
 
-/** 可退单据(已完成 + 材料出库单已审核) */
+/** 可退单据(已完成 + 生产领料单已审核) */
 async function load() {
   loading.value = true
   clearMsg()
@@ -353,6 +358,11 @@ onBeforeUnmount(() => {
 .mr-doc-no { font-size: 14px; font-weight: 600; }
 .mr-tag { padding: 0 6px; border-radius: 8px; font-size: 11px; background: var(--el-fill-color); color: var(--el-text-color-regular); }
 .mr-doc-can { margin-left: auto; font-size: 13px; color: var(--el-color-warning); font-variant-numeric: tabular-nums; }
+/* 最近退料单号(2026-11-24):和生产领料单一样,退料也要有单号给人对 */
+.mr-doc-backno {
+  padding: 0 6px; border-radius: 8px; font-size: 11px; white-space: nowrap;
+  background: var(--el-color-warning-light-9); color: var(--el-color-warning-dark-2);
+}
 .mr-doc-l2 { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; font-size: 12px; }
 .mr-doc-l2 i { font-style: normal; color: var(--el-text-color-secondary); }
 .mr-doc-prog { margin-left: auto; color: var(--el-text-color-secondary); font-variant-numeric: tabular-nums; }

@@ -45,6 +45,8 @@
       <div class="mp-kv"><span>{{ tt('计量单位') }}</span><b>{{ wo.计量单位 || '—' }}</b></div>
       <div class="mp-kv"><span>{{ tt('生产线') }}</span><b>{{ wo.生产线 || '—' }}</b></div>
       <div class="mp-kv"><span>{{ tt('领料单号') }}</span><b class="mono">{{ doc.领料单号 || '—' }}</b></div>
+      <!-- 领料/退料部门(2026-11-24 用户口径「扫码填表关联领料部门,领料部门根据账号所属部门来填入」) -->
+      <div class="mp-kv"><span>{{ tt('领料部门') }}</span><b>{{ doc.领料部门名称 || doc.领料部门 || '—' }}</b></div>
       <div class="mp-kv"><span>{{ tt('领料类型') }}</span><b>{{ tt(doc.领料类型 || '组装') }}</b></div>
       <div class="mp-kv">
         <span>{{ tt('退料单号') }}</span>
@@ -120,6 +122,23 @@
           </el-button>
           <el-button size="large" @click="cancelLock">{{ tt('取消') }}</el-button>
         </div>
+
+        <!-- 批次明细(2026-11-24):这料当初是从哪些 仓库/批号 出的、各还能退多少。
+             提交时按 仓库+批号 分开记明细行,一次退多批就出多行。 -->
+        <div v-if="(cur.批次明细 || []).length > 1" class="mp-batches">
+          <div class="mp-batches-head">
+            <span class="mp-bh-lot">{{ tt('批号') }}</span>
+            <span class="mp-bh-wh">{{ tt('仓库') }}</span>
+            <span class="mp-bh-avail">{{ tt('可退') }}</span>
+            <span class="mp-bh-qty">{{ tt('本次') }}</span>
+          </div>
+          <div v-for="(b, i) in cur.批次明细" :key="i" class="mp-batch-row" :class="{ 'is-checked': b.本次 > 0 }">
+            <span class="mp-bh-lot"><span class="mp-batch-lot" :class="{ mono: !!b.批号 }">{{ b.批号 || tt('无批次') }}</span></span>
+            <span class="mp-bh-wh">{{ b.仓库 || '—' }}</span>
+            <span class="mp-bh-avail num">{{ fmtQty(b.可退数量) }}</span>
+            <span class="mp-bh-qty num">{{ b.本次 > 0 ? fmtQty(b.本次) : '—' }}</span>
+          </div>
+        </div>
       </template>
 
       <div v-if="!cur" class="mp-hint">
@@ -152,6 +171,7 @@
             <div><dt>{{ tt('规格型号') }}</dt><dd>{{ r.规格 || '—' }}</dd></div>
             <div><dt>{{ tt('计量单位') }}</dt><dd>{{ r.单位 || '—' }}</dd></div>
             <template v-if="r.批号"><div><dt>{{ tt('批号') }}</dt><dd>{{ r.批号 }}</dd></div></template>
+            <template v-if="r.仓库"><div><dt>{{ tt('仓库') }}</dt><dd>{{ r.仓库 }}</dd></div></template>
           </dl>
         </div>
         <!-- 已领 / 已退 / 本次退:三行都带标签(与生产领料单的 需求 / 已领 同一写法) -->
@@ -214,7 +234,7 @@ import { tt } from '@/i18n'
 import { errMsg } from '@/business/engine'
 import { parseBarcode } from '@/business/scanPick'
 import { fmtQty } from '@/business/mobilePick'
-import { toReturnRows, applyReturn, clearReturnQty, returnProgress } from '@/business/mobileReturn'
+import { toReturnRows, applyReturn, clearReturnQty, returnProgress, round4 } from '@/business/mobileReturn'
 import { printSlip } from '@/business/slipPrintFlow'
 import { scanOnce, hasNativeScan } from '@/business/nativeScan'
 import { focusScanNow } from '@/business/scanFocus'
@@ -264,7 +284,7 @@ const progress = computed(() => returnProgress(rows.value))
 const hasReturn = computed(() => !!(doc.value.退料单号 && String(doc.value.退料单号).trim()))
 
 /**
- * 能不能退:领料单**已完成** + 材料出库单**已被仓管审核**(库存才真扣了) + 还有可退量。
+ * 能不能退:领料单**已完成** + 生产领料单**已被仓管审核**(库存才真扣了) + 还有可退量。
  *
  * <p>与后端 {@code requireReturnable} 同一判据,这里只是别让人点了才被拒;
  * 真正的闸门在服务端(拿令牌直接调接口照样被拦)。
@@ -280,7 +300,7 @@ const notReturnableReason = computed(() => {
     return tt('这张领料单还没完成:请先把料领完并提交,提交之后才能对已领的料退料')
   }
   if (doc.value.出库已审批 !== true) {
-    return tt('材料出库单还没审批,暂时不能退料:请先让仓管在「材料出库单」里审核通过(审核才扣库存)')
+    return tt('生产领料单还没审批,暂时不能退料:请先让仓管在「生产领料单」里审核通过(审核才扣库存)')
   }
   return tt('这张单的料已经全部退完了,没有可退的物料')
 })
@@ -364,9 +384,10 @@ async function load() {
     const d = res.data?.data || res.data || {}
     doc.value = d
     wo.value = d.工单 || {}
-    // 本次退料在重新取数后要保留(提交前反复刷新的场景),按物料编码回填
-    const prev = new Map(rows.value.map((r) => [r.编码, r.本次退]))
-    rows.value = toReturnRows(d.领料明细).map((r) => ({ ...r, 本次退: prev.get(r.编码) || 0 }))
+    // 本次退料在重新取数后要保留(提交前反复刷新的场景),按**行号**回填
+    // (2026-11-24:同一物料可能多行(不同批次),按物料编码回填会把数量写到错的行上)
+    const prev = new Map(rows.value.map((r) => [String(r.行号), r.本次退]))
+    rows.value = toReturnRows(d.领料明细).map((r) => ({ ...r, 本次退: prev.get(String(r.行号)) || 0 }))
     if (carriedMsg) { okText.value = carriedMsg; carriedMsg = '' }
   } catch (e) {
     errText.value = errMsgOf(e) || tt('加载单据失败')
@@ -399,9 +420,20 @@ async function scanMaterial() {
       已领数量: Number(d.已领数量) || 0,
       已退数量: Number(d.已退数量) || 0,
       可退数量: Number(d.可退数量) || 0,
+      // 扫到的码带批号 ⇒ 退料优先记到那一批上(现场按批退)
+      扫到批号: String(p.batch || '').trim(),
+      // 批次明细:每行一个 仓库+批号,提交时按它拆退料单的明细行
+      批次明细: (Array.isArray(d.批次明细) ? d.批次明细 : []).map((b) => ({
+        仓库: String(b.仓库 || '').trim(),
+        仓库编码: String(b.仓库编码 || '').trim(),
+        批号: String(b.批号 || '').trim(),
+        可退数量: Number(b.可退数量) || 0,
+        本次: 0,
+      })),
     }
     // 默认填可退(整项退),现场可改小
     curQty.value = cur.value.可退数量
+    markBatches(cur.value, curQty.value)
   } catch (e) {
     errText.value = errMsgOf(e) || tt('查询可退数量失败')
   } finally {
@@ -424,7 +456,11 @@ async function scanInto() {
 /** 确认:把数量记到该明细行(覆盖),然后重新锁回扫码状态 */
 function confirmLine() {
   if (!cur.value) return
-  const r = applyReturn(rows.value, { code: cur.value.编码, qty: curQty.value })
+  const r = applyReturn(rows.value, {
+    code: cur.value.编码,
+    qty: curQty.value,
+    batch: cur.value.扫到批号,
+  })
   if (!r.ok) {
     errText.value = r.reason === 'over'
       ? `${tt('超过可退数量')}:${tt('这次可退')} ${fmtQty(cur.value.可退数量)}`
@@ -437,6 +473,33 @@ function confirmLine() {
   curQty.value = 0
   focusScanNow(() => matInput.value, { delay: 80 })
 }
+
+/**
+ * 把本次退料数量摊到「批次明细」上(只为界面看得懂:哪一批退多少)。
+ *
+ * <p>分摊顺序与 {@link applyReturn} / 后端 {@code submitReturn} **同一套**
+ * (扫到的批号优先,其余按行序先进先出),所以这张小表显示的就是提交后落库的那几行。
+ */
+function markBatches(c, qty) {
+  if (!c || !Array.isArray(c.批次明细)) return
+  const want = round4(Number(qty) || 0)
+  const list = c.批次明细
+  const order = list.slice()
+  if (c.扫到批号) {
+    order.sort((a, b) => (a.批号 === c.扫到批号 ? 0 : 1) - (b.批号 === c.扫到批号 ? 0 : 1))
+  }
+  for (const b of list) b.本次 = 0
+  let left = want
+  for (const b of order) {
+    if (left <= 0) break
+    const take = round4(Math.min(left, round4(b.可退数量)))
+    b.本次 = take
+    left = round4(left - take)
+  }
+}
+
+/** 退料数量变化 → 重算批次小表 */
+watch(curQty, (v) => markBatches(cur.value, v))
 
 /** 取消本次解锁并重新锁定 */
 function cancelLock() {
@@ -639,6 +702,17 @@ async function reprintBackSlip() {
 .mp-line-qty i { font-style: normal; font-size: 11px; font-weight: 400; color: var(--el-text-color-secondary); }
 
 .mp-empty { padding: 18px 0; text-align: center; font-size: 13px; color: var(--el-text-color-secondary); line-height: 1.6; }
+/* 批次明细小表(2026-11-24):一个物料可能从多仓多批出库,退料时逐批看、逐批退 */
+.mp-batches { margin-top: 10px; border: 1px solid var(--el-border-color-lighter); border-radius: 6px; overflow: hidden; }
+.mp-batches-head, .mp-batch-row { display: flex; align-items: center; gap: 6px; padding: 6px 8px; font-size: 12px; }
+.mp-batches-head { background: var(--el-fill-color-light); color: var(--el-text-color-secondary); }
+.mp-batch-row { border-top: 1px solid var(--el-border-color-lighter); font-size: 13px; }
+.mp-batch-row.is-checked { background: var(--el-color-primary-light-9); }
+.mp-bh-lot { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; }
+.mp-batch-lot { min-width: 0; word-break: break-all; }
+.mp-bh-wh { flex: none; width: 62px; color: var(--el-text-color-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mp-bh-avail { flex: none; width: 52px; text-align: right; }
+.mp-bh-qty { flex: none; width: 62px; text-align: right; font-weight: 600; }
 .mp-hint { margin-top: 8px; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.6; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace; }
 .num { font-variant-numeric: tabular-nums; }

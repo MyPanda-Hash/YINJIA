@@ -113,6 +113,54 @@ test('clearReturnQty:本次退全部归 0,已领/已退/可退不动', () => {
   assert.equal(returnProgress(rows).ok, false)
 })
 
+// ── 2026-11-24:领料单明细改按 仓库+批号 拆行 ────────────────────────────────
+/** 同一物料两批(不同批号/仓库)的明细行(后端拆行后的形状) */
+const multiBatchLines = () => ([
+  { 行号: '1', 编码: 'YJ-OPP-001', 名称: 'OPP袋', 单位: '个', 仓库: '恒亿仓', 仓库编码: 'WH01', 批号: '20261101001', 数量: 5, 已退数量: 0 },
+  { 行号: '2', 编码: 'YJ-OPP-001', 名称: 'OPP袋', 单位: '个', 仓库: '博辰仓', 仓库编码: 'WH02', 批号: '20261110002', 数量: 3, 已退数量: 0 },
+])
+
+test('toReturnRows:同物料多批 ⇒ 多行,且每行带自己的 仓库/批号', () => {
+  const rows = toReturnRows(multiBatchLines())
+  assert.equal(rows.length, 2, '不同批次号/仓库必须分开成两行')
+  assert.equal(rows[0].仓库, '恒亿仓')
+  assert.equal(rows[1].批号, '20261110002')
+  assert.equal(rows[0].可退, 5)
+  assert.equal(rows[1].可退, 3)
+})
+
+test('applyReturn:数量不足一批时只写第一行,超过时按批号先进先出拆到下一批', () => {
+  const rows = toReturnRows(multiBatchLines())
+  // 退 2 个:只动第一批
+  assert.equal(applyReturn(rows, { code: 'YJ-OPP-001', qty: 2 }).ok, true)
+  assert.equal(rows[0].本次退, 2)
+  assert.equal(rows[1].本次退, 0)
+  // 再改成 7 个:第一批 5 全退 + 第二批 2
+  assert.equal(applyReturn(rows, { code: 'YJ-OPP-001', qty: 7 }).ok, true)
+  assert.equal(rows[0].本次退, 5)
+  assert.equal(rows[1].本次退, 2)
+  // 合计超了(5+3=8)⇒ over,且不改动
+  const before = rows.map((r) => r.本次退)
+  assert.equal(applyReturn(rows, { code: 'YJ-OPP-001', qty: 9 }).reason, 'over')
+  assert.deepEqual(rows.map((r) => r.本次退), before)
+})
+
+test('applyReturn:扫到的码带批号时那一批排最前(按批退)', () => {
+  const rows = toReturnRows(multiBatchLines())
+  applyReturn(rows, { code: 'YJ-OPP-001', qty: 2, batch: '20261110002' })
+  assert.equal(rows[0].本次退, 0, '第一批不该被动到')
+  assert.equal(rows[1].本次退, 2, '扫到的那一批优先')
+})
+
+test('returnProgress:多批的同一物料按物料编码聚合成一项', () => {
+  const rows = toReturnRows(multiBatchLines())
+  applyReturn(rows, { code: 'YJ-OPP-001', qty: 7 })
+  const p = returnProgress(rows)
+  assert.equal(p.done, 1, '退的是同一个物料 ⇒ 算一项')
+  assert.equal(p.totalQty, 7)
+  assert.deepEqual(p.items, [{ code: 'YJ-OPP-001', qty: 7 }])
+})
+
 test('生产退料明细页:文案都有英文译名 + 扫料解锁/提交走对接口', () => {
   const here = dirname(fileURLToPath(import.meta.url))
   const vue = readFileSync(join(here, '../views/mobile/MobileReturnDoc.vue'), 'utf8')

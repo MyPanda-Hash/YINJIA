@@ -220,7 +220,7 @@
       <div class="wb-trace-block">
         <div class="wb-block-title">{{ tt('领料数据') }}<span class="wb-scope-cap" :class="capsule('领料数据')">{{ tt(scopeOf('领料数据')) }}</span></div>
         <div class="wb-trace-sub">
-          {{ tt('按材料出库单**单头**的 工单行号 收敛(2026-10-15 改;原来错查明细行的加工单号 —— 该列全空,这一段一直是空的)。') }}
+          {{ tt('按生产领料单**单头**的 工单行号 收敛(2026-10-15 改;原来错查明细行的加工单号 —— 该列全空,这一段一直是空的)。') }}
           {{ tt('单头 工单行号 空/0 的老单属整单,每行都显示;领料单已开但材料还没补填时,该单也会出现(材料列空)。') }}
         </div>
         <el-table :data="trace['领料数据']" size="small" border max-height="180" :empty-text="tt('暂无领料')">

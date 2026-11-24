@@ -7,7 +7,7 @@
  * 业务背景:
  *   · 条码管理面板的标签码:材料仓 = `公司代码@存货编码@批号`(2026-10-21),半成品/成品 = `存货编码|批号`
  *     (见 v_barcode_material / v_barcode_wip / v_barcode_finished 与 barcodeLabel.barcodeQrText);
- *   · 用户在「材料出库单」里选商品会看到「没有库存」—— 那是库存状况表按(物料,仓库)
+ *   · 用户在「生产领料单」里选商品会看到「没有库存」—— 那是库存状况表按(物料,仓库)
  *     聚合、且此前只回填前 500 行的毛病(已另修 fillCurrentStock);仓库作业真正要的是
  *     **批号级可用量**,对应视图 `v_stock_pick`(kucun 三键: 物料/仓库/批号,只出有货的行)。
  *   · 所以扫码领料必须按「码里带出来的批号」查可用量,而不是按商品合计。
@@ -94,7 +94,7 @@ export function checkPickQty({ qty, available }) {
 }
 
 /**
- * 把已经扫码确认的行拼成「材料出库单」的 formData(交给 /px/callButton 保存成草稿)。
+ * 把已经扫码确认的行拼成「生产领料单」的 formData(交给 /px/callButton 保存成草稿)。
  *
  * 明细必填列来自 yj_field(MATERIAL_OUT):材料编码 / 材料名称 / 计量单位 / 数量。
  * 头必填:单据日期 / 单据编号 / 业务类型 —— 单据编号留空由后端 FormNoService 生成,
@@ -113,7 +113,7 @@ export function buildMaterialOutForm(lines, head = {}) {
     计量单位: String(l.uom || '').trim(),
     // 规格型号(2026-10-21 用户报障「物料编码没有把规格型号带入到领料中去」):
     //   MATERIAL_OUT 明细本来就有「规格型号」列(yj_field place=detail seq=80),
-    //   只是扫码建单时没填 ⇒ 材料出库单上那一列一直是空的。
+    //   只是扫码建单时没填 ⇒ 生产领料单上那一列一直是空的。
     规格型号: String(l.spec || '').trim(),
     批次号: String(l.batch || '').trim(),
     仓库: String(l.warehouse || head.warehouse || '').trim(),
@@ -143,7 +143,7 @@ export function buildMaterialOutForm(lines, head = {}) {
   if (head.woLine !== undefined && head.woLine !== null && String(head.woLine).trim() !== '') {
     form.工单行号 = Number(head.woLine) || String(head.woLine).trim()
   }
-  // 生产线(2026-10-21):材料出库单原字段叫「生产车间」,已改名「生产线」且**只读** ——
+  // 生产线(2026-10-21):生产领料单原字段叫「生产车间」,已改名「生产线」且**只读** ——
   //   值只能由生产领料按工单的产线带入(wo.生产线 = plang.scx);取不到就不带,不硬编。
   if (String(head.prodLine || '').trim()) form.生产线 = String(head.prodLine).trim()
   // 领用人(2026-10-21):由页面传**登录扫码人**的姓名,不再留空。

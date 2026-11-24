@@ -104,7 +104,7 @@ const modules = [
       { code: 'PROCESS_REPORT', label: '工序汇报单' },
       { code: 'TRANSFER', label: '调拨单' },
       { code: 'MATERIAL_REQ', label: '领料申请单' },
-      { code: 'MATERIAL_OUT', label: '材料出库单' },
+      { code: 'MATERIAL_OUT', label: '生产领料单' },
       { code: 'FINISH_IN', label: '产成品入库单' },
       { code: 'PU_REQ_ANALYSIS', label: '采购需求分析' },
     ],
@@ -130,7 +130,7 @@ const modules = [
     docs: [
       { code: 'WORK_ORDER_LIST', label: '生产工单' }, { code: 'PROCESS_REPORT', label: '工序汇报单' },
       { code: 'TRANSFER', label: '调拨单' }, { code: 'MATERIAL_REQ', label: '领料申请单' },
-      { code: 'MATERIAL_OUT', label: '材料出库单' }, { code: 'FINISH_IN', label: '产成品入库单' },
+      { code: 'MATERIAL_OUT', label: '生产领料单' }, { code: 'FINISH_IN', label: '产成品入库单' },
       { code: 'SO_ORDER', label: '销售订单' }, { code: 'PU_REQ_ANALYSIS', label: '采购需求分析' },
       // 2026-10-08 下架:请购单(PU_REQ)—— 全站已无该面板,流程图不再列
       { code: 'PU_ORDER', label: '采购订单' },
@@ -296,7 +296,7 @@ const modules = [
       { code: 'FINISH_IN', label: '产成品入库单' },
       // 2026-10-08 下架:其他入库单(OTHER_IN)/其他出库单(OTHER_OUT)
       { code: 'SALE_OUT', label: '销售出库单' },
-      { code: 'MATERIAL_OUT', label: '材料出库单' },
+      { code: 'MATERIAL_OUT', label: '生产领料单' },
     ],
     edges: [],
     pos: {
@@ -306,7 +306,7 @@ const modules = [
     docs: [
       { code: 'PURCHASE_IN', label: '采购入库单' }, { code: 'FINISH_IN', label: '产成品入库单' },
       // 2026-10-08 下架:委外入库单/其他入库单/其他出库单
-      { code: 'SALE_OUT', label: '销售出库单' }, { code: 'MATERIAL_OUT', label: '材料出库单' },
+      { code: 'SALE_OUT', label: '销售出库单' }, { code: 'MATERIAL_OUT', label: '生产领料单' },
       { code: 'PU_COST_ALLOC', label: '采购费用分摊单' },
       { code: 'MATERIAL_REQ', label: '领料申请单' }, { code: 'TRANSFER', label: '调拨单' },
     ],
@@ -322,7 +322,7 @@ const modules = [
       { code: 'PURCHASE_IN', label: '采购入库单' },
       { code: 'FINISH_IN', label: '产成品入库单' },
       { code: 'SALE_OUT', label: '销售出库单' },
-      { code: 'MATERIAL_OUT', label: '材料出库单' },
+      { code: 'MATERIAL_OUT', label: '生产领料单' },
       { code: 'TRANSFER', label: '调拨单' },
       { code: 'STOCK_CHECK', label: '库存盘点单' },
       { code: 'LOCATION_ADJUST', label: '货位调整单' },
@@ -340,7 +340,7 @@ const modules = [
     },
     docs: [
       { code: 'PURCHASE_IN', label: '采购入库单' }, { code: 'FINISH_IN', label: '产成品入库单' },
-      { code: 'SALE_OUT', label: '销售出库单' }, { code: 'MATERIAL_OUT', label: '材料出库单' },
+      { code: 'SALE_OUT', label: '销售出库单' }, { code: 'MATERIAL_OUT', label: '生产领料单' },
       { code: 'TRANSFER', label: '调拨单' }, { code: 'STOCK_CHECK', label: '库存盘点单' },
       { code: 'LOCATION_ADJUST', label: '货位调整单' },
     ],

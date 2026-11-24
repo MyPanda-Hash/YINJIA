@@ -7,7 +7,7 @@
      库里 yj_role_panel 的 picking 授权词由 migrate-drop-wol-picking-perm-20261105.sql 清理。
      **后端实现原样保留**:/px/workOrderList/toPicking + WorkOrderPickingService(含回写)不动,
      端点闸门仍认 picking 词(见 PanelPermissionService.BUTTON_PERMS_OVERRIDE 的说明);
-     领料单改由「材料出库单」面板手工建单,审核出库后照旧回写工单「领料单号」(ManuWritebackService)。
+     领料单改由「生产领料单」面板手工建单,审核出库后照旧回写工单「领料单号」(ManuWritebackService)。
      取数窗口:默认预填最近 15 天(2026-10-05 用户口径,防单据累积后卡),清空日期范围=查全量。
       2026-11-09 用户口径:①日期范围控件换成与「订单结转」同一个实现(`@core/ui/DateRangeQuery`:单框
       daterange + 快捷档,宽度收紧到 240px);②大日期范围改为**滚动加载**:首屏 50 行(按当前显示顺序
@@ -1292,7 +1292,7 @@ async function doPrintTask(mode) {
 // 「转领料单」前端入口已下架(2026-11-05 用户口径,原 toPicking() 函数同步删除)。
 // 后端实现原样保留:/px/workOrderList/toPicking + WorkOrderPickingService(含 ManuWritebackService 回写);
 // 端点仍按 picking 词做闸门(PanelPermissionService.BUTTON_PERMS_OVERRIDE 保留该词映射)。
-// 领料单改由「材料出库单」面板手工建单,审核出库后照旧回写工单「领料单号」。
+// 领料单改由「生产领料单」面板手工建单,审核出库后照旧回写工单「领料单号」。
 
 /** 切单(9.29 批次①):勾选/当前行必须恰为一张工单 → 后端预览可切上限 → 弹窗输入切出数量 */
 function splitTarget() {

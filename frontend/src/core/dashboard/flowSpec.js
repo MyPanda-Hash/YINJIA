@@ -103,7 +103,7 @@ export const CHAINS = [
         key: 'exec', name: '领料与报工', hint: '排产后按工单转领料单 → 扫码领料 → 报工 → 审核通过才进检验',
         nodes: [
           {
-            key: 'matout', name: '材料出库单', code: 'MATERIAL_OUT', route: '/panelx/list/MATERIAL_OUT',
+            key: 'matout', name: '生产领料单', code: 'MATERIAL_OUT', route: '/panelx/list/MATERIAL_OUT',
             main: { label: '单据数', ref: 'nodes.MATERIAL_OUT.docs' },
             subs: [
               { label: '草稿', ref: 'nodes.MATERIAL_OUT.draft' },

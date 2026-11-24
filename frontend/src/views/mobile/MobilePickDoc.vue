@@ -2,7 +2,7 @@
   MobilePickDoc.vue — 手机扫码 · 生产领料单据详情(2026-10-30 第三轮改版)
 
   【两种状态,两套动作】
-  · **未完成**(还没领完/没提交):扫物料码 → 填领料数量 → 全部领完才能「提交转材料出库单」;
+  · **未完成**(还没领完/没提交):扫物料码 → 填领料数量 → 全部领完才能「提交转生产领料单」;
   · **已完成**(已审核过账):这张单变成"可退料"的凭据 —— 扫物料码 → 填**退料**数量 → 提交退料,
     每次退料生成一张**生产退料单**(MATERIAL_RET;2026-11-13 起由「其他入库单」改为生产退料单,库存加回来),可分多次退。
 
@@ -55,6 +55,8 @@
       <div class="mp-kv"><span>{{ tt('计量单位') }}</span><b>{{ wo.计量单位 || '—' }}</b></div>
       <div class="mp-kv"><span>{{ tt('生产线') }}</span><b>{{ wo.生产线 || '—' }}</b></div>
       <div class="mp-kv"><span>{{ tt('领料单号') }}</span><b class="mono">{{ doc.领料单号 || '—' }}</b></div>
+      <!-- 领料部门(2026-11-24 用户口径「扫码填表关联领料部门,领料部门根据账号所属部门来填入」) -->
+      <div class="mp-kv"><span>{{ tt('领料部门') }}</span><b>{{ doc.领料部门名称 || doc.领料部门 || '—' }}</b></div>
       <!-- 退料标志(2026-10-30 第三轮):退过料就把退料单号列出来,一眼看到"这张含退料" -->
       <div class="mp-kv">
         <span>{{ tt('退料单号') }}</span>
@@ -86,12 +88,12 @@
         <span>{{ isDone ? (outAudited ? tt('扫物料码 · 退料') : tt('扫物料码')) : tt('扫物料码 · 领料') }}</span>
         <span v-if="cur" class="mp-sec-ok">{{ cur.编码 }}</span>
         <span v-if="isDone && outAudited" class="mp-sec-note">{{ tt('这张单已完成:扫码即退料,提交后生成生产退料单') }}</span>
-        <span v-if="isDone && !outAudited" class="mp-sec-note">{{ tt('待仓管审批材料出库单,审批通过后才能退料') }}</span>
+        <span v-if="isDone && !outAudited" class="mp-sec-note">{{ tt('待仓管审批生产领料单,审批通过后才能退料') }}</span>
       </div>
 
-      <!-- 已完成但材料出库单还没审批:还没扣库存,这时不能扫码退料 -->
+      <!-- 已完成但生产领料单还没审批:还没扣库存,这时不能扫码退料 -->
       <div v-if="isDone && !outAudited" class="mp-hint">
-        {{ tt('这张单已提交,材料出库单正在等仓管审批。审批通过(库存扣减)之后,再来这里扫码退料。') }}
+        {{ tt('这张单已提交,生产领料单正在等仓管审批。审批通过(库存扣减)之后,再来这里扫码退料。') }}
       </div>
 
         <!-- 已完成的单**直接进退料模式**(loadDoc 里按状态设 returnMode=true)——
@@ -215,8 +217,20 @@
             <div><dt>{{ tt('规格型号') }}</dt><dd>{{ r.规格 || '—' }}</dd></div>
             <div><dt>{{ tt('计量单位') }}</dt><dd>{{ r.单位 || '—' }}</dd></div>
             <template v-if="r.批号"><div><dt>{{ tt('批号') }}</dt><dd>{{ r.批号 }}</dd></div></template>
+            <!-- 仓库(2026-11-24):明细已按 仓库+批号 分行,这一行到底从哪个仓出的必须看得见 -->
+            <template v-if="r.仓库"><div><dt>{{ tt('仓库') }}</dt><dd>{{ r.仓库 }}</dd></div></template>
             <template v-if="returnMode"><div><dt>{{ tt('可退') }}</dt><dd>{{ fmtQty(canReturnOf(r)) }}</dd></div></template>
           </dl>
+          <!-- 批次分摊(2026-11-24):这一料从哪几个 仓库/批号 出的、各多少。
+               提交后生产领料单按这份分摊**逐批拆明细行**(不同批次号和仓库分开记录),
+               所以页面上必须先让人看得见"这批多少、那仓多少"。 -->
+          <div v-if="!returnMode && r.批次明细 && r.批次明细.length > 1" class="mp-line-batches">
+            <span v-for="(b, i) in r.批次明细" :key="i" class="mp-line-batch">
+              <i>{{ b.批号 || tt('无批次') }}</i>
+              <em v-if="b.仓库"> · {{ b.仓库 }}</em>
+              <b class="num">{{ fmtQty(b.数量) }}</b>
+            </span>
+          </div>
         </div>
         <!-- 退料:本次要退多少 -->
         <span v-if="returnMode" class="mp-line-qty num is-ret">
@@ -269,12 +283,12 @@
           :disabled="!progress.ok"
           @click="submit"
         >
-          {{ tt('提交转材料出库单') }}
+          {{ tt('提交转生产领料单') }}
         </el-button>
-        <!-- 已完成单:材料出库单还没审批 ⇒ 还没扣库存,不能退(退了等于凭空把料退进仓库)。
+        <!-- 已完成单:生产领料单还没审批 ⇒ 还没扣库存,不能退(退了等于凭空把料退进仓库)。
              已审批 ⇒ 退料统一到「生产退料」面板做(2026-11-18 独立成面板,本页不再承担退料)。 -->
         <el-button v-else-if="!outAudited" type="info" size="large" disabled>
-          {{ tt('待仓管审批材料出库单') }}
+          {{ tt('待仓管审批生产领料单') }}
         </el-button>
         <el-button v-else type="primary" size="large" @click="goReturn">{{ tt('去生产退料') }}</el-button>
       </template>
@@ -385,9 +399,9 @@ const nativeScan = typeof window !== 'undefined' && !!(window.YjNative && window
 const isDone = computed(() => String(doc.value.状态 || '') === '已完成')
 
 /**
- * 材料出库单是否已被仓管审批(2026-11-01)。
+ * 生产领料单是否已被仓管审批(2026-11-01)。
  *
- * 提交只生成**待审批**的材料出库单,库存要等仓管在「材料出库单」里审核才扣;
+ * 提交只生成**待审批**的生产领料单,库存要等仓管在「生产领料单」里审核才扣;
  * 未审批就退料 = 凭空把料退进仓库,所以这个状态决定底部给「开始退料」还是「待仓管审批」。
  * 后端同样有硬闸门(requireReturnable),这里只是别让人点了才被拒。
  */
@@ -520,7 +534,7 @@ function applyScan(code) {
  *
  * <p>为什么需要(2026-11-01 用户口径「手机端应该有一个刷新按钮,不然会出现旧缓存没跟新状态问题」):
  * PortalLayout 用 keep-alive 缓存页面,从别处回到这张单时实例是旧的;
- * 而"材料出库单有没有被仓管审批"这种状态**是别人在另一台电脑上改的**,
+ * 而"生产领料单有没有被仓管审批"这种状态**是别人在另一台电脑上改的**,
  * 不主动重拉就永远看不到 —— 用户会以为"我明明审批了,手机还说没审批"。
  */
 async function refreshDoc() {
@@ -566,6 +580,7 @@ function normalize(l) {
   const q = Number(l?.数量) || 0
   return {
     行号: String(l?.行号 ?? ''),
+    明细id: l?.明细id ?? null,
     编码: String(l?.编码 ?? '').trim(),
     名称: String(l?.名称 ?? '').trim(),
     规格: String(l?.规格 ?? '').trim(),
@@ -577,6 +592,15 @@ function normalize(l) {
     明细备注: String(l?.明细备注 ?? '').trim(),
     BOM用量: Number(l?.BOM用量) || 0,
     已退数量: round4(l?.已退数量 || 0),
+    可退数量: round4(l?.可退数量 || 0),
+    // 批次分摊(2026-11-24):本次这一料跨了哪些 仓库+批号、各多少 —— 提交后生产领料单
+    // 就是按这份分摊**逐批拆明细行**的,所以页面上也要逐批显示
+    批次明细: (Array.isArray(l?.批次明细) ? l['批次明细'] : []).map((b) => ({
+      仓库: String(b?.仓库 ?? '').trim(),
+      仓库编码: String(b?.仓库编码 ?? '').trim(),
+      批号: String(b?.批号 ?? '').trim(),
+      数量: round4(b?.数量 || 0),
+    })),
     // 半成品(后端按编码含 **TB 判定,2026-11-16):只显示不领料、可跳过
     半成品: !!l?.['半成品'],
   }
@@ -610,11 +634,11 @@ async function scanMaterial(scanBatch) {
   batchRows.value = []
   if (!code) { errText.value = tt('请先扫描或输入物料编码'); return }
   // 🔴 2026-11-01 用户报障「扫码…没有了」的修正:
-  //   上一版把「已完成但材料出库单未审批」时的**扫码区整块隐藏**了 ——
+  //   上一版把「已完成但生产领料单未审批」时的**扫码区整块隐藏**了 ——
   //   业务上没错(未审批不能退料),但现场看到的是"扫码框凭空消失",像是功能坏了。
   //   改成:扫码区**一直显示**,扫了再明确告诉他为什么现在不能退。
   if (isDone.value && !outAudited.value) {
-    errText.value = tt('材料出库单还没审批,暂时不能退料:请先让仓管在「材料出库单」里审核通过')
+    errText.value = tt('生产领料单还没审批,暂时不能退料:请先让仓管在「生产领料单」里审核通过')
     return
   }
   matLoading.value = true
@@ -705,6 +729,14 @@ async function saveQty() {
     const batches = batchRows.value
       .filter((b) => round4(b.qty) > 0)
       .map((b) => ({ 批号: b.lot, 仓库: b.warehouse, 仓库编码: b.warehouseCode, 数量: round4(b.qty) }))
+    // 2026-11-24:数量必须被批次/仓库分摊**全额覆盖** —— 后端按分摊逐批拆出库明细行,
+    // 分摊不够就没法记账(以前只记第一条批号,别的批次根本没扣)。不够就让现场先改数量。
+    const allocated = round4(batches.reduce((s, b) => s + b.数量, 0))
+    if (round4(curQty.value) - allocated > 0.0001) {
+      errText.value = `${tt('库存不够')}:${tt('还差')} ${fmtQty(round4(round4(curQty.value) - allocated))} ${cur.value.单位 || ''}`
+        + ` · ${tt('请减少数量,或先补货后再领')}`
+      return
+    }
     const res = await request.post('/px/mobilePick/setQty', {
       id: docId.value, side: 'pick', code: cur.value.编码, qty: round4(curQty.value), batches,
     })
@@ -752,8 +784,8 @@ function cancelLock() {
 /** 进入退料模式 */
 function startReturn() {
   if (!isDone.value) { errText.value = tt('这张单还没提交完成,不能退料'); return }
-  // 材料出库单还没被仓管审批 ⇒ 库存没扣,不能退(后端 requireReturnable 同样拦)
-  if (!outAudited.value) { errText.value = tt('材料出库单还没审批,不能退料:请先让仓管审核'); return }
+  // 生产领料单还没被仓管审批 ⇒ 库存没扣,不能退(后端 requireReturnable 同样拦)
+  if (!outAudited.value) { errText.value = tt('生产领料单还没审批,不能退料:请先让仓管审核'); return }
   returnMode.value = true
   returnQty.value = {}
   clearMsg()
@@ -867,12 +899,12 @@ async function reprint() {  printing.value = true
   }
 }
 
-/** 提交领料:全部领完 → 审核 → 材料出库单过账 */
+/** 提交领料:全部领完 → 审核 → 生产领料单过账 */
 async function submit() {
   if (!progress.value.ok || isDone.value) return
   try {
     await ElMessageBox.confirm(
-      tt('提交后领料单会审核过账成材料出库单。确定提交?'),
+      tt('提交后领料单会审核过账成生产领料单。确定提交?'),
       tt('提交确认'),
       { confirmButtonText: tt('确定提交'), cancelButtonText: tt('取消'), type: 'warning' },
     )
@@ -883,7 +915,7 @@ async function submit() {
     const res = await request.post('/px/mobilePick/submit', { id: docId.value })
     const d = res.data?.data || res.data || {}
     doc.value = { ...doc.value, 状态: d.状态 || '已完成' }
-    ElMessage.success(tt('已提交:材料出库单已生成'))
+    ElMessage.success(tt('已提交:生产领料单已生成'))
     okText.value = d.说明 || tt('已提交')
     await loadDoc()
   } catch (e) {
@@ -1017,6 +1049,15 @@ async function submit() {
 .mp-line-fields > div { display: grid; grid-template-columns: 68px 1fr; gap: 6px; line-height: 1.5; }
 .mp-line-fields dt { margin: 0; font-size: 11px; color: var(--el-text-color-secondary); }
 .mp-line-fields dd { margin: 0; font-size: 12px; color: var(--el-text-color-regular); word-break: break-all; }
+/* 明细行的批次分摊(2026-11-24):一批一个灰底小片,数量加粗 */
+.mp-line-batches { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.mp-line-batch {
+  display: inline-flex; align-items: baseline; gap: 2px; padding: 1px 6px; border-radius: 10px;
+  font-size: 11px; color: var(--el-text-color-regular); background: var(--el-fill-color-light);
+}
+.mp-line-batch i { font-style: normal; color: var(--el-text-color-secondary); }
+.mp-line-batch em { font-style: normal; color: var(--el-text-color-placeholder); }
+.mp-line-batch b { font-weight: 600; color: var(--el-color-primary); }
 /* 需求 / 已领 两行(2026-11-04):每行自带标签 + 数字右对齐等宽,单位小字。
    桌面端明细行右侧就是一个"两项对齐"的小表,手机端也不会挤成一串看不懂的数字。 */
 .mp-line-qty { flex: none; min-width: 104px; display: grid; gap: 1px; font-size: 14px; font-weight: 600; }

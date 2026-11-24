@@ -11,7 +11,7 @@ import java.util.Map;
  * 台账粒度 = (物料编码 wzdm, 仓库编码 ckdm, 批号 lot_no) 一行:rkl 累计入库 / ckl 累计出库 / yl 现存量。
  * 已接入面板:
  *   PURCHASE_IN 采购入库单(入库,+,行可无批号) — 材料入库链
- *   MATERIAL_OUT 材料出库单(出库,-,行必须扫码带批号,台账行必须已存在) — 生产过程层·扫码领料
+ *   MATERIAL_OUT 生产领料单(出库,-,行必须扫码带批号,台账行必须已存在) — 生产过程层·扫码领料
  * 守卫:仓库档案必须存在(名称→bs_wh 编码);出库现存量不足拒绝;冲回为负拒绝;整笔回滚。
  *
  * 2026-09-30(库存三表):除 kucun 结存之外,同一事务内还写**流水**(inh/outh,见 {@link StockFlowService}),
@@ -114,7 +114,7 @@ public class StockLedgerService {
     private void apply(String panelCode, String no, String user, boolean forward) {
         boolean inbound = switch (panelCode) {
             case "PURCHASE_IN", "FINISH_IN", "OTHER_IN",
-                 // 2026-11-13:生产退料单是**入库**(料从车间退回仓库),与材料出库单方向相反
+                 // 2026-11-13:生产退料单是**入库**(料从车间退回仓库),与生产领料单方向相反
                  "MATERIAL_RET" -> true; // 2026-10-14 恢复 其他入库
             default -> false; // MATERIAL_OUT, SALE_OUT, OTHER_OUT
         };
@@ -777,10 +777,10 @@ public class StockLedgerService {
                     "SELECT l.[材料编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price,"
                             + " l.id AS rid, l.[材料名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
                             + " ISNULL(l.[金额], l.[单价] * l.[数量]) AS 金额,"
-                            + " N'材料出库单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], NULL AS [经手人]"
+                            + " N'生产领料单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], NULL AS [经手人]"
                             + " FROM bl_material_out l LEFT JOIN bd_material_out h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
-            // 2026-11-13:生产退料单(MATERIAL_RET)—— 行结构与材料出库单同族(材料编码/材料名称/仓库/批号/数量)，
+            // 2026-11-13:生产退料单(MATERIAL_RET)—— 行结构与生产领料单同族(材料编码/材料名称/仓库/批号/数量)，
             // 但方向是**入库**且带单价 ⇒ 金额按单据金额、没有就 单价×数量(与「其他入库」同口径)。
             case "MATERIAL_RET" -> jdbc.queryForList(
                     "SELECT l.[材料编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price,"

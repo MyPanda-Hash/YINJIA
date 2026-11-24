@@ -18,7 +18,7 @@ import java.util.Map;
  * 物理落点是 {@code plang.pl_xc};plang 里可能有多个物理行共用同一标识(同订单行分批转单),
  * 按用户口径它们是**同一个标识**,取代表行出单头,全部批次写进备注。
  *
- * <p>系统里的领料单就是材料出库单({@code bd_material_out} 头 + {@code bl_material_out} 行,
+ * <p>系统里的领料单就是生产领料单({@code bd_material_out} 头 + {@code bl_material_out} 行,
  * 对口金蝶「生产领料单」{@code /jdy/v2/scm/inv_pick});单据头挂
  * {@code 加工单号 = 工单号} + {@code 工单行号 = plang.pl_xc},因此审核出库后
  * {@link ManuWritebackService} 能**按行**把领料单号回写到 {@code plang.ll_no2}
@@ -29,13 +29,13 @@ import java.util.Map;
  * 「物料清单(BOM)」下架(2026-10-04:表 {@code bs_bom}+视图 {@code v_wo_kit}+面板一并删除)而消失;
  * 实测库里再无可用材料来源 —— 配方/工艺清单表({@code rd_mold_formula_*} / {@code rd_*_proc_detail})
  * 全为 0 行,遗留 {@code mate}(物料清单)是光缆旧数据、与现产品 0 命中。故本按钮只**转单头**
- * (日期/业务类型/出库类别/加工单号/工单行号/来源单/车间/领用人),材料行由仓库在材料出库单面板按实发补,
+ * (日期/业务类型/出库类别/加工单号/工单行号/来源单/车间/领用人),材料行由仓库在生产领料单面板按实发补,
  * 补完审核即回写工单 —— 不做"猜材料"的自动展开。
  *
  * <p><b>前置:先排产,再领料</b>(用户口径 2026-10-18:「先要完成排产才进入到领料」)——
  * 该工单行必须**已排入产线**({@code plang.scx} 非空)**且排产数量 &gt; 0**,未排产一律拒绝并提示先去
  * 「快速排产」排入产线;已结案的也不给转。流程看板同口径:
- * 快速排产 → 工单排产/预排线 → 产线排产负荷 → 材料出库单(见 {@code flowSpec.js})。
+ * 快速排产 → 工单排产/预排线 → 产线排产负荷 → 生产领料单(见 {@code flowSpec.js})。
  *
  * <p><b>一张工单可开多张领料单</b>(用户口径 2026-10-18:「一个生产工单可以对应多个领料单据」)——
  * 同一**工单行**可以**同时**存在多张未审核草稿:每次点「转领料单」都新增一张,
@@ -52,7 +52,7 @@ import java.util.Map;
 @Service
 public class WorkOrderPickingService {
 
-    /** 目标面板:材料出库单(= 领料单) */
+    /** 目标面板:生产领料单(= 领料单) */
     private static final String TARGET_PANEL = "MATERIAL_OUT";
     /** 来源面板码:工单落参考库表 plang(非注册面板,故占用链走 linkLine 逐行落,不用 link 的整单映射) */
     private static final String SOURCE_PANEL = "PLANG";

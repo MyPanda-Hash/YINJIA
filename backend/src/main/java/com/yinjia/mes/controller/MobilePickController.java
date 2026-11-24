@@ -5,6 +5,7 @@ import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.FormNoService;
 import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
+import com.yinjia.mes.service.WoPickBatchService;
 import com.yinjia.mes.service.WoPickDocService;
 import com.yinjia.mes.service.WorkOrderBomService;
 import org.slf4j.Logger;
@@ -37,7 +38,7 @@ import java.util.Map;
  *  然后进入到那个单据……可以扫码(扫的是物料码,如果对应的物料码存在,就可以填写领料数量
  *  (数量可以随意填写,只要仓库数量足够,多少都可以),批次处理也保留之前的)和打印
  *  (打印就先只是先打印工单二维码,在生成生产领料单的时候自动打印一次)。
- *  全部领料完成后才可以提交转成材料出库单,并且将已完成的单据,在生产领料的界面放到下面的已完成区
+ *  全部领料完成后才可以提交转成生产领料单,并且将已完成的单据,在生产领料的界面放到下面的已完成区
  *  (并且已完成和未完成都可以展开和收缩)。
  *  生产退料与领料一致,只是退料默认数量为0。可以不进行退料操作,退料生成的应该是其他入库单,并且写好备注。」
 
@@ -71,7 +72,7 @@ import java.util.Map;
  *       由 {@link com.yinjia.mes.service.StockLedgerService} 按既有链路过账 —— 与所有别的单据同一条路,
  *       不另写 SQL 记账(2026-10-16 的教训:自己算一遍必然和看板分叉)。</li>
  *   <li>**不替仓管审批**(2026-11-18 用户口径「所有生成的单都要是草稿状态」):手机端生成的
- *       材料出库单 / 生产退料单一律留**草稿**,审核(过账)在对应面板里由仓管点。</li>
+ *       生产领料单 / 生产退料单一律留**草稿**,审核(过账)在对应面板里由仓管点。</li>
  *   <li>**不做批次追溯口径的改动**:出库批次仍按既有「先进先出拆批」逻辑,可用量仍按
  *       物料+仓库 判断(验收期权宜口径,见 {@code StockLedgerService.LOT_STRICT} 与
  *       「上线前必验-库存批次追溯」文档)。</li>
@@ -83,7 +84,7 @@ public class MobilePickController {
 
     private static final Logger log = LoggerFactory.getLogger(MobilePickController.class);
 
-    /** 领料单面板(材料出库单,业务类型「生产领料」) */
+    /** 领料单面板(生产领料单,业务类型「生产领料」) */
     private static final String PANEL_OUT = "MATERIAL_OUT";
     /**
      * 退料单面板(**生产退料单**,业务类型「生产退料」)。
@@ -198,7 +199,7 @@ public class MobilePickController {
     private final WoPickDocService docs;
     private final ButtonService buttons;
     private final PanelPermissionService perm;
-    /** 单号池:生单时**只取号**(LL-…),不建材料出库单 —— 那张单要等提交才生成 */
+    /** 单号池:生单时**只取号**(LL-…),不建生产领料单 —— 那张单要等提交才生成 */
     private final FormNoService formNo;
     /**
      * 工单 BOM 取数(2026-11-13 收口):临时工单用料 wo_bom 优先 → 产品标准组装 BOM 兜底。
@@ -210,11 +211,21 @@ public class MobilePickController {
      * 与手机扫码「扫码混料」共用同一份取数/单位换算 —— 否则扫码带出的料与领料单明细会两套。
      */
     private final com.yinjia.mes.service.MixBomService mixBomService;
+    /**
+     * 领料批次分摊台账(2026-11-24):一次扫码可能跨多个 (仓库, 批号),分摊逐笔留痕,
+     * 提交时据此把生产领料单的明细**按仓库+批号拆成多行**(用户口径「不同批次号和仓库
+     * 是分开记录明细的」)。改造前只把第一条批号写进明细、其余塞备注 ⇒ 别的批次没记账。
+     */
+    private final WoPickBatchService pickBatches;
+    /** 计量单位精度(拆行后按单位取整时用它;与 ButtonService 保存时同一件服务,口径不会两套) */
+    private final com.yinjia.mes.service.UnitQtyNormalizer unitQty;
 
     public MobilePickController(JdbcTemplate jdbc, WoPickDocService docs,
                                 ButtonService buttons, PanelPermissionService perm,
                                 FormNoService formNo, WorkOrderBomService bomService,
-                                com.yinjia.mes.service.MixBomService mixBomService) {
+                                com.yinjia.mes.service.MixBomService mixBomService,
+                                WoPickBatchService pickBatches,
+                                com.yinjia.mes.service.UnitQtyNormalizer unitQty) {
         this.jdbc = jdbc;
         this.docs = docs;
         this.buttons = buttons;
@@ -222,6 +233,8 @@ public class MobilePickController {
         this.formNo = formNo;
         this.bomService = bomService;
         this.mixBomService = mixBomService;
+        this.pickBatches = pickBatches;
+        this.unitQty = unitQty;
     }
 
     // ══════════════════════════ ⓪ 开单工作台(批量生单) ══════════════════════════
@@ -481,7 +494,7 @@ public class MobilePickController {
         if (!noUnit.isEmpty()) {
             throw new IllegalStateException("下列物料在存货档案里没有计量单位,无法生成领料单:"
                     + String.join("、", noUnit)
-                    + ";请先到 基础资料 → 存货档案 补上单位(材料出库单的计量单位是必填)");
+                    + ";请先到 基础资料 → 存货档案 补上单位(生产领料单的计量单位是必填)");
         }
 
         String user = currentUserName();
@@ -617,7 +630,7 @@ public class MobilePickController {
         String lineWoNo = str(wo.get("工单号"));
         int line = toInt(wo.get("工单行号"));
 
-        // 仓库(2026-10-30 修正):工单行不带仓库,但材料出库单**审核过账时必须有仓库**
+        // 仓库(2026-10-30 修正):工单行不带仓库,但生产领料单**审核过账时必须有仓库**
         // (StockLedgerService 按 (物料,仓库,批号) 写 kucun,仓库为空会抛
         //  「仓库档案不存在:[null],请先在基础档案-仓库中建立」—— 实测生单能成、提交才炸)。
         // ⇒ 生单时按**该物料的库存所在仓库**预填明细行仓库(优先恒亿仓/主料仓,其次库存最大的仓),
@@ -666,12 +679,12 @@ public class MobilePickController {
             if (wh.isEmpty() && !lineWh[0].isEmpty()) { wh = lineWh[0]; whCode = lineWh[1]; }
         }
 
-        // ── 🔴 2026-11-01 两阶段改造:生单**只取号 + 写领料明细**,不建材料出库单
+        // ── 🔴 2026-11-01 两阶段改造:生单**只取号 + 写领料明细**,不建生产领料单
         //
         // 用户口径:「通过『生成工单领料单』生成的应该是**生产领料**里面的明细,
-        //   然后通过扫码领料**提交后才生成材料出库单**。审批是仓管登录平台审批的。」
+        //   然后通过扫码领料**提交后才生成生产领料单**。审批是仓管登录平台审批的。」
         //
-        // 改造前这里调 saveDoc 直接建了一张 bd_material_out 草稿 ⇒ 材料出库单面板里
+        // 改造前这里调 saveDoc 直接建了一张 bd_material_out 草稿 ⇒ 生产领料单面板里
         // 还没领料就有单,提交还会自动审核扣库存,绕过仓管审批。
         // 现在:号从 LL 号池**先预留**(保证提交时用同一个号),单据本体等提交才落库。
         String outNo = formNo.next(pickNoPrefix(), user);
@@ -707,7 +720,7 @@ public class MobilePickController {
             throw e;
         }
 
-        // 领料明细落到 wo_pick_line(材料出库单要等提交才生成,见 submit)
+        // 领料明细落到 wo_pick_line(生产领料单要等提交才生成,见 submit)
         insertPickLines(id, outItems, qtyBase, user);
 
         Map<String, Object> out = new LinkedHashMap<>();
@@ -729,28 +742,70 @@ public class MobilePickController {
     }
 
     /**
-     * 领料单号前缀(取 MATERIAL_OUT 面板配置,如 LL)。
+     * 单号前缀(取面板配置 {@code yj_panel.prefix},查不到用兜底值)。
      *
      * <p>为什么查面板而不写死:前缀是 `yj_panel.prefix` 的配置项,改配置时单号要跟着变;
-     * 写死 "LL" 会在客户改前缀后产生两套号。查不到就退回 LL(与默认配置一致)。
+     * 写死 "LL" 会在客户改前缀后产生两套号。查不到就退回兜底(与默认配置一致)。
+     *
+     * <p>2026-11-24:退料单也要**先生成单号**(用户口径「生产退料要补单号」),
+     * 于是把原来只服务领料的 pickNoPrefix 泛化成按面板取前缀。
      */
-    private String pickNoPrefix() {
+    private String panelPrefix(String panelCode, String fallback) {
         try {
             List<String> p = jdbc.queryForList(
                     "SELECT ISNULL(prefix,N'') FROM dbo.yj_panel WHERE panel_code = ?",
-                    String.class, PANEL_OUT);
+                    String.class, panelCode);
             if (!p.isEmpty() && !p.get(0).isBlank()) return p.get(0).trim();
         } catch (RuntimeException ignore) {
             // 查不到不影响主流程
         }
-        return "LL";
+        return fallback;
+    }
+
+    /** 领料单号前缀(取 MATERIAL_OUT 面板配置,如 LL) */
+    private String pickNoPrefix() {
+        return panelPrefix(PANEL_OUT, "LL");
+    }
+
+    /**
+     * 当前登录账号**所属部门** → 领料/退料部门(2026-11-24 用户口径:
+     * 「扫码填表关联领料部门,领料部门根据账号所属部门来填入」)。
+     *
+     * <p>取值链:{@code yj_user.dept_id → bs_dept.id} ⇒ 返回 {@code {编码, id, 名称}}。
+     * 账号没配部门 / 部门被删 / 表读不到 ⇒ 三项全空串,**不猜、不拦**(部门不是必填,
+     * 但这张单会缺"谁领的料"这一格,现场看得到、能自己补)。
+     *
+     * <p>⚠ 部门编码是金蝶侧的键({@code BM000xx}),写进面板的「领料部门」字段
+     * (物理列仍是 部门编码,参照 DEPT);转ERP 时 {@code KingdeePushService} 直接读这一列。
+     */
+    private Dept deptOf(String user) {
+        if (user == null || user.isBlank()) return Dept.EMPTY;
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT TOP 1 ISNULL(d.部门编码,N'') AS 编码, d.id AS id, ISNULL(d.部门名称,N'') AS 名称"
+                            + " FROM dbo.yj_user u JOIN dbo.bs_dept d ON d.id = u.dept_id"
+                            + " WHERE u.username = ? AND ISNULL(u.asp_cancel,'N') <> 'Y'"
+                            + "   AND ISNULL(d.asp_cancel,'N') <> 'Y'", user);
+            if (rows.isEmpty()) return Dept.EMPTY;
+            Map<String, Object> r = rows.get(0);
+            return new Dept(str(r.get("编码")), toLong(r.get("id")), str(r.get("名称")));
+        } catch (RuntimeException e) {
+            log.debug("取账号所属部门失败(部门不是必填,按空处理):{}", e.getMessage());
+            return Dept.EMPTY;
+        }
+    }
+
+    /** 账号所属部门(编码 / id / 名称);没有部门的账号三项为空串 */
+    private record Dept(String code, long id, String name) {
+        static final Dept EMPTY = new Dept("", 0L, "");
+        boolean present() { return code != null && !code.isBlank(); }
     }
 
     /**
      * 把生单算出来的用料写进**领料明细**(wo_pick_line)。
      *
      * <p>每行:需求数量 = BOM单件用量 × 工单数量(用于扫码预填);
-     * 实领数量 = 0(等现场扫码)。提交时据此生成材料出库单。
+     * 实领数量 = 0(等现场扫码)。提交时据此生成生产领料单。
      *
      * @param docId     wo_pick_doc.id
      * @param outItems  生单时组装好的行(键与 bl_material_out 同口径)
@@ -988,7 +1043,7 @@ public class MobilePickController {
         // 2026-11-18:组装领料 / 混料领料 —— 单据页标题与列表标签都按它显示
         out.put("领料类型", d.pickKind());
         out.put("状态", d.state());
-        // 材料出库单是否已被仓管审批(2026-11-01:提交只建单不过账,审批才扣库存)。
+        // 生产领料单是否已被仓管审批(2026-11-01:提交只建单不过账,审批才扣库存)。
         // 前端据此把「开始退料」换成「待仓管审批」,别让人点了才被服务端拒。
         out.put("出库已审批", isMaterialOutAudited(d.outNo()));
         out.put("物料项数", d.itemCount());
@@ -1009,13 +1064,36 @@ public class MobilePickController {
                 d.woNo(), d.woLine());
         out.put("工单", woRows.isEmpty() ? Map.of() : woRows.get(0));
 
-        // 领料明细:每行补上**已退数量**(2026-10-30 第三轮),前端据此算"还能退多少"、
-        // 并在已完成单上直接显示可退量。已退数量唯一真源 = wo_pick_return。
+        // 领料明细:每行补上**已退数量 / 可退数量**(2026-10-30 第三轮;2026-11-24 起按行核销)。
+        // 已退数量唯一真源 = wo_pick_return。⚠ 2026-11-24 拆行后**同一物料可能有多行**
+        // (不同 仓库/批号),已退量必须按 (物料,仓库,批号) 核 —— 只按物料算会把 A 批的退料
+        // 抵到 B 批上,现场看到"这批没退过却显示已退完"。
         List<Map<String, Object>> pickLines = linesOf(d.outNo(), "pick");
+        boolean draft = isDraftPick(d.outNo());
         for (Map<String, Object> it : pickLines) {
-            it.put("已退数量", returnedQtyOf(d.outNo(), str(it.get("编码"))));
+            String code = str(it.get("编码"));
+            double ret = draft
+                    ? returnedQtyOf(d.outNo(), code)
+                    : returnedQtyOfLine(d.outNo(), code, str(it.get("仓库")), str(it.get("批号")));
+            it.put("已退数量", ret);
+            it.put("可退数量", round4(Math.max(0, num(it.get("数量")) - ret)));
         }
         out.put("领料明细", pickLines);
+        // 领料部门(2026-11-24 用户口径「扫码填表关联领料部门,领料部门根据账号所属部门来填入」)。
+        // 已完成单读它自己那张生产领料单头的部门(别人可能代填过);未完成单按当前账号所属部门显示。
+        Dept cur = deptOf(currentUserName());
+        String deptCode = cur.code(), deptName = cur.name();
+        if (!draft && d.outNo() != null && !d.outNo().isBlank()) {
+            List<Map<String, Object>> head = jdbc.queryForList(
+                    "SELECT TOP 1 ISNULL(部门编码,N'') AS 编码 FROM dbo.bd_material_out WHERE 单据编号 = ?",
+                    d.outNo());
+            if (!head.isEmpty()) {
+                String c = str(head.get(0).get("编码"));
+                if (!c.isEmpty()) { deptCode = c; deptName = deptNameOf(c); }
+            }
+        }
+        out.put("领料部门", deptCode);
+        out.put("领料部门名称", deptName.isEmpty() ? deptCode : deptName);
         // 退料明细不再有"预生成待填"的退料单(改为按需生成),这里保留空数组做结构兼容
         out.put("退料明细", List.of());
         // 已退合计 —— 列表/单据上显示"含退料 N"
@@ -1180,16 +1258,16 @@ public class MobilePickController {
     }
 
     /**
-     * 提交:全部领完 → 审核领料单 → 转成材料出库单(过账)。
+     * 提交:全部领完 → 审核领料单 → 转成生产领料单(过账)。
      *
-     * <p>用户口径:「全部领料完成后才可以提交转成材料出库单」。
+     * <p>用户口径:「全部领料完成后才可以提交转成生产领料单」。
      * 这是本页**唯一动库存**的动作 —— 走 {@code callButton(MATERIAL_OUT, "审核")},
-     * 与在材料出库单面板里手点「审核」是完全同一条路(过账/流水/工单回写全部照旧)。
+     * 与在生产领料单面板里手点「审核」是完全同一条路(过账/流水/工单回写全部照旧)。
      */
     @PostMapping("/submit")
     public ApiResult<Map<String, Object>> submit(@RequestBody Map<String, Object> body) {
         perm.requirePanelView(PANEL_SELF);
-        perm.requireAnyPerm(PANEL_SELF, "提交转材料出库单", "submit");
+        perm.requireAnyPerm(PANEL_SELF, "提交转生产领料单", "submit");
         requireLedger();
         long id = toLong(body.get("id"));
         WoPickDocService.PickDoc d = docs.byId(id);
@@ -1218,15 +1296,15 @@ public class MobilePickController {
 
         String user = currentUserName();
 
-        // ── 🔴 2026-11-01 两阶段改造:提交时才**生成**材料出库单,而且**不审核**
+        // ── 🔴 2026-11-01 两阶段改造:提交时才**生成**生产领料单,而且**不审核**
         //
-        // 用户口径:「通过扫码领料**提交后才生成材料出库单**。审批是仓管登录平台审批的。」
+        // 用户口径:「通过扫码领料**提交后才生成生产领料单**。审批是仓管登录平台审批的。」
         //
         // 改造前这里直接 callButton(MATERIAL_OUT, "审核") —— 既建单又过账,
         // 库存立刻被扣、仓管的审批完全被绕过。
-        // 现在:用生单时预留的号建一张**待审批**的材料出库单(数量=实领),状态停在草稿;
-        // 仓管在「材料出库单」面板点「审核」才走 StockLedgerService 扣库存。
-        // ── 生单:半成品不进材料出库单(不入库 ⇒ 不能有出库流水)
+        // 现在:用生单时预留的号建一张**待审批**的生产领料单(数量=实领),状态停在草稿;
+        // 仓管在「生产领料单」面板点「审核」才走 StockLedgerService 扣库存。
+        // ── 生单:半成品不进生产领料单(不入库 ⇒ 不能有出库流水)
         int madeLines = createMaterialOutFromPick(d, items, user);
 
         // 退料不在这里做(2026-10-30 第三轮用户改口径):
@@ -1241,17 +1319,17 @@ public class MobilePickController {
         out.put("状态", WoPickDocService.STATE_DONE);
         out.put("出库行数", madeLines);
         out.put("说明", madeLines == 0
-                ? "本单明细全是半成品(编码含 **TB),按口径不入库、不生成材料出库单;领料单已结束"
-                : "已生成材料出库单 " + d.outNo() + ",等仓管在「材料出库单」里审批;"
+                ? "本单明细全是半成品(编码含 **TB),按口径不入库、不生成生产领料单;领料单已结束"
+                : "已生成生产领料单 " + d.outNo() + ",等仓管在「生产领料单」里审批;"
                         + "审批通过才扣库存。如需退料,点开这张单再次扫码即可(剩余可退 "
                         + fmtQty(pickedQtyOf(d.outNo())) + ")");
         return ApiResult.ok(out);
     }
 
     /**
-     * 用领料明细生成**待审批**的材料出库单(不审核、不过账)。
+     * 用领料明细生成**待审批**的生产领料单(不审核、不过账)。
      *
-     * <p>用户口径:「扫描领料提交后才生成材料出库单。审批是仓管登录平台审批的。」
+     * <p>用户口径:「扫描领料提交后才生成生产领料单。审批是仓管登录平台审批的。」
      *
      * <p>为什么走 ButtonService 的「保存」而不是直接 INSERT:`bd_material_out`/`bl_material_out`
      * 是金蝶同步口径的表,字段多、有必填校验(计量单位、仓库档案…),直接插会漏项。
@@ -1259,9 +1337,9 @@ public class MobilePickController {
      *
      * <p>数量取**实领数量**(不是需求):需求只是预填参考,实领才是这次真出库的量。
      *
-     * <p>🔴 半成品的行**不进材料出库单**(2026-11-16 用户口径:「半成品是不入库的,只要显示这行数据,
+     * <p>🔴 半成品的行**不进生产领料单**(2026-11-16 用户口径:「半成品是不入库的,只要显示这行数据,
      * 但是实际并不领料」)—— 它不出现在出库明细里就等于不过账,库存不动;
-     * 全部都是半成品时**连单都不建**(建一张 0 行的出库单只会污染材料出库单列表)。
+     * 全部都是半成品时**连单都不建**(建一张 0 行的出库单只会污染生产领料单列表)。
      *
      * @return 真正写进出库单的明细行数(0 = 没建单)
      */
@@ -1269,24 +1347,35 @@ public class MobilePickController {
                                           List<Map<String, Object>> items, String user) {
         String today = java.time.LocalDate.now().toString();
         List<Map<String, Object>> outItems = new ArrayList<>();
+        // 分摊:领料明细 id → 本次跨的 (仓库, 批号, 数量)。没有分摊的老单退回"一行一物料"。
+        Map<Long, List<WoPickBatchService.Alloc>> allocs = pickBatches.ofDoc(d.id());
         String wh = "", whCode = "";
         for (Map<String, Object> it : items) {
             // 半成品跳过:只显示不领料,不影响别的物料正常出库
             if (isSemiLine(it)) continue;
-            Map<String, Object> line = new LinkedHashMap<>();
-            line.put("行号", String.valueOf(outItems.size() + 1));
-            line.put("材料编码", str(it.get("编码")));
-            line.put("材料名称", str(it.get("名称")));
-            line.put("规格型号", str(it.get("规格")));
-            line.put("计量单位", str(it.get("单位")));
-            line.put("数量", num(it.get("数量")));
-            line.put("仓库", str(it.get("仓库")));
-            if (!str(it.get("仓库编码")).isEmpty()) line.put("仓库编码", str(it.get("仓库编码")));
-            String lot = str(it.get("批号"));
-            if (!lot.isEmpty()) line.put("批号", lot);
-            line.put("明细备注", str(it.get("明细备注")));
-            outItems.add(line);
-            if (wh.isEmpty()) { wh = str(it.get("仓库")); whCode = str(it.get("仓库编码")); }
+            // 🔴 2026-11-24 用户口径「出库单要做到不同批次号和仓库是分开记录明细的」:
+            //   同一物料跨 N 个 (仓库,批号) ⇒ 这个物料在出库单上就出 **N 行**,每行一个批次/仓库。
+            //   改造前这里恒出一行(批次取第一条)⇒ 审核只扣了第一笔,其它批次的账没记上。
+            List<WoPickBatchService.Alloc> list = allocs.get(toLong(it.get("明细id")));
+            List<Map<String, Object>> parts = new ArrayList<>();
+            if (list != null && !list.isEmpty()) {
+                for (WoPickBatchService.Alloc a : list) {
+                    if (a.qty() <= 0) continue;
+                    parts.add(partOf(it, a.warehouse(), a.warehouseCode(), a.lot(), a.qty()));
+                }
+            }
+            if (parts.isEmpty()) {
+                // 没有分摊(迁移前生成的老单/没扫到批次)⇒ 按本行自己的仓库与批号出一行
+                parts.add(partOf(it, str(it.get("仓库")), str(it.get("仓库编码")), str(it.get("批号")),
+                        num(it.get("数量"))));
+            }
+            // 拆行后按单位精度补零头(见 keepQtyOnSplit):明细合计必须等于该物料实领数量
+            keepQtyOnSplit(parts);
+            for (Map<String, Object> p : parts) {
+                p.put("行号", String.valueOf(outItems.size() + 1));
+                outItems.add(p);
+                if (wh.isEmpty()) { wh = str(p.get("仓库")); whCode = str(p.get("仓库编码")); }
+            }
         }
         if (outItems.isEmpty()) return 0;
         final String whFinal = wh;
@@ -1305,13 +1394,79 @@ public class MobilePickController {
         form.put("加工单号", d.woNo());
         form.put("工单行号", d.woLine());
         form.put("领用人", user);
+        // 领料部门 = **当前登录账号所属部门**(2026-11-24 用户口径
+        //   「扫码填表关联领料部门,领料部门根据账号所属部门来填入」)。
+        //   ⚠ 写的是面板标签「领料部门」(物理列仍是 部门编码,参照 DEPT)——
+        //   转ERP 时 KingdeePushService 直接读这一列当金蝶的部门编码(BM000xx)。
+        Dept pickDept = deptOf(user);
+        if (pickDept.present()) {
+            form.put("领料部门", pickDept.code());
+            form.put("部门id", String.valueOf(pickDept.id()));
+        }
         if (allSameWh) { form.put("仓库", wh); if (!whCode.isEmpty()) form.put("仓库编码", whCode); }
         form.put("备注", "手机扫码领料提交生成:工单 " + d.woNo() + " 第 " + d.woLine()
-                + " 行;数量为现场扫码确认的实领量,待仓管审批");
+                + " 行;明细按 仓库+批号 分行(" + outItems.size() + " 行);数量为现场扫码确认的实领量,待仓管审批");
         form.put("detail", Map.of("items", outItems));
 
         buttons.callButton(PANEL_OUT, "保存", form, null);
         return outItems.size();
+    }
+
+    /**
+     * 出库单的一行明细(一个 仓库+批号)。
+     *
+     * <p>数量 = 该分摊的数量(**不是**领料行的合计):拆行后每行只记自己那一批/那个仓,
+     * 这样审核过账时 {@code StockLedgerService} 按行逐笔扣 {@code kucun(物料,仓库,批号)},
+     * 有几批扣几批。改造前一行记全量,其它批次永远扣不到。
+     */
+    private static Map<String, Object> partOf(Map<String, Object> it, String warehouse, String warehouseCode,
+                                              String lot, double qty) {
+        Map<String, Object> line = new LinkedHashMap<>();
+        line.put("材料编码", str(it.get("编码")));
+        line.put("材料名称", str(it.get("名称")));
+        line.put("规格型号", str(it.get("规格")));
+        line.put("计量单位", str(it.get("单位")));
+        line.put("数量", round4(qty));
+        line.put("仓库", warehouse);
+        if (!warehouseCode.isEmpty()) line.put("仓库编码", warehouseCode);
+        // ⚠ 键名必须是**面板标签**「批次号」(物理列才是 批号):ButtonService 按 label 取列,
+        //   写 "批号" 会被当成未知键**静默丢弃** —— 实测生成的明细行 批号 全为 NULL,
+        //   而这一行正是"哪一批出的货"的唯一凭据。
+        if (!lot.isEmpty()) line.put("批次号", lot);
+        line.put("明细备注", str(it.get("明细备注")));
+        return line;
+    }
+
+    /**
+     * 拆行后按**计量单位精度**保证数量不丢(2026-11-24)。
+     *
+     * <p>{@link UnitQtyNormalizer} 会把「*数量*」按单位小数位**向下取整**(个/张/支=0 位,kg=3 位)。
+     * 一次领料拆成多行后,每行各自取整会**分别丢零头**:总量 6.8 拆成 3.9 + 2.9,
+     * 取整成 3 + 2 = 5,凭空少 1.8;而改前一行记 6.8 只取整一次。
+     * 这里把各自取整后的**差额补回第一行**,保证「明细合计 = 该物料实领数量(按单位取整)」。
+     *
+     * @param parts 同一物料的各行(就地改数量)
+     */
+    private void keepQtyOnSplit(List<Map<String, Object>> parts) {
+        if (parts == null || parts.size() < 2) return;
+        int nd = unitQty.decimalsOf(parts.get(0));
+        double total = 0;
+        for (Map<String, Object> p : parts) total += num(p.get("数量"));
+        double want = com.yinjia.mes.service.UnitPrecision.floorTo(round4(total), nd);
+        double have = 0;
+        for (Map<String, Object> p : parts) {
+            double f = com.yinjia.mes.service.UnitPrecision.floorTo(num(p.get("数量")), nd);
+            p.put("数量", round4(f));
+            have += f;
+        }
+        double diff = round4(want - have);
+        if (Math.abs(diff) <= 0.0001) return;
+        Map<String, Object> first = parts.get(0);
+        double v = round4(num(first.get("数量")) + diff);
+        if (v > 0) {
+            first.put("数量", v);
+            log.debug("拆行取整差额 {} 补回第一行,合计={}", diff, round4(have + diff));
+        }
     }
 
     // ══════════════════════════ ④ 退料(已完成单上按需退) ══════════════════════════
@@ -1325,8 +1480,8 @@ public class MobilePickController {
      *
      * <h3>筛什么</h3>
      * <ol>
-     *   <li>台账状态 = <b>已完成</b>(没提交的领料单还没有材料出库单,无可退之物);</li>
-     *   <li>它的<b>材料出库单已被仓管审核</b>({@link #isMaterialOutAudited}) ——
+     *   <li>台账状态 = <b>已完成</b>(没提交的领料单还没有生产领料单,无可退之物);</li>
+     *   <li>它的<b>生产领料单已被仓管审核</b>({@link #isMaterialOutAudited}) ——
      *       库存是审核那一刻才扣的,没审核就退 = 凭空把料加进仓库
      *       (这条闸门 {@code requireReturnable} 里也有一份,两处同口径);</li>
      *   <li>关键字按 工单号/领料单号/产品/退料单号 模糊匹配(与列表页同一口径)。</li>
@@ -1350,15 +1505,17 @@ public class MobilePickController {
         for (Map<String, Object> r : raw) {
             String outNo = str(r.get("领料单号"));
             if (outNo.isEmpty()) continue;
-            // 材料出库单没被审核 ⇒ 库存还没扣 ⇒ 退料会凭空加库存,直接不列
+            // 生产领料单没被审核 ⇒ 库存还没扣 ⇒ 退料会凭空加库存,直接不列
             if (!isMaterialOutAudited(outNo)) continue;
             double picked = 0;
             int canItems = 0;
+            // 2026-11-24:领料单明细已按 仓库+批号 拆行 ⇒ 可退量按**行**核(物料+仓库+批号),
+            // 不能再按物料汇总:一个物料两批各 5 件,退第 1 批 5 件不该把第 2 批也算成已退。
             for (Map<String, Object> it : linesOf(outNo, "pick")) {
                 double q = num(it.get("数量"));
                 if (q <= 0) continue;
                 picked += q;
-                double back = returnedQtyOf(outNo, str(it.get("编码")));
+                double back = returnedQtyOfLine(outNo, str(it.get("编码")), str(it.get("仓库")), str(it.get("批号")));
                 if (round4(q - back) > 0) canItems++;
             }
             double returned = returnedTotalOf(outNo);
@@ -1369,6 +1526,9 @@ public class MobilePickController {
             m.put("可退数量", can);
             m.put("可退项数", canItems);
             m.put("出库已审批", true);
+            // 最近一次退料单号(台账里是逗号分隔的一串)—— 退料面板列表直接显示,
+            // 用户口径 2026-11-24「生产退料要补单号」(原来只能看到领料单号)。
+            m.put("最近退料单号", lastOf(str(r.get("退料单号"))));
             out.add(m);
             sumCan += can;
         }
@@ -1422,28 +1582,64 @@ public class MobilePickController {
         if (code.isEmpty()) throw new IllegalArgumentException("请先扫描或输入物料编码");
 
         WoPickDocService.PickDoc d = requireReturnable(id);
-        Map<String, Object> line = pickLineOf(d.outNo(), code);
-        if (line == null) {
+        List<Map<String, Object>> outLines = outLinesOfCode(d.outNo(), code);
+        if (outLines.isEmpty()) {
             throw new IllegalStateException("物料 " + code + " 不在这张领料单里:请核对是否扫错了料");
         }
-        double picked = num(line.get("数量"));
-        double returned = returnedQtyOf(d.outNo(), code);
-        double canReturn = round4(Math.max(0, picked - returned));
+        // 2026-11-24:同一物料在出库单上可能有多行(不同 仓库/批号)⇒ 逐行核可退量,
+        // 并把「这批还能退多少」一并回给前端(现场按批退,不能把 A 批的退料记到 B 批上)。
+        double picked = 0, returned = 0, canReturn = 0;
+        List<Map<String, Object>> batchView = new ArrayList<>();
+        for (Map<String, Object> line : outLines) {
+            double q = num(line.get("数量"));
+            double r = returnedQtyOfLine(d.outNo(), code, str(line.get("仓库")), str(line.get("批号")));
+            double c = round4(Math.max(0, q - r));
+            picked += q;
+            returned += r;
+            canReturn += c;
+            Map<String, Object> b = new LinkedHashMap<>();
+            b.put("仓库", str(line.get("仓库")));
+            b.put("仓库编码", str(line.get("仓库编码")));
+            b.put("批号", str(line.get("批号")));
+            b.put("已领数量", round4(q));
+            b.put("已退数量", round4(r));
+            b.put("可退数量", c);
+            batchView.add(b);
+        }
+        picked = round4(picked);
+        returned = round4(returned);
+        canReturn = round4(canReturn);
+        Map<String, Object> first = outLines.get(0);
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("编码", code);
-        out.put("名称", str(line.get("名称")));
-        out.put("规格", str(line.get("规格")));
-        out.put("单位", str(line.get("单位")));
-        out.put("仓库", str(line.get("仓库")));
-        out.put("仓库编码", str(line.get("仓库编码")));
-        out.put("批号", str(line.get("批号")));
+        out.put("名称", str(first.get("名称")));
+        out.put("规格", str(first.get("规格")));
+        out.put("单位", str(first.get("单位")));
+        out.put("仓库", str(first.get("仓库")));
+        out.put("仓库编码", str(first.get("仓库编码")));
+        out.put("批号", str(first.get("批号")));
         out.put("已领数量", picked);
         out.put("已退数量", returned);
         // 累计可退 —— 前端输入框的 max,后端提交时再校验一次
         out.put("可退数量", canReturn);
         out.put("可退", canReturn > 0);
+        // 批次明细:仓库 / 批号 / 已领 / 已退 / 可退(前端列出来,提交时按这个顺序自动分配)
+        out.put("批次明细", batchView);
         return ApiResult.ok(out);
+    }
+
+    /**
+     * 该物料在这张**已完成**领料单上的出库明细行(每行 = 一个 仓库+批号)。
+     *
+     * <p>2026-11-24 拆行后,同一物料可能有多行;退料必须逐行核销,不能按物料汇总。
+     */
+    private List<Map<String, Object>> outLinesOfCode(String outNo, String code) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> it : linesOf(outNo, "pick")) {
+            if (code.equals(str(it.get("编码")))) out.add(it);
+        }
+        return out;
     }
 
     /**
@@ -1451,7 +1647,7 @@ public class MobilePickController {
      *
      * <p>🔴 2026-11-18 用户口径:「生产退料单怎么自动审批了,所有生成的单都要是草稿状态」——
      * 生成后**不再**自动审核,库存等仓管在「生产退料单」面板点「审核」时才入账
-     * (与材料出库单"提交只建单、仓管审核才过账"完全同一口径)。
+     * (与生产领料单"提交只建单、仓管审核才过账"完全同一口径)。
      *
      * <p>用户口径:「退多少生多少」(2026-10-30)+
      * 「手机扫码的生产退料扫码后退料后填入的单据从其他入库改成生产退料单」(2026-11-13)。
@@ -1480,37 +1676,73 @@ public class MobilePickController {
         WoPickDocService.PickDoc d = requireReturnable(id);
         String user = currentUserName();
 
-        // ① 逐项校验 + 组装明细
+        // ① 逐项校验 + **按出库行(仓库+批号)分摊**(2026-11-24)
+        //
+        // 用户口径:「出库单和入库单要做到不同批次号和仓库是分开记录明细的」——
+        // 退料单是入库方向的那张单,同样必须逐批逐仓出行。
+        // 现场一次退 5 件,这 5 件可能就是 A 批 3 件 + B 批 2 件:分摊按出库行的**可退余量**
+        // 依次取(扫到的码带批号时,那一批排最前),每一笔落一行明细、一笔退料台账。
         List<Map<String, Object>> lines = new ArrayList<>();
         double total = 0;
         for (Map<String, Object> it : items) {
             String code = str(it.get("code"));
             double qty = round4(num(it.get("qty")));
             if (code.isEmpty() || qty <= 0) continue;
-            Map<String, Object> line = pickLineOf(d.outNo(), code);
-            if (line == null) throw new IllegalStateException("物料 " + code + " 不在这张领料单里");
-            double picked = num(line.get("数量"));
-            double returned = returnedQtyOf(d.outNo(), code);
-            double canReturn = round4(Math.max(0, picked - returned));
-            if (qty > canReturn) {
-                throw new IllegalStateException("物料 " + code + " 可退只剩 " + fmtQty(canReturn)
-                        + "(已领 " + fmtQty(picked) + " − 已退 " + fmtQty(returned) + "),本次要退 " + fmtQty(qty));
+            List<Map<String, Object>> outLines = outLinesOfCode(d.outNo(), code);
+            if (outLines.isEmpty()) throw new IllegalStateException("物料 " + code + " 不在这张领料单里");
+
+            // 每行还能退多少
+            Map<Map<String, Object>, Double> canOf = new LinkedHashMap<>();
+            double canAll = 0;
+            for (Map<String, Object> line : outLines) {
+                double q = num(line.get("数量"));
+                double r = returnedQtyOfLine(d.outNo(), code, str(line.get("仓库")), str(line.get("批号")));
+                double c = round4(Math.max(0, q - r));
+                canOf.put(line, c);
+                canAll = round4(canAll + c);
             }
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("编码", code);
-            row.put("名称", str(line.get("名称")));
-            row.put("规格", str(line.get("规格")));
-            row.put("单位", str(line.get("单位")));
-            row.put("仓库", str(line.get("仓库")));
-            row.put("仓库编码", str(line.get("仓库编码")));
-            row.put("批号", str(line.get("批号")));
-            row.put("数量", qty);
-            // 2026-11-13:退料单要带**领料行的出库单价**(金蝶 inv_pick_ret 行有 price/cost)。
-            //   注意这里必须从领料行 line 取 —— 早前只放进 lines 的少数几个键,
-            //   ② 段再读 l.get("单价") 会永远是 0(实测确实退料金额为 0)。
-            row.put("单价", num(line.get("单价")));
-            lines.add(row);
-            total = round4(total + qty);
+            if (qty > canAll + 0.0001) {
+                throw new IllegalStateException("物料 " + code + " 可退只剩 " + fmtQty(canAll)
+                        + "(已领 " + fmtQty(sumOf(outLines, "数量")) + " − 已退 "
+                        + fmtQty(round4(sumOf(outLines, "数量") - canAll)) + "),本次要退 " + fmtQty(qty));
+            }
+
+            // 分配顺序:扫到的码带批号/仓库 ⇒ 那一批排最前;其余按出库行序(先进先出)
+            String preferLot = str(it.get("批号"));
+            String preferWh = str(it.get("仓库"));
+            List<Map<String, Object>> order = new ArrayList<>(outLines);
+            if (!preferLot.isEmpty() || !preferWh.isEmpty()) {
+                order.sort((a, b) -> {
+                    int ra = rankOf(a, preferLot, preferWh), rb = rankOf(b, preferLot, preferWh);
+                    return Integer.compare(ra, rb);
+                });
+            }
+            double left = qty;
+            for (Map<String, Object> line : order) {
+                if (left <= 0.00005) break;
+                double c = canOf.getOrDefault(line, 0d);
+                if (c <= 0.00005) continue;
+                double take = round4(Math.min(c, left));
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("编码", code);
+                row.put("名称", str(line.get("名称")));
+                row.put("规格", str(line.get("规格")));
+                row.put("单位", str(line.get("单位")));
+                row.put("仓库", str(line.get("仓库")));
+                row.put("仓库编码", str(line.get("仓库编码")));
+                row.put("批号", str(line.get("批号")));
+                row.put("数量", take);
+                // 2026-11-13:退料单要带**领料行的出库单价**(金蝶 inv_pick_ret 行有 price/cost)。
+                //   ⚠ 必须从出库行 line 取 —— ② 段读 l.get("单价") 才不会是 0。
+                row.put("单价", num(line.get("单价")));
+                lines.add(row);
+                total = round4(total + take);
+                left = round4(left - take);
+            }
+            if (left > 0.00005) {
+                throw new IllegalStateException("物料 " + code + " 还有 " + fmtQty(left)
+                        + " 没分摊到批号上(可能被别人同时退了),请刷新后重试");
+            }
         }
         if (lines.isEmpty()) throw new IllegalArgumentException("退料数量必须大于 0");
 
@@ -1527,7 +1759,9 @@ public class MobilePickController {
             item.put("计量单位", str(l.get("单位")));
             if (!str(l.get("仓库")).isEmpty()) item.put("仓库", str(l.get("仓库")));
             if (!str(l.get("仓库编码")).isEmpty()) item.put("仓库编码", str(l.get("仓库编码")));
-            if (!str(l.get("批号")).isEmpty()) item.put("批号", str(l.get("批号")));
+            // ⚠ 「批次号」是面板标签(物理列 批号):写 "批号" 会被 ButtonService 当未知键丢弃,
+            //   生产退料单的明细批号就永远是 NULL(那正是"入库单看不出退的是哪一批"的根因)。
+            if (!str(l.get("批号")).isEmpty()) item.put("批次号", str(l.get("批号")));
             item.put("数量", num(l.get("数量")));
             // 单价/金额:退料按**领料时的出库单价**退回(领料行里带,拿不到就留空 →
             //   StockLedgerService 按 金额=单价×数量 记 0,与旧「其他入库」口径一致,不臆造成本)
@@ -1541,7 +1775,13 @@ public class MobilePickController {
         }
         Map<String, Object> backForm = new LinkedHashMap<>();
         backForm.put("单据日期", today);
-        backForm.put("单据编号", "");
+        // 🔴 2026-11-24 用户口径:「生产退料要补单号,生产退料没有单号,生产领料才有。」
+        //   改造前这里传的是 `单据编号 = ""` —— 那是**面板字段**,不是 saveDoc 认的单据标识:
+        //   运气好按钮服务自己补号,运气不好(字段名对不上/被清空)落库就是空号,
+        //   打印纸面的「No」也是空的。现在与生产领料单**同一口径**:先生成号再建单,
+        //   单号当场回给手机端(抬头「退料单号」+ 提交即打印都用它)。
+        String backNo = formNo.next(panelPrefix(PANEL_BACK, "TL"), user);
+        backForm.put("编号", backNo);
         backForm.put("业务类型", BIZ_BACK);
         // 🔴 2026-11-13 用户口径「生产退料要有工单号和工单行号」:
         //   ⚠ 面板显示名是「工单号」(物理列仍是 加工单号),而 ButtonService.save 是**按面板标签**取值的
@@ -1550,17 +1790,26 @@ public class MobilePickController {
         backForm.put("工单行号", d.woLine());
         backForm.put("领用人", user);
         backForm.put("经手人编码", user);
+        // 退料部门 = **当前账号所属部门**(2026-11-24 用户口径「扫码填表关联领料部门,
+        //   领料部门根据账号所属部门来填入」)。标签是「退料部门」,物理列仍是 部门编码(参照 DEPT)。
+        Dept backDept = deptOf(user);
+        if (backDept.present()) {
+            backForm.put("退料部门", backDept.code());
+            backForm.put("部门id", String.valueOf(backDept.id()));
+        }
         // 备注按用户口径「写好备注」
         backForm.put("备注", "【生产退料】退自领料单 " + d.outNo()
                 + ";工单 " + d.woNo() + " 第 " + d.woLine() + " 行;产品 " + nz(d.productName())
-                + ";本次退料 " + lines.size() + " 项,合计 " + fmtQty(total));
+                + ";本次退料 " + lines.size() + " 行,合计 " + fmtQty(total));
         backForm.put("detail", Map.of("items", backItems));
 
-        String backNo = saveDoc(PANEL_BACK, backForm);
+        String savedNo = saveDoc(PANEL_BACK, backForm);
+        // 兜底:按钮服务若因任何原因没沿用预取号,以它实际落库的号为准(两组号不会同时存在)
+        if (savedNo != null && !savedNo.isBlank()) backNo = savedNo;
 
         // ③ 🔴 2026-11-18 用户口径「生产退料单怎么自动审批了,所有生成的单都要是草稿状态」:
         //   这里原来紧跟一句 `callButton(PANEL_BACK, "审核", …)` —— 手机一提交就**替仓管审了**,
-        //   库存当场加回来,面板里根本看不到待审的退料单(与「材料出库单提交时不审核、
+        //   库存当场加回来,面板里根本看不到待审的退料单(与「生产领料单提交时不审核、
         //   等仓管点审核才过账」的既定口径也不一致)。
         //   现在只生成**草稿**,审核是仓管在「生产退料单」面板点「审核」时的事,
         //   过账(`StockLedgerService.postIn(MATERIAL_RET,…)`)仍在那一步发生。
@@ -1586,19 +1835,29 @@ public class MobilePickController {
         //    (台账 wo_pick_doc 的退料单号:多次退料就追加,用逗号分隔)
         docs.appendReturnNo(id, backNo, user);
 
-        // ⑥ 回执:剩余可退
-        List<Map<String, Object>> remain = new ArrayList<>();
-        for (Map<String, Object> l : lines) {
-            String code = str(l.get("编码"));
-            Map<String, Object> line = pickLineOf(d.outNo(), code);
-            double picked = line == null ? 0 : num(line.get("数量"));
-            double returned = returnedQtyOf(d.outNo(), code);
+        // ⑥ 回执:剩余可退(按物料汇总,逐行的明细在「批次明细」里)
+        Map<String, Map<String, Object>> remainByCode = new LinkedHashMap<>();
+        for (Map<String, Object> line : linesOf(d.outNo(), "pick")) {
+            String code = str(line.get("编码"));
+            if (remainByCode.containsKey(code)) continue;
+            double picked = 0, returned = 0;
+            for (Map<String, Object> x : outLinesOfCode(d.outNo(), code)) {
+                picked += num(x.get("数量"));
+                returned += returnedQtyOfLine(d.outNo(), code, str(x.get("仓库")), str(x.get("批号")));
+            }
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("编码", code);
-            m.put("已领数量", picked);
-            m.put("已退数量", returned);
+            m.put("已领数量", round4(picked));
+            m.put("已退数量", round4(returned));
             m.put("可退数量", round4(Math.max(0, picked - returned)));
-            remain.add(m);
+            remainByCode.put(code, m);
+        }
+        List<Map<String, Object>> remain = new ArrayList<>();
+        for (Map<String, Object> l : lines) {
+            Map<String, Object> m = remainByCode.get(str(l.get("编码")));
+            if (m != null && remain.stream().noneMatch(r -> str(r.get("编码")).equals(str(m.get("编码"))))) {
+                remain.add(m);
+            }
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("退料单号", backNo);
@@ -1626,18 +1885,18 @@ public class MobilePickController {
         if (d.outNo() == null || d.outNo().isBlank()) {
             throw new IllegalStateException("这张单没有领料单号,不能退料");
         }
-        // 🔴 2026-11-01:材料出库单**还没被仓管审批**时不能退料。
+        // 🔴 2026-11-01:生产领料单**还没被仓管审批**时不能退料。
         //   退料要冲减库存;而库存是审核那一刻才扣的 —— 未审核就退,等于凭空把料退进仓库。
         //   这是服务端硬闸门,不靠界面挡。
         if (!isMaterialOutAudited(d.outNo())) {
-            throw new IllegalStateException("材料出库单 " + d.outNo()
-                    + " 还没审批,不能退料:请先让仓管在「材料出库单」里审核通过(审核才扣库存)");
+            throw new IllegalStateException("生产领料单 " + d.outNo()
+                    + " 还没审批,不能退料:请先让仓管在「生产领料单」里审核通过(审核才扣库存)");
         }
         return d;
     }
 
     /**
-     * 材料出库单是否已被审核(仓管审批过)。
+     * 生产领料单是否已被审核(仓管审批过)。
      *
      * <p>判据取 {@code yj_doc_status.shr}(审核人)非空 —— 那是全系统审核的唯一留痕口径;
      * 不能只看单据存不存在:提交后单子就存在了,但还没审批。
@@ -1694,6 +1953,61 @@ public class MobilePickController {
     }
 
     /**
+     * 某物料在**某仓库某批次上**已退多少(累计;2026-11-24 拆行后按行核销)。
+     *
+     * <p>唯一真源 = {@code wo_pick_return}(作废的退料不计)。仓库/批号按**名称**匹配 ——
+     * 出库行与退料台账写的是同一个仓库名({@code 仓库}),批号可以是空串(无批次物料)。
+     */
+    private double returnedQtyOfLine(String outNo, String code, String wh, String lot) {
+        if (outNo == null || outNo.isBlank()) return 0;
+        try {
+            Double n = jdbc.queryForObject(
+                    "SELECT ISNULL(SUM(退料数量),0) FROM dbo.wo_pick_return"
+                            + " WHERE 领料单号 = ? AND 物料编码 = ?"
+                            + "   AND ISNULL(仓库,N'') = ? AND ISNULL(批号,N'') = ?"
+                            + "   AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    Double.class, outNo, code, wh == null ? "" : wh, lot == null ? "" : lot);
+            return round4(n == null ? 0 : n);
+        } catch (RuntimeException e) {
+            log.debug("退料台账不可用(迁移未执行?)已退数量按 0 计:{}", e.getMessage());
+            return 0;
+        }
+    }
+
+    /** 部门编码 → 部门名称(单据详情显示"领料部门"用;查不到就回空串) */
+    private String deptNameOf(String code) {
+        if (code == null || code.isBlank()) return "";
+        try {
+            List<String> n = jdbc.queryForList(
+                    "SELECT TOP 1 ISNULL(部门名称,N'') FROM dbo.bs_dept WHERE 部门编码 = ?", String.class, code);
+            return n.isEmpty() ? "" : n.get(0);
+        } catch (RuntimeException e) {
+            return "";
+        }
+    }
+
+    /** 逗号分隔的一串单号里的**最后一个**(退料单号多次退料时追加,取最近那张) */
+    private static String lastOf(String csv) {
+        if (csv == null || csv.isBlank()) return "";
+        String last = "";
+        for (String p : csv.split("[,，]")) if (!p.isBlank()) last = p.trim();
+        return last;
+    }
+
+    /** 分配优先级:码里带了批号/仓库 ⇒ 匹配的排最前(0),其余原序(1) */
+    private static int rankOf(Map<String, Object> line, String preferLot, String preferWh) {
+        boolean lotOk = preferLot.isEmpty() || preferLot.equals(str(line.get("批号")));
+        boolean whOk = preferWh.isEmpty() || preferWh.equals(str(line.get("仓库")));
+        return lotOk && whOk ? 0 : 1;
+    }
+
+    /** 一组明细里某键的合计(只用于提示文案) */
+    private static double sumOf(List<Map<String, Object>> list, String key) {
+        double t = 0;
+        for (Map<String, Object> r : list) t += num(r.get(key));
+        return round4(t);
+    }
+    /**
      * 把「批次串」并进原有的明细备注,而不是覆盖它。
      *
      * <p>原备注里可能带着生单时写的 **BOM 需求**(「…(需求 3)」),那是 {@link #bomUsageOf} 的取数依据 ——
@@ -1707,42 +2021,47 @@ public class MobilePickController {
      * @return 合并后的备注:「原备注;批次串」
      */
     /**
-     * 把实领数量写进**领料明细**(wo_pick_line),并顺带记批号/批次串。
+     * 把实领数量写进**领料明细**(wo_pick_line),并把本次的 **仓库+批号 分摊**
+     * 逐笔落进批次台账 {@code wo_pick_batch}(2026-11-24)。
      *
-     * <p>只用于**未完成**的领料单 —— 这时还没有材料出库单,明细的唯一载体就是这张表。
-     * 提交时 {@link #submit} 会据此生成正式的材料出库单。
+     * <p>只用于**未完成**的领料单 —— 这时还没有生产领料单,明细的唯一载体就是这张表。
+     * 提交时 {@link #submit} 会据此生成正式的生产领料单,并**按分摊拆成多行明细**。
+     *
+     * <p>🔴 2026-11-24 用户口径:「出库单和入库单要做到不同批次号和仓库是分开记录明细的」
+     * ⇒ 以前这里只把**第一条批号**写进「批号」列、其余批次串成一串塞进「明细备注」,
+     * 于是审核过账时只有第一个批次的账被扣、其它批次/仓库的货纹丝不动(现场表现:
+     * "料领了但库存没扣"或"另一个仓的货被算少了")。现在分摊逐笔存表,提交时逐笔行。
      *
      * @param outNo      领料单号(wo_pick_doc.领料单号)
      * @param line       行号
-     * @param qty        实领数量
-     * @param note       批次串(可能为空)
-     * @param batchesRaw 批次列表(取第一条批号写进「批号」列)
+     * @param qty        实领数量(分摊合计必须等于它)
+     * @param note       批次串(写进明细备注留痕,人看的)
+     * @param allocs     本次分摊 [{仓库,仓库编码,批号,数量}];空 = 按本行仓库一整笔
      * @param code       物料编码(兜底定位:行号对不上时按物料找)
      */
-    @SuppressWarnings("unchecked")
-    private void writeQtyToPickLine(String outNo, String line, double qty,
-                                    String note, Object batchesRaw, String code) {
+    private void writeQtyToPickLine(String outNo, String line, double qty, String note,
+                                    List<Map<String, Object>> allocs, String code) {
         // 先定位这一行(行号优先;老数据行号可能不规范,退回按物料编码)
         List<Map<String, Object>> hit = jdbc.queryForList(
-                "SELECT TOP 1 x.id, ISNULL(x.明细备注,N'') AS 备注"
+                "SELECT TOP 1 x.id, ISNULL(x.单头id,0) AS 单头id, ISNULL(x.明细备注,N'') AS 备注,"
+                        + " ISNULL(x.仓库,N'') AS 仓库, ISNULL(x.仓库编码,N'') AS 仓库编码"
                         + " FROM dbo.wo_pick_line x JOIN dbo.wo_pick_doc d ON d.id = x.单头id"
                         + " WHERE d.领料单号 = ? AND ISNULL(x.asp_cancel,'N') <> 'Y'"
                         + "   AND (x.行号 = ? OR x.物料编码 = ?)"
                         + " ORDER BY CASE WHEN x.行号 = ? THEN 0 ELSE 1 END, x.id",
                 outNo, line, code, line);
         if (hit.isEmpty()) return;
-        long lineId = ((Number) hit.get(0).get("id")).longValue();
-        String oldNote = str(hit.get(0).get("备注"));
+        Map<String, Object> row = hit.get(0);
+        long lineId = toLong(row.get("id"));
+        long docId = toLong(row.get("单头id"));
+        String oldNote = str(row.get("备注"));
         String merged = mergeNote(oldNote, note);
 
-        // 批号:拆批后本行只记第一条(多批次已在明细备注里)
+        // 批号列:拆批后本行只记第一条(完整分摊在 wo_pick_batch;单据明细提交时才逐批拆行)
         String lot = "";
-        if (batchesRaw instanceof List<?> list) {
-            for (Object o : list) {
-                if (!(o instanceof Map)) continue;
-                String l = str(((Map<String, Object>) o).get("批号"));
-                if (!l.isEmpty()) { lot = l; break; }
-            }
+        for (Map<String, Object> a : allocs) {
+            String l = str(a.get("批号"));
+            if (!l.isEmpty()) { lot = l; break; }
         }
         if (lot.isEmpty()) {
             jdbc.update("UPDATE dbo.wo_pick_line SET 实领数量 = ?, 明细备注 = ?,"
@@ -1753,6 +2072,60 @@ public class MobilePickController {
                     + " asp_user2 = ?, asp_time2 = SYSDATETIME() WHERE id = ?",
                     qty, merged, lot, currentUserName(), lineId);
         }
+
+        // 分摊:没有批次信息(老前端/没扫到批号)时按"本行仓库 + 无批号"记一整笔,
+        // 这样提交时至少有一条明细、数量对得上(与改造前行为一致)。
+        List<Map<String, Object>> effective = allocs.isEmpty()
+                ? List.of(allocOf(str(row.get("仓库")), str(row.get("仓库编码")), "", qty))
+                : allocs;
+        pickBatches.replace(lineId, docId, code, effective, currentUserName());
+    }
+
+    /** 分摊项(与前端 batches 同键名) */
+    private static Map<String, Object> allocOf(String wh, String whCode, String lot, double qty) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("仓库", wh);
+        m.put("仓库编码", whCode);
+        m.put("批号", lot);
+        m.put("数量", qty);
+        return m;
+    }
+
+    /**
+     * 前端传来的 {@code batches} → 分摊列表(过滤数量 ≤0、去重同 仓库+批号 相加)。
+     *
+     * <p>⚠ 合计**必须等于**本次写入的数量:不等就是前端拆批算错了,宁可让现场重扫一遍,
+     * 也不能把"领 10 件只记了 6 件的批次"这种账写进库(那种账事后谁也说不清)。
+     */
+    private List<Map<String, Object>> parseAllocs(Object batchesRaw, double qty, String code) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (!(batchesRaw instanceof List<?> list) || list.isEmpty()) return out;
+        Map<String, Map<String, Object>> byKey = new LinkedHashMap<>();
+        for (Object o : list) {
+            if (!(o instanceof Map)) continue;
+            @SuppressWarnings("unchecked")
+            Map<String, Object> b = (Map<String, Object>) o;
+            double q = num(b.get("数量"));
+            if (q <= 0) continue;
+            String wh = str(b.get("仓库"));
+            String whCode = str(b.get("仓库编码"));
+            String lot = str(b.get("批号"));
+            String key = wh + "\u0001" + lot;
+            Map<String, Object> exist = byKey.get(key);
+            if (exist == null) {
+                byKey.put(key, allocOf(wh, whCode, lot, q));
+            } else {
+                exist.put("数量", round4(num(exist.get("数量")) + q));
+            }
+        }
+        out.addAll(byKey.values());
+        double sum = 0;
+        for (Map<String, Object> a : out) sum += num(a.get("数量"));
+        if (!out.isEmpty() && Math.abs(round4(sum) - round4(qty)) > 0.0001) {
+            throw new IllegalStateException("物料 " + code + " 的批次分摊合计 " + fmtQty(sum)
+                    + " 与本次领料数量 " + fmtQty(qty) + " 不一致:请重新扫码(批次可能已被别人占用),再填数量");
+        }
+        return out;
     }
 
     private static String mergeNote(String old, String note) {
@@ -1814,7 +2187,7 @@ public class MobilePickController {
      *
      * <p>🔴 2026-11-06 用户口径:「现在扫码后已存在的领料单,是不在打印的。但是现在是需要给他打印,
      * 只是不生成领料单」⇒ 以前这里 {@code 打印 = null},重复扫码什么都不打;
-     * 现在把**那张已存在单据**的打印载荷原样返回(明细取 wo_pick_line / 材料出库单,
+     * 现在把**那张已存在单据**的打印载荷原样返回(明细取 wo_pick_line / 生产领料单,
      * 与新建时同一个 {@code printPayload}),前端就能"只打印、不生单"。
      */
     private Map<String, Object> existingResult(WoPickDocService.PickDoc d, String woNo, int line,
@@ -1877,7 +2250,7 @@ public class MobilePickController {
                     : "没有找到工单 " + woNo + "(已作废的单查不到)");
         }
         Map<String, Object> wo = new LinkedHashMap<>(rows.get(0));
-        wo.put("仓库", "");   // plang 无仓库列:仓库由材料出库单明细的行仓库决定
+        wo.put("仓库", "");   // plang 无仓库列:仓库由生产领料单明细的行仓库决定
         return wo;
     }
 
@@ -1919,8 +2292,8 @@ public class MobilePickController {
      * <p>🔴 2026-11-01 改造:领料明细**按单据状态分两个数据源** ——
      * <ul>
      *   <li><b>未完成</b>(生单后、提交前):明细在 {@code wo_pick_line},
-     *       此时**还没有材料出库单**(用户口径「提交后才生成材料出库单」);</li>
-     *   <li><b>已完成</b>(提交后):明细就是 {@code bl_material_out}(材料出库单已生成),
+     *       此时**还没有生产领料单**(用户口径「提交后才生成生产领料单」);</li>
+     *   <li><b>已完成</b>(提交后):明细就是 {@code bl_material_out}(生产领料单已生成),
      *       退料/查看都读它,历史数据也照旧。</li>
      * </ul>
      * 这样上层所有调用(扫码、写数量、提交、打印)都不用改,只换数据源。
@@ -1929,7 +2302,7 @@ public class MobilePickController {
         if (no == null || no.isBlank()) return List.of();
         List<Map<String, Object>> out = new ArrayList<>();
         if ("back".equals(side)) {
-            // 2026-11-13:退料单改为「生产退料单」MATERIAL_RET ⇒ 明细读 bl_material_ret(列名与材料出库单同族)
+            // 2026-11-13:退料单改为「生产退料单」MATERIAL_RET ⇒ 明细读 bl_material_ret(列名与生产领料单同族)
             for (Map<String, Object> r : jdbc.queryForList(
                     "SELECT id, 行号 AS 行号, ISNULL(材料编码,N'') AS 编码, ISNULL(材料名称,N'') AS 名称,"
                             + " ISNULL(规格型号,N'') AS 规格, ISNULL(计量单位,N'') AS 单位,"
@@ -1940,7 +2313,7 @@ public class MobilePickController {
                 out.add(normalizeLine(r, "行号", "材料编码"));
             }
         } else if (isDraftPick(no)) {
-            // 未完成:读领料明细表(此时还没有材料出库单)
+            // 未完成:读领料明细表(此时还没有生产领料单)
             for (Map<String, Object> r : jdbc.queryForList(
                     "SELECT x.id, x.行号, ISNULL(x.物料编码,N'') AS 编码, ISNULL(x.物料名称,N'') AS 名称,"
                             + " ISNULL(x.规格型号,N'') AS 规格, ISNULL(x.计量单位,N'') AS 单位,"
@@ -1952,6 +2325,15 @@ public class MobilePickController {
                             + " WHERE d.领料单号 = ? AND ISNULL(x.asp_cancel,'N') <> 'Y'"
                             + " ORDER BY TRY_CAST(x.行号 AS int), x.id", no)) {
                 out.add(normalizeLine(r, "行号", "物料编码"));
+            }
+            // 2026-11-24:每行挂上「批次明细」(本次领料跨了哪些 仓库+批号、各多少)。
+            // 界面上照着它显示,提交时后端按同一份分摊拆生产领料单的明细行 —— 两处同源。
+            Map<String, List<WoPickBatchService.Alloc>> allocs = pickBatches.byOutNo(no);
+            for (Map<String, Object> it : out) {
+                List<WoPickBatchService.Alloc> list = allocs.get(str(it.get("编码")));
+                List<Map<String, Object>> view = new ArrayList<>();
+                if (list != null) for (WoPickBatchService.Alloc a : list) view.add(WoPickBatchService.toView(a));
+                it.put("批次明细", view);
             }
         } else {
             for (Map<String, Object> r : jdbc.queryForList(
@@ -1971,7 +2353,7 @@ public class MobilePickController {
     /**
      * 这张领料单是否还处于「未完成」(生单后、提交前)。
      *
-     * <p>它是选择明细数据源的开关:未完成 ⇒ wo_pick_line(尚无材料出库单);
+     * <p>它是选择明细数据源的开关:未完成 ⇒ wo_pick_line(尚无生产领料单);
      * 其余(已完成/已作废)⇒ 走 bl_material_out 的历史口径。
      */
     private boolean isDraftPick(String outNo) {
@@ -2006,6 +2388,9 @@ public class MobilePickController {
         m.put("BOM用量", needCol != null ? num(needCol) : bomUsageOf(str(r.get("明细备注"))));
         // 半成品标记(2026-11-16):前端据此把这一行显示成「半成品·免领」、不参与进度、不可填数量
         m.put("半成品", isSemiFinished(m.get("编码")));
+        // 2026-11-24:明细行主键(未完成的单 = wo_pick_line.id)。提交生成生产领料单时
+        //   按它取 wo_pick_batch 的批次分摊 —— 同一物料多行时只按物料编码会张冠李戴。
+        m.put("明细id", r.get("id"));
         m.put("codeCol", codeCol);
         return m;
     }
@@ -2015,7 +2400,7 @@ public class MobilePickController {
      *
      * <p>为什么从备注解析而不是加列:领料单明细表 {@code bl_material_out} 是金蝶同步口径的表,
      * 加自有列会与 ERP 字段对账打架;而"需求多少"是**生单那一刻的快照**,写进备注正好留痕
-     * (明细备注本来就允许自由文本,且现场在材料出库单里也看得到)。
+     * (明细备注本来就允许自由文本,且现场在生产领料单里也看得到)。
      *
      * @return 需求用量;备注里没有或解析不出 → 0
      */
@@ -2048,7 +2433,7 @@ public class MobilePickController {
      * <h3>口径</h3>
      * <ul>
      *   <li>基数:{@code v_stock_pick}(= kucun 三键结存,已过账的真账);</li>
-     *   <li>扣减:同物料、同仓库、**状态为草稿**(即还没审核)的材料出库单明细数量合计;
+     *   <li>扣减:同物料、同仓库、**状态为草稿**(即还没审核)的生产领料单明细数量合计;
      *       ⚠ 要排除**本单自己** —— 否则自己已填的数量会把自己挤掉,越领越少;</li>
      *   <li>不退到负数:最多减到 0(已填满的单会让可用量显示 0,不会显示负数)。</li>
      * </ul>
@@ -2056,23 +2441,29 @@ public class MobilePickController {
      * <p>批次行仍按 (物料,仓库,批号) 给,{@code 现存量} 字段放的是**可用量**;
      * 批号级的占用量按"同批号优先抵扣,不够再顺延"分摊,保证各行可用量加起来等于总量。
      *
+     * <p>🔴 2026-11-24 用户口径「这个手机端会涉及到多个批次号和仓库出库的问题,重点修复」:
+     * 改造前这里按**领料行预填的那个仓**过滤(`AND 仓库 = ?`)⇒ 物料在别的仓有货也看不到,
+     * 现场只能从这一个仓领,多仓出库等于不存在。现在**一律返回全部仓的批次行**,
+     * 只把"本行仓库"排在前面(FIFO 仍按批号日期)——前端据此可以跨仓拆批。
+     *
      * @param code    物料编码
-     * @param wh      仓库(空 = 不限)
+     * @param wh      优先仓库(只影响排序,不再过滤;空 = 不排前)
      * @param selfNo  本单编号(排除本单自己的占用量;null/空 = 不排除)
      */
     private List<Map<String, Object>> stockRows(String code, String wh, String selfNo) {
         String sql = "SELECT 存货编码, 存货名称, 规格型号, 计量单位, 仓库, 仓库编码, 批号, 现存量"
-                + " FROM dbo.v_stock_pick WHERE 存货编码 = ?"
-                + (wh == null || wh.isBlank() ? "" : " AND (仓库 = ? OR 仓库编码 = ?)")
-                + " AND 现存量 > 0 ORDER BY 批号";
+                + " FROM dbo.v_stock_pick WHERE 存货编码 = ? AND 现存量 > 0"
+                + (wh == null || wh.isBlank() ? "" : " ORDER BY CASE WHEN 仓库 = ? OR 仓库编码 = ? THEN 0 ELSE 1 END, 批号")
+                + (wh == null || wh.isBlank() ? " ORDER BY 批号" : "");
         List<Map<String, Object>> rows = (wh == null || wh.isBlank())
                 ? jdbc.queryForList(sql, code)
                 : jdbc.queryForList(sql, code, wh, wh);
 
-        // 其他未审核草稿已占用的量(按 批号 分组;没有批号的行合并到空批号)
+        // 其他未审核草稿已占用的量(按 **仓库+批号** 分组:2026-11-24 起多仓出库,
+        // 同一批号可能同时躺在两个仓里,按批号合并会把 A 仓的占用扣到 B 仓上)
         Map<String, Double> occupied = new LinkedHashMap<>();
         try {
-            String osql = "SELECT ISNULL(l.批号,N'') AS lot, SUM(ISNULL(l.数量,0)) AS qty"
+            String osql = "SELECT ISNULL(l.仓库,N'') AS wh, ISNULL(l.批号,N'') AS lot, SUM(ISNULL(l.数量,0)) AS qty"
                     + " FROM dbo.bl_material_out l"
                     + " JOIN dbo.bd_material_out h ON h.单据编号 = l.单据编号"
                     + " WHERE l.材料编码 = ? AND ISNULL(l.asp_cancel,'N') <> 'Y'"
@@ -2082,25 +2473,27 @@ public class MobilePickController {
                     + "   AND NOT EXISTS (SELECT 1 FROM dbo.yj_doc_status s"
                     + "                    WHERE s.panel_code = N'MATERIAL_OUT' AND s.doc_no = h.单据编号"
                     + "                      AND ISNULL(s.shr, N'') <> N'')"
-                    + " GROUP BY ISNULL(l.批号,N'')";
+                    + " GROUP BY ISNULL(l.仓库,N''), ISNULL(l.批号,N'')";
             for (Map<String, Object> r : jdbc.queryForList(osql, code, selfNo == null ? "" : selfNo)) {
-                occupied.put(str(r.get("lot")), num(r.get("qty")));
+                occupied.put(str(r.get("wh")) + "\u0001" + str(r.get("lot")), num(r.get("qty")));
             }
         } catch (RuntimeException e) {
             // 占用查询失败不阻断:退化为实时结存(宁可显示宽一点,也不要让扫码直接报错)
             log.debug("可用量占用查询失败,退化为实时结存:{}", e.getMessage());
         }
 
-        // 逐行抵扣:先扣同批号的占用,再按顺序扣空批号/其它批号的剩余占用
+        // 逐行抵扣:先扣同 (仓库,批号) 的占用,再按顺序扣空批号/其它批号的剩余占用
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> r : rows) {
             String lot = str(r.get("批号"));
+            String whKey = str(r.get("仓库"));
+            String key = whKey + "\u0001" + lot;
             double avail = num(r.get("现存量"));
-            double occ = occupied.getOrDefault(lot, 0d);
+            double occ = occupied.getOrDefault(key, 0d);
             if (occ > 0) {
                 double take = Math.min(occ, avail);
                 avail = round4(avail - take);
-                occupied.put(lot, round4(occ - take));
+                occupied.put(key, round4(occ - take));
             }
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("批号", r.get("批号"));
@@ -2136,9 +2529,10 @@ public class MobilePickController {
         }
 
         // 🔴 2026-11-01:未完成的领料单,数量写进 **wo_pick_line.实领数量**
-        //   (此时还没有材料出库单,不能写 bl_material_out —— 那张单要等提交才生成)。
+        //   (此时还没有生产领料单,不能写 bl_material_out —— 那张单要等提交才生成)。
+        // 2026-11-24:本次的 仓库+批号 分摊一并逐笔落 wo_pick_batch,提交时按它拆明细行。
         if (!"back".equals(side) && isDraftPick(no)) {
-            writeQtyToPickLine(no, line, qty, note, batchesRaw, code);
+            writeQtyToPickLine(no, line, qty, note, parseAllocs(batchesRaw, qty, code), code);
             return;
         }
 
@@ -2214,7 +2608,7 @@ public class MobilePickController {
             m.put("状态", d.state());
             m.put("领料类型", kind);
             m.put("打印日期", java.time.LocalDate.now().toString());
-            // 明细与页面同源(未完成读 wo_pick_line,已完成读材料出库单)
+            // 明细与页面同源(未完成读 wo_pick_line,已完成读生产领料单)
             for (Map<String, Object> it : linesOf(d.outNo(), "pick")) {
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("材料名称", str(it.get("名称")));
@@ -2237,7 +2631,7 @@ public class MobilePickController {
     /**
      * 该物料的默认出库仓库 = **有库存、且库存最多的那个仓**。
      *
-     * <p>为什么必须预填:材料出库单审核过账走 {@code StockLedgerService.apply},它按
+     * <p>为什么必须预填:生产领料单审核过账走 {@code StockLedgerService.apply},它按
      * (物料, 仓库, 批号) 写 {@code kucun};仓库为空会抛
      * 「仓库档案不存在:[null],请先在基础档案-仓库中建立」—— 生单能成、**提交才炸**,
      * 现场看到的症状是"料都领完了却提交不了"(2026-10-30 实测踩到)。

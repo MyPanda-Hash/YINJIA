@@ -570,6 +570,50 @@ public class ButtonService {
     }
 
     /**
+     * 领料部门 / 退料部门默认 = **当前账号所属部门**(2026-11-24)。
+     *
+     * <p>用户口径:「扫码填表关联领料部门,领料部门根据账号所属部门来填入。」
+     *
+     * <p>取值链 {@code yj_user.dept_id → bs_dept.id} ⇒ 面板那格的**部门编码**({@code BM000xx},
+     * 「领料部门 / 退料部门」这两个标签的物理列都是 {@code 部门编码},参照 DEPT)。
+     * 转ERP 时 {@code KingdeePushService} 直接读这一列当金蝶的部门编码。
+     *
+     * <p>三条保守边界:
+     * <ol>
+     *   <li>**只填空值** —— 现场手工改过的部门一律不动(与 putHeadDefaults 同口径);</li>
+     *   <li>账号没配部门 / 部门已作废 ⇒ 什么都不写(部门不是必填,不要拦单);</li>
+     *   <li>后台无登录态({@code system})⇒ 不写,免得给所有单盖一个假部门。</li>
+     * </ol>
+     */
+    private void fillDeptByAccount(PanelRegistry.PanelDef def, Map<String, Object> head, String user) {
+        if (head == null || def == null) return;
+        String label = "MATERIAL_OUT".equals(def.code()) ? "领料部门"
+                : "MATERIAL_RET".equals(def.code()) ? "退料部门" : "";
+        if (label.isEmpty()) return;
+        if (def.byLabel(label) == null) return;
+        if (!blankSafe(head.get(label)).isEmpty()) return;
+        if (user == null || user.isBlank() || "system".equalsIgnoreCase(user.trim())) return;
+        try {
+            java.util.List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT TOP 1 ISNULL(d.部门编码,N'') AS code, d.id AS id FROM dbo.yj_user u"
+                            + " JOIN dbo.bs_dept d ON d.id = u.dept_id"
+                            + " WHERE u.username = ? AND ISNULL(u.asp_cancel,'N') <> 'Y'"
+                            + "   AND ISNULL(d.asp_cancel,'N') <> 'Y'", user);
+            if (rows.isEmpty()) return;
+            String code = blankSafe(rows.get(0).get("code"));
+            if (code.isEmpty()) return;
+            head.put(label, code);
+            if (def.byLabel("部门id") != null && blankSafe(head.get("部门id")).isEmpty()) {
+                Object id = rows.get(0).get("id");
+                if (id != null) head.put("部门id", String.valueOf(id));
+            }
+        } catch (RuntimeException e) {
+            // 部门取不到不该挡住开单(不是必填);留痕便于排查账号/档案问题
+            log.debug("按账号所属部门填 {} 失败:{}", label, e.getMessage());
+        }
+    }
+
+    /**
      * 单据保存本体。{@code systemDraft=true} = **引擎内部代建的草稿单**
      * (2026-10-16 起唯一用途:产品信息表「分发责任人」后自动建规格书草稿)。
      *
@@ -993,6 +1037,12 @@ public class ButtonService {
         }
         // 工序检验三单:检验人员默认当前电脑端登录人(2026-10-21;空值/历史 system 占位才填)
         defaultQcInspector(def, head, user);
+        // 领料部门 / 退料部门默认 = **当前账号所属部门**(2026-11-24 用户口径「扫码填表关联领料部门,
+        // 领料部门根据账号所属部门来填入」)。只在该格为空时补,**不覆盖**现场手填的值;
+        // 账号没配部门就什么都不写(部门不是必填)。
+        // 放在这里而不是只写在手机端控制器:手机扫码、电脑手工新增、工单「转领料单」三条路
+        // 都会走到本方法,一处兜住才不会出现"手机端有部门、电脑端没有"的两套单。
+        fillDeptByAccount(def, head, user);
         boolean split = def.hasHeadTable();
         // 内部开发样品申请单=「数据记录表」(2026-11-06 用户口径:「谁填写的申请人就是谁,每个人只能改自己
         // 作为申请人的行数据;点保存之后申请人就不能改了,只能由有更改权限的人来改;每一行数据就像一张独立的
@@ -7579,7 +7629,7 @@ public class ButtonService {
         if (!supportsErp(def.code()))
             throw new IllegalStateException(ERP_UNSUPPORTED_MSG);
         String tbl = ERP_HEAD_TABLE.get(def.code());
-        // 材料出库单没有 客户/供应商 列(领料是内部单据),往来单位取「领用人」
+        // 生产领料单没有 客户/供应商 列(领料是内部单据),往来单位取「领用人」
         // 产品入库单(2026-10-14 接入转ERP)是生产完工入库,同样无 客户/供应商 列,往来单位取「经手人」
         // 其他入库单=供应商往来;其他出库单=内部领用,往来单位取「经手人」
         // 暂收退料单=退给供应商,头上有「供应商」(名称)列 ⇒ 走默认「供应商」

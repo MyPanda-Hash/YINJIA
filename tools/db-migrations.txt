@@ -5212,3 +5212,11 @@ migrate-drop-inv-process-inspection-20261124.sql
 #   本脚本按暂收行当前数量回写占用、重算批次台账;行已删则释放占用。幂等 + 末尾自检(必须 0 差额)。
 #   代码侧已同步修(BatchService.syncReceiptLinks,保存暂收单即回写);体检工具 verify/BatchLinkQtyAudit.java。
 migrate-batch-link-qty-sync-20261124.sql
+
+# 2026-11-24 出入库明细「按 仓库 + 批号 分行」+ 材料出库单改名「生产领料单」:
+#   ① 新建领料批次分摊台账 wo_pick_batch(手机扫码跨多仓/多批号领料逐笔留痕,提交时据此把
+#      生产领料单明细拆成多行 —— 此前只写第一条批号,其余批次/仓库的账根本没记上);
+#   ② yj_panel 改名 MATERIAL_OUT/_DETAIL/_STATS → 生产领料单(含 9 语言译名);
+#   ③ yj_field 部门编码 → 领料部门(MATERIAL_OUT)/ 退料部门(MATERIAL_RET),phone 端按账号所属部门带入;
+#   ④ wo_pick_return 补 (领料单号,物料编码) 索引。幂等 + 末尾自检(全 PASS)。两账套均执行。
+migrate-inv-split-by-lot-20261124.sql

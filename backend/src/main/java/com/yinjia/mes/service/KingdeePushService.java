@@ -217,7 +217,7 @@ public class KingdeePushService {
         // 采购订单直推(2026-09-23):作为**金蝶采购订单**落到目标账套(用户口径:测试沙箱的采购订单里);
         // 与入库单推送互不影响 —— 订单推 pur_order,入库单推 pur_inbound(后者带 src 挂回订单)。
         boolean isOrder = "PU_ORDER".equals(panelCode);
-        // 材料出库单直推(2026-09-28):作为**金蝶生产领料单**(inv_pick)落到目标账套。
+        // 生产领料单直推(2026-09-28):作为**金蝶生产领料单**(inv_pick)落到目标账套。
         // 为什么是它:真实账套只读实测(deploy/_probe-matout.mjs)inv_pick 有 4801 张,是料件出库的对口单据;
         // 同族对照 pur_inbound 3266 / sal_out_bound 5084 / inv_other_out 1130,其余候选路径一律 519 无此接口。
         boolean isMatOut = "MATERIAL_OUT".equals(panelCode);
@@ -256,7 +256,7 @@ public class KingdeePushService {
         //     —— 与销售出库同族,只是**多一个 price 必填**(销售出库的 price 是选填)。
         //   · 生产退料 → 金蝶「生产退料单」POST /jdy/v2/scm/inv_pick_ret
         //     该单据是生产领料单(inv_pick)的**严格子集**(头少 pick_type/pick_use_*,行键完全一致)
-        //     ⇒ 载荷构造直接复用材料出库单那段,只换接口路径与表名。
+        //     ⇒ 载荷构造直接复用生产领料单那段,只换接口路径与表名。
         boolean isSaleRet = "SALE_IN".equals(panelCode);
         boolean isPickRet = "MATERIAL_RET".equals(panelCode);
         String headTable = isOrder ? "bd_pu_order" : isPur ? "bd_purchase_in" : isMatOut ? "bd_material_out"
@@ -265,8 +265,8 @@ public class KingdeePushService {
         String lineTable = isOrder ? "bl_pu_order" : isPur ? "bl_purchase_in" : isMatOut ? "bl_material_out"
                 : isFinIn ? "bl_finish_in" : isOtherIn ? "bl_other_in" : isOtherOut ? "bl_other_out"
                 : isQcReturn ? "qc_return_detail" : isSaleRet ? "bl_sale_in" : isPickRet ? "bl_material_ret" : "bl_sale_out";
-        // 日志文案用的单据名(此前硬编码"采购入库单",材料出库单接进来后会把日志写错单)
-        String docLabel = isOrder ? "采购订单" : isPur ? "采购入库单" : isMatOut ? "材料出库单"
+        // 日志文案用的单据名(此前硬编码"采购入库单",生产领料单接进来后会把日志写错单)
+        String docLabel = isOrder ? "采购订单" : isPur ? "采购入库单" : isMatOut ? "生产领料单"
                 : isFinIn ? "产品入库单" : isOtherIn ? "其他入库单" : isOtherOut ? "其他出库单"
                 : isQcReturn ? "暂收退料单" : isSaleRet ? "销售退货单" : isPickRet ? "生产退料单" : "销售出库单";
 
@@ -428,7 +428,7 @@ public class KingdeePushService {
             }
         }
 
-        // 材料出库单(生产领料单)头:部门 + 经手人 + 领料类型。
+        // 生产领料单(生产领料单)头:部门 + 经手人 + 领料类型。
         // 金蝶 inv_pick 头**没有** 供应商/客户/仓库/业务类型(与采购入库/销售出库不同),
         // 但领料要落「部门(dept_number)」与「经手人(emp_number)」——MES 侧存的是名称(生产车间/领用人),
         // 这里按档案解析成编码;解析不到就不带该字段(不阻断,金蝶按自己的默认值处理)。
@@ -597,7 +597,7 @@ public class KingdeePushService {
             } else {
                 e.put("qty", num(line, qtyKey));
                 e.put("price", num(line, priceKey));
-                // 材料出库单(生产领料单)无税金族:金蝶 inv_pick 头/行**没有** cess/tax_price/tax_amount/
+                // 生产领料单(生产领料单)无税金族:金蝶 inv_pick 头/行**没有** cess/tax_price/tax_amount/
                 // amount/all_amount 键(真实账套实测),MES 行表也没有 税率% 列 —— 不推税金(2026-09-28 用户口径)。
                 if (!isMatOut) { double cess = num(line, "税率%"); if (cess != 0) e.put("cess", cess); }
             }
@@ -754,7 +754,7 @@ public class KingdeePushService {
         long tPrepared = System.currentTimeMillis();
         String apiPath = isOrder ? "/jdy/v2/scm/pur_order"
                 : isPur ? "/jdy/v2/scm/pur_inbound"
-                : isMatOut ? "/jdy/v2/scm/inv_pick"   // 材料出库单 → 金蝶「生产领料单」
+                : isMatOut ? "/jdy/v2/scm/inv_pick"   // 生产领料单 → 金蝶「生产领料单」
                 : isFinIn ? "/jdy/v2/scm/inv_product" // 产品入库单 → 金蝶「产品入库单」
                 : isOtherIn ? "/jdy/v2/scm/inv_other_in"   // 其他入库单 → 金蝶「其他入库单」
                 : isOtherOut ? "/jdy/v2/scm/inv_other_out" // 其他出库单 → 金蝶「其他出库单」
@@ -1040,7 +1040,7 @@ public class KingdeePushService {
     }
 
     /**
-     * 档案名称 → 编码(材料出库单推送用:生产车间→部门编码、领用人→员工编码)。
+     * 档案名称 → 编码(生产领料单推送用:生产车间→部门编码、领用人→员工编码)。
      * 档案表/列名由调用方给定(bs_dept 部门名称/部门编码、bs_emp 员工名称/员工编码);
      * 查不到或库结构不一致一律返回空串 —— 该字段是"能带就带",绝不因档案缺失阻断转ERP。
      */
