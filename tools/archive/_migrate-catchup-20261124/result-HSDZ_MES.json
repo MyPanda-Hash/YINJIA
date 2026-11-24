@@ -1,0 +1,267 @@
+﻿[
+    {
+        "script":  "migrate-qc-proc-insp-batch-table-20261111.sql",
+        "ok":  false,
+        "code":  1
+    },
+    {
+        "script":  "migrate-qc-asm-insp-batch-table-20261112.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-qc-asm-insp-unlink-finish-in-20261112.sql",
+        "ok":  false,
+        "code":  1
+    },
+    {
+        "script":  "migrate-finish-in-insp-link-20261112.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-wo-ledger-rowid-align-20261112.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-wo-report-list-query-input-20261113.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-wo-draft-20261113.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-wo-list-del-perm-20261113.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-merge-gen-20261113.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-pu-order-price-wh-not-required-20261113.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-inv-process-inspection-20261114.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-qc-line-patrol-20261114.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-sample-insp-20261115.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-sample-insp-module-20261116.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-pur-in-wh-group-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-insp-commission-rev-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-insp-commission-required-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-insp-commission-sender-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-sample-catalog-rev-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-insp-summary-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-jjf-twolevel-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-insp-freq-oqc-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-rd-extra-record-file-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-sample-nondev-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-sample-nondev-pk-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-prod-mold-perms-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-role-perms-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-spec-approve-perm-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-datarec-clear-prefilled-auditor-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-asm-proc-auditor-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-prod-info-scene-stdlib-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-asm-proc-fixed-manager-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-datarec-auditor-from-shr-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-qc-docs-twolevel-20261118.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-mold-proc-auditor-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-prod-info-perf-stdlib-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-insp-plan-manager-20261118.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-xsinter-formula-fix-20261118.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-restore-rd-del-batch-20261117.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-finish-in-failqty-20261118.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-prodinfo-labels-and-size-20261118.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-sample-ext-attach-20261118.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-prodinfo-i18n-required-20261118.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-sample-catalog-rev-20261119.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-sample-reg-detail-tab-20261119.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-selfmade-20261119.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-approval-customer-code-20261119.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-sample-nd-columns-20261119.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-approval-initiator-required-20261119.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-change-cosign-20261119.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-filter-eff-dyncols-visible-20261120.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-prodinfo-approver-no-default-20261120.sql",
+        "ok":  true,
+        "code":  0
+    },
+    {
+        "script":  "migrate-prodinfo-name-not-required-20261123.sql",
+        "ok":  true,
+        "code":  0
+    }
+]
