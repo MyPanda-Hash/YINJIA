@@ -1,17 +1,5 @@
 <template>
   <div class="pf-page">
-    <header class="pf-head">
-      <div class="pf-head-main">
-        <h1 class="pf-title">{{ tt('项目流程管控') }}</h1>
-        <p class="pf-sub">
-          {{ tt('按立项申请单号查这条项目走到哪一步：哪个环节还没审批、哪个环节该谁动手、单据建了内容有没有开始填') }}
-        </p>
-      </div>
-      <p class="pf-source">
-        {{ tt('数据来源：立项申请 / 实施方案 / 审批留痕 / 项目进度查询实时计算，本页只读不改单') }}
-      </p>
-    </header>
-
     <section class="pf-kpis">
       <article v-for="k in kpiCards" :key="k.key" class="pf-kpi">
         <span class="pf-kpi-label">{{ tt(k.label) }}</span>
@@ -266,25 +254,6 @@ onBeforeUnmount(() => window.removeEventListener('resize', syncWidth))
   min-width: 0;
   color: var(--t-text-1);
 }
-.pf-head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 16px;
-  align-items: flex-end;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
-.pf-head-main { min-width: 0; }
-.pf-title { margin: 0; font-size: 17px; font-weight: 700; color: var(--t-text-1); }
-.pf-sub { margin: 4px 0 0; font-size: 12px; line-height: 1.5; color: var(--t-text-3); }
-.pf-source {
-  margin: 0;
-  flex: 1 1 320px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--t-text-3);
-  text-align: right;
-}
 .pf-kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
@@ -409,7 +378,6 @@ onBeforeUnmount(() => window.removeEventListener('resize', syncWidth))
 .pf-meta dd { margin: 0; font-size: 12px; color: var(--t-text-2); }
 
 @media (max-width: 768px) {
-  .pf-source { text-align: left; }
   .pf-search { width: 100%; }
   /* 窄屏:表格列宽合计 > 视口(el-table 内部横向滚动),展开行若不限宽,
      整句会被表格虚拟宽度撑着、在可视区右缘被裁掉 —— 这里把片段宽度钉在视口内让它换行。 */
