@@ -5529,6 +5529,9 @@ export default {
     '样品进度跟踪': 'Sample Progress',
     /* ── 2026-11-20：按单号打开不到（已作废/无权限）时的兜底提示 ── */
     '未找到该单据（可能已作废或没有查看权限）': 'Document not found (it may be voided or outside your permission scope)',
+    /* ── 2026-11-24：按单号打开落空时按真实单据状态说清原因（检验数据记录明细表单号直索引） ── */
+    '该单据已作废,作废单不进入列表': 'This document is voided, and voided documents are not listed',
+    '当前状态为': 'current status is',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
     '按外部开发样品单看进展：谁提交、审到第几级、谁在等确认，一屏看完': 'Follow each external development sample request: who submitted it, which approval level it is waiting on, and who needs to act',
     /* ── 研发管理·样品 → 样品进度跟踪 /rd/sampleFlow(2026-11-18 新增) ── */
@@ -6802,6 +6805,10 @@ export default {
     '这张单还没有退料单号': 'This document has no return note number yet',
     // ---- 样品检验汇总表 INSP_SUMMARY(2026-11-17:按时间范围看「谁送了什么样品、要测什么」+ 导出 Excel)----
     '样品检验汇总表': 'Sample Inspection Summary',
+    '纸面缩放': 'Paper zoom',
+    '适应宽度': 'Fit width',
+    '放大': 'Zoom in',
+    '缩小': 'Zoom out',
     '按送样人': 'By sender',
     '按委托单': 'By commission',
     '按委托单/样品': 'By commission / sample',

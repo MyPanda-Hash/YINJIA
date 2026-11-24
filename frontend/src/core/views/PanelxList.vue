@@ -336,8 +336,18 @@
              FIXED_SHEET_W),窄窗装不下时**在纸面区自己横向滚动**,右侧操作栏不被挤出去
              (此前纸面是 flex:1 弹性宽,永远不会溢出,所以从来没有这个容器)。 -->
         <div v-else class="sheet-scroll">
+          <!-- 纸面缩放条(2026-11-24 用户报障「面板看起来有点小…也调不大」)：
+               定死纸宽的面板窄窗会被自动缩到 0.7 左右且无法放大 ⇒ 给一个手动缩放入口
+               （适应宽度 / 缩小 / 放大，最大 150%），按面板记住选择。口径见 sheetZoom.js。 -->
+          <div v-if="sheetZoomEnabled" class="sheet-zoom-bar no-print">
+            <span class="szb-title">{{ tt('纸面缩放') }}</span>
+            <el-button class="szb-btn" size="small" text :disabled="!canSheetZoomOut" :title="tt('缩小')" @click="sheetZoomOut">－</el-button>
+            <span class="szb-val" :class="{ 'is-auto': sheetZoomUser === null }">{{ sheetZoomLabel }}</span>
+            <el-button class="szb-btn" size="small" text :disabled="!canSheetZoomIn" :title="tt('放大')" @click="sheetZoomIn">＋</el-button>
+            <el-button class="szb-btn szb-fit" size="small" text :disabled="sheetZoomUser === null" @click="sheetZoomFit">{{ tt('适应宽度') }}</el-button>
+          </div>
           <DocSheet ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable && !annOn" :attach-can-edit="attachEditable"
-                :can-edit-others="canEditOtherRowsHere" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" @progress-save="onProgressSave" />
+                :can-edit-others="canEditOtherRowsHere" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" :user-zoom="sheetZoomUser" @zoom-change="onSheetZoomChange" @dirty="markInlineDirty" @term-changed="onTermChanged" @progress-save="onProgressSave" />
         </div>
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
 
@@ -1058,6 +1068,13 @@
                     class="doc-no-link"
                     :title="tt('点击跳转到该单据')"
                     @click.stop="openReportLink(row, column.prop)">{{ row[column.prop] }}</span>
+              <!-- 检验数据记录明细表(2026-11-24 恢复 2026-11-11 的交付):来料检验单号 / 检验数据记录单号
+                   可点跳转(用户口径「只有上面两个才用」);采购订单 / 送料暂收单 / 采购入库单 三组
+                   只显示单号+行号,走下面的普通单元格 -->
+              <span v-else-if="qcRecLinkPanel(column.prop) && row[column.prop]"
+                    class="doc-no-link"
+                    :title="tt('点击跳转到该单据')"
+                    @click.stop="gotoLinkedDoc(row[column.prop], qcRecLinkPanel(column.prop))">{{ row[column.prop] }}</span>
               <span v-else>{{ row[column.prop] }}</span>
             </template>
             <template #header>
@@ -1079,6 +1096,22 @@
             </template>
           </el-table-column>
         </template>
+        <!-- 检验数据记录明细表:已完成检验的行给「取消完成」(2026-11-24 恢复 2026-11-11 的交付)。
+             待检验目录已不显示这些行(statusGate 只放行「已完成检验」),而反审核挂靠单据前必须先取消完成
+             —— 见 QcCatalogService.assertLinkedRowNotCompleted。点「取消完成」把目录行回弹成
+             「正在检验中」(+写一条修改记录):该行随即离开本表并重新出现在「待检验目录」。 -->
+        <el-table-column v-if="qcRecDetailReopen" :label="tt('操作')" width="112" align="center" fixed="right">
+          <template #default="{ row }">
+            <span
+              v-if="row[QC_REC_DETAIL_REOPEN.statusField] === QC_REC_DETAIL_REOPEN.doneStatus"
+              class="doc-no-link"
+              :class="{ disabled: qcRecReopenBusy }"
+              :title="tt('取消完成并回弹为正在检验中（之后才可反审核挂靠的检验单与检验数据记录）')"
+              @click.stop="reopenCatalogRow(row)"
+            >{{ tt('取消完成') }}</span>
+            <span v-else class="qc-reopen-na">—</span>
+          </template>
+        </el-table-column>
       </el-table>
     </div>
 
@@ -2979,7 +3012,12 @@ import {
 } from './changeCosign'
 import QcInspReqSheet from './QcInspReqSheet.vue'
 import { isQcInspReqPanel } from './qcInspReqConfig'
-import { approvalSheetCfg, planSheetCfg, qcSheetCfgs, sampleExtSheetCfg, sampleIntSheetCfg, sampleNdSheetCfg } from './docSheetConfigs'
+// 检验数据记录明细表(QC_INSP_REC_DETAIL,2026-11-11):单号跳转列 + 行内「取消完成」的取参口径。
+// 2026-11-24:该表的这两处渲染在 merge 9e8e5db2c(2026-11-13)里被整段丢掉,本次按原实现恢复
+// (常量的定义一直都在,丢的只是 PanelxList 里的渲染与动作 —— 详见下方 qcRecDetailLinks 段注释)。
+import { QC_REC_DETAIL_PANEL, QC_REC_DETAIL_LINKS, QC_REC_DETAIL_REOPEN } from '@core/qc/qcInspRecDetail'
+import { approvalSheetCfg, planSheetCfg, qcSheetCfgs, sampleExtSheetCfg, sampleIntSheetCfg, sampleNdSheetCfg, fixedSheetWidth } from './docSheetConfigs'
+import { MAX_SHEET_ZOOM, MIN_SHEET_ZOOM, ZOOM_STEP, clampZoom, clearStoredZoom, loadStoredZoom, saveStoredZoom } from './sheetZoom'
 import ImportDialog from './ImportDialog.vue'
 import BomImportDialog from './BomImportDialog.vue'
 import ProductImportDialog from './ProductImportDialog.vue'
@@ -7902,6 +7940,77 @@ function gotoDocNo() {
   router.push({ path: '/panelx/list/' + panel, query: no ? { focus: no } : {} })
 }
 
+/* ══════════ 检验数据记录明细表(QC_INSP_REC_DETAIL):单号跳转 + 行内「取消完成」 ══════════
+ * 2026-11-11 用户口径:「每一条罗列的都要带来料检验单,也要带行号和检验数据记录。还有也要有采购订单,
+ * 送料暂收单,采购入库单(这3个的单号和行号,但是这个不用跳转,只有上面两个才用)。」
+ *   · 只有 来料检验单号 / 检验数据记录单号 渲染成可点跳转(与检验目录的 ↗ 同款:
+ *     /panelx/list/<面板>?docNo=<单号> 定位);
+ *   · 采购订单 / 送料暂收单 / 采购入库单 三组只显示单号+行号,不跳。
+ * 跳转同样要过面板查看权(canViewPanel,与条码面板单号同一口径),没权限只提示不发路由。
+ *
+ * 行内「取消完成」:待检验目录只显示待检验行,已完成的行只剩本表看得到,而反审核挂靠单据的守卫
+ * 要求先在目录行上「取消完成」⇒ 该动作跟着已完成的行搬到这里(后端仍是 QC_CATALOG 的「修改」)。
+ * 字段/面板码见 @core/qc/qcInspRecDetail(唯一真源)。
+ *
+ * ⚠ 2026-11-24 修复:整段代码是 2026-11-11 就交付过的(commit 6cf9aea6c),但在
+ *   **merge 9e8e5db2c(2026-11-13「合并 origin/main(LF 云端) 到本地分支」)里被整段丢掉**
+ *   (该次合并后 PanelxList.vue 里 qcRecDetailReopen/qcRecLinkPanel 命中为 0) —— 与 AGENTS §5⑦
+ *   「整文件覆盖抹掉并发提交」同一类事故。后果:明细表单号点不动、行内没有「取消完成」,
+ *   而 QcCatalogService.assertLinkedRowNotCompleted 却让用户去这张表点那个不存在的按钮。
+ *   本次按原实现恢复(会话文案沿用,en 词条早已在 en.js 里,不必新增)。 */
+const qcRecDetailLinks = computed(() => String(panelCode.value) === QC_REC_DETAIL_PANEL ? QC_REC_DETAIL_LINKS : null)
+/** 该列是不是可跳转的单号列;是则返回目标面板编码 */
+function qcRecLinkPanel(prop) {
+  const map = qcRecDetailLinks.value
+  return map ? (map[prop] || '') : ''
+}
+const qcRecDetailReopen = computed(() => String(panelCode.value) === QC_REC_DETAIL_PANEL)
+const qcRecReopenBusy = ref(false)
+
+/** 点单号 → 定位到目标面板的那张单(无查看权只提示) */
+function gotoLinkedDoc(no, targetPanel) {
+  const v = String(no ?? '').trim()
+  if (!v || !targetPanel) return
+  if (!canViewPanel({ isAdmin: user.isAdmin, visiblePanels: user.visiblePanels }, targetPanel)) {
+    ElMessage.warning(tt('无查看该面板的权限') + ':' + tt(targetPanel))
+    return
+  }
+  router.push({ path: '/panelx/list/' + targetPanel, query: { docNo: v } })
+}
+
+/** 已完成检验的行 →「取消完成」:回弹为正在检验中,并写一条修改记录(后端 QC_CATALOG「修改」) */
+async function reopenCatalogRow(row) {
+  const cfg = QC_REC_DETAIL_REOPEN
+  const docNo = String(row?.[cfg.docField] ?? '').trim()
+  const rowId = row?.[cfg.rowIdField]
+  if (!docNo || rowId == null || rowId === '') {
+    ElMessage.warning(tt('该行没有关联的检验目录记录，无法取消完成'))
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      tt('取消完成后该目录行回到「正在检验中」（会重新出现在待检验目录里），之后才可反审核挂靠的检验单与检验数据记录。确定取消完成吗？'),
+      tt('取消完成'),
+      { confirmButtonText: tt('确定'), cancelButtonText: tt('取消'), type: 'warning' },
+    )
+  } catch { return }
+  qcRecReopenBusy.value = true
+  try {
+    await engine.callButton({
+      panelCode: cfg.catalogPanel,
+      buttonName: cfg.buttonName,
+      formData: { 编号: docNo, id: rowId },
+      buttonParam: {},
+    })
+    ElMessage.success(tt('已取消完成（已写入修改记录）'))
+    await load()          // 该行状态已变,重取当前页(不跳回第一页)
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('操作失败'))
+  } finally {
+    qcRecReopenBusy.value = false
+  }
+}
+
 /** 报表模式(flat)的当前页勾选状态:与 blocks 那套同口径,只是数据源是 reportList */
 const qrReportAllChecked = computed(() =>
   reportList.value.length > 0 && reportList.value.every((r) => qrSel.value.has(qrRowKey(r))))
@@ -9126,6 +9235,43 @@ function onGroupAction(a) {
 const sideCollapsed = ref(false)
 // ══════════ 文书式面板:导出 = 整张文书打印/存PDF(浏览器原生,所见即所得) ══════════
 const approvalSheetRef = ref(null)
+
+/* ── 纸面缩放(2026-11-24) ────────────────────────────────────────────────
+ * 用户报障:「面板看起来有点小，其他人都没有就他有，也调不大」。
+ * 根因:定死纸宽的面板(立项申请 1242px)在窄窗被**自动**等比缩小(下限 0.6),
+ * 而自动缩放封顶 1 且没有手动入口 ⇒ 窄屏用户只能看着纸面变小。
+ * 处置:保「适应宽度」为默认,另给 缩小/放大(10% 一档,最大 150%),按面板记在 localStorage。
+ * 口径(纯函数)见 sheetZoom.js;屏幕专用 —— 导出/打印会把 zoom 归 1。 */
+const sheetZoomUser = ref(null)      // null = 适应宽度
+const sheetZoomEffective = ref(1)    // DocSheet 算出来的实际值(自动模式下显示成百分比)
+const sheetZoomPaperW = computed(() => fixedSheetWidth(panelCode.value))
+/** 只有定死纸宽的面板才有「缩放」这回事(自适应宽的纸本来就不缩放) */
+const sheetZoomEnabled = computed(() => sheetZoomPaperW.value > 0)
+const sheetZoomBase = computed(() => (sheetZoomUser.value === null ? sheetZoomEffective.value : sheetZoomUser.value))
+/** 始终显示实际百分比:自动模式也报数(灰字),不然会与右侧「适应宽度」按钮重复 */
+const sheetZoomLabel = computed(() => Math.round((sheetZoomEffective.value || 1) * 100) + '%')
+const canSheetZoomIn = computed(() => sheetZoomBase.value < MAX_SHEET_ZOOM - 0.001)
+const canSheetZoomOut = computed(() => sheetZoomBase.value > MIN_SHEET_ZOOM + 0.001)
+function onSheetZoomChange(v) {
+  sheetZoomEffective.value = Number(v) || 1
+}
+function sheetZoomIn() {
+  sheetZoomUser.value = clampZoom(sheetZoomBase.value + ZOOM_STEP)
+}
+function sheetZoomOut() {
+  sheetZoomUser.value = clampZoom(sheetZoomBase.value - ZOOM_STEP)
+}
+/** 回到「适应宽度」:清掉记住的值 */
+function sheetZoomFit() {
+  sheetZoomUser.value = null
+}
+// 换面板就换成那张纸记住的值(各面板互不影响)
+watch(panelCode, (code) => { sheetZoomUser.value = loadStoredZoom(code) }, { immediate: true })
+// 用户改了就记住;回到适应宽度则清除
+watch(sheetZoomUser, (v) => {
+  if (v === null) clearStoredZoom(panelCode.value)
+  else saveStoredZoom(panelCode.value, v)
+})
 /** 删除组下拉动作:收起菜单后走统一入口(删除带整单确认) */
 function pickDelAction(a) {
   openDelMenu.value = false
@@ -14512,8 +14658,45 @@ async function loadDocNoTarget() {
   if (!shouldRestoreAfterDocNo(no, list.value)) return
   delete condition['_docNo']
   docQueryNo.value = ''
-  ElMessage.warning(tt('未找到该单据（可能已作废或没有查看权限）'))
+  ElMessage.warning(await missingDocHint(no))
   await load()
+}
+
+/**
+ * 「按单号打开」落空时给一句**能照着办**的提示（2026-11-24 用户报障）。
+ *
+ * <p>用户原话：「索引无法查找到对应的单据，当前转跳为空表」。实测（待检验目录的 ↗ →
+ * 来料检验单 IJ-2026-11-0002）根因是**那张单已被作废**：作废走的是
+ * yj_doc_status.canceled='Y'，单据行仍在库里，但列表按其口径过滤掉 ⇒ 深链 0 行。
+ * 旧文案把「已作废 / 已删除 / 无权限 / 版本不一致」混成一句「可能已作废或没有查看权限」，
+ * 用户不知道该找谁、也不知道该改什么。</p>
+ *
+ * <p>这里回查一次单据抬头（{@code getFormDescriptor} 对**作废单仍返回抬头**，2026-11-24
+ * 在生产实测：IJ-2026-11-0002 → 单据状态=已作废）：
+ * ① 抬头只是「空壳」（只有 编号 / 单据状态 / saved 这些壳字段，没有任何业务字段有值）⇒ 说明接口
+ *    对**不存在的单号**合成了一张新单默认抬头（实测 `IJ-2099-01-9999` 返回「草稿」）⇒ 不采信它的
+ *    状态，直接走通用兜底文案；
+ * ② 有业务字段且状态含「作废」⇒ 直接说已作废、作废单不进列表（这是绝大多数情形）；
+ * ③ 有业务字段、其它非空状态 ⇒ 带出真实状态，便于判断是不是被页签/范围挡住。</p>
+ */
+async function missingDocHint(no) {
+  const label = `${tt('单据')} ${no}`
+  const generic = tt('未找到该单据（可能已作废或没有查看权限）') + `：${no}`
+  /** 空抬头的壳字段:出现它们**不**代表单据存在(见上面 ①) */
+  const SHELL_KEYS = ['编号', 'saved', '单据状态', '状态', '二级审核人']
+  try {
+    const fd = await engine.getFormDescriptor({ panelCode: panelCode.value, code: no })
+    const head = (fd && fd.data) || {}
+    const hasBizField = Object.keys(head).some((k) => !SHELL_KEYS.includes(k)
+      && head[k] !== null && head[k] !== undefined && String(head[k]).trim() !== '')
+    if (!hasBizField) return generic
+    const status = String(head['单据状态'] || head['状态'] || '').trim()
+    if (status.includes('作废')) return `${label} ${tt('该单据已作废,作废单不进入列表')}`
+    if (status) return `${label} ${tt('当前状态为')}「${status}」`
+  } catch (e) {
+    /* 取不到抬头(不存在/无权限):走下面的兜底文案 */
+  }
+  return generic
 }
 // 同一面板内跳另一张单据(panelCode 不变,上面的 watcher 不触发)
 watch(
@@ -14737,6 +14920,10 @@ onUnmounted(() => {
 /* 单号链(条码面板):看起来是链接,但只开弹窗 —— 真跳转要过面板权限,不在这里直连 */
 .doc-no-link { color: var(--el-color-primary); cursor: pointer; text-decoration: underline dotted; }
 .doc-no-link:hover { color: var(--el-color-primary-light-3); }
+/* 检验数据记录明细表「取消完成」提交中:整列置灰,防连点 */
+.doc-no-link.disabled { opacity: 0.45; cursor: not-allowed; }
+/* 非「已完成检验」行的操作格占位(保持列宽一致) */
+.qc-reopen-na { color: var(--el-text-color-placeholder); }
 .doc-no-dlg-row { display: flex; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--el-border-color-lighter); }
 .doc-no-dlg-label { width: 48px; color: var(--el-text-color-secondary); flex: none; }
 .doc-no-dlg-value { word-break: break-all; }
@@ -14844,6 +15031,42 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+/* 纸面缩放条(2026-11-24):贴纸面区左上角,不参与纸张排版、不进导出件。
+   横向随纸面区一起滚动(absolute 定在容器内),纵向吸顶,长纸翻看时也点得到。 */
+.sheet-zoom-bar {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin: 6px 0 4px;
+  padding: 2px 6px;
+  border: 1px solid var(--t-border, #e4e7ed);
+  border-radius: 6px;
+  background: var(--t-bg-1, #fff);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  font-size: 12px;
+  color: var(--t-text-3, #909399);
+  user-select: none;
+}
+.sheet-zoom-bar .szb-title { margin-right: 2px; }
+.sheet-zoom-bar .szb-btn {
+  min-width: 24px;
+  height: 24px;
+  padding: 0 4px;
+  font-size: 13px;
+  line-height: 1;
+}
+.sheet-zoom-bar .szb-val {
+  min-width: 52px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--t-text-1, #303133);
+}
+.sheet-zoom-bar .szb-val.is-auto { color: var(--t-text-3, #909399); }
+.sheet-zoom-bar .szb-fit { margin-left: 2px; font-size: 12px; }
   height: 26px;
   padding: 0 10px;
   margin: 0 0 6px 0;

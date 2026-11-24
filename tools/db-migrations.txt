@@ -5205,3 +5205,10 @@ migrate-plan-wrong-project-name-20261123.sql
 migrate-i18n-upstream-newfields-20261124.sql
 migrate-finish-in-produced-qty-20261124.sql
 migrate-drop-inv-process-inspection-20261124.sql
+
+# 2026-11-24 分批送料「占用自洽」修数(客户报障:生单 4000、暂收单只有 200):
+#   form_flow_link.linked_quantity / yj_doc_batch.batch_qty 只在生单那一刻写一次,草稿里改暂收行
+#   「数量」不回写 ⇒ 订单行「已送」虚高、「剩余」被吃光(生产 YJ-20261103-06 行6 多算 3800)。
+#   本脚本按暂收行当前数量回写占用、重算批次台账;行已删则释放占用。幂等 + 末尾自检(必须 0 差额)。
+#   代码侧已同步修(BatchService.syncReceiptLinks,保存暂收单即回写);体检工具 verify/BatchLinkQtyAudit.java。
+migrate-batch-link-qty-sync-20261124.sql

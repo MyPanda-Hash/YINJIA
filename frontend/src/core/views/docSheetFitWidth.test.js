@@ -28,22 +28,22 @@ const docSheet = read('src/core/views/DocSheet.vue')
 test('① 纸面根节点挂了可算的缩放比例(sheetZoom)', () => {
   // 必须有一个按"容器宽 ÷ 纸宽"算出来的比例
   assert.match(docSheet, /sheetZoom/, 'DocSheet 没有 sheetZoom 计算属性 ⇒ 窄窗仍会横向滚动')
-  // 比例必须封顶 1(宽屏不放大)且封底(再小就看不清)
-  const m = docSheet.match(/const sheetZoom = computed\(\(\) => \{[\s\S]*?\n\}\)/)
-  assert.ok(m, '找不到 sheetZoom 计算属性')
-  const body = m[0]
-  assert.match(body, /Math\.min\(\s*1\b/, 'sheetZoom 必须用 Math.min(1, …) 封顶（宽屏不放大）')
-  // 下限可以是字面量，也可以是具名常量 —— 后者更可读，但要能查到它的数值在合理区间
-  const lit = body.match(/Math\.max\(\s*(0?\.\d+)/)
-  if (lit) {
-    assert.ok(Number(lit[1]) >= 0.4 && Number(lit[1]) <= 0.9, `缩放下限 ${lit[1]} 不合理`)
-  } else {
-    const name = body.match(/Math\.max\(\s*([A-Z_]+)/)
-    assert.ok(name, 'sheetZoom 必须有下限（太小可读性归零）')
-    const def = docSheet.match(new RegExp(`const ${name[1]} = (0?\\.\\d+)`))
-    assert.ok(def, `找不到 ${name[1]} 的数值定义`)
-    assert.ok(Number(def[1]) >= 0.4 && Number(def[1]) <= 0.9, `缩放下限 ${def[1]} 不合理（0.4~0.9）`)
-  }
+  // 2026-11-24：公式抽到 sheetZoom.js（同时支持用户手动放大），DocSheet 只负责调用。
+  //   口径仍必须：适应宽度封顶 1（宽屏不放大）、封底 0.6（再小就看不清）。
+  const fit = read('src/core/views/sheetZoom.js')
+  const m = fit.match(/export function fitZoom\([\s\S]*?\n\}/)
+  assert.ok(m, 'sheetZoom.js 找不到 fitZoom ⇒ 自动缩小的口径丢了')
+  assert.match(m[0], /Math\.min\(\s*1\b/, 'fitZoom 必须用 Math.min(1, …) 封顶（宽屏不放大）')
+  const floor = fit.match(/export const MIN_SHEET_ZOOM = (0?\.\d+)/)
+  assert.ok(floor, '找不到 MIN_SHEET_ZOOM 的数值定义')
+  assert.ok(Number(floor[1]) >= 0.4 && Number(floor[1]) <= 0.9, `缩放下限 ${floor[1]} 不合理（0.4~0.9）`)
+  // DocSheet 必须真的调用它（而不是自己又写一套公式）
+  const body = docSheet.match(/const sheetZoom = computed\(\(\) => \{[\s\S]*?\n\}\)/)
+  assert.ok(body, '找不到 sheetZoom 计算属性')
+  assert.match(body[0], /fitZoom\(/, 'sheetZoom 必须走 fitZoom 统一口径')
+  // 手动放大也必须经过钳位（不能直接把用户值塞进 zoom）
+  assert.match(body[0], /resolveZoom\(props\.userZoom/, '手动缩放必须经 resolveZoom 钳位')
+  assert.match(fit, /export const MAX_SHEET_ZOOM = 1\.5/, '手动放大上限按用户口径为 150%')
 })
 
 test('② 缩放只对"定死纸宽"的面板生效(自适应宽的纸本来就不会溢出)', () => {

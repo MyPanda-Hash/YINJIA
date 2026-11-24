@@ -1268,6 +1268,12 @@ public class ButtonService {
         // 明细列在 yj_field 里是 editable=0(见 tools/migrate-batch-no-on-generate.sql),
         // 行上的号只由这一处维护;非批次面板/无该列时内部直接返回,不做任何写入。
         batchService.syncBatchNo(def, no, user);
+        // 分批送料**占用自洽**(2026-11-24 客户报障「生单 4000、这里只有 200」):
+        // 占用 form_flow_link.linked_quantity 与批次台账 batch_qty 原先只在生单那一刻写一次,
+        // 之后在草稿里改暂收单行的「数量」不回写 ⇒ 该订单行的「已送」虚高、「剩余」被吃光,
+        // 而暂收/入库单只有改后的数量(生产实例:YJ-20261103-06 行6 占用 4000、单据 200)。
+        // 这里按**落库后的行数量**重算这两处;只在送料暂收单上生效,不动检验→入库/退回那条链的占用。
+        if ("QC_RECV".equals(def.code())) batchService.syncReceiptLinks(no, user);
         // 主保存路径落库成功才写 saved:markSaved=true「保存/提交/保存新增」,false「保存为草稿/新增」。
         // saved='Y' 只表示"这张单存过一次"(不表示已审核),前端 isFreshAddedDoc() 用 'N' 界定"本次新增"窗口。
         markDocSaved(def.code(), no, markSaved);

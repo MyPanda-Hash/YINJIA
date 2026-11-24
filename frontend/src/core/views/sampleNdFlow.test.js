@@ -36,7 +36,12 @@ test('一级审批：纸面只留「申请 / 审核」两格，span 合计 = 7',
 
 test('侧栏放出审批按钮组，且 ND 用独立配置', () => {
   assert.match(list, /if \(panelCode\.value === 'RD_SAMPLE_ND'\) return sampleNdSheetCfg/, 'ND 必须用独立配置')
-  assert.match(list, /sampleIntSheetCfg, sampleNdSheetCfg \} from '\.\/docSheetConfigs'/, '要 import 新配置')
+  // 2026-11-24：本行新增了 fixedSheetWidth，别再钉「以 sampleNdSheetCfg } 结尾」这种脆弱匹配；
+  // 意图是「两张样品的配置都从 docSheetConfigs 导入」，两个名字在同一个 import 里即成立。
+  const cfgImport = list.match(/import \{([^}]*)\} from '\.\/docSheetConfigs'/)
+  assert.ok(cfgImport, '要 import docSheetConfigs 的配置')
+  assert.match(cfgImport[1], /\bsampleIntSheetCfg\b/, '要 import sampleIntSheetCfg')
+  assert.match(cfgImport[1], /\bsampleNdSheetCfg\b/, 'ND 要 import 独立配置')
   const at = list.indexOf('const hasApprovalBtns = computed')
   const seg = list.slice(at, at + 2000)
   assert.match(seg, /RD_SAMPLE_ND/, 'hasApprovalBtns 要包含 ND')
