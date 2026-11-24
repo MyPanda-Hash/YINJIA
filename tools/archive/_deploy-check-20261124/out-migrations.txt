@@ -1,0 +1,39 @@
+      [注意] 使用 Basic 认证（明文 HTTP，仅限本次部署会话）
+[ok] 已连接 ecs-38508784 (http://36.140.66.163:5985/wsman)
+
+[0] 建远程目录 C:\yinjia\backup\mig
+[1] 上传
+    migrate-cleanup-non-kingdee-po-20261112.sql          OK  远端=7193 本地=7193
+    migrate-route-process-control-optional-20261119.sql  OK  远端=2879 本地=2879
+    migrate-sample-reg-seq-20261120.sql                  OK  远端=7097 本地=7097
+    migrate-sample-reg-list-order-20261120.sql           OK  远端=3891 本地=3891
+    migrate-qc-ship-insp-rename-20261120.sql             OK  远端=6213 本地=6213
+    migrate-qc-bhc-ship-insp-link-20261120.sql           OK  远端=8324 本地=8324
+    migrate-instr-summary-page-20261120.sql              OK  远端=7282 本地=7282
+    migrate-qc-flow-rename-20261120.sql                  OK  远端=6320 本地=6320
+    migrate-route-dates-optional-20261120.sql            OK  远端=3144 本地=3144
+    migrate-qc-line-patrol-approval-20261120.sql         OK  远端=4244 本地=4244
+    migrate-qc-bhc-resp-per-section-20261123.sql         OK  远端=11699 本地=11699
+    migrate-qc-insp-detail-panels-20261123.sql           OK  远端=14986 本地=14986
+    migrate-qc-insp-detail-doclinks-20261123.sql         OK  远端=10852 本地=10852
+    migrate-qc-bhcp-finished-20261124.sql                OK  远端=20423 本地=20423
+    migrate-po-erp-qty-cols-20261123.sql                 OK  远端=6149 本地=6149
+    migrate-i18n-upstream-newfields-20261124.sql         OK  远端=1868 本地=1868
+    migrate-finish-in-produced-qty-20261124.sql          OK  远端=7390 本地=7390
+    migrate-drop-inv-process-inspection-20261124.sql     OK  远端=3996 本地=3996
+    migrate-batch-link-qty-sync-20261124.sql             OK  远端=5617 本地=5617
+[2] 逐库执行（-b 出错即停）
+    [HSDZ_MES] migrate-cleanup-non-kingdee-po-20261112.sql          OK
+        == migrate-cleanup-non-kingdee-po-20261112 ==
+         ???????????(? 0 ?);????:???? 0 ?
+         ??????,????
+    [HSDZ_MES] migrate-route-process-control-optional-20261119.sql  OK
+         HSDZ_MES:ROUTE/???? required=1 ? 1 ?
+         HSDZ_MES:??????????
+         HSDZ_MES:ROUTE/???? ???(required=0)
+    [HSDZ_MES] migrate-sample-reg-seq-20261120.sql                  FAIL
+         HSDZ_MES:??? 57,?? Excel ?? 55
+        ?? 50000,?? 16,?? 1,??? ECS-38508784,? 112 ?
+         HSDZ_MES:??????????? 1~55 ???(???/??),???
+
+[中止] 第一条失败，后续未执行
