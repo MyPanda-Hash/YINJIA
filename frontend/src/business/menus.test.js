@@ -841,7 +841,9 @@ test('成型检验单 / 切炭检验单 / 成品检验规范 已下架:菜单树
   assert.deepEqual((group('qcProcess').children || []).map((c) => c.panelCode),
     ['QC_FIRST_INSP', 'QC_PROC_INSP', 'QC_ASM_INSP', 'QC_PROC_INSP_DETAIL', 'QC_ASM_INSP_DETAIL',
       'QC_OQC_REPORT', 'QC_LINE_PATROL'])
-  assert.equal((group('qcDoc').children || []).length, 7)
+  // 2026-11-24 用户口径「表观就转向不合格处理(成品)」⇒ 质量单据组 7 → 8 张(不合格品处理单(成品) QC_BHCP)
+  assert.equal((group('qcDoc').children || []).length, 8)
+  assert.ok((group('qcDoc').children || []).some((c) => c.panelCode === 'QC_BHCP'), '质量单据组应有「不合格品处理单(成品)」')
 })
 
 /**

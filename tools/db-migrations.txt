@@ -5132,3 +5132,14 @@ migrate-qc-bhc-resp-per-section-20261123.sql
 #   + flat 面板 QC_PROC_INSP_DETAIL / QC_ASM_INSP_DETAIL(报表,100 行/页) + yj_field + 只读授权 + 译名。
 #   幂等;两账套均执行。
 migrate-qc-insp-detail-panels-20261123.sql
+
+# 2026-11-23 出货检验两张明细表的单号可跳转(用户口径「点击对应的单号可以转到对应的单据」):
+#   视图 v_qc_proc_insp_detail / v_qc_asm_insp_detail 尾部补隐藏列 [工单行id] = plang.id
+#   (点工单号 → 生产工单页 ?keyword=&focus= 定位该工单行);yj_field 隐藏列 + 10 语言译名 + 列中文注明。
+#   幂等;两账套均执行。
+migrate-qc-insp-detail-doclinks-20261123.sql
+
+# 2026-11-24 出货检验判不合格的去向 + 不合格数量影响产成品入库(用户口径「修改为弹窗跳转…表观转向不合格处理(成品)"):
+#   新建《不合格品处理单(成品)》qc_bhc_cp/_detail + 面板 QC_BHCP(前缀 BHCP) + 字段/授权/译名;
+#   制程单 qc_bhc 补 工单行号/批次号(与成品单同键,供产成品入库按工单行+批次扣减)。幂等;两账套均执行。
+migrate-qc-bhcp-finished-20261124.sql

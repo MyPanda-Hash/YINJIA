@@ -237,7 +237,7 @@
           :result-text-field="procInspResultTextField"
           @dirty="markInlineDirty"
           @open-items="qcInspPlanVisible = true"
-          @open-ng="openNgDisposition"
+          @ng-verdict="onNgVerdict"
         />
         <QcFirstInspSheet
           v-else-if="panelCode === 'QC_FIRST_INSP'"
@@ -996,7 +996,7 @@
               :prop="child.prop"
               :min-width="child.width"
               :align="child.align"
-              show-overflow-tooltip
+              :show-overflow-tooltip="!child.wrap"
             >
               <template #header>
                 <div class="report-col-container">
@@ -1022,7 +1022,7 @@
             :prop="column.prop"
             :min-width="column.width"
             :align="column.align"
-            show-overflow-tooltip
+            :show-overflow-tooltip="!column.wrap"
           >
             <template #default="{ row }">
               <template v-if="isStockStatus && column.prop === '预警数量'">
@@ -1048,6 +1048,13 @@
                     class="doc-no-link"
                     :title="tt('点击查看或复制编号')"
                     @click.stop="openDocNoDialog(row, column.prop)">{{ row[column.prop] }}</span>
+              <!-- 出货检验明细表(2026-11-23 用户口径「实现点击对应的单号可以转到对应的单据」):
+                   单据编号 → 该出货检验单(面板列表 ?docNo= 定位);工单号 → 生产工单页定位该工单行。
+                   只有这两列算链接,契约与权限闸门的唯一真源 = @core/qc/qcInspDetailLinks。 -->
+              <span v-else-if="reportLinkKind(column.prop) && row[column.prop]"
+                    class="doc-no-link"
+                    :title="tt('点击跳转到该单据')"
+                    @click.stop="openReportLink(row, column.prop)">{{ row[column.prop] }}</span>
               <span v-else>{{ row[column.prop] }}</span>
             </template>
             <template #header>
@@ -2892,9 +2899,13 @@ import InspCommissionSheet from '@core/qc/InspCommissionSheet.vue'
 // 首件检验单的列模型(「取成型工艺清单」按列合并时用:已有列只刷标准、保留已填数据)
 import { mergeFetchedColumns } from '@core/qc/firstInspCols.js'
 import QcProcInspWoPicker from '@core/qc/QcProcInspWoPicker.vue'
+// 判不合格 → 不合格品处理单(2026-11-24 用户口径):检验结论选「不合格」→ 提示窗询问是否前往 →
+//   确认后跳到对应处理单(功能→制程 QC_BHC / 表观→成品 QC_BHCP,见 NG_TARGETS)。
+import { canOpenNgDisposition, ngTargetOf } from '@core/qc/shipInspNg'
 import ZonePickDialog from './ZonePickDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
+import { fitColWidth, needsWrap } from '@core/report/colWidth'
 // 通用「日期范围查询」控件(2026-11-09 从订单结转抽出的共用实现,带今日/本周/本月快捷档)。
 // 2026-11-18:报工记录的内联查询区「单据日期」也用它(用户口径「要可以选择某个日期段的」)——
 // 与订单结转/生产工单同一份控件、同一套快捷档,不另写一套 date-range。
@@ -2918,6 +2929,14 @@ import { applyCodes, applyFuzzy, applyPicked, clearField, normalizeCodeList } fr
 import { PROD_DOC_FIELD_OPTIONS, buildProdDocFilter, filterProdDocRows } from '@core/prod/prodDocSearch'
 import { nextSortState, sortRows } from '@core/sort/rowSort'
 import { canConfigFields, canConfigWarn, canPanelDo, canViewPanel } from '@core/auth/panelAccess'
+// 出货检验明细表(QC_PROC_INSP_DETAIL / QC_ASM_INSP_DETAIL)的单号跳转契约(2026-11-23):
+// 单据编号 → 出货检验单、工单号 → 生产工单页;只有这两列算链接,权限闸门也在同一份纯函数里。
+import {
+  LINK_WO_LINE_COL,
+  detailLinkKind,
+  docJumpTarget,
+  workOrderJumpTarget,
+} from '@core/qc/qcInspDetailLinks'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import { BARCODE_PANELS, barcodeLabelsOf } from '@core/panel/barcodeLabel'
 import RefPickDialog from './RefPickDialog.vue'
@@ -4414,7 +4433,7 @@ const DIRECT_AUDIT_ACTION = '审核'
  * 这些面板上「审核」按钮照常出现(用户口径:单据按钮界面都要有),点了会给出「走两级审批」的原因。
  */
 const DIRECT_AUDIT_BLOCKED = [
-  'QC_TC_IN', 'QC_BHG', 'QC_BHC', 'QC_BHZ', 'QC_JJF', 'QC_SCP', 'QC_LYB', 'QC_SCY', 'QC_OQC_REPORT',
+  'QC_TC_IN', 'QC_BHG', 'QC_BHC', 'QC_BHCP', 'QC_BHZ', 'QC_JJF', 'QC_SCP', 'QC_LYB', 'QC_SCY', 'QC_OQC_REPORT',
   'RD_PROD_INFO', 'RD_SAMPLE_EXT',
 ]
 
@@ -4603,6 +4622,14 @@ const selfAuditNow = computed(() => curSubmitter.value === String(user.userName 
 const docQueryVisible = ref(false)
 const docQueryNo = ref('')
 const docQueryRange = ref(null)
+/**
+ * ?docNo= 深链刚消费掉 = 下一次 load 要判「目标单是否被左栏状态页签挡住」并退回「全部」
+ * (2026-11-23;判定与消费都在 load() 内同名块,来源 applyDocNoQuery)。
+ * 声明放在这里(而不是 applyDocNoQuery 旁边):load() 在它之前定义也要能读,免得踩 TDZ。
+ */
+let docDeepPending = false
+/** 该深链是给哪个面板的(面板码)—— 切走面板后残留的标记不许影响新面板 */
+let docDeepPanel = ''
 
 // ---------- 库存状况:仓库下拉(_ckdm 按仓库编码精确过滤;dm_ck 字典改名不影响绑定) ----------
 const stockWh = ref('')
@@ -5611,7 +5638,7 @@ const l2ApproverNow = computed(() => {
 //   ButtonService.QC_DOC_PREPARER / ADMIN_L2_PANELS):提交审批 → 审批通过(一次) → 已审核 → 弃审 → 草稿。
 //   它们仍保留侧栏审批组显示(hasApprovalBtns 名单),只是不再走「一级/二级/批准」节点;
 //   本清单必须与后端 ADMIN_L2_PANELS 的 key 集一致,否则按钮点了被后端拒。
-const L2_DOC_PANELS = ['QC_TC_IN', 'QC_BHG', 'QC_BHC', 'QC_BHZ', 'QC_JJF', 'QC_SCP', 'QC_LYB', 'QC_SCY', 'QC_OQC_REPORT']
+const L2_DOC_PANELS = ['QC_TC_IN', 'QC_BHG', 'QC_BHC', 'QC_BHCP', 'QC_BHZ', 'QC_JJF', 'QC_SCP', 'QC_LYB', 'QC_SCY', 'QC_OQC_REPORT']
 const isQcL2Panel = computed(() => L2_DOC_PANELS.includes(String(panelCode.value)))
 /** 一级审核节点(节点 1):状态还是「审批中」 */
 const qcL2Node = computed(() => isQcL2Panel.value && curDocStatus.value === '待二级审批')
@@ -6733,6 +6760,8 @@ const DOC_RAIL_PANELS = {
   QC_TC_IN: ['供应商', '采购单号'],
   QC_BHG: ['客户名称', '产品名称'],
   QC_BHC: ['产品编码'],
+  // 不合格品处理单(成品)(2026-11-24):与制程单同族,左栏同样按产品编码定位
+  QC_BHCP: ['产品编码'],
   QC_BHZ: ['物料编码', '物料批次'],
   QC_JJF: ['物料编码', '批次号'],
   QC_SCP: ['物料编码', '物料批次'],
@@ -8280,6 +8309,24 @@ function colW(f) {
   if (t === '日期' || t === '日期时间') return 136
   const n = f.label || f.dataName || ''
   return n.length <= 2 ? 96 : Math.min(Math.max(n.length * 16 + 30, 96), 220)
+}
+
+/**
+ * 报表列宽(2026-11-23 用户口径:基础列的内容要**默认完全展开**,不能显示成省略号)。
+ *
+ * 旧口径 colW 只按**列名**的字数算宽 ⇒ 2 字以上中文列一律 96px,于是
+ * 单据编号/工单号/产品名称/规格型号/批次号 全被截断(2026-11-23 在 .report-table 实测:
+ * 单据编号 100/100 行、工单号 97/100、产品名称 91/100、规格型号 70/100 行带省略号)。
+ * 现在交给 core/report/colWidth.js:宽 = max(列名宽, yj_field.width, 当前页真实内容宽),
+ * 撞上限的长段落由 reportLeaf 标 wrap ⇒ 单元格换行、全文显示。
+ */
+function reportColW(field, prop) {
+  const values = []
+  for (const row of list.value || []) {
+    if (!row || row._placeholder) continue
+    values.push(row[prop])
+  }
+  return fitColWidth(colW(field), field.width, values)
 }
 
 // ---------- 明细右键/图标操作（作用于当前活动区块） ----------
@@ -10950,7 +10997,7 @@ async function openNgDisposition() {
     //   见 GlobalExceptionHandler 头注) ⇒ 必须显式判 code,否则会把错误体当成功、拿不到编号
     if (!res || res.code !== 200) throw new Error(res?.message || tt('开不合格品处理单失败'))
     const data = res.data || {}
-    const target = String(data['gotoPanel'] || 'QC_BHC')
+    const target = String(data['gotoPanel'] || ngTargetOf(panelCode.value)?.panel || 'QC_BHC')
     const targetNo = String(data['编号'] || '')
     if (!targetNo) {
       ElMessage.warning(tt('未生成不合格品处理单'))
@@ -10958,6 +11005,8 @@ async function openNgDisposition() {
     }
     ElMessage.success(`${data['已存在'] === true ? tt('该检验单已有不合格品处理单')
       : tt('已生成不合格品处理单')}：${targetNo}`)
+    // 2026-11-24 用户口径(第二轮):**不是**在弹窗里内嵌处理单纸面 ——
+    //   提示窗问「是否前往」,确认后直接关本页签 → 开目标页签 → ?docNo= 定位那张不合格单。
     await guardPageAction(async () => {
       const targetPath = `/panelx/list/${target}`
       tabs.close(route.path)
@@ -10969,6 +11018,33 @@ async function openNgDisposition() {
   } finally {
     ngOpening.value = false
   }
+}
+
+/**
+ * 纸面「检验结论」选成「不合格」的那一刻(2026-11-24 用户口径):
+ * 「点击这个检验结论为不合格能跳出一个弹窗提示前往那个不合格单据」。
+ *
+ * <p>只弹一次提示(选一次弹一次);点「暂不」就什么都不做,单据照常保存;
+ * 点「前往开单」→ 走 {@link openNgDisposition}(脏单先静默保存 → 服务端取/建对应处理单 → 整页定位到那张单)。
+ * 目标是哪张由 {@link ngTargetOf} 决定:功能→不合格品处理单(制程)、表观→不合格品处理单(成品)。</p>
+ */
+async function onNgVerdict() {
+  if (!canOpenNgDisposition(panelCode.value, cur.value)) return
+  if (ngOpening.value) return
+  const target = ngTargetOf(panelCode.value)
+  try {
+    await ElMessageBox.confirm(
+      tt('检验结论已选为「不合格」，是否前往「{a}」开单？').replace('{a}', tt(target?.label || '不合格品处理单')),
+      tt('检验结论：不合格'),
+      {
+        type: 'warning',
+        confirmButtonText: tt('前往开单'),
+        cancelButtonText: tt('暂不'),
+        distinguishCancelAndClose: true,
+      },
+    )
+  } catch { return }
+  await openNgDisposition()
 }
 
 /**
@@ -12074,12 +12150,52 @@ function qOptions(qr) {
   return qOptCache.get(key)
 }
 
+/* ══════════ 出货检验明细表(QC_*_INSP_DETAIL):单号列可点跳转 ══════════
+ * 用户口径(2026-11-23):「实现点击对应的单号可以转到对应的单据」(红框圈住「工单号」列)。
+ *   · 单据编号 → 该行所属的出货检验单(/panelx/list/<面板>?docNo=<单号>,与检验数据记录明细表同款);
+ *   · 工单号   → 生产工单页(/prod/plan/workOrderList?keyword=<工单号>&focus=<工单行id>),
+ *                与「生产工序进度看板」点整行同款:定位该工单行 + 打开追溯。
+ * 哪些列算链接、跳去哪、权限够不够,全在 @core/qc/qcInspDetailLinks(纯函数,有单测);
+ * 这里只做「判定 → 提示 → 发路由」。没权限/空单号一律只提示,不发路由(免得多跑一趟必然被拒的跳转)。
+ */
+/** 该列要不要渲染成链接('' = 普通单元格) */
+function reportLinkKind(prop) {
+  return detailLinkKind(panelCode.value, prop)
+}
+
+/** 点单号 → 打开对应单据(出货检验单 / 生产工单行) */
+function openReportLink(row, prop) {
+  const kind = reportLinkKind(prop)
+  if (!kind) return
+  const no = String(row?.[prop] ?? '').trim()
+  if (!no) return
+  // 面板权限判定用 isAdmin + visiblePanels;页面权限用 isAdmin + pagePerms(两个判据各取所需,
+  // 与导航/看板/生产工序进度看板跳转同一真源,见 @core/auth/panelAccess)。
+  const permUser = {
+    isAdmin: user.isAdmin,
+    visiblePanels: user.visiblePanels,
+    pagePerms: user.pagePerms,
+  }
+  const target = kind === 'workOrder'
+    ? workOrderJumpTarget(permUser, no, row?.[LINK_WO_LINE_COL])
+    : docJumpTarget(permUser, panelCode.value, no)
+  if (!target.ok) {
+    if (target.reason === 'no-permission') {
+      ElMessage.warning(tt('无查看该面板的权限') + ':' + tt(kind === 'workOrder' ? '生产工单' : target.title))
+    }
+    return
+  }
+  router.push({ path: target.path, query: target.query })
+}
+
 function reportLeaf(column) {
   const field = fieldDefOf(column)
   // 「数值」也要按数值列处理(2026-11-20):报工数量在 yj_field 里 data_type=数值,
   // 旧判据只认 小数/整数 ⇒ 报表列左对齐、导出 Excel 也当文本(不能直接求和/右对齐)。
   const numeric = ['小数', '整数', '数值'].includes(field.dataType)
-  return { prop: column, label: column, width: colW(field), align: numeric ? 'right' : 'left' }
+  const width = reportColW(field, column)
+  // 撞到上限 ⇒ 内容比列还长(长段落):关掉省略号,让单元格换行把全文显示出来
+  return { prop: column, label: column, width, align: numeric ? 'right' : 'left', wrap: needsWrap(width) }
 }
 
 async function reportPage(pageNo) {
@@ -13925,6 +14041,23 @@ async function load(clamping = false) {
       if (fi >= 0) curIdx.value = fi
       router.replace({ path: route.path, query: { ...route.query, focus: undefined } })
     }
+    // ?docNo= 深链的页签兜底(2026-11-23):与上面的 ?focus= 同一口径 —— **深链优先于页签**。
+    // 左栏「未完成/已完成/全部」默认停在「未完成」(RAIL_STATUS_TABS 首项),而明细表里点
+    // 「单据编号」要看的往往是一张**已审核**的单(实测 ZJ-2026-11-0009:shr=admin ⇒ 落在已完成)
+    // ⇒ 不退回「全部」就只会看到一张空白纸面 + 左栏「共有数据 0 条」,用户以为单子丢了。
+    // 只认「发给本面板」的那一次(docDeepPanel 相同),用完即清:切走面板后残留的标记不许影响新面板,
+    // 之后用户自己切页签也不能被这条兜底抢回来。
+    if (docDeepPending && docDeepPanel === String(panelCode.value || '')) {
+      const deepNo = String(docQueryNo.value || '').trim()
+      const deepFound = !!deepNo && list.value.some((r) => String(r['单据编号'] || r['编号'] || r['锭号'] || '') === deepNo)
+      docDeepPending = false
+      if (deepNo && !deepFound && railStatusTabs.value.length && railStatusTab.value !== 'all') {
+        railStatusTab.value = 'all'
+        query.pageNo = 1
+        await load(true) // clamping=true:同一套防递归口径
+        return
+      }
+    }
     // 参照字段模式跟随最新数据量(增删档案跨越 20 条阈值时下拉↔弹窗自动切换)
     refreshRefModes()
     markSavedSnapshot() // 未保存离开守卫的基线快照（载入即干净；保存成功也会经此刷新）
@@ -14149,6 +14282,8 @@ function applyDocNoQuery() {
   if (!no) return false
   docQueryNo.value = String(no)
   condition['_docNo'] = String(no)
+  docDeepPending = true
+  docDeepPanel = String(panelCode.value || '')
   lastDocJumpAt = Date.now()
   router.replace({ path: route.path, query: { ...route.query, docNo: undefined } })
   return true

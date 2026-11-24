@@ -46,7 +46,8 @@ test('④ QC_BHC 右上「时间」= 提交审批时间戳(含时分),后端派�
   const time = qcSheetCfgs.QC_BHC.info.find((i) => i.label === '时间')
   assert.equal(time.key, '提交时间')
   assert.equal(time.kind, 'head-static')
-  assert.match(QUERY_SVC, /DOC_SUBMIT_TIME_PANELS = java\.util\.Set\.of\("QC_BHC"\)/)
+  assert.match(QUERY_SVC, /DOC_SUBMIT_TIME_PANELS = java\.util\.Set\.of\("QC_BHC", "QC_BHCP"\)/,
+    '制程与成品两张不合格品处理单都要派生「提交时间」')
   assert.match(QUERY_SVC, /ofPattern\("yyyy-MM-dd HH:mm"\)/)
   assert.match(QUERY_SVC, /pending_at.*shsj.*firstSave/s, '必须是 提交时间 → 审核时间 → 首次填写 的回退链')
 })

@@ -1332,6 +1332,9 @@ public class ButtonService {
         // 纯落款「编制」格的创建人预填(2026-11-02):见 prefillPreparerName 注释。
         // 落库后执行 ⇒ 同一次保存即可在纸面上看到;只在为空时写,不覆盖已有/用户已确认的值。
         prefillPreparerName(def, no, user);
+        // 不合格品处理单(制程/成品)保存后:按本单不合格数量**下调**同工单行的产成品入库草稿
+        // (2026-11-24 用户口径:「不合格处理数量能影响到后面的产成品入库的实际数量」)
+        refreshFinishInAfterNg(def, no, user);
         return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
     }
 
@@ -3114,6 +3117,15 @@ public class ButtonService {
         //   (用户流程「等两张检验单审核完成后再提交」——不该再让人手挑单号)
         String wo = String.valueOf(h.get("wo") == null ? "" : h.get("wo")).trim();
         int xc = h.get("xc") instanceof Number n ? n.intValue() : 0;
+        // 2026-11-24:提交/审核前按两张不合格品处理单的数量**下调**实收数量(只下调 —— 用户手工改小的
+        //   值保留,不会被抬回去;口径见 ensureFinishInDrafts 注释)。
+        if (!wo.isEmpty() && xc > 0) {
+            try {
+                ensureFinishInDrafts(wo, xc, currentUserName(), true);
+            } catch (RuntimeException e) {
+                log.warn("[FINISH_IN] 单据 {} 提交前按不合格数量下调失败(不阻断门禁): {}", no, e.getMessage());
+            }
+        }
         // 2026-11-18 用户口径「当前物料如果没有选择是否过程检验就不强制这个实现了」:
         //   商品档案没勾「是否过程检验=是」的入库单不强制关联两张检验单(判据见 finishInNeedsInsp)。
         if (!finishInNeedsInsp(no, wo, xc)) {
@@ -3649,6 +3661,29 @@ public class ButtonService {
 
     /** 重算某工单行的多批次入库草稿并落库(报工审核/补生成共用);返回{新建单据,更新明细}。 */
     private java.util.Map<String, Object> ensureFinishInDrafts(String wo, int xc, String user) {
+        return ensureFinishInDrafts(wo, xc, user, false);
+    }
+
+    /**
+     * 重算某工单行的多批次入库草稿(带「不合格数量」扣减 —— 2026-11-24 用户口径)。
+     *
+     * <p>用户口径:「要求需要实现当前的不合格处理数量能影响到后面的产成品入库的实际数量。
+     * 也就是这些内容都和工单相关联。」</p>
+     *
+     * <p>口径:</p>
+     * <ul>
+     *   <li>不合格数量来源 = 两张不合格品处理单:**制程 {@code qc_bhc}**(出货检验功能判不合格)
+     *       + **成品 {@code qc_bhc_cp}**(出货检验表观判不合格);两者都带 工单号/工单行号/批次号;</li>
+     *   <li>归集键 = **工单号 + 工单行号(+批次号=yMMdd 完工日)**;处理单没填行号(历史单/手工单)按整工单归集,
+     *       处理单没填批次 ⇒ 记到**最新批次**(本次生成里最靠后的那批),并写 warn 日志;</li>
+     *   <li>每批明细行:`实收数量 = 完工报工量 − 已锁定批次量 − 不合格数量`(下限 0),
+     *       `不合格数量` 同步写进明细列(该列 2026-11-18 起就有,此前只记录不扣减);</li>
+     *   <li>{@code onlyLower=true}(不合格处理单保存/产成品入库提交时)= 只**下调**实收数量,
+     *       绝不把用户手工改小的值再抬回去;</li>
+     *   <li>取不到处理单表/列(老库、测试库缺迁移)⇒ 按 0 处理并 warn,不阻断开单。</li>
+     * </ul>
+     */
+    private java.util.Map<String, Object> ensureFinishInDrafts(String wo, int xc, String user, boolean onlyLower) {
         java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
         out.put("新建单据", 0);
         out.put("更新明细", 0);
@@ -3705,16 +3740,60 @@ public class ButtonService {
             }
         }
         java.util.List<java.util.Map<String, Object>> need = new java.util.ArrayList<>();
+        // ── 不合格数量(2026-11-24):制程 qc_bhc + 成品 qc_bhc_cp,按 工单号+工单行号(+批次) 归集 ──
+        java.util.Map<String, Double> ngByBatch = new java.util.LinkedHashMap<>();
+        double ngLoose = 0d;
+        for (java.util.Map<String, Object> r : ngRowsOf(wo, xc)) {
+            String nb = str(r.get("batch"));
+            double ng = numOr(r.get("ng"));
+            if (ng <= 0) continue;
+            if (nb.isEmpty()) ngLoose = roundQty(ngLoose + ng);
+            else ngByBatch.merge(nb, ng, (a, b) -> roundQty(a + b));
+        }
+        // 处理单批次对不上本次报工的任何批次(手工填错/更早批次):并入「未填批次」按最新批次扣,
+        // 否则这笔不合格会留在 ngByBatch 里、永远不参与扣减(静默丢失,违背「数量要影响入库」口径)。
+        if (!ngByBatch.isEmpty()) {
+            java.util.Set<String> knownBatch = new java.util.HashSet<>();
+            for (java.util.Map<String, Object> b : batches) knownBatch.add(str(b.get("batch")));
+            for (String k : new java.util.ArrayList<>(ngByBatch.keySet())) {
+                if (k.isEmpty() || knownBatch.contains(k)) continue;
+                ngLoose = roundQty(ngLoose + ngByBatch.remove(k));
+                log.warn("[FINISH_IN] 工单 {} 行 {}:不合格处理单批次 {} 不在本次报工批次内,按未填批次归集到最新批次",
+                        wo, xc, k);
+            }
+        }
         for (java.util.Map<String, Object> b : batches) {
             String batch = str(b.get("batch"));
             double total = numOr(b.get("qty"));
             double got = lockedQty.getOrDefault(batch, 0d);
-            double qty = roundQty(total - got);
-            if (batch.isEmpty() || qty <= 0.0001) continue;
+            double ng = ngByBatch.getOrDefault(batch, 0d);
+            double qty = roundQty(total - got - ng);
+            if (batch.isEmpty() || (qty <= 0.0001 && ng <= 0.0001)) continue;
             java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
             item.put("batch", batch);
-            item.put("qty", qty);
+            item.put("qty", Math.max(0d, qty));
+            item.put("ng", ng);
             need.add(item);
+        }
+        // 处理单没填批次的量:记到本次生成里**最新一个还有剩余量的批次**,并在日志里留痕
+        // (从后往前找 qty>0 的那批:最后一批可能已被自己的不合格数量扣到 0,不能白丢)
+        if (ngLoose > 0.0001 && !need.isEmpty()) {
+            java.util.Map<String, Object> last = null;
+            for (int i = need.size() - 1; i >= 0; i--) {
+                if (numOr(need.get(i).get("qty")) > 0.0001) { last = need.get(i); break; }
+            }
+            if (last == null) {
+                log.warn("[FINISH_IN] 工单 {} 行 {}:不合格数量 {} 没有可扣的剩余批次(各批已扣完),未写入入库草稿",
+                        wo, xc, ngLoose);
+            } else {
+                String lb = str(last.get("batch"));
+                double cur = numOr(last.get("qty"));
+                double take = Math.min(ngLoose, cur);
+                last.put("qty", Math.max(0d, roundQty(cur - take)));
+                last.put("ng", roundQty(numOr(last.get("ng")) + take));
+                ngByBatch.merge(lb, take, (a, b) -> roundQty(a + b));
+                log.warn("[FINISH_IN] 工单 {} 行 {}:不合格处理单有 {} 未填/对不上批次,已从批次 {} 扣减", wo, xc, ngLoose, lb);
+            }
         }
         if (need.isEmpty()) return out;
         String procNo = latestInsp("QC_PROC_INSP", "qc_proc_insp_head", wo, xc);
@@ -3724,23 +3803,27 @@ public class ButtonService {
             for (java.util.Map<String, Object> item : need) {
                 String batch = str(item.get("batch"));
                 double qty = numOr(item.get("qty"));
+                double ng = numOr(item.get("ng"));
                 java.util.List<java.util.Map<String, Object>> exists = jdbc.queryForList(
-                        "SELECT id FROM dbo.bl_finish_in WHERE 单据编号=? AND ISNULL(批号,N'')=?"
+                        "SELECT id, ISNULL(实收数量,0) AS qty FROM dbo.bl_finish_in WHERE 单据编号=? AND ISNULL(批号,N'')=?"
                                 + " AND ISNULL(asp_cancel,'N')<>'Y'", openNo, batch);
                 if (exists.isEmpty()) {
                     Integer seq = jdbc.queryForObject(
                             "SELECT ISNULL(MAX(序号),0)+1 FROM dbo.bl_finish_in WHERE 单据编号=?", Integer.class, openNo);
                     jdbc.update("INSERT INTO dbo.bl_finish_in (单据编号, 序号, 产品编码, 产品名称, 规格型号, 计量单位,"
-                                    + " 批号, 实收数量, 仓库, asp_cancel, asp_user1, asp_time1)"
-                                    + " VALUES (?,?,?,?,?,?,?,?,?,N'N',?,GETDATE())",
-                            openNo, seq, inv, invName, spec, unit, batch, qty, wh, user);
+                                    + " 批号, 实收数量, 不合格数量, 仓库, asp_cancel, asp_user1, asp_time1)"
+                                    + " VALUES (?,?,?,?,?,?,?,?,?,?,N'N',?,GETDATE())",
+                            openNo, seq, inv, invName, spec, unit, batch, qty, ng, wh, user);
                 } else {
-                    jdbc.update("UPDATE dbo.bl_finish_in SET 实收数量=?, 仓库=?,"
+                    // onlyLower:只下调(用户手工改小的实收数量不被抬回去)
+                    double finalQty = qty;
+                    if (onlyLower) finalQty = Math.min(qty, numOr(exists.get(0).get("qty")));
+                    jdbc.update("UPDATE dbo.bl_finish_in SET 实收数量=?, 不合格数量=?, 仓库=?,"
                                     + " 产品编码=CASE WHEN ISNULL(产品编码,N'')=N'' THEN ? ELSE 产品编码 END,"
                                     + " 产品名称=CASE WHEN ISNULL(产品名称,N'')=N'' THEN ? ELSE 产品名称 END,"
                                     + " 规格型号=CASE WHEN ISNULL(规格型号,N'')=N'' THEN ? ELSE 规格型号 END,"
                                     + " 计量单位=CASE WHEN ISNULL(计量单位,N'')=N'' THEN ? ELSE 计量单位 END"
-                                    + " WHERE id=?", qty, wh, inv, invName, spec, unit, exists.get(0).get("id"));
+                                    + " WHERE id=?", finalQty, ng, wh, inv, invName, spec, unit, exists.get(0).get("id"));
                 }
                 out.put("更新明细", (int) numOr(out.get("更新明细")) + 1);
             }
@@ -3776,6 +3859,7 @@ public class ButtonService {
             if (!unit.isEmpty()) line.put("计量单位", unit);
             line.put("批次号", str(item.get("batch")));
             line.put("实收数量", numOr(item.get("qty")));
+            if (numOr(item.get("ng")) > 0.0001) line.put("不合格数量", numOr(item.get("ng")));
             line.put("仓库", wh);
             items.add(line);
         }
@@ -3792,6 +3876,105 @@ public class ButtonService {
     private static double roundQty(double v) {
         return Math.round(v * 10000d) / 10000d;
     }
+
+    /**
+     * 某工单行的「不合格处理数量」明细(2026-11-24):制程 {@code qc_bhc} + 成品 {@code qc_bhc_cp}。
+     *
+     * <p>行号匹配:处理单行号 = 本行则计入;处理单行号为 0/NULL(历史单、手工建的处理单)
+     * **只在「单行工单」上**并入本行 —— 多行工单无法判断这笔不合格属于哪一行,若每行都算一遍
+     * 会把同一笔数量重复扣到每条入库草稿上(2026-11-24 审查发现:多行工单重复扣减)。</p>
+     *
+     * <p>返回 {@code [{batch, ng}]};表/列缺失(老库未跑迁移)⇒ 空列表 + warn,不抛。</p>
+     */
+    private java.util.List<java.util.Map<String, Object>> ngRowsOf(String wo, int xc) {
+        java.util.List<java.util.Map<String, Object>> all = new java.util.ArrayList<>();
+        // 未填行号的处理单只在单行工单上按该行归集;多行工单宁可不扣(留 warn),也不能重复扣
+        boolean looseOk = xc > 0 && singleLineWorkOrder(wo);
+        String lineCond = looseOk
+                ? "(ISNULL([工单行号],0)=? OR ISNULL([工单行号],0)=0)"
+                : "ISNULL([工单行号],0)=?";
+        for (String table : new String[]{"qc_bhc", "qc_bhc_cp"}) {
+            try {
+                all.addAll(jdbc.queryForList(
+                        "SELECT ISNULL([批次号],N'') AS batch, ISNULL(SUM(ISNULL([不合格品数量],0)),0) AS ng"
+                                + " FROM dbo." + table
+                                + " WHERE [工单号]=? AND " + lineCond
+                                + "   AND ISNULL(asp_cancel,'N')<>'Y'"
+                                + " GROUP BY ISNULL([批次号],N'')", wo, xc));
+            } catch (RuntimeException e) {
+                log.warn("[FINISH_IN] 取 {} 的不合格处理数量失败(按 0 处理): {}", table, e.getMessage());
+            }
+        }
+        if (looseOk) {
+            // 有未填行号的处理单被并入时才提示一次(便于排查"数量对不上"的来路)
+            try {
+                Integer loose = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM ("
+                                + " SELECT id FROM dbo.qc_bhc WHERE [工单号]=? AND ISNULL([工单行号],0)=0"
+                                + "   AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL([不合格品数量],0)>0"
+                                + " UNION ALL"
+                                + " SELECT id FROM dbo.qc_bhc_cp WHERE [工单号]=? AND ISNULL([工单行号],0)=0"
+                                + "   AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL([不合格品数量],0)>0) t",
+                        Integer.class, wo, wo);
+                if (loose != null && loose > 0) {
+                    log.warn("[FINISH_IN] 工单 {} 有 {} 张未填工单行号的不合格处理单,已按单行工单归集到第 {} 行",
+                            wo, loose, xc);
+                }
+            } catch (RuntimeException ignored) {
+                // 提示查询失败不影响主链路
+            }
+        }
+        return all;
+    }
+
+    /** 该工单是否只有一行(plang.pl_xc 去重后 = 1);查不到/异常 ⇒ false(按多行处理,宁可不猜) */
+    private boolean singleLineWorkOrder(String wo) {
+        try {
+            Integer n = jdbc.queryForObject(
+                    "SELECT COUNT(DISTINCT ISNULL(pl_xc,0)) FROM dbo.plang"
+                            + " WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'", Integer.class, wo);
+            return n != null && n == 1;
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /**
+     * 不合格品处理单(制程/成品)落库后 → 把该工单行的产成品入库草稿按不合格数量**下调**
+     * (只下调,不抬回;用户口径 2026-11-24「不合格处理数量能影响到后面的产成品入库的实际数量」)。
+     */
+    private void refreshFinishInAfterNg(PanelRegistry.PanelDef def, String no, String user) {
+        if (def == null || no == null || !("QC_BHC".equals(def.code()) || "QC_BHCP".equals(def.code()))) return;
+        if (def.headTable() == null || def.headTable().isBlank()) return;
+        try {
+            java.util.List<java.util.Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT ISNULL([工单号],N'') AS wo, ISNULL([工单行号],0) AS xc FROM dbo." + def.headTable()
+                            + " WHERE [单据编号]=? AND ISNULL(asp_cancel,'N')<>'Y'", no);
+            if (rows.isEmpty()) return;
+            String wo = str(rows.get(0).get("wo"));
+            if (wo.isEmpty()) return;
+            int xc = (int) numOr(rows.get(0).get("xc"));
+            if (xc > 0) {
+                ensureFinishInDrafts(wo, xc, user, true);
+                return;
+            }
+            // 处理单没写行号(手工单/历史单):只有单行工单能确定归属;
+            // 多行工单若逐行刷新,同一笔不合格会被每行各扣一遍(审查发现),故只留 warn 不猜。
+            java.util.List<java.util.Map<String, Object>> lines = jdbc.queryForList(
+                    "SELECT DISTINCT ISNULL(pl_xc,0) AS xc FROM dbo.plang"
+                            + " WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY 1", wo);
+            if (lines.size() == 1) {
+                int x = (int) numOr(lines.get(0).get("xc"));
+                if (x > 0) ensureFinishInDrafts(wo, x, user, true);
+            } else if (lines.size() > 1) {
+                log.warn("[FINISH_IN] 不合格处理单 {} {} 未填工单行号,工单 {} 有 {} 行,无法确定扣减归属,已跳过"
+                        + "(从出货检验单判不合格入口自动建单会带出行号;手工建单请按工单行分开)", def.code(), no, wo, lines.size());
+            }
+        } catch (RuntimeException e) {
+            log.warn("[FINISH_IN] 不合格处理单 {} {} 落库后刷新入库草稿失败(不阻断): {}", def.code(), no, e.getMessage());
+        }
+    }
+
 
     /** 工单行的**最后一道工序**名称:优先工序台账(wo_process_line.工序序最大),回退 工单行工艺路线(bs_route.加工顺序最大);取不到返回空(不猜)。 */
     private String lastProcessOf(String wo, int xc) {
@@ -4650,6 +4833,8 @@ public class ButtonService {
             Map.entry("QC_SCY", "编制人"),        // YJ-QR-120 生产异常分析报告
             Map.entry("QC_BHG", "填写人"),        // YJ-QR-11  不合格报告(制程)
             Map.entry("QC_BHC", "责任人"),        // YJ-QR-59  不合格品处理单(制程)
+            // 2026-11-24:不合格品处理单(成品) —— 出货检验(表观)判不合格的去向,纸面/审批链与制程单同形
+            Map.entry("QC_BHCP", "责任人"),
             Map.entry("QC_BHZ", "责任人"),        // YJ-QR-64  不合格品处理单(自制物料)
             Map.entry("QC_JJF", "责任人"),        // YJ-QR-92  紧急放行申请单(2026-11-17:纸面「编制」= 责任人)
             Map.entry("QC_SCP", "责任人"),        // YJ-QR-118 试产材料使用申请单
@@ -4680,7 +4865,7 @@ public class ButtonService {
      *   ⚠ yj_field 的「检验员」保持 editable=1(前端可编辑);不要照 OQC 把它置只读。
      */
     private static final java.util.Set<String> PREPARER_EDITABLE_PANELS =
-            java.util.Set.of("QC_BHC", "QC_BHZ", "QC_SCP");
+            java.util.Set.of("QC_BHC", "QC_BHCP", "QC_BHZ", "QC_SCP");
 
     /**
      * **单级审批、但纸面仍有「检验人 / 审核人」签署格**的工序检验单(2026-11-09 用户口径)。
@@ -4798,7 +4983,7 @@ public class ButtonService {
 
     /** 走「责任部门 = 责任人所属部门」的质量单据(2026-11-17 QC_JJF + 2026-11-18 其余 5 张) */
     private static final java.util.Set<String> RESP_DEPT_PANELS = java.util.Set.of(
-            "QC_JJF", "QC_BHC", "QC_BHZ", "QC_SCP", "QC_LYB", "QC_SCY");
+            "QC_JJF", "QC_BHC", "QC_BHCP", "QC_BHZ", "QC_SCP", "QC_LYB", "QC_SCY");
     /** 「责任部门」列(各表标签=物理列同名) */
     private static final String RESP_DEPT_COL = "责任部门";
 

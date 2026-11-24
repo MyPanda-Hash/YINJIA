@@ -16,14 +16,27 @@
 /** 有「不合格 → 开处理单」入口的面板(纸面共用 QcProcInspSheet 的两张) */
 export const SHIP_INSP_PANELS = ['QC_PROC_INSP', 'QC_ASM_INSP']
 
-/** 目标单据:不合格品处理单(制程) */
-export const NG_DISPOSITION_PANEL = 'QC_BHC'
+/**
+ * 目标单据映射(2026-11-24 用户口径:「当前的功能就转向当前的不合格处理(制程),表观就转向不合格处理(成品)」):
+ *   · 出货检验（功能）QC_PROC_INSP → 不合格品处理单(制程) QC_BHC(原有);
+ *   · 出货检验（表观）QC_ASM_INSP → 不合格品处理单(成品) QC_BHCP(新建)。
+ * 两张处理单都带 出货检验单号 + 工单号 + 工单行号 + 批次号,产成品入库按这三键扣减不合格数量。
+ */
+export const NG_TARGETS = Object.freeze({
+  QC_PROC_INSP: Object.freeze({ panel: 'QC_BHC', label: '不合格品处理单(制程)' }),
+  QC_ASM_INSP: Object.freeze({ panel: 'QC_BHCP', label: '不合格品处理单(成品)' }),
+})
+
+/** 默认目标(制程)—— 旧调用点/接口未回目标时的兜底 */
+export const NG_DISPOSITION_PANEL = NG_TARGETS.QC_PROC_INSP.panel
+
+/** 该面板判不合格后去开哪张处理单;不在入口名单返回 null */
+export function ngTargetOf(panelCode) {
+  return NG_TARGETS[String(panelCode || '').trim()] || null
+}
 
 /** 检验结论的不合格数据键 */
 export const NG_VERDICT = '不合格'
-
-/** 纸面按钮文字(渲染时走 tt) */
-export const NG_DISPOSITION_ACTION = '去开不合格处理单'
 
 /** 本单检验结论是否判了不合格(空/历史自由文本一律不算) */
 export function isNgVerdict(head) {

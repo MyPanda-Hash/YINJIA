@@ -22,9 +22,9 @@ VIEW	dbo	v_pu_order_detail		null	33
 VIEW	dbo	v_pu_order_stats		null	16
 VIEW	dbo	v_purchase_in_detail		null	32
 VIEW	dbo	v_purchase_in_stats		null	19
-VIEW	dbo	v_qc_asm_insp_detail	出货检验（表观）明细表:一行 = 一个检验项目×内部批次(qc_asm_insp_detail)，头表信息摊平；只读报表，供查询/导出/打印(2026-11-23)	null	19
+VIEW	dbo	v_qc_asm_insp_detail	出货检验（表观）明细表:一行 = 一个检验项目×内部批次(qc_asm_insp_detail)，头表信息摊平；只读报表，供查询/导出/打印(2026-11-23)	null	20
 VIEW	dbo	v_qc_insp_rec_detail	检验数据记录明细表只读视图(一行=一条检验数据记录=来料检验单的一行物料;把 来料检验单/检验数据记录/采购订单/送料暂收单/采购入库单 的单号+行号摊平,供 QC_INSP_REC_DETAIL 查询面板取数;不改任何业务表)	null	27
-VIEW	dbo	v_qc_proc_insp_detail	出货检验（功能）明细表:一行 = 一个检验项目×内部批次(qc_proc_insp_detail)，头表信息摊平；只读报表，供查询/导出/打印(2026-11-23)	null	19
+VIEW	dbo	v_qc_proc_insp_detail	出货检验（功能）明细表:一行 = 一个检验项目×内部批次(qc_proc_insp_detail)，头表信息摊平；只读报表，供查询/导出/打印(2026-11-23)	null	20
 VIEW	dbo	v_sale_in_detail		null	31
 VIEW	dbo	v_sale_in_stats		null	14
 VIEW	dbo	v_sale_out_detail		null	31
@@ -233,7 +233,9 @@ TABLE	dbo	plang_pc	工单排产	451	77
 TABLE	dbo	Porder	采购单	12	93
 TABLE	dbo	qc_asm_insp_detail	组装成品检验单行表(检验项目/标准/实测/判定;组装成品另有 数量+处理方式)	1360	28
 TABLE	dbo	qc_asm_insp_head	组装成品检验单头表(9.29 批次④:报工审核自动生成,一工序一单)	446	37
-TABLE	dbo	qc_bhc	不合格品处理单(制程)头表——面板 QC_BHC;列名即中文标签	1	65
+TABLE	dbo	qc_bhc	不合格品处理单(制程)头表——面板 QC_BHC;列名即中文标签	1	67
+TABLE	dbo	qc_bhc_cp	不合格品处理单(成品)头表——面板 QC_BHCP(2026-11-24);出货检验(表观)判不合格时自动建草稿,带出 出货检验单号/工单号/工单行号/批次号;不合格品数量参与产成品入库实收数量扣减	0	67
+TABLE	dbo	qc_bhc_cp_detail	不合格品处理单(成品)行表——面板 QC_BHCP 明细(纸面为单表式,行表只留审计四件套与备用列池)	0	27
 TABLE	dbo	qc_bhc_detail	不合格品处理单(制程)行表——面板 QC_BHC 明细	0	27
 TABLE	dbo	qc_bhg	不合格报告(制程)头表——面板 QC_BHG;含检验工站/异常时间/责任部门	9	51
 TABLE	dbo	qc_bhg_detail	不合格报告(制程)行表——面板 QC_BHG 明细	0	27
@@ -379,24 +381,24 @@ TABLE	dbo	yj_doc_modify_log	归档单修改记录(修改前后差异快照与审
 TABLE	dbo	yj_doc_status	单据状态表(shr审核/canceled作废/stopped中止/pending审批中/archived归档/modify_state修改态)	6110	31
 TABLE	dbo	yj_erp_wh_map	金蝶(ERP)仓库编码 → MES 仓库编码 映射(条码/库存面板按此把外部仓归到 MES 仓;改口径只改数据)	2	7
 TABLE	dbo	yj_ext_bind_log	动态字段绑定审计(bind绑定/retire退绑/clear清空;备用列池操作留痕)	2	8
-TABLE	dbo	yj_field	面板字段注册表(列名/中文标签/类型/字典SQL/参照面板/位置query|header|detail/必填)	5398	21
+TABLE	dbo	yj_field	面板字段注册表(列名/中文标签/类型/字典SQL/参照面板/位置query|header|detail/必填)	5443	21
 TABLE	dbo	yj_field_view	角色字段视图(2026-11-13):同一面板在不同角色下"显示/隐藏哪些字段、按什么顺序"。行存在=该角色显式设定,行不存在=跟随系统整体(yj_field);只存显隐与角色内序号,栏名仍走系统整体	0	9
 TABLE	dbo	yj_form_approval	审批记录表（提交/通过/驳回/弃审全留痕）	5606	10
 TABLE	dbo	yj_locale	语言表(启用语言清单,插行即出现语言切换器)	10	5
 TABLE	dbo	yj_lot_seq	批号流水表(批号=yyyymmdd+3位流水,材料/产品批号统一取号)	6	2
 TABLE	dbo	yj_menu_node	菜单覆盖表(系统管理平台·菜单设计):只存人能改的名称/上级/排序/隐藏,导航基线与数据键仍在代码 menus.js	0	14
 TABLE	dbo	yj_message	站内消息表(收件人/消息码/关联面板与单据/已读)	4054	14
-TABLE	dbo	yj_panel	面板注册表(元数据核心:面板编码/模式doc|flat|archive/头行表/前缀/日期列/模块分组)	167	17
+TABLE	dbo	yj_panel	面板注册表(元数据核心:面板编码/模式doc|flat|archive/头行表/前缀/日期列/模块分组)	168	17
 TABLE	dbo	yj_plan_term	计划条款表(阶段中止/恢复申请:stage/reason/state)	0	16
 TABLE	dbo	yj_print_task	自动打印·任务缓存(2026-11-16)。一行=一条手机端发起的打印任务：代理掉线时留在这里，代理回来第一次轮询即按 id 顺序补打；目标站点按"开关开+勾了该类型"算，不看在线与否。状态机 PENDING→SENT→DONE/FAILED，超保留时长(默认 3 天) EXPIRED。	5	16
 TABLE	dbo	yj_report_template	报表模板表(ADR-0002:DB 存储精细模板,上传即编译校验生效免重启;template_code 唯一,panel_code 绑定面板)	3	11
 TABLE	dbo	yj_role	角色表(角色编码/名称/is_admin)	20	5
-TABLE	dbo	yj_role_panel	角色-面板授权表(perms动作词表含view等,can_approve=审批权)	1962	5
-TABLE	dbo	yj_schema_log	数据库结构脚本执行日志(script_name+content_hash 幂等记录)	887	3
+TABLE	dbo	yj_role_panel	角色-面板授权表(perms动作词表含view等,can_approve=审批权)	1968	5
+TABLE	dbo	yj_schema_log	数据库结构脚本执行日志(script_name+content_hash 幂等记录)	889	3
 TABLE	dbo	yj_share_file	共享文件表(研发管理·全公司共享资料:标准/测试报告/认证报告;1行=1份文件,文件本体存yj_attachment,权限=指定人上传改删、其余仅查阅)	0	37
 TABLE	dbo	yj_share_file_cat	共享文件分类表(树形 parent_id,研发管理·共享文件模块;分类可增减,有文件或子分类时禁删)	13	8
 TABLE	dbo	yj_std_lib	标准库(lib_code+item_code 内容片段,供文书面板引用)	270	11
 TABLE	dbo	yj_supplier_account	☆供应商门户账号(2026-10-24 用户口径「供应商可以通过登录供应商配置的账号登录进来,只能看到供应商采购打印面版(和对应供应商编码的数据)」):一行 = 一个供应商登录账号的供应商归属;登录凭据仍在 yj_user(口令同 PasswordEncoder 口径),本表按 username 一对一给出「这个账号属于哪个供应商」;登录命中本表即整体降权为供应商会话(只剩 供应商采购打印 一个页面、一份数据)。维护入口:采购管理 → 供应商权限配置(管理员专属)。	0	16
-TABLE	dbo	yj_translation	多语言翻译表(scope=panel|field,ref_key=中文键,source=mt机翻|manual人工)	8017	8
-TABLE	dbo	yj_usage_log	使用日志(登录与面板操作留痕,使用权限查看页面数据源)	11166	10
+TABLE	dbo	yj_translation	多语言翻译表(scope=panel|field,ref_key=中文键,source=mt机翻|manual人工)	8037	8
+TABLE	dbo	yj_usage_log	使用日志(登录与面板操作留痕,使用权限查看页面数据源)	11167	10
 TABLE	dbo	yj_user	用户表(登录名/口令哈希/姓名/部门dept_id/角色role_id/管理员标志is_admin)	32	28

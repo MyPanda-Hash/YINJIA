@@ -26,7 +26,8 @@ const SQL = readFileSync(
 /** 2026-11-18 改造的 6 张(紧急放行单 11-17 已改;QC_BHG 只做日期/编码口径,责任部门不动) */
 const SIX = ['QC_BHG', 'QC_BHC', 'QC_BHZ', 'QC_SCP', 'QC_LYB', 'QC_SCY']
 /** 责任部门 = 责任人所属部门 的 5 张(BHG 的「责任部门」是表头录入业务值,刻意不动) */
-const FIVE_DEPT = ['QC_BHC', 'QC_BHZ', 'QC_SCP', 'QC_LYB', 'QC_SCY']
+// 2026-11-24 新增《不合格品处理单(成品)》QC_BHCP:与制程单同形,责任部门同口径
+const FIVE_DEPT = ['QC_BHC', 'QC_BHCP', 'QC_BHZ', 'QC_SCP', 'QC_LYB', 'QC_SCY']
 /** 纸面写了「可附图片」的 4 张 */
 const FOUR_ATTACH = ['QC_BHC', 'QC_BHZ', 'QC_SCP', 'QC_LYB']
 
@@ -40,8 +41,8 @@ test('① 责任部门 = 责任人所属部门(动态):5 张单右上信息表�
     assert.equal(info[1].kind, undefined, `${code} 责任部门不能写死成 static`)
     // 2026-11-23 用户口径「时间取填写提交日期」:QC_BHC 右上「时间」改绑后端派生只读「提交时间」
     // (= 提交审批时间戳，含时分)，别的单仍是单据日期。
-    if (code === 'QC_BHC') {
-      assert.equal(info[2].key, '提交时间', 'QC_BHC 时间格必须绑提交时间')
+    if (code === 'QC_BHC' || code === 'QC_BHCP') {
+      assert.equal(info[2].key, '提交时间', code + ' 时间格必须绑提交时间')
       assert.equal(info[2].kind, 'head-static', 'QC_BHC 时间格是只读派生值')
     } else {
       assert.equal(info[2].key, '单据日期', code)
@@ -53,7 +54,7 @@ test('① 责任部门 = 责任人所属部门(动态):5 张单右上信息表�
   const m = JAVA.match(/RESP_DEPT_PANELS\s*=\s*java\.util\.Set\.of\(([\s\S]*?)\);/)
   assert.ok(m, '缺少 RESP_DEPT_PANELS 登记')
   const list = [...m[1].matchAll(/"(QC_[A-Z_]+)"/g)].map((x) => x[1])
-  assert.deepEqual(list.sort(), ['QC_BHC', 'QC_BHZ', 'QC_JJF', 'QC_LYB', 'QC_SCP', 'QC_SCY'])
+  assert.deepEqual(list.sort(), ['QC_BHC', 'QC_BHCP', 'QC_BHZ', 'QC_JJF', 'QC_LYB', 'QC_SCP', 'QC_SCY'])
   assert.ok(!list.includes('QC_BHG'), 'QC_BHG 的责任部门是业务值,不得进自动写入名单')
 })
 

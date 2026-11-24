@@ -741,6 +741,9 @@ export const menuTree = [
           // 成品检验的纸面能力由「组装成品检验单 QC_ASM_INSP」承接(报表 qc_asm_insp.jrxml)。
           { code: 'qcNcrp', title: '不合格报告(制程)', path: '/panelx/list/QC_BHG', icon: 'CircleClose', panelCode: 'QC_BHG', operationName: '新增流程' },
           { code: 'qcNcdp', title: '不合格品处理单(制程)', path: '/panelx/list/QC_BHC', icon: 'Box', panelCode: 'QC_BHC', operationName: '新增流程' },
+          // 2026-11-24:出货检验(表观)判不合格的去向(用户口径「表观就转向不合格处理(成品)」)。
+          // 面板/表/字段见 tools/migrate-qc-bhcp-finished-20261124.sql;纸面与制程单同形(YJ-QR-59-成品占位编号)。
+          { code: 'qcNcdpFin', title: '不合格品处理单(成品)', path: '/panelx/list/QC_BHCP', icon: 'Box', panelCode: 'QC_BHCP', operationName: '新增流程' },
           { code: 'qcNcdz', title: '不合格品处理单(自制物料)', path: '/panelx/list/QC_BHZ', icon: 'Files', panelCode: 'QC_BHZ', operationName: '新增流程' },
           { code: 'qcJjf', title: '紧急放行申请单', path: '/panelx/list/QC_JJF', icon: 'AlarmClock', panelCode: 'QC_JJF', operationName: '新增流程' },
           { code: 'qcScp', title: '试产材料使用申请单', path: '/panelx/list/QC_SCP', icon: 'DocumentChecked', panelCode: 'QC_SCP', operationName: '新增流程' },

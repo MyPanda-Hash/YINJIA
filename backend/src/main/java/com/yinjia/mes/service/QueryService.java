@@ -344,7 +344,7 @@ public class QueryService {
      * </ul>
      * 只读派生、**不落库**、不进 yj_field(属后端合成行键，与「检测周期」「发起人」同类)。
      */
-    private static final java.util.Set<String> DOC_SUBMIT_TIME_PANELS = java.util.Set.of("QC_BHC");
+    private static final java.util.Set<String> DOC_SUBMIT_TIME_PANELS = java.util.Set.of("QC_BHC", "QC_BHCP");
 
     /**
      * 供应商门户的数据范围控制键(2026-10-25 用户口径「供应商打印面版的前端要与采购订单一致。

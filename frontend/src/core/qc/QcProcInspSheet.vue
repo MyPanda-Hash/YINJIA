@@ -76,21 +76,16 @@
          ⧉带入检验项目仍走 emit('open-items') 由 PanelxList 打开 QcInspPlanDialog(链路不变) -->
     <div class="qr-band">
       <span class="qr-band-title">{{ tt('检验明细') }}</span>
-      <!-- 动作条:三个纸面录入动作只在草稿态出现;**「去开不合格处理单」与草稿态无关**
-           (2026-11-20 用户口径:判定不合格就要能转到不合格品处理单(制程))——
-           已审核的单也可能要补开处理单,故它与 editable 分开判,只按结论显隐。 -->
+      <!-- 动作条:三个纸面录入动作只在草稿态出现。
+           ⚠ 2026-11-24 用户口径(第二轮):**去掉「⧉ 去开不合格处理单」按钮** ——
+             现在改为「检验结论选成不合格的那一刻弹提示窗,询问是否前往对应处理单」,
+             入口不再挂在动作条上(见下方 onSummaryChange / emit('ng-verdict'))。 -->
       <span class="qr-band-acts no-print">
         <template v-if="editable">
           <span class="qr-band-act" @click="addItem()">＋ {{ tt('新增检验项') }}</span>
           <span class="qr-band-act" @click="emit('open-items')">⧉ {{ tt('带入检验项目') }}</span>
           <span class="qr-band-act" @click="addBatch()">＋ {{ tt('添加批次') }}</span>
         </template>
-        <span
-          v-if="ngDispositionOn"
-          class="qr-band-act qr-band-ng"
-          :title="tt('本单检验结论为不合格，去开不合格品处理单（制程）并带出本单号与工单号')"
-          @click="emit('open-ng')"
-        >⧉ {{ tt(NG_DISPOSITION_ACTION) }}</span>
       </span>
     </div>
 
@@ -277,7 +272,7 @@
               clearable
               class="qr-cell-input"
               :placeholder="tt('请选择')"
-              @change="emit('dirty')"
+              @change="onSummaryChange"
             >
               <el-option v-for="o in summaryOptions" :key="o" :label="o" :value="o" />
             </el-select>
@@ -384,7 +379,7 @@ import {
   PROC_INSP_TITLE,
 } from '@/core/qc/qcProcInspExport.js'
 // 判定不合格 → 去开不合格品处理单(制程):显隐契约是纯函数(见模块头注),纸面只管渲染
-import { canOpenNgDisposition, NG_DISPOSITION_ACTION } from '@/core/qc/shipInspNg.js'
+import { NG_VERDICT } from '@/core/qc/shipInspNg.js'
 // 项目行分组(按身份全局归并,不按"连续行"分组)—— 纯函数 + 单测,避免"新增批次后内容出现第二块"
 import { buildGroups, isContiguouslyGrouped, setToken, tokenOf } from '@/core/qc/qcProcInspGroups.js'
 
@@ -408,7 +403,12 @@ const props = defineProps({
   /** 草稿态才可填;只读态(已审核/归档/无权限/标注模式)全部渲染成纯文本 */
   editable: { type: Boolean, default: false },
 })
-const emit = defineEmits(['dirty', 'open-items', 'open-ng'])
+/**
+ * 2026-11-24 用户口径:「点击这个检验结论为不合格能跳出一个弹窗提示前往那个不合格单据」
+ *   ⇒ 检验结论下拉**选中「不合格」的那一刻**发 ng-verdict,由面板层弹提示窗并前往对应处理单。
+ *   (不再是“先点按钮、弹窗里内嵌处理单纸面”那种形态。)
+ */
+const emit = defineEmits(['dirty', 'open-items', 'ng-verdict'])
 
 /** 「⚙ 维护处理意见选项」入口的权限:与后端 perm.requireFieldConfig 同源 ——
  *  管理员,或该面板在角色里勾了「自定义字段」(fieldPanels)。没权限的人不显示入口,
@@ -434,8 +434,16 @@ const FOOT_KEYS = {
   reviewer: { key: '表单审核人' },
   disposal: { key: '处理方式' },
 }
-/** 「去开不合格处理单」是否出按钮:面板是出货检验（功能/表观）且检验结论=不合格 */
-const ngDispositionOn = computed(() => canOpenNgDisposition(props.panelCode, props.head))
+/**
+ * 检验结论下拉变更(2026-11-24 用户口径):
+ * 「点击这个检验结论为不合格能跳出一个弹窗提示前往那个不合格单据」。
+ * ⇒ 只在**本次选中「不合格」**时发 ng-verdict(面板层弹提示窗);清空/选回合格不发。
+ * 提交给面板层的判定仍走同一份纯函数(canOpenNgDisposition),避免两处口径漂移。
+ */
+function onSummaryChange(value) {
+  emit('dirty')
+  if (String(value ?? '').trim() === NG_VERDICT) emit('ng-verdict')
+}
 /** 下拉兜底选项(元数据没下发 options 时用;存储数据键,不翻译) */
 const RESULT_FALLBACK = ['合格', '不合格']
 const SUMMARY_FALLBACK = ['合格', '不合格']
@@ -1198,13 +1206,6 @@ defineExpose({ exportProcInspExcel })
 }
 /* 判定不合格时的跨单动作(去开不合格品处理单(制程)):与纸面录入动作同排,用警示色区分,
    不让用户以为它也是"加一行/加一列"这类纸面编辑。数据键(合格/不合格)不在这里翻译。 */
-.qr-band-ng {
-  color: #c45656;
-  font-weight: 600;
-}
-.qr-band-ng:hover {
-  color: #a63f3f;
-}
 /* 明细矩阵:屏上列多时横向滚动(打印收回纸宽) */
 .qr-grid-scroll {
   overflow-x: auto;

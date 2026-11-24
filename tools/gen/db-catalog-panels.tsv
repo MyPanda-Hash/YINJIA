@@ -68,6 +68,7 @@ PURCHASE_IN_STATS	采购入库单统计表	报表	flat	v_purchase_in_stats			id	
 QC_ASM_INSP	出货检验（表观）	生产管理	doc	qc_asm_insp_detail	qc_asm_insp_head	单据编号	id	单据编号	ZJ	单据日期	20	items	品质管理	{"fixedItems":[{"group":"外观","items":["端盖两头","管身两侧"]},{"group":"尺寸","items":[],"label":"按照尺寸检验项目填充"},{"group":"出货重量","items":[],"label":"按照重量检验项目填充"}],"inspGate":"block","inspGateLegacy":"pass"}		Outgoing Inspection Sheet (Appearance)
 QC_ASM_INSP_DETAIL	出货检验（表观）明细表	报表	flat	v_qc_asm_insp_detail			id			单据日期	100	items	品质管理			Outgoing Inspection (Appearance) Details
 QC_BHC	不合格品处理单(制程)	单据	doc	qc_bhc_detail	qc_bhc	单据编号	id	单据编号	BHC	单据日期	20	items	品质管理			
+QC_BHCP	不合格品处理单(成品)	单据	doc	qc_bhc_cp_detail	qc_bhc_cp	单据编号	id	单据编号	BHCP	单据日期	20	items	品质管理			Nonconforming Product Disposition (Finished Goods)
 QC_BHG	不合格报告(制程)	单据	doc	qc_bhg_detail	qc_bhg	单据编号	id	单据编号	BHG	单据日期	20	items	品质管理			
 QC_BHZ	不合格品处理单(自制物料)	单据	doc	qc_bhz_detail	qc_bhz	单据编号	id	单据编号	BHZ	单据日期	20	items	品质管理			
 QC_CATALOG	待检验目录	单据	doc	qc_catalog_detail	qc_catalog	单据编号	id	单据编号	JYML	单据日期	20	items	品质管理	{"singleDoc":true}		Pending Inspections

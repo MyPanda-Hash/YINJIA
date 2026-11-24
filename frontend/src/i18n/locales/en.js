@@ -6839,6 +6839,13 @@ export default {
     '本单检验结论为不合格，去开不合格品处理单（制程）并带出本单号与工单号':
       'This sheet is judged nonconforming. Open a Nonconforming Product Disposition (Process) sheet carrying this sheet no. and the work order no.',
     '该检验单已有不合格品处理单': 'This inspection sheet already has a nonconforming product disposition sheet',
+    // ---- 2026-11-24 检验结论选「不合格」→ 提示窗询问是否前往对应处理单 ----
+    '不合格品处理单(成品)': 'Nonconforming Product Disposition (Finished Goods)',
+    '检验结论：不合格': 'Inspection verdict: nonconforming',
+    '检验结论已选为「不合格」，是否前往「{a}」开单？':
+      'The inspection verdict is set to "nonconforming". Go to "{a}" to raise the sheet?',
+    '前往开单': 'Go and raise',
+    '暂不': 'Not now',
     '已生成不合格品处理单': 'Nonconforming product disposition sheet created',
     '未生成不合格品处理单': 'No nonconforming product disposition sheet was created',
     '开不合格品处理单失败': 'Failed to open the nonconforming product disposition sheet',
