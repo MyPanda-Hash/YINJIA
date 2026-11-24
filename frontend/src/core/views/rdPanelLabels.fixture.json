@@ -4440,7 +4440,7 @@
         "visible": true
       },
       "产品名称": {
-        "required": true,
+        "required": false,
         "hidden": false,
         "visible": true
       },
@@ -4450,7 +4450,7 @@
         "visible": true
       },
       "客户编码": {
-        "required": true,
+        "required": false,
         "hidden": false,
         "visible": true
       },

@@ -19,8 +19,10 @@ const src = readFileSync(new URL('./recordSheetConfigs.js', import.meta.url), 'u
 const start = src.indexOf('RD_PROD_INFO: {')
 const block = src.slice(start, src.indexOf('\n  RD_', start) + 1 || undefined)
 
-test('RD_PROD_INFO 纸面:主要性能描述 / 两级审批人 / 产品负责人 的 key 必须是 label', () => {
-  for (const label of ['主要性能描述', '审核人（一级审批人）', '审核人（二级审批人）', '产品负责人']) {
+test('RD_PROD_INFO 纸面:主要性能描述 / 两级审批人 的 key 必须是 label', () => {
+  // 2026-11-19 起「产品负责人」不再上纸面（二级审核即产品负责人），
+  //   故这里只钉仍在上纸面的三格；历史字段 产品负责人 的 label 口径由元数据/迁移保留。
+  for (const label of ['主要性能描述', '审核人（一级审批人）', '审核人（二级审批人）']) {
     assert.ok(
       block.includes(`key: '${label}'`),
       `${label} 的 key 必须等于 label(接口行契约是 label;写物理列名会被后端静默丢弃)`,

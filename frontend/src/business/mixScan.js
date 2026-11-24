@@ -218,6 +218,36 @@ export function scaleReadingOf(payload) {
 }
 
 /**
+ * 从 `/dc/monitor` 的 `devices[]` 里挑出**电子秤**那台设备的 id。
+ *
+ * <h3>为什么必须有这一步(2026-11-19 实测)</h3>
+ * `/dc/monitor` 不带 `deviceId` 时,后端取的是 `ORDER BY device_type, code` 的**第一台设备**
+ * (`DcPlatformService.monitor` 的 {@code target} 默认值)—— 本项目数采表里排在最前的是
+ * 「加工设备」,于是扫码混料页永远读到别的设备的点位,秤一直显示「等待称重」。
+ * 用户口径是「应该实时抓取电子秤的数据」,所以页面先认准秤设备,再按 `deviceId` 取它的读数。
+ *
+ * 识别口径(宽进,宁可认错也不认漏——只需在这几台设备里挑):
+ * ① `type`(device_type)含「电子秤」或「秤」;② 名称含「秤」;③ 设备号以 `DZ-` 开头。
+ *
+ * @param {any} payload `/dc/monitor` 的响应体(或它的 data)
+ * @returns {number|null} 电子秤设备 id;没有则 null(调用方退回默认 payload)
+ */
+export function scaleDeviceIdOf(payload) {
+  const d = (payload && (payload.data || payload)) || {}
+  const list = Array.isArray(d.devices) ? d.devices : []
+  const looksScale = (x) => {
+    const type = String(x?.type || x?.deviceType || '')
+    const name = String(x?.name || x?.deviceName || '')
+    const code = String(x?.code || x?.deviceCode || '')
+    return /电子秤|秤/.test(type) || /秤/.test(name) || /^DZ-/i.test(code)
+  }
+  const hit = list.find(looksScale)
+  if (!hit) return null
+  const id = Number(hit.id ?? hit.deviceId)
+  return Number.isFinite(id) ? id : null
+}
+
+/**
  * 判定电子秤读数是否可用于记录实际用量。
  *
  * 实测教训(2026-10-19 采样):库里出现过 `-1.0000` 的脏值,以及同一时刻重复上报。

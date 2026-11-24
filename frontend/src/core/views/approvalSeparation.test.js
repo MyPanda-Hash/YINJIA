@@ -35,7 +35,8 @@ test('提交人从哪来：后端在「审批中」的单据上下发 `提交人
  *   显示 = 有没有资格;能不能点 = isDisabled。
  */
 test('审批按钮「显示」只看资格,不因"我是提交人"就消失(否则用户以为流程坏了)', () => {
-  assert.match(panelx, /const approvalBtnsVisible = computed\(\(\) => \(isQcL2Panel\.value\s*\n\s*\? canApproveQcL2Here\.value\s*\n\s*: \(canApproveHere\(\) \|\| l2ApproverNow\.value\)\)\)/,
+  // 2026-11-19 产品变更「待批准」在其前插入 admin-only 分支；其余判据一字未改。
+  assert.match(panelx, /const approvalBtnsVisible = computed\(\(\) => \([\s\S]{0,500}?canApproveHere\(\) \|\| l2ApproverNow\.value\)/,
     '资格 = 审批权 ∪ 被一级选定的二级审核人(QC 两级走原口径)')
   assert.match(panelx, /<template v-if="approvalBtnsVisible">/, '模板要按资格渲染按钮组')
   assert.ok(!/approvalActionReady/.test(panelx), '旧的"能不能真的批"判据不该再留在模板里(会把人藏没)')

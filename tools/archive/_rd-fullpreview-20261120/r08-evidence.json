@@ -1,0 +1,165 @@
+{
+ "panels": [
+  {
+   "code": "RD_SAMPLE_EXT",
+   "title": "单据预览",
+   "sub": "外部开发样品申请单 · 按归属人筛选",
+   "count": "共 6 条 （全部 11）",
+   "scopeOn": "只看我申请的",
+   "gradeShown": false,
+   "headings": [
+    "序号",
+    "单据编号",
+    "客户名称",
+    "期望交期",
+    "费用",
+    "申请",
+    "确认",
+    "单据日期",
+    "状态",
+    "操作"
+   ],
+   "rowCount": 6,
+   "overflow": {
+    "sw": 1390,
+    "cw": 1390
+   }
+  },
+  {
+   "code": "RD_SAMPLE_ND",
+   "title": "单据预览",
+   "sub": "外部-非开发样品申请单 · 按归属人筛选",
+   "count": "共 0 条",
+   "scopeOn": "全部",
+   "gradeShown": false,
+   "headings": [],
+   "rowCount": 0,
+   "overflow": {
+    "sw": 1390,
+    "cw": 1390
+   }
+  },
+  {
+   "code": "RD_SAMPLE_INT",
+   "title": "单据预览",
+   "sub": "内部开发样品申请单 · 按归属人筛选",
+   "count": "共 1 条 （全部 5）",
+   "scopeOn": "只看我申请的",
+   "gradeShown": false,
+   "headings": [
+    "序号",
+    "单据编号",
+    "单据日期",
+    "发起人",
+    "状态",
+    "操作"
+   ],
+   "rowCount": 1,
+   "overflow": {
+    "sw": 1390,
+    "cw": 1390
+   }
+  },
+  {
+   "code": "RD_FILTER_EFF",
+   "title": "单据预览",
+   "sub": "功能性滤效 · 按归属人筛选",
+   "count": "共 5 条",
+   "scopeOn": "全部",
+   "gradeShown": false,
+   "headings": [
+    "序号",
+    "单据编号",
+    "测试主题",
+    "测试编号",
+    "测试负责人",
+    "单据日期",
+    "状态",
+    "操作"
+   ],
+   "rowCount": 5,
+   "overflow": {
+    "sw": 1390,
+    "cw": 1390
+   }
+  },
+  {
+   "code": "RD_MOLD_PROC",
+   "title": "单据预览",
+   "sub": "烧结工艺清单 · 按归属人筛选",
+   "count": "共 3 条",
+   "scopeOn": "全部",
+   "gradeShown": false,
+   "headings": [
+    "序号",
+    "单据编号",
+    "版本号",
+    "产品编号",
+    "产品名称",
+    "表单管理人",
+    "单据日期",
+    "状态",
+    "操作"
+   ],
+   "rowCount": 3,
+   "overflow": {
+    "sw": 1390,
+    "cw": 1390
+   }
+  },
+  {
+   "code": "RD_PLAN",
+   "title": "单据预览",
+   "sub": "项目实施计划 · 按归属人筛选",
+   "count": "共 5 条",
+   "scopeOn": "全部",
+   "gradeShown": false,
+   "headings": [
+    "序号",
+    "单据编号",
+    "项目名称",
+    "项目定级",
+    "负责人",
+    "单据日期",
+    "状态",
+    "操作"
+   ],
+   "rowCount": 5,
+   "overflow": {
+    "sw": 1390,
+    "cw": 1390
+   }
+  },
+  {
+   "code": "RD_SPEC_DOC",
+   "title": "单据预览",
+   "sub": "规格书 · 按归属人筛选",
+   "count": "共 3 条",
+   "scopeOn": "全部",
+   "gradeShown": false,
+   "headings": [
+    "序号",
+    "单据编号",
+    "产品编号",
+    "名称",
+    "客户名称",
+    "版本",
+    "单据日期",
+    "状态",
+    "操作"
+   ],
+   "rowCount": 3,
+   "overflow": {
+    "sw": 1390,
+    "cw": 1390
+   }
+  }
+ ],
+ "keyword": {
+  "count": "共 1 条 （全部 3）",
+  "rows": 1,
+  "text": [
+   "1MP-2026-11-0004V2026-11-11-02———2026-11-11草稿跳转"
+  ]
+ }
+}

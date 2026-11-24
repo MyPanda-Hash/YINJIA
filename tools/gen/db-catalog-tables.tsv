@@ -278,7 +278,7 @@ TABLE	dbo	rd_alkaline_detail	碱性测试行表	0	40
 TABLE	dbo	rd_alkaline_head	碱性测试头表	0	48
 TABLE	dbo	rd_antibact_detail	抑菌测试行表	0	33
 TABLE	dbo	rd_antibact_head	抑菌测试头表	0	44
-TABLE	dbo	rd_approval	立项申请表(文件类,管理员保存即归档)	38	45
+TABLE	dbo	rd_approval	立项申请表(文件类,管理员保存即归档)	38	46
 TABLE	dbo	rd_approval_detail	立项申请表占位行表(恒空,doc模式要求)	22	27
 TABLE	dbo	rd_asm_bom_detail	「组装BOM表」明细行表	0	39
 TABLE	dbo	rd_asm_bom_head	「组装BOM表」头表	0	35
@@ -312,7 +312,7 @@ TABLE	dbo	rd_prod_doclist_detail	产品文件列表明细表(占位,doc 模式�
 TABLE	dbo	rd_prod_doclist_head	产品文件列表(产品开发文件汇总):产品×4文件开发状态矩阵,状态由 DevTaskService 实时推导不存表	1	33
 TABLE	dbo	rd_prod_info_detail	产品信息表行表	12	32
 TABLE	dbo	rd_prod_info_head	产品信息表头表(归档后产品开发下发5个下游文件)	13	61
-TABLE	dbo	rd_progress	项目进度查询头表	1	41
+TABLE	dbo	rd_progress	项目进度查询头表	1	42
 TABLE	dbo	rd_progress_detail	项目进度查询行表(产品开发二三四级项目控制列表;纸面 14 列:项目定级=col 项目层级/项目名称/子项目/尺寸/项目编号/内容/项目发起人=col 项目级/项目负责人=col 项目负责/立项日期=col 实施进度/预计完成日期=col 里程完成/状态(按实施计划阶段派生,只读)/测试情况=col 测试员/技术目标达成/是否市场转化/未转换原因。另 4 列 开发复杂度/重要程度/紧急程度/项目定及变更 保留物理列与数据但不上纸面(hidden=1,2026-09-22 用户口径);[说明] 是 RD_PLAN→RD_PROGRESS 同步的匹配键,与 [项目编号] 同值)	2	54
 TABLE	dbo	rd_ro_protect_detail	RO保护测试行表	0	37
 TABLE	dbo	rd_ro_protect_head	RO保护测试头表	0	45
@@ -322,7 +322,7 @@ TABLE	dbo	rd_sample_int_detail		0	21
 TABLE	dbo	rd_sample_int_head	内部开发样品申请单-头（研发管理·样品）。内部立项后开发样品：项目名/炭棒尺寸/配方工艺要求/样品状态。	0	20
 TABLE	dbo	rd_sample_no_detail	样品编号表明细(客户项目代号/样品编号/项目名称/子项目/项目负责人/项目编号/炭棒尺寸)	0	36
 TABLE	dbo	rd_sample_no_head	样品编号表(产品开发样品编号):样品编号=客户项目代号+项目编号(确定性拼接,38样例验证)	0	33
-TABLE	dbo	rd_sample_nondev_detail	（外部）非开发样品申请单-明细（研发管理·样品）。	0	15
+TABLE	dbo	rd_sample_nondev_detail	（外部）非开发样品申请单-明细（研发管理·样品）。	0	17
 TABLE	dbo	rd_sample_nondev_head	（外部）非开发样品申请单-头（研发管理·样品）。版式与「外部开发样品申请单」一致；销售录单、刘磊/王光珍审核、其他人只读。	0	24
 TABLE	dbo	rd_scale_detail	阻垢性能测试行表	0	38
 TABLE	dbo	rd_scale_head	阻垢性能测试头表	0	43
@@ -381,7 +381,7 @@ TABLE	dbo	yj_doc_modify_log	归档单修改记录(修改前后差异快照与审
 TABLE	dbo	yj_doc_status	单据状态表(shr审核/canceled作废/stopped中止/pending审批中/archived归档/modify_state修改态)	6110	31
 TABLE	dbo	yj_erp_wh_map	金蝶(ERP)仓库编码 → MES 仓库编码 映射(条码/库存面板按此把外部仓归到 MES 仓;改口径只改数据)	2	7
 TABLE	dbo	yj_ext_bind_log	动态字段绑定审计(bind绑定/retire退绑/clear清空;备用列池操作留痕)	2	8
-TABLE	dbo	yj_field	面板字段注册表(列名/中文标签/类型/字典SQL/参照面板/位置query|header|detail/必填)	5443	21
+TABLE	dbo	yj_field	面板字段注册表(列名/中文标签/类型/字典SQL/参照面板/位置query|header|detail/必填)	5447	21
 TABLE	dbo	yj_field_view	角色字段视图(2026-11-13):同一面板在不同角色下"显示/隐藏哪些字段、按什么顺序"。行存在=该角色显式设定,行不存在=跟随系统整体(yj_field);只存显隐与角色内序号,栏名仍走系统整体	0	9
 TABLE	dbo	yj_form_approval	审批记录表（提交/通过/驳回/弃审全留痕）	5606	10
 TABLE	dbo	yj_locale	语言表(启用语言清单,插行即出现语言切换器)	10	5
@@ -394,11 +394,11 @@ TABLE	dbo	yj_print_task	自动打印·任务缓存(2026-11-16)。一行=一条�
 TABLE	dbo	yj_report_template	报表模板表(ADR-0002:DB 存储精细模板,上传即编译校验生效免重启;template_code 唯一,panel_code 绑定面板)	3	11
 TABLE	dbo	yj_role	角色表(角色编码/名称/is_admin)	20	5
 TABLE	dbo	yj_role_panel	角色-面板授权表(perms动作词表含view等,can_approve=审批权)	1968	5
-TABLE	dbo	yj_schema_log	数据库结构脚本执行日志(script_name+content_hash 幂等记录)	889	3
+TABLE	dbo	yj_schema_log	数据库结构脚本执行日志(script_name+content_hash 幂等记录)	900	3
 TABLE	dbo	yj_share_file	共享文件表(研发管理·全公司共享资料:标准/测试报告/认证报告;1行=1份文件,文件本体存yj_attachment,权限=指定人上传改删、其余仅查阅)	0	37
 TABLE	dbo	yj_share_file_cat	共享文件分类表(树形 parent_id,研发管理·共享文件模块;分类可增减,有文件或子分类时禁删)	13	8
 TABLE	dbo	yj_std_lib	标准库(lib_code+item_code 内容片段,供文书面板引用)	270	11
 TABLE	dbo	yj_supplier_account	☆供应商门户账号(2026-10-24 用户口径「供应商可以通过登录供应商配置的账号登录进来,只能看到供应商采购打印面版(和对应供应商编码的数据)」):一行 = 一个供应商登录账号的供应商归属;登录凭据仍在 yj_user(口令同 PasswordEncoder 口径),本表按 username 一对一给出「这个账号属于哪个供应商」;登录命中本表即整体降权为供应商会话(只剩 供应商采购打印 一个页面、一份数据)。维护入口:采购管理 → 供应商权限配置(管理员专属)。	0	16
-TABLE	dbo	yj_translation	多语言翻译表(scope=panel|field,ref_key=中文键,source=mt机翻|manual人工)	8037	8
+TABLE	dbo	yj_translation	多语言翻译表(scope=panel|field,ref_key=中文键,source=mt机翻|manual人工)	8039	8
 TABLE	dbo	yj_usage_log	使用日志(登录与面板操作留痕,使用权限查看页面数据源)	11167	10
 TABLE	dbo	yj_user	用户表(登录名/口令哈希/姓名/部门dept_id/角色role_id/管理员标志is_admin)	32	28

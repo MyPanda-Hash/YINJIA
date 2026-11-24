@@ -70,9 +70,35 @@
          「1.二级项目-开发性项目 2.三级项目-…近期（一年内）…」,与需求原文的二级/三级口径**不符**
          (需求:二级=一年内有重要经济效益或重大推广价值;三级=未来(一年后)可能有重要经济效益)。
          三段各自走 tt(),译名见 i18n/locales/en.js。 -->
+    <!-- 2026-11-23 用户口径：「标红的项目控制列表的这个题头位置的内容改为可以自己编辑」
+         ⇒ 由写死的静态文案改成**可编辑字段** `项目定级原则`（列 + yj_field 见
+           tools/migrate-progress-grade-principle-20261123.sql）。
+         空值回落默认文案：老单据没填过也能照旧显示，观感不变。 -->
     <div class="ps-principle">
-      {{ tt('项目定级原则') }}：{{ tt('1.二级项目-A级或B级客户/该产品一年内有重要经济效益或对应技术产品有重大推广价值/部分对客户认同有重要影响的项目；') }}{{ tt('2.三级项目-A级或B级客户/未来（一年后）可能有重要经济效益；') }}{{ tt('3.四级项目-简单应对（检测/打样）：如内部简单测试、客户样品测试等') }}
+      <span class="ps-principle-label">{{ tt('项目定级原则') }}：</span>
+      <!-- 2026-11-23：本面板是**只读汇总面板**（纸面 editable 恒 false），
+           所以这一格不能跟着 editable 走 —— 用独立的小编辑入口（弹窗 + 专用端点），
+           只改这一列，不把整张面板变成可编辑。 -->
+      <span class="ps-principle-text">{{ tt(head['项目定级原则'] || GRADE_PRINCIPLE_DEFAULT) }}</span>
+      <el-button link type="primary" size="small" class="ps-principle-edit no-print" @click="openPrinciple">
+        {{ tt('编辑') }}
+      </el-button>
     </div>
+
+    <el-dialog v-model="principleOpen" :title="tt('编辑项目定级原则')" width="640px" append-to-body>
+      <el-input
+        v-model="principleDraft"
+        type="textarea"
+        :autosize="{ minRows: 4, maxRows: 10 }"
+        :placeholder="tt(GRADE_PRINCIPLE_DEFAULT)"
+        maxlength="1000"
+        show-word-limit
+      />
+      <template #footer>
+        <el-button @click="principleOpen = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="principleSaving" @click="savePrinciple">{{ tt('保存') }}</el-button>
+      </template>
+    </el-dialog>
 
     <!-- ⑤ 主从控制表 -->
     <div class="ps-scroll">
@@ -374,6 +400,43 @@ import { pickStages, stageRowState, statusLabel, STATUS_TOKENS, statusTone, summ
 // xlsx 动态引入(~430KB 只在导入/导出时加载)
 import { PROGRESS_COLUMNS, readCell } from '@core/progress/progressColumns'
 import { parseCarbonSize, productsOfKey, devSummaryOf, prefillProduct } from '@core/progress/devProduct'
+
+/**
+ * 「项目定级原则」的默认文案（2026-11-23）。
+ *
+ * <p>用户口径「标红的项目控制列表的这个题头位置的内容改为可以自己编辑」——
+ * 原来这段写死在模板里；现在改成字段 `项目定级原则`（rd_progress 列 + yj_field）。
+ * 本常量只做**空值回落**：老单据没填过时照旧显示这段，用户一旦自己填了就显示自己的。</p>
+ *
+ * <p>⚠ 文案来源《产品开发系统需求汇总.xlsx》sheet「开发相关流程」（2026-09-30 已按原文更正）。</p>
+ */
+/** 项目定级原则：编辑弹窗状态（2026-11-23；本面板只读，故用独立小通道，见模板注释） */
+const principleOpen = ref(false)
+const principleDraft = ref('')
+const principleSaving = ref(false)
+function openPrinciple() {
+  principleDraft.value = String(props.head?.['项目定级原则'] || '') || GRADE_PRINCIPLE_DEFAULT
+  principleOpen.value = true
+}
+async function savePrinciple() {
+  principleSaving.value = true
+  try {
+    const res = await request.post('/px/progressPrinciple', { text: principleDraft.value })
+    const saved = (res && res.data && res.data['项目定级原则']) ?? principleDraft.value
+    props.head['项目定级原则'] = saved
+    principleOpen.value = false
+    ElMessage.success(tt('已保存'))
+  } catch (e) {
+    ElMessage.error(e?.message || tt('保存失败'))
+  } finally {
+    principleSaving.value = false
+  }
+}
+
+const GRADE_PRINCIPLE_DEFAULT =
+  '1.二级项目-A级或B级客户/该产品一年内有重要经济效益或对应技术产品有重大推广价值/部分对客户认同有重要影响的项目；'
+  + '2.三级项目-A级或B级客户/未来（一年后）可能有重要经济效益；'
+  + '3.四级项目-简单应对（检测/打样）：如内部简单测试、客户样品测试等'
 
 /**
  * 界面显示名 → 落库数据键 的映射(唯一真源见 progressColumns.js)。
@@ -1028,6 +1091,23 @@ defineExpose({ exportProgressExcel })
   font-size: 12.5px;
   line-height: 1.6;
   color: #4A4642;
+  /* 2026-11-23：这一段现在是可编辑的，标签与输入框同一行（输入框吃满剩余宽度） */
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+.ps-principle-label {
+  flex: none;
+  padding-top: 4px;
+  white-space: nowrap;
+}
+.ps-principle-text {
+  flex: 1;
+  min-width: 0;
+}
+.ps-principle-edit {
+  flex: none;
+  white-space: nowrap;
 }
 
 /* ═══ ⑤ 控制表 ═══ */

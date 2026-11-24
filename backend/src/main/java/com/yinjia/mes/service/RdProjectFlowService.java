@@ -55,8 +55,21 @@ public class RdProjectFlowService {
     public Map<String, Object> query(String keyword) {
         String kw = keyword == null ? "" : keyword.trim();
         List<Map<String, Object>> approvals = jdbc.queryForList(
+                // 2026-11-23 用户报障「项目名称带成尺寸了」：原来项目名称直接取 [机型及应用位置]，
+                //   而那一格实际常填尺寸（如 44.5*9.5*46±0.5mm(包布)）⇒ 项目流程管控/项目控制列表
+                //   把尺寸当项目名显示。现在改为：**优先取该立项已生成的实施计划的项目名称**（业务上
+                //   真正的项目名，用户可在计划里改），没有计划才回落 机型；再没有回落客户名。
+                //   ⚠ 关联口径沿用既有的两种：计划.文档编号 = 立项单据编号 / 立项文档编号（老单）。
                 "SELECT TOP " + MAX_ROWS + " [单据编号] AS no, ISNULL([文档编号],N'') AS docNo,"
-                        + " ISNULL([机型及应用位置],N'') AS projectName, ISNULL([客户名],N'') AS customer,"
+                        // ⚠ 括号层级务必对齐（这行 2026-11-23 首版多套了 LTRIM/RTRIM 少关两层，
+                        //   线上直接 SQL 语法错误 500）。这里只用两层：
+                        //   ISNULL( 子查询 , ISNULL([机型及应用位置], N'') )
+                        + " ISNULL((SELECT TOP 1 p.[项目名称] FROM rd_plan p"
+                        + "   WHERE ISNULL(p.asp_cancel,'N') <> 'Y'"
+                        + "     AND ISNULL(p.[项目名称],N'') <> N''"
+                        + "     AND (p.[文档编号] = rd_approval.[单据编号] OR p.[文档编号] = rd_approval.[文档编号])"
+                        + "   ORDER BY p.id DESC), ISNULL([机型及应用位置],N'')) AS projectName,"
+                        + " ISNULL([客户名],N'') AS customer,"
                         + " ISNULL([申请立项人],N'') AS initiator, ISNULL([项目等级],N'') AS level,"
                         + " ISNULL([备用1],N'') AS liaison, ISNULL([备用2],N'') AS owner,"
                         + " ISNULL([备用3],N'') AS ownerAck, ISNULL([备用4],N'') AS ownerAckAt,"
@@ -74,7 +87,12 @@ public class RdProjectFlowService {
                         + " AND s.doc_no = rd_approval.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')"
                         + (kw.isEmpty() ? "" : " AND ([单据编号] LIKE ? OR ISNULL([文档编号],N'') LIKE ?"
                         + " OR ISNULL([机型及应用位置],N'') LIKE ? OR ISNULL([客户名],N'') LIKE ?)")
-                        + " ORDER BY [单据编号] DESC",
+                        // 2026-11-23 用户口径：「项目进度查询和产品进度查询都应该是新增的项目内容在最顶上，
+                        //   最老的在最下边」。
+                        //   ⚠ 原来按 [单据编号] DESC 排 —— 那是**字符串**序，LXA-… 与 C-… 混在一起时
+                        //     与建单先后完全无关（生产实测第一行 LXA-2026-11-0033、第二行 C-10920261123）；
+                        //   改按自增主键 id 倒序 = 真正的新建先后（越晚建 id 越大）。
+                        + " ORDER BY id DESC",
                 kwArr(kw, 4));
         if (approvals.isEmpty()) {
             Map<String, Object> empty = new LinkedHashMap<>();

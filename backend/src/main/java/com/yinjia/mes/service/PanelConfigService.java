@@ -383,6 +383,16 @@ public class PanelConfigService {
         } else {
             // 无 PANDA 基准(旧单据/派工等):同样遵守 选单在新增后 / 生单在审核后 的固定位置
             buttonGroups.add(group("新增", List.of("新增")));
+            // 复制单据(2026-11-23 用户口径,只有 4 张单据)——
+            //   用户原话:「给立项申请表、产品信息表、外部开发、非开发样品申请单,这 4 个单据都需要一个
+            //   单据复制功能,就是复制单据内容为一个新的草稿……自动生成的单据编号还是按新的单据规则生成」。
+            //   位置:紧挨「新增」之后(单动作组 ⇒ 侧栏渲染成一颗独立按钮,不用展开下拉);
+            //   动作名用「复制单据」而不是列表页通用的「复制」—— 后者是 PANDA 工具栏的整单复制,
+            //   前端 APPROVAL_SIDE_EXCLUDE 也把「复制」排除了,沿用会让文书侧栏永远看不到它。
+            //   判据 = 后端白名单 ButtonService.COPY_DOC_PANELS(两处必须同源,单测钉住)。
+            if (ButtonService.COPY_DOC_PANELS.contains(def.code())) {
+                buttonGroups.add(group("复制单据", List.of("复制单据")));
+            }
             if (SELECT_FLOWS.containsKey(def.code())) {
                 buttonGroups.add(group("选单", List.of("选单")));
             } else {
@@ -448,7 +458,13 @@ public class PanelConfigService {
             if (IMPORTABLE_PANELS.contains(def.code())) {
                 buttonGroups.add(group("导入", List.of("导入")));
             }
-            buttonGroups.add(group("更多", List.of("复制", "表格调整", "导出", "退出")));
+            // 2026-11-23：这 4 张单据改用服务端「复制单据」（整单另存为新草稿，见
+            //   ButtonService.copyDocToDraft），把旧的「更多 → 复制」从工具栏撤掉 ——
+            //   旧路径是前端 getFormDescriptor + 删字段再调「保存」，对文书面板会直接走
+            //   「保存=提交/归档」，用户很容易点错并以为"复制过来内容不全"。
+            buttonGroups.add(group("更多", COPY_DOC_PANELS.contains(def.code())
+                    ? List.of("表格调整", "导出", "退出")
+                    : List.of("复制", "表格调整", "导出", "退出")));
         }
 
         // 「审核」(直接审核:草稿 → 已审核,一步到位)是**每张单据面板都要有**的按钮 ——
@@ -1174,6 +1190,10 @@ public class PanelConfigService {
         out.add("退出");
         return out;
     }
+
+    /** 用服务端「复制单据」的 4 张单（旧「复制」对这些面板不再下发，见「更多」组的注释） */
+    private static final java.util.Set<String> COPY_DOC_PANELS =
+            com.yinjia.mes.service.ButtonService.COPY_DOC_PANELS;
 
     private static final Map<String, List<String[]>> PANDA_BUTTONS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.ofEntries(
             // 供应商采购打印(2026-10-25 用户口径「是多做一个和采购订单一样的供应商面版,

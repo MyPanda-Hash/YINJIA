@@ -90,7 +90,13 @@ const DOC_DEFAULTS = {
     //   二级仍给陈秀丽作初值，但真正回填发生在**一级审批选了二级签核人之后**
     //     （ButtonService.writeBackL2Approver → 写 rd_prod_info_head.审核人二级），
     //     用户口径「责任人在一级审批选择二级签核人之前都是空的，选了就回填，后续改动也对应改动」。
-    ['审核人（一级审批人）', '陈秀丽'],
+    // 2026-11-19 用户口径：「审批人没有默认显示名字，在审批之后才填进去」
+    //   ⇒ 去掉一级默认「陈秀丽」，两格都从空开始，审批动作写入后才显示。
+    // 2026-11-20 截图复验：只清这里不够 —— 后端 buildMeta 下发的 yj_panel.config.headDefaults
+    //   里仍有「审核人（一级审批人）: 陈秀丽」，草稿态 applyDocDefaults 会把空格补成它。
+    //   已在 tools/migrate-prodinfo-approver-no-default-20261120.sql 清掉两个键；
+    //   审批动作写回见 ButtonService.writeBackL1Approver / writeBackL2Approver。
+    ['审核人（一级审批人）', ''],
     ['审核人（二级审批人）', ''],
   ],
   // 2026-09-20 出货检验项目控制计划按《出货检验项目控制计划.xlsx》重排为「一张表 7 列」。

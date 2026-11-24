@@ -185,7 +185,10 @@ async function save() {
   if (!String(head['主批次'] || '').trim()) { ElMessage.warning(tt('请先填写主批次')); return }
   saving.value = true
   try {
-    const payload = { ...head, detail: { items: rows.value.map((r) => ({ id: r.id ?? undefined, 序号: r['序号'], 子批次: r['子批次'], 流程卡: r['流程卡'] || '', 配料表: r['配料表'] || '', 异常情况描述: r['异常情况描述'] || '' })) } }
+    // ⚠ 必须带「编号」：后端 save() 只把 编号 当存量单号（单据编号 是表头数据键），
+    //   缺了它就当新建单 ⇒ 每次保存另开一张头表单号，并把带 id 的明细行改挂到新单号，
+    //   而附件还留在旧单号下（2026-11-20 生产库实测：ZL-…-0001 有 14 个附件、明细却在 0002）。
+    const payload = { ...head, 编号: head['单据编号'], detail: { items: rows.value.map((r) => ({ id: r.id ?? undefined, 序号: r['序号'], 子批次: r['子批次'], 流程卡: r['流程卡'] || '', 配料表: r['配料表'] || '', 异常情况描述: r['异常情况描述'] || '' })) } }
     const res = await request.post('/px/callButton', { panelCode: 'RD_SELFMADE', buttonName: '保存', formData: payload, buttonParam: {} })
     const no = res?.data?.编号 || head['单据编号']
     await load(no)   // 重新拉取拿回行 id（附件格要靠 id 做锚点）

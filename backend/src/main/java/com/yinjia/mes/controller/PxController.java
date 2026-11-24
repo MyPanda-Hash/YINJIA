@@ -67,6 +67,8 @@ public class PxController {
     private final com.yinjia.mes.service.PanelFieldViewService fieldView;
     /** 采购入库单「一行拆多个仓库」(2026-11-17 客户口径):只在草稿、未转ERP 时可用 */
     private final com.yinjia.mes.service.PurInSplitService purInSplit;
+    /** 测试申请汇总表只读取数(2026-11-19):按申请人汇总测试申请单(内部委托 / 销售端两个页签) */
+    private final com.yinjia.mes.service.TestApplySummaryService testApplySummaryService;
     /**
      * 工艺清单归档 → 基础数据清单的同步(2026-11-18):组装工艺清单→组装物料清单、
      * 烧结/X烧结工艺清单→混料物料清单。同步主体挂在归档入口(ButtonService.markArchived),
@@ -93,7 +95,8 @@ public class PxController {
                         com.yinjia.mes.panel.QcRecvGenerateHandler qcRecvGenerate,
                         com.yinjia.mes.service.PanelFieldViewService fieldView,
                         com.yinjia.mes.service.PurInSplitService purInSplit,
-                        com.yinjia.mes.service.ProcBomArchiveSyncService procBomSync) {
+                        com.yinjia.mes.service.ProcBomArchiveSyncService procBomSync,
+                        com.yinjia.mes.service.TestApplySummaryService testApplySummaryService) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -115,6 +118,7 @@ public class PxController {
         this.fieldView = fieldView;
         this.purInSplit = purInSplit;
         this.procBomSync = procBomSync;
+        this.testApplySummaryService = testApplySummaryService;
     }
 
     // 2026-11-18:原「工单扫码领料」的四个端点(/woPick/lines|bom|scanLog|attachDoc|scanLogs)已随页面下架，
@@ -1256,6 +1260,25 @@ public class PxController {
         return ApiResult.ok(buttons.termRowOf(code));
     }
 
+    /**
+     * 项目进度查询：「项目定级原则」说明段的保存（2026-11-23 用户口径）。
+     *
+     * <p>用户原话：「标红的项目控制列表的这个题头位置的内容改为可以自己编辑」。</p>
+     *
+     * <p>⚠ 为什么单独开一个端点，而不走「保存」按钮：RD_PROGRESS 自 2026-10-19 用户口径起是
+     * 只读汇总面板（服务端 READONLY_PANELS 拦掉全部写按钮），纸面 editable 恒 false。
+     * 要把这一格改成可编辑、又不把整张面板变成可编辑，只能给这一格一条窄通道 ——
+     * 只允许改 rd_progress 的「项目定级原则」一列，其余字段一个都碰不到。</p>
+     *
+     * <p>权限：与读取同源（该面板的「可见」词），不额外要求编辑权 —— 它就是一段说明文字。</p>
+     */
+    @PostMapping("/progressPrinciple")
+    public ApiResult<Map<String, Object>> progressPrinciple(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView("RD_PROGRESS");
+        String text = body == null || body.get("text") == null ? "" : String.valueOf(body.get("text"));
+        return ApiResult.ok(buttons.saveProgressPrinciple(text));
+    }
+
     /** 项目进度查询:按项目编号(=立项申请文档编号)取该项目全部数据记录表单据(8 面板,含状态) */
     @GetMapping("/progress/dataSheets")
     public ApiResult<List<Map<String, Object>>> progressDataSheets(@RequestParam String code) {
@@ -1355,10 +1378,20 @@ public class PxController {
         return ApiResult.ok(queryService.selfmadeRows(name, batchFrom, batchTo, field, keyword));
     }
 
+    /**
+     * 样品进度跟踪（2026-11-18 Excel #9；2026-11-20 扩为双外部面板）。
+     *
+     * <p>用户口径：「样品追踪应该是追踪外部的两个样品面板，现在只是一个，
+     * 加上在这个界面可以切换分别追踪这两个外部的单据」。</p>
+     *
+     * <p>{@code panel} 只认 {@code RD_SAMPLE_EXT}（默认，兼容旧调用）与 {@code RD_SAMPLE_ND}；
+     * 权限**按所选面板**校验（看非开发单要非开发单的查看权，不能借开发单的权越看）。</p>
+     */
     @GetMapping("/sampleFlow")
-    public ApiResult<List<Map<String, Object>>> sampleFlow() {
-        perm.requirePanelView("RD_SAMPLE_EXT");
-        return ApiResult.ok(queryService.sampleFlowRows());
+    public ApiResult<List<Map<String, Object>>> sampleFlow(@RequestParam(required = false) String panel) {
+        String code = com.yinjia.mes.service.QueryService.normalizeSampleFlowPanel(panel);
+        perm.requirePanelView(code);
+        return ApiResult.ok(queryService.sampleFlowRows(code));
     }
 
     @PostMapping("/queryFormDataList")
@@ -1416,6 +1449,36 @@ public class PxController {
     public ApiResult<List<Map<String, Object>>> linkedRecordSheets(@RequestParam String domNo) {
         perm.requirePanelView("RD_DOM_TEST");
         return ApiResult.ok(configService.linkedRecordSheets(domNo));
+    }
+
+    /**
+     * 测试申请汇总表(2026-11-19,只读)—— 按**申请人**汇总「内部委托-测试申请单」与
+     * 「销售端-测试/检测申请表」,并给出每张单的明细(前端展开 + 点单号跳转用)。
+     *
+     * <p>用户口径(原话):「做一个类似于样品检验汇总单一样的按照人员进行一个汇总分类的有关测试申请单的
+     * 测试申请汇总面板,还可以点击跳转到对应的测试申请单」;补充确认:「内部和销售端放在同一张表里查询,
+     * 按申请人分组,列按你拟的」。两张申请表其实是同一张 {@code RD_DOM_TEST} 的两个页签
+     * (共用 {@code rd_dom_test_detail},按 {@code [表区]} 分块),故一条 SQL 合并取数。
+     *
+     * <p>权限:复用测试申请单的**查看权**({@code requirePanelView("RD_DOM_TEST")})——
+     * 不新造页面级虚拟面板码:能看到这张单的人才看得到它的汇总;也不新增
+     * {@code yj_role_panel} 授权行(权限矩阵里已经勾过这张单)。
+     *
+     * @param from      日期起 YYYY-MM-DD(缺省 = 今天)
+     * @param to        日期止 YYYY-MM-DD(缺省 = 日期起)
+     * @param applicant 申请人模糊匹配(申请人口径见 {@link com.yinjia.mes.service.TestApplySummaryService})
+     * @param status    草稿/审批中/已审核/已作废/已中止;空或「全部」= 全部(排除已作废/已中止)
+     * @param keyword   单据编号 / 申请人 / 样品 / 检测项目 / 备注
+     */
+    @GetMapping("/testApplySummary")
+    public ApiResult<Map<String, Object>> testApplySummary(
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) String applicant,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String keyword) {
+        perm.requirePanelView("RD_DOM_TEST");
+        return ApiResult.ok(testApplySummaryService.summary(from, to, applicant, status, keyword));
     }
 
     @PostMapping("/callButton")

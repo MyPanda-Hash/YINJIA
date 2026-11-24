@@ -131,7 +131,10 @@ test('「批准」段下方三格：审批通过时回填、纸面只读（2026-
   // 窗口 600 → 1200(2026-10-19):`editable && c.key` 与末尾只读渲染之间**多插了一支**
   //   「变更文件只读态 → 跳转入口」的分支(见 openLinkedFile),原 600 字符窗口装不下。
   //   断言意图不变:这条可编辑分支之后**必须**落到 AnnotatedText 只读渲染,不能没有出口。
-  assert.match(rec, /<template v-else-if="editable && c\.key && !c\.ro">[\s\S]{0,1200}?<AnnotatedText v-else class="rs-txt" :text="head\[c\.key\] \|\| c\.fixed \|\| ''"/,
+  //   2026-11-20:只读文案改为 `tt(c.fixed)` —— 烧结工艺清单的「实际灌料重量计算公式」用
+  //   fixed 承载固定公式,词条在 10 个语言文件里都有,不翻译会把中文带到英文/日文界面。
+  //   改的只是**文案取值表达式**,"必须落到只读文本"的意图不变。
+  assert.match(rec, /<template v-else-if="editable && c\.key && !c\.ro">[\s\S]{0,1200}?<AnnotatedText v-else class="rs-txt" :text="head\[c\.key\] \|\| tt\(c\.fixed\) \|\| ''"/,
     '网格格:无 key/ro 时必须是只读文本,不能给输入控件')
 })
 
@@ -187,12 +190,18 @@ test('RD_CHANGE:大标题**固定**为「产品变更申请表」(2026-11-11 推
   assert.equal(cfg.titleKeyPh, undefined, 'titleKey 已去掉，提示词一并清理')
 })
 
-test('RD_PROD_INFO:大标题格是 产品名称 输入框(titleKey),且该键能定位到页(否则高亮不生效)', () => {  const cfg = recordSheetConfigs.RD_PROD_INFO
-  assert.equal(cfg.titleKey, '产品名称', '左上角大标题要绑 产品名称')
-  assert.equal(cfg.titleKeyPh, '产品名称', '背景提示词要是 产品名称')
-  assert.equal(cfg.staticTitle, '产品信息表', 'staticTitle 保留:只读态字段为空时回落显示表单名')
-  // 缺必填时 focusField 要先找到该键所在页;找不到就直接 return false(高亮根本不出现)
-  assert.equal(pageOfKeyIn(cfg, '产品名称'), 0, '产品名称 必须能定位到第 0 页,否则保存报错时不高亮')
+/**
+ * 2026-11-23 用户口径：「这个产品名称已经固定了，但是必填没有取消」。
+ *
+ * 演变：2026-10-16 把左上角大标题改成「产品名称」输入框（titleKey）并把该字段置必填；
+ * 2026-11-19 用户改口径「左上角的大的产品名称固定为产品信息表」⇒ titleKey 撤掉、纸面没有输入口。
+ * ⇒ 大标题恒为「产品信息表」，且该字段不再是必填（迁移 migrate-prodinfo-notrequired-20261123.sql）。
+ * 本条原先还在断言 titleKey='产品名称'，是改版前的旧口径，已随用户口径更新。
+ */
+test('RD_PROD_INFO:大标题固定显示 产品信息表（titleKey 已撤，不再绑 产品名称 输入框）', () => {
+  const cfg = recordSheetConfigs.RD_PROD_INFO
+  assert.equal(cfg.titleKey, undefined, 'titleKey 必须已撤（纸面上没有产品名称输入框）')
+  assert.equal(cfg.staticTitle, '产品信息表', '大标题固定为 产品信息表')
   const rec = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
   assert.match(rec, /v-if="editable && cfg\.titleKey"[\s\S]{0,220}?:placeholder="tt\(cfg\.titleKeyPh \|\| cfg\.titleKey\)"/,
     '标题格要按 titleKey 渲染输入框 + 提示词')

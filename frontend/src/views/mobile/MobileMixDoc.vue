@@ -15,8 +15,14 @@
     · 明细卡:每行 应投 / 实投(带标签、各占一行);
     · 底栏:全部确认完毕才点得亮「提交并打印」。
 
+  【2026-11-19 改口径:数量只认电子秤,不许手输】
+  「手机扫码混料,扫物料码解锁后,不能手动填写数据,应该实时抓取电子秤的数据。
+    等他们确认数量无误后再点击确认就可以。」
+  ⇒ 解锁后数量框换成**电子秤实时读数**(1 秒一抓,只读),没有输入控件可改;
+    读数稳定(连续两次一致 / 数采报 normal)才点得亮「确认」,点下去就是"以这一秤为准"。
+
   【与生产领料的三点小区别(其余一模一样)】
-  ① **数量来自电子秤**:解锁时默认填「台车电子秤」的当前读数(手输兜底),还多一颗「取秤」重新抓读数;
+  ① **数量来自电子秤实时读数(只读)**:扫物料解锁 → 数字自己跳 → 核对无误点「确认」;
   ② 明细右侧是 **应投 / 实投**(领料是 需求 / 已领),因为混料是"该投多少 vs 秤上实际多少";
   ③ 底栏是「提交并打印」(用户口径「整单保存。保存后自动打印」),领料是「提交转材料出库单」。
 
@@ -77,14 +83,13 @@
         <span v-if="cur" class="mp-sec-ok">{{ cur.编码 }}</span>
       </div>
 
-      <!-- 电子秤(与生产领料的唯一硬件差别):读数稳定才认,取不到就手输 -->
+      <!-- 电子秤(与生产领料的唯一硬件差别):只读实时读数,稳定才允许确认,页面不提供任何手输入口 -->
       <div class="mp-scale" :class="{ live: scaleOk }">
         <div class="mp-scale-main">
           <span class="mp-scale-label">{{ tt('台车电子秤') }}</span>
           <span class="mp-scale-num">{{ scaleText }}</span>
           <span class="mp-scale-hint">{{ scaleHint }}</span>
         </div>
-        <el-button size="small" :loading="scaleLoading" @click="takeScale">{{ tt('取秤') }}</el-button>
       </div>
 
       <div class="mp-row">
@@ -117,27 +122,29 @@
         </div>
         <div class="mp-row mp-qty">
           <span class="mp-qty-label">{{ tt('实投重量') }}</span>
-          <el-input-number
-            v-model="curQty"
-            :min="0"
-            :precision="4"
-            :step="0.1"
-            size="large"
-            controls-position="right"
-          />
-          <span class="mp-qty-unit">{{ cur.单位 || '' }}</span>
-          <el-button type="primary" size="large" :loading="saving" :disabled="!(curQty > 0)" @click="saveQty">
+          <!-- 只能看不能改:数字直接跟着电子秤跳,避免手抄/手改把实际用量写歪 -->
+          <div
+            class="mp-live"
+            :class="{ ok: scaleOk, zero: !(liveQty > 0) }"
+            data-test="mix-live-qty"
+          >
+            <b class="num">{{ liveQty > 0 ? fmtQty(liveQty) : '—' }}</b>
+            <i class="mp-live-unit">{{ cur.单位 || '' }}</i>
+            <em class="mp-live-badge">{{ scaleOk ? tt('实时') : tt('未稳定') }}</em>
+          </div>
+          <el-button type="primary" size="large" :loading="saving" :disabled="!canConfirm" @click="saveQty">
             {{ tt('确认') }}
           </el-button>
           <el-button size="large" @click="cancelLock">{{ tt('取消') }}</el-button>
         </div>
+        <div class="mp-qty-tip" :class="{ warn: !scaleOk }">{{ qtyTip }}</div>
       </template>
 
       <div v-if="!cur" class="mp-hint">
-        {{ tt('扫物料码解锁:只有本单混料物料清单里的料才能确认;数量默认取电子秤读数,可手改') }}
+        {{ tt('扫物料码解锁:只有本单混料物料清单里的料才能确认;数量只取电子秤实时读数,不能手输') }}
       </div>
       <div v-else class="mp-hint">
-        {{ tt('确认后重新锁回扫码状态,再扫下一个物料;全部确认完毕才可提交') }}
+        {{ tt('核对电子秤读数无误后点「确认」;确认后重新锁回扫码状态,再扫下一个物料') }}
       </div>
     </section>
 
@@ -236,6 +243,7 @@ import {
   buildScanPayload,
   scaleReadingOf,
   checkScaleReading,
+  scaleDeviceIdOf,
 } from '@/business/mixScan'
 import { printSlip } from '@/business/slipPrintFlow'
 import { scanOnce, hasNativeScan } from '@/business/nativeScan'
@@ -281,12 +289,10 @@ const head = ref({})
 const rows = ref([])
 /** 解锁中的物料(扫到本单清单里的料才非空) */
 const cur = ref(null)
-const curQty = ref(0)
 
 /** 电子秤实时读数 */
 const scaleVal = ref(0)
 const scaleOk = ref(false)
-const scaleLoading = ref(false)
 const prevScale = ref(null)
 let scaleTimer = null
 
@@ -296,6 +302,21 @@ const scaleHint = computed(() => {
   if (scaleOk.value) return tt('读数稳定，可取值')
   if (scaleVal.value <= 0) return tt('等待称重')
   return tt('读数跳动中')
+})
+/**
+ * 本次「实投重量」= 电子秤实时读数,**没有第二种来源**。
+ *
+ * <p>用户口径(2026-11-19):「扫物料码解锁后,不能手动填写数据,应该实时抓取电子秤的数据。
+ * 等他们确认数量无误后再点击确认就可以。」⇒ 页面上不再有任何可改数字的输入控件;
+ * 读数不稳定(< 0.001 的两次一致 或 数采报 normal)一律不给确认,避免把跳动值写进单据。
+ */
+const liveQty = computed(() => (cur.value && scaleOk.value && scaleVal.value > 0 ? scaleVal.value : 0))
+const canConfirm = computed(() => !!cur.value && liveQty.value > 0 && scaleOk.value && !saving.value)
+/** 确认按钮旁边的一句话:为什么点不了 / 点了会发生什么 */
+const qtyTip = computed(() => {
+  if (scaleOk.value) return tt('数量来自电子秤实时读数,核对无误后点「确认」')
+  if (scaleVal.value <= 0) return tt('取不到秤读数:请把料放上台车电子秤(或检查秤与网关是否在线)')
+  return tt('读数还在跳动,稳定后才可确认')
 })
 
 function fmtQty(n) {
@@ -348,7 +369,6 @@ watch([woNo, lineNo, docNo], () => {
 function softReset() {
   matText.value = ''
   cur.value = null
-  curQty.value = 0
   clearMsg()
 }
 
@@ -421,7 +441,8 @@ async function load() {
  * `存货编码|批号`(纸面条码)、`公司代码@存货编码@批号`(材料仓条码)、或**裸编码**(手输/PDA)。
  *
  * <p>后端按《混料物料清单》(bs_mix_bom)校验:不在本单清单里的料直接拒绝并列出应投的编码,不解锁;
- * 命中则把数量框放出来,数量**默认填电子秤读数**(取不到稳定值就留 0,由人取秤或手输)。
+ * 命中则把**只读的实投重量**放出来 —— 它的值始终跟着电子秤实时跳(见 {@link liveQty}),
+ * 页面上没有任何手输入口。
  */
 async function scanMaterial() {
   const raw = String(matText.value || '').trim()
@@ -447,9 +468,10 @@ async function scanMaterial() {
       待投: Number(d.待投) || 0,
       批号: String(d.物料批次 || p.batch || ''),
     }
-    // 数量默认取秤(现场口径「根据连接电子秤的取数,点击确认」);秤没稳定值就留 0 等人取秤/手输
-    curQty.value = scaleOk.value && scaleVal.value > 0 ? scaleVal.value : 0
-    if (curQty.value > 0) okText.value = `${tt('已取秤')}: ${fmtQty(curQty.value)} ${cur.value.单位 || ''}`
+    // 不解锁数量、也不预填:数字由秤实时给,人只负责核对与确认
+    if (scaleOk.value && scaleVal.value > 0) {
+      okText.value = `${tt('电子秤当前读数')}: ${fmtQty(scaleVal.value)} ${cur.value.单位 || ''}`
+    }
   } catch (e) {
     errText.value = errMsgOf(e) || tt('查询物料失败')
   } finally {
@@ -475,31 +497,32 @@ async function scanInto() {
 }
 
 /**
- * 确认:把数量框里的秤值**写入**该项(后端覆盖写入,不累加)。
+ * 确认:**以当下这一秤为准**,把电子秤读数写入该项(后端覆盖写入,不累加)。
  *
- * 与生产领料的「写入」同一动作,只是数量来自电子秤:
+ * <p>与生产领料的「写入」同一动作,区别只在数量不由人填:
+ * 人只判断"秤上的数对不对",点确认就把此刻的稳定读数落库。
  * 写入成功后重新拉一次单据(进度/明细由服务端给,避免界面与库里两套数)。
  */
 async function saveQty() {
-  if (!cur.value || !(curQty.value > 0)) return
+  if (!canConfirm.value) return
+  const qty = liveQty.value
   saving.value = true
   clearMsg()
   try {
     const body = buildScanPayload({
       order: head.value,
       line: cur.value,
-      qty: curQty.value,
+      qty,
       batch: cur.value.批号,
     })
     await request.post('/px/mix/scan', body)
-    const applied = applyConfirm(rows.value, { code: cur.value.编码, qty: curQty.value, batch: cur.value.批号 })
+    const applied = applyConfirm(rows.value, { code: cur.value.编码, qty, batch: cur.value.批号 })
     // 提示文案先算好:下面 load() 会清空提示条(它自带 clearMsg),所以要在**之后**再写回去
     const msg = applied.ok && applied.exceed
       ? `${tt('已确认')} ${cur.value.编码} · ${tt('超出应投')} ${fmtQty(-applied.line.待投)}`
-      : `${tt('已确认')} ${cur.value.编码} · ${fmtQty(curQty.value)} ${cur.value.单位 || ''}`
+      : `${tt('已确认')} ${cur.value.编码} · ${fmtQty(qty)} ${cur.value.单位 || ''}`
     matText.value = ''
     cur.value = null
-    curQty.value = 0
     // 服务端为准:重拉一次(进度/待投/批次全跟着库走)
     await load()
     okText.value = progress.value.ok ? tt('全部物料已确认,可以提交') : msg
@@ -516,7 +539,6 @@ async function saveQty() {
 function cancelLock() {
   matText.value = ''
   cur.value = null
-  curQty.value = 0
   clearMsg()
   nextTick(() => matInput.value?.focus?.())
 }
@@ -597,48 +619,59 @@ async function reprint() {
 
 // ═══════════ 电子秤(与生产领料的唯一硬件差别) ═══════════
 
-/** 取一次秤值填进数量框(操作工按秤上的读数走,不用手工抄) */
-async function takeScale() {
-  scaleLoading.value = true
-  try {
-    const v = await readScale()
-    if (!(v > 0)) {
-      errText.value = tt('取不到稳定的秤读数:请确认电子秤已连接,或直接在数量框里手输')
-      return
-    }
-    curQty.value = v
-    okText.value = `${tt('已取秤')}: ${fmtQty(v)}`
-  } finally {
-    scaleLoading.value = false
-  }
+/**
+ * 认准「电子秤」那台数采设备(2026-11-19)。
+ *
+ * <p>`/dc/monitor` 不带 `deviceId` 时后端取的是 `ORDER BY device_type, code` 的第一台设备,
+ * 本项目里排最前的不是秤 ⇒ 会一直显示「等待称重」。所以第一次先取全量 devices 找到秤的 id,
+ * 之后每次都带 `deviceId` 取它自己的点位。找不到秤就退回默认 payload(与改造前一致)。
+ */
+const scaleDeviceId = ref(null)
+
+/** 把一份 `/dc/monitor` 载荷换算成本页的实时读数状态 */
+function applyReading(payload) {
+  const reading = scaleReadingOf(payload)
+  if (!reading) return 0
+  const chk = checkScaleReading(reading, prevScale.value)
+  prevScale.value = reading
+  scaleVal.value = reading.value > 0 ? reading.value : 0
+  scaleOk.value = chk.ok
+  return chk.ok ? chk.value : 0
 }
 
 /**
- * 读一次秤,返回可用数量(取不到稳定值返回 0)。
+ * 读一次秤,刷新实时读数。
  *
- * 手输为什么必须有(2026-10-21 教训):台车秤离线/故障时若硬要读数,现场当场卡死;
- * 而且验证阶段常常没有秤硬件。
+ * <p>页面上**没有手输兜底**(2026-11-19 用户口径):读数取不到就不给确认,
+ * 提示去查秤与网关,而不是让人抄一个数进来 —— 那正是过去实际用量写歪的来源。
  */
 async function readScale() {
   try {
-    const res = await request.get('/dc/monitor')
-    const reading = scaleReadingOf(res?.data || res)
-    if (!reading) return 0
-    const chk = checkScaleReading(reading, prevScale.value)
-    prevScale.value = reading
-    scaleVal.value = reading.value > 0 ? reading.value : 0
-    scaleOk.value = chk.ok
-    return chk.ok ? chk.value : 0
+    if (scaleDeviceId.value == null) {
+      const first = (await request.get('/dc/monitor')).data
+      const body = first?.data || first
+      const id = scaleDeviceIdOf(body)
+      // 默认返回的就是秤(或压根没有秤设备):直接用这一份,不白打第二次请求
+      if (!id || Number(body?.deviceId) === id) {
+        scaleDeviceId.value = id || 0   // 0 = 已确认没有秤,别再每轮重找
+        return applyReading(body)
+      }
+      scaleDeviceId.value = id
+    }
+    if (!scaleDeviceId.value) return applyReading(null)   // 没有秤设备:保持"等待称重"
+    const res = (await request.get('/dc/monitor', { params: { deviceId: scaleDeviceId.value } })).data
+    return applyReading(res?.data || res)
   } catch {
     scaleOk.value = false
     return 0
   }
 }
 
+/** 1 秒一抓(用户口径「实时抓取电子秤的数据」);稳定判定靠连续两次一致,所以不建议再拉长 */
 function startScalePolling() {
   stopScalePolling()
   readScale()
-  scaleTimer = setInterval(readScale, 2000)
+  scaleTimer = setInterval(readScale, 1000)
 }
 
 function stopScalePolling() {
@@ -703,8 +736,27 @@ function stopScalePolling() {
 
 .mp-qty { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .mp-qty-label { flex: none; font-size: 13px; color: var(--el-text-color-regular); }
-.mp-qty :deep(.el-input-number) { flex: none; width: 140px; }
-.mp-qty-unit { flex: none; min-width: 24px; font-size: 13px; color: var(--el-text-color-secondary); }
+/*
+ * 「实投重量」= 电子秤实时读数,视觉上做成"仪表盘"而不是输入框:
+ * 没有边框可点、没有光标,让人一眼看出这里改不了,只能核对后按确认。
+ */
+.mp-live {
+  flex: 1 1 150px; min-width: 132px; box-sizing: border-box;
+  display: flex; align-items: baseline; gap: 6px; min-height: 44px; padding: 6px 10px;
+  border-radius: 6px; background: var(--el-fill-color-lighter);
+  border: 1px dashed var(--el-border-color); font-variant-numeric: tabular-nums;
+}
+.mp-live.ok { border-style: solid; border-color: var(--el-color-success); background: var(--el-color-success-light-9); }
+.mp-live.zero { border-color: var(--el-color-warning); background: var(--el-color-warning-light-9); }
+.mp-live .num { font-size: 22px; font-weight: 700; line-height: 1.1; }
+.mp-live-unit { flex: none; font-size: 13px; font-style: normal; color: var(--el-text-color-secondary); }
+.mp-live-badge {
+  margin-left: auto; flex: none; font-size: 11px; font-style: normal; line-height: 16px;
+  padding: 0 6px; border-radius: 8px; color: var(--el-color-info); background: var(--el-fill-color);
+}
+.mp-live.ok .mp-live-badge { color: #fff; background: var(--el-color-success); }
+.mp-qty-tip { flex: 1 1 100%; font-size: 11px; color: var(--el-text-color-secondary); }
+.mp-qty-tip.warn { color: var(--el-color-warning); }
 .mp-qty :deep(.el-button) { flex: 1 1 88px; }
 
 .mp-kv { display: flex; align-items: baseline; gap: 8px; padding: 2px 0; font-size: 13px; }
@@ -713,7 +765,7 @@ function stopScalePolling() {
 .mp-kv > b.ok { color: var(--el-color-success); }
 .mp-kv > b i { font-style: normal; color: var(--el-text-color-secondary); }
 
-/* 电子秤卡(与「扫码混料」列表页的秤卡同一形态:左边读数、右边取秤) */
+/* 电子秤卡(只读读数:读数由后台每秒刷新,页面不给任何取值/输入按钮) */
 .mp-scale {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   margin-bottom: 10px; padding: 8px 10px; border-radius: 6px;

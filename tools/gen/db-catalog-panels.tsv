@@ -110,7 +110,7 @@ RD_MOLD_FORMULA	成型配方	单据	doc	rd_mold_formula_detail	rd_mold_formula_h
 RD_MOLD_PROC	烧结工艺清单	单据	doc	rd_mold_proc_detail	rd_mold_proc_head	单据编号	id	单据编号	MP	单据日期	20	items	研发管理			
 RD_PLAN	项目实施计划	单据	doc	rd_plan_detail	rd_plan	单据编号	id	单据编号	LXB	单据日期	20	items	研发管理			
 RD_PROD_DOCLIST	产品文件列表	单据	doc	rd_prod_doclist_detail	rd_prod_doclist_head	单据编号	id	单据编号	PDL	单据日期	50	items	研发管理	{"singleDoc":true}		
-RD_PROD_INFO	产品信息表	单据	doc	rd_prod_info_detail	rd_prod_info_head	单据编号	id	单据编号	PI	单据日期	20	items	研发管理	{"headDefaults":{"审核人（一级审批人）":"陈秀丽"}}		
+RD_PROD_INFO	产品信息表	单据	doc	rd_prod_info_detail	rd_prod_info_head	单据编号	id	单据编号	PI	单据日期	20	items	研发管理	{"headDefaults":{}}		
 RD_PROGRESS	项目进度查询	单据	doc	rd_progress_detail	rd_progress	单据编号	id	单据编号	LXJ	单据日期	20	items	研发管理	{"singleDoc":true}		
 RD_RO_PROTECT	RO保护	单据	doc	rd_ro_protect_detail	rd_ro_protect_head	单据编号	id	单据编号	RO	单据日期	20	items	研发管理			RO Protection
 RD_SAMPLE_EXT	外部开发样品申请单	单据	doc	rd_sample_ext_detail	rd_sample_ext_head	单据编号	id	单据编号	SPW	单据日期	20	items	研发管理			

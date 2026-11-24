@@ -144,20 +144,7 @@ export function nextDay(value) {
   return `${t.getUTCFullYear()}-${p(t.getUTCMonth() + 1)}-${p(t.getUTCDate())}`
 }
 
-/**
- * 相邻阶段日期衔接:阶段 n「计划完成」确定后,若阶段 n+1「计划开始」为空则填次日。
- * 规则:**只在下一阶段为空时写入**,不覆盖已填值;本阶段日期为空/非法、或 n 已是最后阶段时不写入。
- * 就地修改 head(与面板其它字段读写方式一致)。
- * @param {Object} head 实施计划单据表头
- * @param {number} n 阶段号
- * @returns {number} 被写入的阶段号;未写入返回 0
- */
-export function chainNextStageStart(head, n, total = MAX_STAGE) {
-  if (!head || !n || n >= total) return 0
-  const start = nextDay(head[`阶段${n}_计划完成`])
-  if (!start) return 0
-  const nextKey = `阶段${n + 1}_计划开始`
-  if (text(head[nextKey])) return 0
-  head[nextKey] = start
-  return n + 1
-}
+/* 2026-11-23 用户口径：「项目实施计划自动生成下一个阶段计划的开始时间这个功能去掉，时间自己来选就行」
+   ⇒ 原 chainNextStageStart（阶段 n 计划完成后把阶段 n+1 计划开始接成次日）已整体删除，
+     阶段日期一律只认用户自己选的。nextDay 仍保留（日期工具函数，别处/测试在用）。 */
+

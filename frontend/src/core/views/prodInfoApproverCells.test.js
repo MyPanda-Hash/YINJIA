@@ -32,27 +32,35 @@ const cfg = read('src/core/views/recordSheetConfigs.js')
 const btn = read('../backend/src/main/java/com/yinjia/mes/service/ButtonService.java')
 const mig = read('../tools/migrate-prodinfo-approver-cells-20261111.sql')
 
-test('① 一级审核人默认值 = 陈秀丽（不再是冯总）', () => {
-  const m = defaults.match(/\['审核人（一级审批人）',\s*'([^']+)'\]/)
-  assert.ok(m, 'docDefaults 里找不到「审核人（一级审批人）」的默认值')
-  assert.equal(m[1], '陈秀丽', `一级审核人默认值应为陈秀丽，实际是 ${m[1]}`)
+test('① 两级审核人不再有默认值（2026-11-19/20 用户口径）', () => {
+  const at = defaults.indexOf('RD_PROD_INFO: [')
+  assert.ok(at >= 0, '找不到 RD_PROD_INFO 默认值段')
+  const end = defaults.indexOf('\n  ],', at)
+  const seg = defaults.slice(at, end)
+  // 2026-11-19 用户口径「审批人没有默认显示名字，在审批之后才填进去」
+  //   ⇒ docDefaults 两格都必须为空串；名字由审批动作写（见 ButtonService.writeBackL1Approver）。
+  assert.match(seg, /'审核人（一级审批人）',\s*''/, '一级审核人不得再有默认值')
+  assert.match(seg, /'审核人（二级审批人）',\s*''/, '二级审核人不得再有默认值')
+  assert.ok(!/'审核人（一级审批人）',\s*'[^']+'/.test(seg), '一级不能残留任何姓名默认值')
+  assert.ok(!/'审核人（二级审批人）',\s*'[^']+'/.test(seg), '二级不能残留任何姓名默认值')
 })
 
-test('② 三格在纸面上都是只读（ro:true）', () => {
+test('② 两级审核人在纸面上都是只读（ro:true）', () => {
   const at = cfg.indexOf('五、文件与签署')
   assert.ok(at > 0, '找不到「五、文件与签署」段')
-  // 窗口放宽到 2400:三格之间隔着大段口径注释(第一版 1200 字符切在产品负责人之前,误报)
+  // 窗口放宽到 2400:两格之间隔着大段口径注释
   const seg = cfg.slice(at, at + 2400)
   for (const [label, key] of [
     ['审核人（一级审核）', '审核人（一级审批人）'],
     ['审核人（二级审核）', '审核人（二级审批人）'],
-    ['产品负责人', '产品负责人'],
   ]) {
     const re = new RegExp(`label: '${label}', key: '${key}'[^}]*`)
     const hit = seg.match(re)
     assert.ok(hit, `找不到 ${label} 那一格`)
     assert.match(hit[0], /ro:\s*true/, `${label} 必须 ro:true（用户口径"这三个都是只读的"）`)
   }
+  // 2026-11-19 版式：产品负责人不再单列一行（二级审核即产品负责人）
+  assert.ok(!seg.includes("label: '产品负责人'"), '产品负责人不再上纸面')
 })
 
 test('③ yj_field 里三格必须 editable=0（只读要落到元数据，不能只靠前端配置）', () => {
@@ -106,9 +114,11 @@ test('⑥ 组件真的读了 pair.ro(否则配置写 ro:true 也拦不住输入�
     'pairs 的两条输入分支(text / textarea)都必须判 !pair.ro，实际匹配到 ' + hits.length)
 })
 
-test('⑤ 产品负责人那格写的是 责任人 列(与纸面 key 一致，不能各写各的)', () => {
-  const at = cfg.indexOf("label: '产品负责人', key: '产品负责人'")
-  assert.ok(at > 0, '找不到产品负责人那一格')
-  // 物理列由 yj_field 决定(col_name=责任人)，这里只钉配置用的是 label 口径
-  assert.match(cfg.slice(at, at + 120), /ro:\s*true/, '产品负责人必须只读')
+test('⑤ 产品负责人不再上纸面，但历史字段/只读元数据仍保留', () => {
+  // 2026-11-19 用户口径（对照《产品信息表（固定）》新版式）：
+  //   二级审核那一格写的就是「产品负责人」，不再单列一行。
+  assert.ok(!cfg.includes("label: '产品负责人', key: '产品负责人'"),
+    '产品负责人不得再上纸面（二级审核已承担该格）')
+  // 历史字段不能删：老单据的值、元数据、2026-11-11 的只读迁移都要保留。
+  assert.ok(mig.includes('产品负责人'), '2026-11-11 迁移里的 产品负责人 只读处理不能删（历史列仍在）')
 })

@@ -6,7 +6,7 @@
        报告头/条件区/数据表竖线全页对齐;数据键=字段 label(中文)
        特例块:碱性原水水质条 / 浸泡安全(浸泡液用量+仪器检出限) / 矿化(4 指标块+散点图)
        ═══════════════════════════════════════════════════════════════════ -->
-  <div ref="rootEl" class="record-sheet rsp-sheet">
+  <div ref="rootEl" class="record-sheet rsp-sheet" :class="{ 'rs-align-center': cfg.cellAlign === 'center' }">
     <!-- ═══ 页签(规格书多页结构:封面/修订与范围/检验要求/关键物料/包装运输) ═══ -->
     <div v-if="pageList.length" class="rsp-pages">
       <div
@@ -155,6 +155,9 @@
         <tr>
           <td v-if="companySpan > 0" class="rs-td rs-company-cell" :colspan="companySpan">{{ COMPANY_NAME }}</td>
           <td v-if="gapLeftSpan > 0" class="rs-td" :colspan="gapLeftSpan"></td>
+          <!-- 2026-11-19 用户口径：「所有数据记录表右上角加一个项目编号前缀，
+               现在只是直接引用编号但是没有前缀标识」—— 只有声明了 dualDocNo 的记录表才加，
+               且是**标签前缀**（不写进数据），其它面板/单据纸面一个字不动。 -->
           <td v-if="docnoSpan > 0" class="rs-td rs-docno" :colspan="docnoSpan">
             <!-- ⚠ 同格版式的排排坐必须落在**内层 div** 上:给 <td> 加 display:flex 会让它不再是
                  table-cell(浏览器另生匿名格包住它,colspan 随之失效 —— 实测 colspan=10 的格子只剩
@@ -164,45 +167,54 @@
                  :style="sameCellDocno && oneCellDocnoW ? { '--docno-w': oneCellDocnoW + 'px' } : null">
               <!-- 同格版式:公司名与编号同处一格(设计一格含两段文字),公司名内联在编号左边 -->
               <span v-if="sameCellDocno" class="rs-company-inline">{{ COMPANY_NAME }}</span>
-              <!-- 文档编号(纸张右上角那一格)。前置标识「编号：」**由 head.docnoPrefix 决定**:
-                   设计原表的原值都是裸编号(碱性 N2=" YJ-PD-01"、功能性滤效 K2="YJ-PD-01"…),
-                   故缺省 false = 按设计显示裸值;哪个面板要标识(或非纸面场景要提示)就在它的 head 里写 true。 -->
-              <!-- 受控表单编号(逐页常量 YJ-RIR001 / YJ-XS002)—— **2026-10-29 起停用**
-                   (用户口径:「这个应该是显示表格编号,不应该是 YJ-RIR001,这个改为单据编号,
-                    自动生成,内容就是表格编号」)。
-                   现在这一格统一显示**后端「新增」时自动生成的单据编号**(DT-…),
-                   与汇总表「表格编号」列同一份值;docNoStatic 配置保留但不再优先渲染 ——
-                   留它是因为打印空白模板/设计对照还可能引用,删掉会让文档失据。 -->
-              <!-- ⚠ 2026-11-06 起 docNoStatic 优先级最高：声明了受控表单编号的面板，编辑态也不出
-                   参照控件/输入框（否则点开还能改，与"固定"自相矛盾）。 -->
-              <template v-if="docNoStatic"><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span><span class="rs-docno-static">{{ docNoStatic }}</span></template>
-              <div v-else-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
-                <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>
-                <span class="rs-ref-text" :class="{ 'rs-docno-empty': !head['文档编号'] }">{{ head['文档编号'] || tt('点击选择') }}</span>
-                <el-icon class="rs-ref-ico"><Search /></el-icon>
+              <!-- 编号行（2026-11-20 用户报障「前缀和编号叠成上下两行」）：前缀与编号/控件收进
+                   同一层单行弹性行（flex 只加这层 div，**不加 <td>** —— 会丢 colspan，见上）。
+                   值过长时朝**左**溢出到公司名右侧的留白，不换行、不省略，也不把前缀挤到上一行。 -->
+              <div class="rs-docno-line" :class="{ 'rs-docno-line--pre': !!cfg.dualDocNo }">
+                <!-- 2026-11-19 用户口径：「所有数据记录表右上角加一个项目编号前缀，
+                     现在只是直接引用编号但是没有前缀标识」—— 只有声明了 dualDocNo 的记录表才加，
+                     且是**标签前缀**（不写进数据），其它面板/单据纸面一个字不动。 -->
+                <span v-if="cfg.dualDocNo" class="rs-docno-pre">{{ tt('项目编号') }}：</span>
+                <!-- 文档编号(纸张右上角那一格)。前置标识「编号：」**由 head.docnoPrefix 决定**:
+                     设计原表的原值都是裸编号(碱性 N2=" YJ-PD-01"、功能性滤效 K2="YJ-PD-01"…),
+                     故缺省 false = 按设计显示裸值;哪个面板要标识(或非纸面场景要提示)就在它的 head 里写 true。 -->
+                <!-- 受控表单编号(逐页常量 YJ-RIR001 / YJ-XS002)—— **2026-10-29 起停用**
+                     (用户口径:「这个应该是显示表格编号,不应该是 YJ-RIR001,这个改为单据编号,
+                      自动生成,内容就是表格编号」)。
+                     现在这一格统一显示**后端「新增」时自动生成的单据编号**(DT-…),
+                     与汇总表「表格编号」列同一份值;docNoStatic 配置保留但不再优先渲染 ——
+                     留它是因为打印空白模板/设计对照还可能引用,删掉会让文档失据。 -->
+                <!-- ⚠ 2026-11-06 起 docNoStatic 优先级最高：声明了受控表单编号的面板，编辑态也不出
+                     参照控件/输入框（否则点开还能改，与"固定"自相矛盾）。 -->
+                <template v-if="docNoStatic"><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span><span class="rs-docno-static">{{ docNoStatic }}</span></template>
+                <div v-else-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
+                  <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>
+                  <span class="rs-ref-text" :class="{ 'rs-docno-empty': !head['文档编号'] }">{{ head['文档编号'] || tt('点击选择') }}</span>
+                  <el-icon class="rs-ref-ico"><Search /></el-icon>
+                </div>
+                <!-- 文档类面板(编号字段=文档编号):编号由人填,给输入框 -->
+                <div v-else-if="editable && docNoKey === '文档编号'" class="rs-docno-wrap">
+                  <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>
+                  <!-- 提示词口径(2026-10-28 用户口径「编号的占位背景提示词会让人误会是固定的一个编号」):
+                       带前缀时原先写的是**前缀本身**(`'编号：'`)⇒ 左侧黑字「编号：」与框里灰字一模一样,
+                       读起来像"这里已经印好一个编号了"。改成「请输入编号」= 明确这是**要你填**的空格;
+                       不带前缀的 7 张裸编号设计表仍用字段名(docNoKey)做提示,它们没有前缀可重复。 -->
+                  <el-input v-model="head[docNoKey]" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt(docnoPrefix ? '请输入编号' : docNoKey)" @input="emit('dirty')" />
+                </div>
+                <!-- 单据类面板(编号字段=单据编号):号是后端「新增」时自动生成的,只读显示 ——
+                     给输入框既没意义又会被误改(打印/预览还必须看得见号) -->
+                <!-- 只读兜底口径(2026-10-28 用户口径「会让人误会是固定的一个编号在这边」):
+                     原先末尾还挂着写死的 'YJ-PD-01' —— 一张**还没发号**的单在屏幕上印出假编号。
+                     cfg.docNoDefault 保留(那是设计纸面的样板号,打印空白模板要用),
+                     两者都取不到时显示「—」= 明确"这里还没有号",不再编造。 -->
+                <!-- 受控表单编号(2026-11-06 用户口径 A)：「产品文件右上角全部是文件编号，固定的」
+                     —— 产品信息表 YJ-QR-152 / 烧结工艺清单 YJ-QR-146-1 / X烧结工艺清单 YJ-QR-146-1 /
+                     规格书 YJ-QR-153。声明了 pages[i].docNoStatic 的面板，这一格印常量文本（编辑态与
+                     只读态一致、不出输入框、不可改）；单据自身编号（SD-…/MP-…）仍在左侧选单栏与
+                     产品文件列表里，两张单靠「产品编号」关联（用户口径：「单据之间就通过产品编号来关联」）。
+                     未声明 docNoStatic 的面板逐字不变。 -->
+                <template v-else><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>{{ head[docNoKey] || cfg.docNoDefault || '—' }}</template>
               </div>
-              <!-- 文档类面板(编号字段=文档编号):编号由人填,给输入框 -->
-              <div v-else-if="editable && docNoKey === '文档编号'" class="rs-docno-wrap">
-                <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>
-                <!-- 提示词口径(2026-10-28 用户口径「编号的占位背景提示词会让人误会是固定的一个编号」):
-                     带前缀时原先写的是**前缀本身**(`'编号：'`)⇒ 左侧黑字「编号：」与框里灰字一模一样,
-                     读起来像"这里已经印好一个编号了"。改成「请输入编号」= 明确这是**要你填**的空格;
-                     不带前缀的 7 张裸编号设计表仍用字段名(docNoKey)做提示,它们没有前缀可重复。 -->
-                <el-input v-model="head[docNoKey]" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt(docnoPrefix ? '请输入编号' : docNoKey)" @input="emit('dirty')" />
-              </div>
-              <!-- 单据类面板(编号字段=单据编号):号是后端「新增」时自动生成的,只读显示 ——
-                   给输入框既没意义又会被误改(打印/预览还必须看得见号) -->
-              <!-- 只读兜底口径(2026-10-28 用户口径「会让人误会是固定的一个编号在这边」):
-                   原先末尾还挂着写死的 'YJ-PD-01' —— 一张**还没发号**的单在屏幕上印出假编号。
-                   cfg.docNoDefault 保留(那是设计纸面的样板号,打印空白模板要用),
-                   两者都取不到时显示「—」= 明确"这里还没有号",不再编造。 -->
-              <!-- 受控表单编号(2026-11-06 用户口径 A)：「产品文件右上角全部是文件编号，固定的」
-                   —— 产品信息表 YJ-QR-152 / 烧结工艺清单 YJ-QR-146-1 / X烧结工艺清单 YJ-QR-146-1 /
-                   规格书 YJ-QR-153。声明了 pages[i].docNoStatic 的面板，这一格印常量文本（编辑态与
-                   只读态一致、不出输入框、不可改）；单据自身编号（SD-…/MP-…）仍在左侧选单栏与
-                   产品文件列表里，两张单靠「产品编号」关联（用户口径：「单据之间就通过产品编号来关联」）。
-                   未声明 docNoStatic 的面板逐字不变。 -->
-              <template v-else><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt(docnoPrefixText) }}</span>{{ head[docNoKey] || cfg.docNoDefault || '—' }}</template>
             </div>
           </td>
           <td v-if="gapRightSpan > 0" class="rs-td" :colspan="gapRightSpan"></td>
@@ -309,8 +321,8 @@
               <td class="rs-td rs-label" :class="{ 'rs-focus': isPairFocus(pair), 'rs-req': isPairReq(pair) }" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
               <template v-if="pair.cells">
                 <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
-                  <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" :placeholder="c.ph ? tt(c.ph) : ''" @input="emit('dirty')" />
-                  <AnnotatedText v-else class="rs-txt" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
+                  <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" :placeholder="c.ph ? tt(c.ph) : emptyMark" @input="emit('dirty')" />
+                  <AnnotatedText v-else class="rs-txt" :text="paperCellText(c.key, head[c.key])" :field-key="String(c.key || '')" />
                 </td>
               </template>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(pair.key) }" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
@@ -354,9 +366,9 @@
                      ⚠ 此前 pairs 分支**完全没有读 ro** —— c.ro 只对 row.grid 分支生效,
                        所以只写配置里的 ro:true 界面照旧能改(实测 hasInput=true)。这里补齐两条输入分支的判断。
                      值仍照常渲染(落到下面的 AnnotatedText),只是不给输入框 ⇒ "只读但看得到回填值"。 -->
-                <el-input v-else-if="editable && !pair.ro && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
+                <el-input v-else-if="editable && !pair.ro && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : emptyMark" @input="emit('dirty')" />
                 <el-input v-else-if="editable && !pair.ro" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
-                <AnnotatedText v-else class="rs-txt" :text="head[pair.key] || ''" :field-key="String(pair.key || '')" />
+                <AnnotatedText v-else class="rs-txt" :text="paperCellText(pair.key, head[pair.key])" :field-key="String(pair.key || '')" />
               </td>
             </template>
           </tr>
@@ -469,9 +481,9 @@
                 <span v-else-if="c.userPick" class="rs-userpick-ro">{{ signNamesOf(head[c.key]) }}</span>
                 <span v-else-if="c.pre" class="rs-pre-cell">
                   <span class="rs-pre">{{ tt(c.pre) }}</span>
-                  <AnnotatedText class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
+                  <AnnotatedText class="rs-txt" :text="head[c.key] || tt(c.fixed) || ''" :field-key="String(c.key || '')" />
                 </span>
-                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
+                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || tt(c.fixed) || ''" :field-key="String(c.key || '')" />
               </td>
             </template>
           </tr>
@@ -500,7 +512,7 @@
             <template v-if="row.cells">
               <td v-for="c in row.cells" :key="c.key" class="rs-td" :colspan="c.span || 1">
                 <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="100" class="rs-t-in" :placeholder="c.ph || ''" @input="emit('dirty')" />
-                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
+                <AnnotatedText v-else class="rs-txt" :text="paperCellText(c.key, head[c.key])" :field-key="String(c.key || '')" />
               </td>
             </template>
             <td v-else class="rs-td" :colspan="nCols > 1 ? nCols - 1 : 1">
@@ -1046,7 +1058,7 @@
               <template v-if="pair.cells">
                 <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
                   <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" :placeholder="c.ph ? tt(c.ph) : ''" @input="emit('dirty')" />
-                  <AnnotatedText v-else class="rs-txt" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
+                  <AnnotatedText v-else class="rs-txt" :text="paperCellText(c.key, head[c.key])" :field-key="String(c.key || '')" />
                 </td>
               </template>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(pair.key) }" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
@@ -1092,7 +1104,7 @@
                      值仍照常渲染(落到下面的 AnnotatedText),只是不给输入框 ⇒ "只读但看得到回填值"。 -->
                 <el-input v-else-if="editable && !pair.ro && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
                 <el-input v-else-if="editable && !pair.ro" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
-                <AnnotatedText v-else class="rs-txt" :text="head[pair.key] || ''" :field-key="String(pair.key || '')" />
+                <AnnotatedText v-else class="rs-txt" :text="paperCellText(pair.key, head[pair.key])" :field-key="String(pair.key || '')" />
               </td>
             </template>
           </tr>
@@ -1181,9 +1193,9 @@
                 </span>
                 <span v-else-if="c.pre" class="rs-pre-cell">
                   <span class="rs-pre">{{ tt(c.pre) }}</span>
-                  <AnnotatedText class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
+                  <AnnotatedText class="rs-txt" :text="head[c.key] || tt(c.fixed) || ''" :field-key="String(c.key || '')" />
                 </span>
-                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
+                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || tt(c.fixed) || ''" :field-key="String(c.key || '')" />
               </td>
             </template>
           </tr>
@@ -1212,7 +1224,7 @@
             <template v-if="row.cells">
               <td v-for="c in row.cells" :key="c.key" class="rs-td" :colspan="c.span || 1">
                 <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="100" class="rs-t-in" :placeholder="c.ph || ''" @input="emit('dirty')" />
-                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
+                <AnnotatedText v-else class="rs-txt" :text="paperCellText(c.key, head[c.key])" :field-key="String(c.key || '')" />
               </td>
             </template>
             <td v-else class="rs-td" :colspan="nCols > 1 ? nCols - 1 : 1">
@@ -1372,7 +1384,7 @@
                   <el-button v-for="o in checkList(head[c.key])" :key="o" link type="primary" size="small"
                              @click.stop="openLinkedFile(c, o)">{{ tt(o) }}</el-button>
                 </span>
-                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || c.fixed || ''" :field-key="String(c.key || '')" />
+                <AnnotatedText v-else class="rs-txt" :text="head[c.key] || tt(c.fixed) || ''" :field-key="String(c.key || '')" />
               </td>
             </template>
           </template>
@@ -1921,6 +1933,7 @@ import request from '@/core/request'
 import { recordSheetConfigs } from './recordSheetConfigs'
 import { buildCoverPatch } from './prodPickCarry.js'
 import { pageOfKeyIn, pageOfLabelIn } from './recordSheetFocus'
+import { signoffPaperText } from '@core/panel/paperSignoff.js'
 import { productCodeWithSuffix, rawProductCode } from '@core/panel/productCodeSuffix.js'
 import { sectionLibText } from './sectionLibText'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry, orderSpecGroups, clusterSpecGroups, SPEC_MOTHERS } from '@/core/panel/testItemLib'
@@ -2089,6 +2102,36 @@ function rowAttachKey(c, row) {
 //   文档编号」这一条,撞上"文档编号是隐藏物理列但仍在 head 里"的面板(出货检验计划表 RD_INSP_PLAN)
 //   就会把 YJ-RD001 印到右上角,而这张单自己的 IP-2026-10-00xx 一个字看不到(实测探针证实)。
 //   未声明的面板仍走原推断,逐字不变。
+/**
+ * 纸面空格的默认占位（2026-11-19 销售问题汇总 P9「没内容的默认 “/”」）：
+ *   面板级 cfg.emptyMark 有值时才生效（目前只有 产品信息表 = '/'），其余面板仍为空占位，
+ *   观感一个字不变。放在值格 placeholder 上，而不是往 head 里写值 —— 写值会被当成真实数据保存。
+ */
+const emptyMark = computed(() => String(cfg.value?.emptyMark || ''))
+
+/**
+ * 审批人两格的纸面显示门禁（2026-11-20 用户口径「审批之后才有对应审批人的名字」）。
+ *   配置 = 面板级 signoffVisibility（见 core/panel/paperSignoff.js）；状态取**本单当前单据状态**
+ *   （head 由 QueryService 下发，草稿=草稿、一级通过=待二级审批、终审后=已审核/已归档）。
+ *   ⚠ 只拦**显示**：保存报文仍带原值也没关系，后端 ButtonService.save 会把这两格从入参剥掉，
+ *     落库值只由审批动作写 —— 两道闸门缺一不可，前端这道管老单据/旧页面。
+ */
+const docStatusNow = computed(() => String(props.head?.['单据状态'] || ''))
+/** 纸面值格文本：命中 signoffVisibility 且状态未到 ⇒ 空串（不显示历史值） */
+/** 只读态纸面显示文本：审批人门禁 → 空值补占位符。
+ *
+ *  <p>2026-11-23 用户口径：「产品信息表的非必填未填写项在保存之后没有 / 占位显示」。
+ *  原先 emptyMark 只挂在**可编辑**输入框的 placeholder 上（`c.ph ? tt(c.ph) : emptyMark`），
+ *  一保存转只读就落到 AnnotatedText，空格子什么都看不到 —— 与纸面表单（空格填「/」）的观感不一致。
+ *  这里在只读分支补齐：有值照常显示，空值且该面板配了 emptyMark（目前只有产品信息表 = '/'）才补。
+ *  ⚠ 只影响**显示**：不往 head 里写值，保存报文与库里的 NULL 都不变（写值会被当成真实数据存下去）。</p>
+ */
+function paperCellText(key, value) {
+  const text = signoffPaperText(cfg.value, key, value, docStatusNow.value)
+  if (String(text ?? '').trim() !== '') return text
+  return emptyMark.value
+}
+
 const docNoKey = computed(() => docNoKeyFor(props.head, effHead.value))
 // 版式:'report' | 'plain'——面板级值是缺省,多页签面板可按页覆盖(见 effPlain)
 
@@ -2957,9 +3000,14 @@ let clearFocusOf = null
 function isFocus(key) { return !!key && focusKeys.value.has(String(key)) }
 /** 键值对行的标签格:整对里任意一格(key 或 cells 的某一格)命中即高亮标签 */
 /** 该数据键是否**必填**(yj_field.required 经 fieldSpec 下发为 isRequired)——
- *  纸面标签格据此打星号(2026-11-06 用户口径:「所有的必填项…要打*号」)。 */
+ *  纸面标签格据此打星号(2026-11-06 用户口径:「所有的必填项…要打*号」)。
+ *  ⚠ 2026-11-20 产品信息表用户口径「必填项用 / 占位，不要那个红点了」：
+ *    面板级 cfg.hideRequiredMark=true 时**本函数只影响画星**，直接返回 false；
+ *    保存/提交的必填校验在 PanelxList.validateInlineDraft + 后端 ensureRequiredFilled，
+ *    与这里无关 ⇒ 不画星 ≠ 不拦。别把这条改成全局删 CSS（2026-11-17 刚要求过必填标红）。 */
 function isReq(key) {
   if (!key) return false
+  if (cfg.value?.hideRequiredMark === true) return false
   const f = fieldMap.value.get(String(key))
   return !!(f && (f.isRequired === true || f.isRequired === 1))
 }
@@ -4967,6 +5015,23 @@ watch([matPickKeyword, () => GOODS_FACETS.map((k) => matPickFilters[k]).join('\u
 const hasMaterialPickTable = computed(() =>
   (cfg.value?.dataTables || []).some((d) => d && d.materialPick && !d.bar)
   || (cfg.value?.sections || []).some((sec) => !!materialPickAt(sec)))
+/**
+ * 「直接导入采购物料清单」要**只显示采购物料**（2026-11-19 销售问题汇总 P10）：
+ *   用户口径「这里只显示采购物料，所以去掉 裸棒、成品、滤芯」。
+ * 为什么按类别过滤而不是按面板：商品档案(INV)里这四类是同一张表，
+ *   而 BOM 要引用的只有**采购进来的物料**；裸棒/成品/滤芯是自制或成品口径，选进来就是错数据。
+ * 只作用于**本次弹窗的候选行**（matPickRows），不动档案本身、也不影响其它面板引用商品档案。
+ */
+// 2026-11-23 用户口径（产品信息表 · 产品BOM表）：「把这个半成品也去掉，这里面填写 BOM 表不需要这个类别」
+//   —— 半成品是上一道工序的半制件，BOM 只填直接采购/直接投入的物料。
+const MAT_PICK_EXCLUDE_CATS = new Set(['裸棒', '成品', '滤芯', '半成品'])
+
+/** 过滤掉自制/成品类别（空类别保留 —— 历史档案有脏值为空的物料，不能因过滤把它们藏掉） */
+function isPurchasableMaterial(r) {
+  const cat = String(r && r['所属类别'] || '').trim()
+  return !cat || !MAT_PICK_EXCLUDE_CATS.has(cat)
+}
+
 /** 每栏的候选值 —— 按**其它三栏**的当前条件收窄(用户要的"范围缩小"),capped 见 goodsPick.FACET_CAP */
 const matPickFacets = computed(() => GOODS_FACETS.map((k) => ({ key: k, ...facetValues(matPickRows.value, k, matPickFilters) })))
 /** 表格数据 = 四栏 AND 之后的结果 */
@@ -5030,12 +5095,12 @@ async function openMaterialPick(dt) {
     // 不带 keyword ⇒ 一次拿全,级联筛选全在本地做(打开弹窗一次,之后零请求)。
     // 2026-11-13:先看预取缓存 —— 命中就**零请求秒开**（进面板时已经拉过了，见 prefetchMatPickRows）
     if (matPickCache.value.length) {
-      matPickRows.value = matPickCache.value.slice()
+      matPickRows.value = matPickCache.value.filter(isPurchasableMaterial)
       return
     }
     const res = await request.post('/px/queryFormDataList', { panelCode: INV_PANEL, condition: {}, pageNo: 1, pageSize: 20 })
     const rows = invRowsOf(res?.data ?? res)
-    matPickRows.value = rows.map((r, i) => ({ ...r, __k: `${r?.['存货编码'] || ''}#${i}` }))
+    matPickRows.value = rows.filter(isPurchasableMaterial).map((r, i) => ({ ...r, __k: `${r?.['存货编码'] || ''}#${i}` }))
     // 首次（没预取到）也顺手填缓存，这一轮会话里再打开就不用再拉了
     if (matPickRows.value.length) matPickCache.value = matPickRows.value.slice()
   } catch (e) {
@@ -5709,6 +5774,74 @@ body.approval-printing .rs-mold-pick { display: none !important; }
 .rs-focus :deep(.el-select__wrapper) {
   box-shadow: 0 0 0 1px #f56c6c inset;
 }
+/**
+ * 下拉（el-select）长文本**自动折行 + 格子随内容长高**
+ * （2026-11-19 用户报障「烧结炉参数这些被覆盖了」；2026-11-20 二次修复）
+ *
+ * 【根因（2026-11-20 活体实测，Element Plus 2.14.4）】
+ *   单选 el-select 的**选中值**不是普通文本节点，而是
+ *   `<div class="el-select__selected-item el-select__placeholder"><span>值</span></div>`；
+ *   Element 给 `.el-select__placeholder` 的是
+ *     `position: absolute; top: 50%; transform: translateY(-50%); white-space: nowrap;
+ *      width: 100%; overflow: hidden; text-overflow: ellipsis; z-index: -1`
+ *   ⇒ **绝对定位不参与行高**：上一版只把 white-space 改成 normal，多行文字照样从 wrapper
+ *   （小号 24px）里溢出去压住相邻行 —— 实测「烧结炉参数」的选中值 54px 高、wrapper 24px，
+ *   文字上沿超出格子上沿 10.7px，被上一行的白底盖住半截（用户截图就是它）。
+ *
+ * 【修法】（只作用于纸面；表单页、列表页的普通下拉一字不动）
+ *   ① 下拉**收起且已有值**时，把选中值拉回文档流（position: static）⇒ 撑高 wrapper ⇒ 撑高行；
+ *   ② 过滤输入框（filterable + allow-create）在收起态不占位（0×0 绝对定位）——否则 flex
+ *      会先给它一整行，每个下拉格平白高 20px；
+ *   ③ 展开中（`aria-expanded="true"`，正在输入）还原成单行省略号，避免展开瞬间撑高/溢出；
+ *   ④ 高度只用 min-height，**不写死 height**：行高随内容长，打印/导出态同样不截断。
+ *
+ * ⚠ 选择器必须落到 `td.rs-td`：行式 grid（页签「成型工艺清单」的工序块）就是
+ *   `<table class="rs-t"><tr><td class="rs-td">…el-select…</td>`，只写 `.rs-t` 命中整张表，
+ *   `td.rs-td` 才能把“纸面数据格里的下拉”与表外的下拉区分开。
+ * ⚠ `:has()` 是本项目既有用法（OrgAdmin / DocSheet / InspCommissionSheet）；老浏览器整条丢弃时
+ *   退化成单行省略号 —— 仍不会压行。
+ */
+/* 兜底：纸面内下拉的选中值/占位符先按单行省略（展开态与空值态走这条） */
+.rs-t :deep(.el-select__placeholder),
+.rsp-sheet :deep(.el-select__placeholder) {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+/* ① 收起态 + 有值：选中值回到文档流，多行折行，wrapper 与行跟着长高 */
+.rs-t :deep(td.rs-td .el-select__wrapper:not(:has(.el-select__input[aria-expanded='true'])) .el-select__placeholder:not(.is-transparent)),
+.rsp-sheet :deep(td.rs-td .el-select__wrapper:not(:has(.el-select__input[aria-expanded='true'])) .el-select__placeholder:not(.is-transparent)) {
+  position: static;
+  transform: none;
+  z-index: auto;
+  width: auto;
+  min-width: 0;
+  flex: 1 1 auto;
+  display: block;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  line-height: 18px;
+}
+/* ② 收起态的过滤输入框不占位（仍是可聚焦元素：点格子照样展开、照样能输入筛选） */
+.rs-t :deep(td.rs-td .el-select__wrapper:not(:has(.el-select__input[aria-expanded='true'])) .el-select__input-wrapper),
+.rsp-sheet :deep(td.rs-td .el-select__wrapper:not(:has(.el-select__input[aria-expanded='true'])) .el-select__input-wrapper) {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+/* ③ 高度随内容：min-height 起步，绝不写死 height（写死会把多行选中值裁掉、打印也截断） */
+.rs-t :deep(.el-select__wrapper),
+.rsp-sheet :deep(.el-select__wrapper) {
+  height: auto;
+  min-height: 28px;
+  align-items: center;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
 .rs-txt {
   white-space: pre-wrap;
   word-break: break-all;
@@ -5795,7 +5928,17 @@ body.approval-printing .rs-mold-pick { display: none !important; }
 .rs-td :deep(.rs-range-in .el-range__icon) {
   display: none;
 }
-/* 纸面格内控件一律铺满格子(文本/下拉/自动完成) */
+/* 值格居中（2026-11-19，烧结/X烧结两张工艺清单）：
+   只居中**数据格**（.rs-td 里非标签的 td）与其中的输入控件，标签列与栏目带不动。 */
+.rs-align-center .rs-td:not(.rs-label):not(.rs-company-cell):not(.rs-topic-cell):not(.rs-info-label) {
+  text-align: center;
+}
+.rs-align-center .rs-td:not(.rs-label) :deep(input),
+.rs-align-center .rs-td:not(.rs-label) :deep(textarea),
+.rs-align-center .rs-td:not(.rs-label) :deep(.el-input__inner),
+.rs-align-center .rs-td:not(.rs-label) :deep(.el-select__selected-item) {
+  text-align: center;
+}
 .rs-t-in,
 .rs-c-in {
   width: 100%;
@@ -5876,6 +6019,46 @@ body.approval-printing .rs-mold-pick { display: none !important; }
   padding: 6px 14px !important;
   vertical-align: middle;
 }
+/* 编号格标签前缀（2026-11-19 用户口径；2026-11-20 修排版）：
+   与 DataRecordSheet.vue 的 .rs-docno-pre **同款**（两处值不许各自漂）；纯展示，打印态照常显示。
+   间距不写 margin，统一由 .rs-docno-line--pre 的 gap 给。 */
+.rs-docno-pre {
+  flex: none;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #595959;
+}
+/* 编号行（2026-11-20 用户报障「前缀与编号叠成上下两行」）：
+   前缀是行内 span、编号值/控件是块级 div ⇒ 原样排必然分成两行。
+   改法：外层一行 flex + nowrap；值区不缩（flex:0 0 auto），值过长时靠 flex-end 的负剩余
+   空间朝**左**溢出到左侧留白 —— 不换行、不省略号、不截断，也不把前缀挤到上一行。
+   ⚠ flex 只加在这层内层 div，**不加 <td>**：td 脱离 table-cell 会另生匿名格、colspan 失效
+      （见模板同处注释，2026-11-11 实测）。 */
+.rs-docno-line--pre {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-width: 0;
+  white-space: nowrap;
+}
+/* 值区不缩：否则 flex 会把编号压窄，nowrap 的文字溢到相邻格/页边 */
+.rs-docno-line--pre > * {
+  flex: 0 0 auto;
+}
+/* 参照框：有富余时铺满剩余宽度；格子窄时保持整串编号宽度（min-content=max-content）⇒ 整行朝左溢出 */
+.rs-docno-line--pre > .rs-ref-ctl {
+  flex: 1 1 auto;
+  min-width: max-content;
+}
+/* 参照文本默认允许折行（供别的格子），编号格里必须单行 */
+.rs-docno-line--pre .rs-ref-text {
+  white-space: nowrap;
+}
+/* 编号格输入框：与 DataRecordSheet 同宽（160px），不再按百分比跟着窄格子压到 90% */
+.rs-docno-line--pre .rs-docno-input {
+  width: 160px;
+}
 .rs-docno-input {
   width: 90%;
 }
@@ -5916,12 +6099,18 @@ body.approval-printing .rs-mold-pick { display: none !important; }
 }
 /* 同格版式：编号控件**固定为下方信息块的那几列宽**（--docno-w），不再吃满整格剩余宽度。
    2026-11-11 用户口径「选择框应该收短与下边平齐」——原来 flex:1 1 auto 会让它左缘压到
-   信息块中段，与下面 5 行不齐。未声明 --docno-w 时退回原弹性行为。 */
-.rs-onecell > .rs-docno-wrap,
-.rs-onecell > .rs-ref-ctl {
+   信息块中段，与下面 5 行不齐。未声明 --docno-w 时退回原弹性行为。
+   2026-11-20：前缀移进编号行后，宽度仍钉在**编号控件**上（前缀落在它左边的留白），
+   控件左缘继续与下方信息块对齐，这条口径不变。 */
+.rs-onecell > .rs-docno-line > .rs-docno-wrap,
+.rs-onecell > .rs-docno-line > .rs-ref-ctl {
   flex: 0 0 var(--docno-w, auto);
   min-width: 0;
   max-width: 100%;
+}
+/* 同格版式的输入框仍按控件原口径（90% 铺满 --docno-w 的编号块），不套用上面 160px 单列口径 */
+.rs-onecell > .rs-docno-line > .rs-docno-wrap > .rs-docno-input {
+  width: 90%;
 }
 .rs-docno-empty {
   color: #b6bcc6;
@@ -7227,5 +7416,23 @@ body.approval-printing .rsp-sheet .el-input__clear {
   .rs-dev-badge {
     display: none !important;
   }
+}
+/* ═══ 编号格：打印态保持「前缀 + 编号」同一行（2026-11-20 用户报障）═══
+   上面的打印规则会把 `.rsp-sheet .rs-td` 的 white-space 改成 normal（那是给长文本折行用的），
+   编号行必须反向钉回 nowrap；值长时仍按屏幕口径朝左溢出，不换行、不省略、不截断。
+   两条打印路径各一条（@media print / 侧栏「打印」按钮 body.approval-printing）。 */
+@media print {
+  .rsp-sheet .rs-docno-line--pre,
+  .rsp-sheet .rs-docno-line--pre * {
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+}
+body.approval-printing .rsp-sheet .rs-docno-line--pre,
+body.approval-printing .rsp-sheet .rs-docno-line--pre * {
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
 }
 </style>

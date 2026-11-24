@@ -194,7 +194,7 @@ public class QueryService {
      */
     public List<java.util.Map<String, Object>> selfmadeRows(String name, String batchFrom, String batchTo, String field, String keyword) {
         StringBuilder sql = new StringBuilder(
-                "SELECT ISNULL(CAST(d.id AS varchar(20)), '') AS 明细id, h.[单据编号], ISNULL(h.[材料名], N'') AS 材料名, ISNULL(h.[主批次], N'') AS 主批次, "
+                "SELECT ISNULL(CAST(d.id AS varchar(20)), '') AS 明细id, ISNULL(d.[序号], N'') AS 序号, h.[单据编号], ISNULL(h.[材料名], N'') AS 材料名, ISNULL(h.[主批次], N'') AS 主批次, "
               + "ISNULL(d.[子批次], N'') AS 子批次, ISNULL(d.[流程卡], N'') AS 流程卡, "
               + "ISNULL(d.[配料表], N'') AS 配料表, ISNULL(d.[异常情况描述], N'') AS 异常情况描述, "
               + "ISNULL(h.[录入人], N'') AS 录入人, ISNULL(CONVERT(varchar(10), h.[单据日期], 23), '') AS 录入日期 "
@@ -219,9 +219,10 @@ public class QueryService {
         if (batchFrom != null && !batchFrom.isBlank()) { sql.append(" AND ISNULL(h.[主批次],'') >= ?"); args.add(batchFrom.trim()); }
         if (batchTo != null && !batchTo.isBlank()) { sql.append(" AND ISNULL(h.[主批次],'') <= ?"); args.add(batchTo.trim()); }
         sql.append(" ORDER BY h.[主批次] DESC, h.[单据编号] DESC, TRY_CAST(d.[序号] AS int)");
-        return jdbc.query(sql.toString(), (rs, i) -> {
+        java.util.List<java.util.Map<String, Object>> rows = jdbc.query(sql.toString(), (rs, i) -> {
             java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
             row.put("明细id", rs.getString("明细id"));
+            row.put("序号", rs.getString("序号"));
             row.put("单据编号", rs.getString("单据编号"));
             row.put("材料名", rs.getString("材料名"));
             row.put("主批次", rs.getString("主批次"));
@@ -233,23 +234,270 @@ public class QueryService {
             row.put("录入日期", rs.getString("录入日期"));
             return row;
         }, args.toArray());
+        attachSelfmadeFiles(rows);
+        return rows;
     }
 
+    /**
+     * 查询页的附件清单（2026-11-19 用户报障「流程卡/配料表只显示文件名文本、点击打不开」；
+     * 2026-11-20 生产库复核后修正根因）：
+     * <p>根因不是"附件没上传"，也不只是"锚点前缀写错" —— 是**单号变了**：
+     * 自制料录入页保存时载荷只带「单据编号」、没带后端 save() 读取的「编号」，
+     * 后端每次都当新建单 ⇒ 另开一张头表单号（如 ZL-…-0002），并把带 id 的明细行
+     * **改挂到新单号**下；而附件仍留在上传当时的旧单号（如 ZL-…-0001）下。
+     * 于是查询页拿本页单号去精确查附件，查空 ⇒ 显示「—」。
+     * <p>实测：附件 field_key 的数字段 = **明细行 id**（不是序号；0005 的 8..11 与
+     * 序号 1..4 对不上），所以「字段名-序号」不能替代行 id。
+     * <p>解析策略（每行按顺序，任一级命中即返回；全程一次批量查询、无 N+1）：
+     * <ol>
+     *   <li>① 字段名-明细行id：先本单，再**跨单**（明细行 id 全局唯一，换号后旧附件仍能命中）；</li>
+     *   <li>② 字段名-序号（本单）：用户口径里的旧锚点形态，兼容 序号 与 id 相同的历史数据；</li>
+     *   <li>③ 该单按 file_name 与列里存的文件名逐一匹配（列里可能是多文件、逗号/分号/冒号分隔）；</li>
+     *   <li>④ 同一单该字段名只有一组时直接取这组（仅单行单）。</li>
+     * </ol>
+     * <p>返回元素与 {@code /attachment/list} 同构：id / fileName / fileSize / contentType /
+     * uploader / uploadTime —— 可直接作为 FileAttachCell 的 attachments 入参。
+     */
+    private void attachSelfmadeFiles(java.util.List<java.util.Map<String, Object>> rows) {
+        if (rows.isEmpty()) return;
+        java.util.LinkedHashSet<String> docNos = new java.util.LinkedHashSet<>();
+        java.util.Map<String, Integer> rowCountByDoc = new java.util.HashMap<>();
+        for (java.util.Map<String, Object> row : rows) {
+            String no = strOf(row.get("单据编号"));
+            if (no.isEmpty()) continue;
+            docNos.add(no);
+            rowCountByDoc.merge(no, 1, Integer::sum);
+        }
+        if (docNos.isEmpty()) return;
+        String in = String.join(",", java.util.Collections.nCopies(docNos.size(), "?"));
+        // 候选池 = 本页单据的附件 + 本页明细行 id 锚点跨单命中的附件（EXISTS 按 d.id 匹配，
+        // 不把每行 id 当参数传，避免明细行多时超 SQL Server 2100 参数上限）。
+        // 2026-11-20 生产库实测：附件在 0001/0004、明细行已挪到 0002/0005，靠后半段才能命中。
+        java.util.List<java.util.Map<String, Object>> files = jdbc.queryForList(
+                "SELECT a.id, a.doc_no AS docNo, a.field_key AS fieldKey, a.file_name AS fileName, "
+              + "a.file_size AS fileSize, a.content_type AS contentType, a.asp_user1 AS uploader, "
+              + "CONVERT(varchar(19), a.asp_time1, 120) AS uploadTime "
+              + "FROM yj_attachment a WHERE a.panel_code = N'RD_SELFMADE' AND ("
+              + "a.doc_no IN (" + in + ") OR EXISTS (SELECT 1 FROM rd_selfmade_detail d "
+              + "WHERE d.[单据编号] IN (" + in + ") AND a.field_key IN ("
+              + "N'流程卡-' + CAST(d.id AS varchar(20)), N'配料表-' + CAST(d.id AS varchar(20))))) "
+              + "ORDER BY a.id", duplicateArgs(docNos));
+        for (java.util.Map<String, Object> row : rows) {
+            String no = strOf(row.get("单据编号"));
+            // 「字段名本身」这级兜底只对**单行单**开放：多行单的旧数据整单挂在同一个键下，
+            // 逐行复制会把同一份文件贴到每一行（错行比空着更糟）。
+            boolean singleRow = rowCountByDoc.getOrDefault(no, 0) == 1;
+            row.put("流程卡附件", pickSelfmadeFiles(files, "流程卡", no, row.get("明细id"), row.get("序号"),
+                    row.get("流程卡"), singleRow));
+            row.put("配料表附件", pickSelfmadeFiles(files, "配料表", no, row.get("明细id"), row.get("序号"),
+                    row.get("配料表"), singleRow));
+        }
+    }
+
+    /** 同一批单号再排一遍（SQL 里 doc_no 与 EXISTS 子查询各要一份），保持参数顺序与占位符一致。 */
+    private static Object[] duplicateArgs(java.util.Collection<String> values) {
+        java.util.List<Object> args = new java.util.ArrayList<>(values.size() * 2);
+        args.addAll(values);
+        args.addAll(values);
+        return args.toArray();
+    }
+
+    /**
+     * 单行附件匹配：① 字段-明细行id（本单 → 跨单）→ ② 字段-序号（本单）→
+     * ③ 列内文件名（本单）→ ④ 字段名本身（仅单行单）。
+     */
+    private java.util.List<java.util.Map<String, Object>> pickSelfmadeFiles(
+            java.util.List<java.util.Map<String, Object>> files, String baseKey, String docNo, Object rowId,
+            Object seq, Object columnText, boolean singleRow) {
+        if (files.isEmpty()) return java.util.List.of();
+        String id = strOf(rowId);
+        if (!id.isEmpty()) {
+            String anchor = baseKey + "-" + id;
+            // ①-a 本单；①-b 跨单：保存换号后附件仍挂在旧单号下，明细行 id 全局唯一所以不会串行
+            java.util.List<java.util.Map<String, Object>> hit = selfmadeHitByAnchor(files, anchor, docNo, true);
+            if (hit.isEmpty()) hit = selfmadeHitByAnchor(files, anchor, docNo, false);
+            if (!hit.isEmpty()) return selfmadeFilePayload(hit);
+        }
+        String seqText = strOf(seq).trim();
+        if (!seqText.isEmpty()) {
+            java.util.List<java.util.Map<String, Object>> hit =
+                    selfmadeHitByAnchor(files, baseKey + "-" + seqText, docNo, true);
+            if (!hit.isEmpty()) return selfmadeFilePayload(hit);
+        }
+        java.util.Set<String> names = selfmadeFileNames(columnText);
+        if (!names.isEmpty()) {
+            // ③ 只在本单按文件名匹配：文件名（1.jpg / 2.jpg）跨单会重名，跨单贴错比空着更糟；
+            //    换号后的旧附件已由 ①-b 按明细行 id 精确命中，不需要再拿文件名跨单猜。
+            java.util.List<java.util.Map<String, Object>> hit = selfmadeHitByNames(files, names, docNo, true);
+            if (!hit.isEmpty()) return selfmadeFilePayload(hit);
+        }
+        // ④ 字段名本身：只在单行单兜底（多行单分不清是哪一行的，宁可空着也不贴错）
+        if (!singleRow) return java.util.List.of();
+        java.util.List<java.util.Map<String, Object>> hit = files.stream()
+                .filter(f -> docNo.equals(strOf(f.get("docNo"))))
+                .filter(f -> baseKey.equals(String.valueOf(f.get("fieldKey"))))
+                .toList();
+        return hit.isEmpty() ? java.util.List.of() : selfmadeFilePayload(hit);
+    }
+
+    /** 按锚点取附件；sameDocOnly=true 只认本单，false 允许跨单（明细行 id 全局唯一）。 */
+    private java.util.List<java.util.Map<String, Object>> selfmadeHitByAnchor(
+            java.util.List<java.util.Map<String, Object>> files, String anchor, String docNo, boolean sameDocOnly) {
+        return files.stream()
+                .filter(f -> anchor.equals(strOf(f.get("fieldKey"))))
+                .filter(f -> !sameDocOnly || docNo.equals(strOf(f.get("docNo"))))
+                .toList();
+    }
+
+    /** 按列内文件名取附件；本单专用（跨单重名风险，见 ③ 的注释）。 */
+    private java.util.List<java.util.Map<String, Object>> selfmadeHitByNames(
+            java.util.List<java.util.Map<String, Object>> files, java.util.Set<String> names, String docNo,
+            boolean sameDocOnly) {
+        return files.stream()
+                .filter(f -> names.contains(strOf(f.get("fileName"))))
+                .filter(f -> !sameDocOnly || docNo.equals(strOf(f.get("docNo"))))
+                .toList();
+    }
+
+    /** 明细列里的文件名串（上传后由 AttachmentService 同步为「、」拼接）→ 去重后的文件名集合。 */
+    private static java.util.Set<String> selfmadeFileNames(Object columnText) {
+        String text = columnText == null ? "" : String.valueOf(columnText).trim();
+        if (text.isEmpty()) return java.util.Set.of();
+        java.util.LinkedHashSet<String> names = new java.util.LinkedHashSet<>();
+        for (String part : text.split("[、,，;；:：\\n\\r]+")) {
+            String name = part.trim();
+            if (!name.isEmpty()) names.add(name);
+        }
+        return names;
+    }
+
+    /** 只回传前端要的字段（与 /attachment/list 同构），不把 doc_no/stored_name 等内部列抛出去。 */
+    private static java.util.List<java.util.Map<String, Object>> selfmadeFilePayload(
+            java.util.List<java.util.Map<String, Object>> files) {
+        java.util.List<java.util.Map<String, Object>> out = new java.util.ArrayList<>(files.size());
+        for (java.util.Map<String, Object> f : files) {
+            java.util.Map<String, Object> item = new java.util.LinkedHashMap<>();
+            item.put("id", f.get("id"));
+            item.put("fileName", f.get("fileName"));
+            item.put("fileSize", f.get("fileSize"));
+            item.put("contentType", f.get("contentType"));
+            item.put("uploader", f.get("uploader"));
+            item.put("uploadTime", f.get("uploadTime"));
+            out.add(item);
+        }
+        return out;
+    }
+
+    /** 样品进度跟踪认的两个外部样品面板（2026-11-20 用户口径：「追踪外部的两个样品面板」） */
+    public static final String SAMPLE_FLOW_PANEL_EXT = "RD_SAMPLE_EXT";
+    public static final String SAMPLE_FLOW_PANEL_ND = "RD_SAMPLE_ND";
+
+    /**
+     * 面板码归一（接口 {@code GET /px/sampleFlow?panel=}）：
+     * 只认 {@link #SAMPLE_FLOW_PANEL_ND}，其余一律落回 {@link #SAMPLE_FLOW_PANEL_EXT}
+     * —— 不传（旧调用/旧前端）与脏值都保持原有行为，不会把页面打死。
+     */
+    public static String normalizeSampleFlowPanel(String panel) {
+        String p = panel == null ? "" : panel.trim();
+        return SAMPLE_FLOW_PANEL_ND.equalsIgnoreCase(p) ? SAMPLE_FLOW_PANEL_ND : SAMPLE_FLOW_PANEL_EXT;
+    }
+
+    /** 兼容旧调用：不传面板 = 外部-开发样品单（原行为一字不变） */
     public List<java.util.Map<String, Object>> sampleFlowRows() {
-        String sql = "SELECT h.[单据编号], "
-                + "ISNULL(h.[客户名称], N'') AS 客户名称, "
-                + "ISNULL(CONVERT(varchar(10), h.[单据日期], 23), '') AS 单据日期, "
-                + "ISNULL(h.[审核], N'') AS 审核人, "
-                + "ISNULL(h.[确认], N'') AS 确认人, "
-                + "ISNULL(h.[进度描述], N'') AS 进度描述, "
-                + "ISNULL(s.pending, 'N') AS pending, "
-                + "ISNULL(s.approve_node, 0) AS approve_node, "
-                + "ISNULL(s.archived, 'N') AS archived, "
-                + "ISNULL(s.canceled, 'N') AS canceled "
-                + "FROM rd_sample_ext_head h "
-                + "LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SAMPLE_EXT' AND s.doc_no = h.[单据编号] "
-                + "WHERE ISNULL(h.asp_cancel, 'N') <> 'Y' "
-                + "ORDER BY h.[单据日期] DESC, h.[单据编号] DESC";
+        return sampleFlowRows(SAMPLE_FLOW_PANEL_EXT);
+    }
+
+    /**
+     * 样品进度跟踪 · 双外部面板（2026-11-20 用户口径：
+     * 「样品追踪应该是追踪外部的两个样品面板，现在只是一个，加上在这个界面可以切换分别追踪这两个外部的单据」）。
+     *
+     * <p>两种面板返回**同一套行契约**（前端只有一份渲染/筛选逻辑）：
+     * 单据编号 / 客户名称 / 单据日期 / 审核人 / 确认人 / 进度描述 /
+     * pending / approve_node / archived / canceled / signed。差异只在数据源与单级审批的映射：</p>
+     * <ul>
+     *   <li>{@link #SAMPLE_FLOW_PANEL_EXT} 外部-开发样品单：头表 {@code rd_sample_ext_head}，
+     *       两级审批（提交 → 一级审核 → 二级确认 → 已审核）。**本单不在 DOC_ARCHIVE_PANELS**，
+     *       二级通过后 {@code pending='N' + shr 有值 + archived 通常仍为 'N'} 是常态（只有修改保存
+     *       等闭环才置 archived）⇒ 由 {@code signed} 表达「已审核」（2026-11-20 报障：此前节点推导
+     *       只认 archived，整批已审单显示草稿）；</li>
+     *   <li>{@link #SAMPLE_FLOW_PANEL_ND} 外部-非开发样品单：头表 {@code rd_sample_nondev_head}，
+     *       **一级审批**（ButtonService.SAMPLE_SIGN_COLUMNS 把「确认」槽位指向「审核」列）。
+     *       ① 确认人恒空（纸面/审批流都没有这一格）；
+     *       ② approve_node 按一级口径收口（≥2 也只算 1），前端不会出现「待二级确认」；
+     *       ③ 本单不在 DOC_ARCHIVE_PANELS，通过后是「已审核」而非归档 ⇒ 用
+     *          {@code pending='N' 且 shr 非空} 映射成契约里的 archived 完成标记，
+     *          signed 同口径下发（两面板契约一致，前端按同一套顺序判节点）。</li>
+     * </ul>
+     *
+     * <p>签名真源是 {@code yj_doc_status.shr}，不是头表「审核/确认」落款：弃审
+     * （ButtonService.unaudit）只清 shr/archived，不清样品单纸面落款，拿纸面判断会把弃审单误判成已审核。</p>
+     *
+     * <p>权限由 Controller 按所选面板 {@code requirePanelView} 校验 —— 这里不重复判权。</p>
+     */
+    public List<java.util.Map<String, Object>> sampleFlowRows(String panel) {
+        String code = normalizeSampleFlowPanel(panel);
+        boolean nonDev = SAMPLE_FLOW_PANEL_ND.equals(code);
+        // 可见范围必须与目标单据列表（queryDocs）同口径 —— 否则进度页列出来的单，
+        // 点进去在列表里找不到：用户报障「点单号/点行不会跳到对应的样品单」的根因。
+        //   ① 作废单：queryDocs 里 `s.canceled='Y'` 无条件排除；
+        //   ② 本人归属：RD_SAMPLE_EXT 在 OWN_DOCS_PANELS，非管理员且无 view_all 只看 asp_user1=当前账号
+        //      （RD_SAMPLE_ND 不在该集合，列表本身全量）。
+        boolean restrictOwn = OWN_DOCS_PANELS.contains(code) && !isAdminLogin() && !canViewAllOf(code);
+        String me = restrictOwn ? currentLogin() : null;
+        String scopeCond;
+        java.util.List<Object> args = new java.util.ArrayList<>();
+        if (restrictOwn) {
+            if (me == null || me.isBlank()) {
+                scopeCond = " AND 1 = 0 "; // 无登录人/空账号:不放行（与 queryDocs 的 1=0 同口径）
+            } else {
+                scopeCond = " AND ISNULL(RTRIM(h.asp_user1),'') = ? ";
+                args.add(me);
+            }
+        } else {
+            scopeCond = "";
+        }
+        String sql = nonDev
+                ? "SELECT h.[单据编号], "
+                    + "ISNULL(h.[客户名称], N'') AS 客户名称, "
+                    + "ISNULL(CONVERT(varchar(10), h.[单据日期], 23), '') AS 单据日期, "
+                    + "ISNULL(h.[审核], N'') AS 审核人, "
+                    // 非开发样品单纸面只有「申请 / 审核」两格 ⇒ 确认人恒空（列仍下发，契约统一）
+                    + "CAST(N'' AS nvarchar(200)) AS 确认人, "
+                    + "ISNULL(h.[进度描述], N'') AS 进度描述, "
+                    + "ISNULL(s.pending, 'N') AS pending, "
+                    // 一级审批：节点只可能是 1；脏数据里的 2 也收口成 1（不产生"待二级"）
+                    + "CASE WHEN ISNULL(s.approve_node, 0) >= 2 THEN 1 ELSE ISNULL(s.approve_node, 0) END AS approve_node, "
+                    // 单级通过 ⇒ pending='N' + shr 有值（「已审核」）；契约里用 archived 表达"完成"
+                    + "CASE WHEN ISNULL(s.pending, 'N') = 'N' AND s.shr IS NOT NULL THEN 'Y' ELSE 'N' END AS archived, "
+                    // 已签：pending 已结束且审批人已落库（shr 有值）⇒ 前端「已审核」中间态。
+                    // archived 是本单的完成标记映射，signed 保留原始签名事实，两面板契约一致。
+                    + "CASE WHEN ISNULL(s.pending, 'N') = 'N' AND s.shr IS NOT NULL THEN 'Y' ELSE 'N' END AS [signed], "
+                    + "ISNULL(s.canceled, 'N') AS canceled "
+                    + "FROM rd_sample_nondev_head h "
+                    + "LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SAMPLE_ND' AND s.doc_no = h.[单据编号] "
+                    + "WHERE ISNULL(h.asp_cancel, 'N') <> 'Y' "
+                    + scopeCond
+                    + " AND ISNULL(s.canceled, 'N') <> 'Y' "
+                    + "ORDER BY h.[单据日期] DESC, h.[单据编号] DESC"
+                : "SELECT h.[单据编号], "
+                    + "ISNULL(h.[客户名称], N'') AS 客户名称, "
+                    + "ISNULL(CONVERT(varchar(10), h.[单据日期], 23), '') AS 单据日期, "
+                    + "ISNULL(h.[审核], N'') AS 审核人, "
+                    + "ISNULL(h.[确认], N'') AS 确认人, "
+                    + "ISNULL(h.[进度描述], N'') AS 进度描述, "
+                    + "ISNULL(s.pending, 'N') AS pending, "
+                    + "ISNULL(s.approve_node, 0) AS approve_node, "
+                    + "ISNULL(s.archived, 'N') AS archived, "
+                    // 已签：pending 已结束且 shr 有值（二级/一级审批通过），但 EXT 不是归档面板
+                    // ⇒ archived 恒 'N'。下发该事实让前端显示「已审核」而不是「草稿」。
+                    + "CASE WHEN ISNULL(s.pending, 'N') = 'N' AND s.shr IS NOT NULL THEN 'Y' ELSE 'N' END AS [signed], "
+                    + "ISNULL(s.canceled, 'N') AS canceled "
+                    + "FROM rd_sample_ext_head h "
+                    + "LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SAMPLE_EXT' AND s.doc_no = h.[单据编号] "
+                    + "WHERE ISNULL(h.asp_cancel, 'N') <> 'Y' "
+                    + scopeCond
+                    + " AND ISNULL(s.canceled, 'N') <> 'Y' "
+                    + "ORDER BY h.[单据日期] DESC, h.[单据编号] DESC";
         return jdbc.query(sql, (rs, i) -> {
             java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
             row.put("单据编号", rs.getString("单据编号"));
@@ -261,9 +509,10 @@ public class QueryService {
             row.put("pending", rs.getString("pending"));
             row.put("approve_node", rs.getInt("approve_node"));
             row.put("archived", rs.getString("archived"));
+            row.put("signed", rs.getString("signed"));
             row.put("canceled", rs.getString("canceled"));
             return row;
-        });
+        }, args.toArray());
     }
     private final TranslationService translations;
 
@@ -1100,7 +1349,7 @@ public class QueryService {
             }
             doc.put("编号", no);
             Map<String, Object> st = status.get(no);
-            String statusText = docStatus(st);
+            String statusText = docStatus(def.code(), st);
             doc.put("单据状态", statusText);
             doc.put("saved", st != null ? st.get("saved") : null);
             // 「二级审核人」= yj_doc_status.l2_approver（一级审批通过时选定的人）。
@@ -1154,8 +1403,9 @@ public class QueryService {
                     doc.put("审核时间", auditTimeText(st.get("shsj")));
                 }
                 doc.put("审批状态", "已通过");
-            } else if ("审批中".equals(statusText)) {
-                doc.put("审批状态", "审批中");
+            } else if ("审批中".equals(statusText) || "待批准".equals(statusText)) {
+                // 待批准（RD_CHANGE 终审节点）同样是在途状态：提交人/提交时间照常下发，列表可筛。
+                doc.put("审批状态", statusText);
                 doc.put("提交人", st.get("pending_by"));
                 doc.put("提交时间", auditTimeText(st.get("pending_at")));
             }
@@ -1401,8 +1651,10 @@ public class QueryService {
 
     /** 状态推导:已作废 > 已中止 > 金蝶已删除/已作废 > 删除申请中 > 已终止/终止审批中(项目实施计划) > 修改申请中 > 待二级审批/审批中 > 修改中 > 已生效 > 已归档 > 已完成(金蝶自动关单) > 已审核 > 草稿
      *  ⚠ 与 ButtonService.docStatusOf **必须同改**(两处推导,一处管列表行、一处管按钮/保存门禁;
-     *    2026-09-20 两级审批新增「待二级审批」时同改两处)。 */
-    private String docStatus(Map<String, Object> st) {
+     *    2026-09-20 两级审批新增「待二级审批」时同改两处。
+     *    2026-11-19 产品变更申请表会签全过后 approve_node=2 = 管理员终审，显示「待批准」；
+     *    其余面板的 node=2 仍是「待二级审批」——与 ButtonService.docStatusOf 同口径)。 */
+    private String docStatus(String panelCode, Map<String, Object> st) {
         if (st != null && "Y".equals(st.get("canceled"))) return "已作废";
         if (st != null && "Y".equals(st.get("stopped"))) return "已中止";
         // 金蝶「手动关闭」(erp_close_state='H')= 人工终止,与 MES 中止同义(方案 A,2026-09-20)
@@ -1420,7 +1672,10 @@ public class QueryService {
         if (st != null && "R".equals(st.get("modify_state"))) return "修改申请中";
         if (st != null && "Y".equals(st.get("signoff_pending"))) return "会签中";
         if (st != null && "Y".equals(st.get("pending"))) {
-            return l2Node(st) ? "待二级审批" : "审批中";
+            // 产品变更申请表：会签全过后的第二节点 = 管理员最终批准（2026-11-19 用户口径）。
+            // 与 ButtonService.docStatusOf 必须同改；其余面板 node=2 仍是「待二级审批」。
+            if (l2Node(st)) return "RD_CHANGE".equals(panelCode) ? "待批准" : "待二级审批";
+            return "审批中";
         }
         if (st != null && "Y".equals(st.get("modify_state"))) return "修改中";
         if (st != null && "Y".equals(st.get("effective"))) return "已生效";

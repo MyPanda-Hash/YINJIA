@@ -10,17 +10,8 @@
        同一份事实),本页不写库、不触发审批。
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="pfl-page">
-    <header class="pfl-head">
-      <div>
-        <h1 class="pfl-title">{{ tt('产品文件流程管控') }}</h1>
-        <p class="pfl-sub">
-          {{ tt('按产品看这份开发包走到哪一步：产品信息表 + 4 张受控文件，哪一步还没建单、哪一步卡在开发中') }}
-        </p>
-      </div>
-      <p class="pfl-source">
-        {{ tt('数据来源：产品信息表与 4 个文件面板的实时单据状态，本页只读不改单') }}
-      </p>
-    </header>
+    <!-- 2026-11-23 用户口径：「产品文件流程管控这些字样删掉」
+         ⇒ 页头标题/副标题/数据来源三行整体撤除，直接从 KPI 卡片开始（页面标题已由页签给出）。 -->
 
     <section class="pfl-kpis">
       <article v-for="k in kpiCards" :key="k.key" class="pfl-kpi">
@@ -79,10 +70,33 @@
                       <span class="pfl-step-name">{{ tt(st.label) }}</span>
                       <!-- 状态标签:与项目流程管控的 el-tag 同款(三档统一说法,不再吐「草稿」原文) -->
                       <el-tag size="small" :type="tagTypeOf(st.tone)" effect="plain">{{ tt(stateLabel(st)) }}</el-tag>
-                      <span v-if="st.docNo" class="pfl-step-no">{{ st.docNo }}</span>
+                      <!-- 2026-11-20 用户口径：步骤行显示**产品编号**，不再显示单据编号。
+                           单据编号只保留在下面「· N 张」展开的多单据清单里（区分同类多张单必需）。 -->
+                      <span v-if="st.productCode" class="pfl-step-code" :title="tt('产品编号')">{{ st.productCode }}</span>
+                      <!-- 2026-11-19 用户口径 A：同类多张数据记录表 —— 显示「· N 张」，点开列全部 -->
+                      <span
+                        v-if="st.docs && st.docs.length > 1"
+                        class="pfl-step-count" @click.stop="toggleDocs(st)"
+                      >· {{ st.docs.length }} {{ tt('张') }}</span>
+                      <!-- 填写人（2026-11-19 销售问题汇总 P14：「要跟项目查询一样，增加填写人名字」） -->
+                      <span v-if="st.actor" class="pfl-step-actor" :title="tt('填写人')">{{ st.actor }}</span>
                       <!-- 最后操作时间(2026-11-17 取代原来的「处理人」;取不到显示「-」,不编造) -->
                       <span class="pfl-step-at" :title="tt('最后操作时间')">{{ st.at || '-' }}</span>
                     </div>
+                    <!-- 谁提交 / 谁审批通过（2026-11-23 用户口径「像立项申请表一样，展开能看到
+                         谁提交了单据等待审批中，谁审批通过了，现在只有进行中」）。
+                         有数据才渲染；没有就整行不出现（不占高度、不印「—」凑数）。 -->
+                    <p v-if="approvalLine(st)" class="pfl-step-approval">{{ approvalLine(st) }}</p>
+                    <!-- 多单据清单：保留单据编号（区分同类多张单），并补产品编号 / 日期 / 填写人。
+                         点单号跳转的行为不变（openDoc 按前缀判面板）。 -->
+                    <ul v-if="openDocs.has(st.key) && st.docs && st.docs.length" class="pfl-docs">
+                      <li v-for="d in st.docs" :key="d.no" class="pfl-doc" @click.stop="openDoc(d.no)">
+                        <span class="pfl-doc-code" :title="tt('产品编号')">{{ d.productCode || '—' }}</span>
+                        <span class="pfl-doc-no" :title="tt('单据编号')">{{ d.no }}</span>
+                        <span class="pfl-doc-at" :title="tt('最后操作时间')">{{ d.at || '-' }}</span>
+                        <span class="pfl-doc-by" :title="tt('填写人')">{{ d.actor || '-' }}</span>
+                      </li>
+                    </ul>
                     <p v-if="st.reaudited" class="pfl-step-detail">{{ tt('曾经审核又被弃审，需重走这一步') }}</p>
                   </div>
                 </li>
@@ -148,14 +162,36 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { tt } from '@/i18n'
 import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import {
-  STEP_STATE, currentStepOf, docMetaOf, filterFlowRows, flowKpisOf, flowStatusOf, flowStepsOf,
-  nextStepOf, stateLabelOf,
+  STEP_STATE, approvalLineOf, currentStepOf, docMetaOf, filterFlowRows, flowKpisOf, flowStatusOf,
+  flowStepsOf, nextStepOf, stateLabelOf,
 } from '@/core/prod/productFlow'
+
+const router = useRouter()
+/** 展开状态：哪些步骤的多单据清单是打开的（2026-11-19） */
+const openDocs = reactive(new Set())
+function toggleDocs(st) {
+  if (openDocs.has(st.key)) openDocs.delete(st.key)
+  else openDocs.add(st.key)
+}
+/** 点单号进对应单据（按单号前缀判面板：LXA=立项、其余=实施计划/数据记录表走对应面板） */
+function openDoc(no) {
+  const v = String(no || '')
+  if (!v) return
+  const panel = v.startsWith('LXA') ? 'RD_APPROVAL' : (panelOfNo(v) || 'RD_PROGRESS')
+  router.push({ path: `/panelx/list/${panel}`, query: { focus: v } })
+}
+/** 数据记录表单号 → 面板（碱性 YJ-PD-… 等；取不到就落回项目控制列表） */
+function panelOfNo(no) {
+  const map = { 'YJ-PD': 'RD_ALKALINE' }
+  for (const k of Object.keys(map)) if (String(no).startsWith(k)) return map[k]
+  return ''
+}
 
 const rows = ref([])
 const loading = ref(false)
@@ -207,6 +243,8 @@ function currentOf(row) { return currentStepOf(flowStepsOf(row)) }
 function metaOf(row) { return docMetaOf(row) }
 /** 状态文案三档(已完成/进行中/未开始) —— 不再显示「草稿」这种单据状态原文 */
 function stateLabel(st) { return stateLabelOf(st) }
+/** 这一步「谁提交 / 谁审批通过」的一句话（2026-11-23；没有就返回空串，不渲染那一行） */
+function approvalLine(st) { return approvalLineOf(st) }
 /** el-tag 的 type 映射(与项目流程管控的 tagType 同款) */
 function tagTypeOf(tone) {
   if (tone === STEP_STATE.done) return 'success'
@@ -273,10 +311,8 @@ onBeforeUnmount(() => window.removeEventListener('resize', syncWidth))
 /* 版式语言与 ProjectFlow.vue 一致：浅底、白卡片、1px 边框、无阴影；
    间距 8 的倍数；数字列 tabular-nums（这里只有"进度"是数字列）。 */
 .pfl-page { padding: 20px 24px 32px; background: #f5f7fa; min-height: 100%; box-sizing: border-box; }
-.pfl-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-bottom: 16px; }
-.pfl-title { margin: 0 0 6px; font-size: 20px; line-height: 28px; font-weight: 600; color: #1f2d3d; }
-.pfl-sub { margin: 0; font-size: 13px; line-height: 20px; color: #5c6b7a; }
-.pfl-source { margin: 0; font-size: 12px; color: #8a97a5; max-width: 360px; text-align: right; }
+/* 页头三行已按 2026-11-23 用户口径撤除（.pfl-head/.pfl-title/.pfl-sub/.pfl-source 不再使用），
+   故对应样式一并删除，避免留死样式误导后来者以为还有页头。 */
 
 .pfl-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
 .pfl-kpi { background: #fff; border: 1px solid #e4e8ee; border-radius: 6px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
@@ -330,14 +366,17 @@ onBeforeUnmount(() => window.removeEventListener('resize', syncWidth))
 }
 .pfl-step.is-done .pfl-step-idx { border-color: #2f6f4e; color: #2f6f4e; }
 .pfl-step.is-doing .pfl-step-idx { border-color: #1e5a8a; color: #1e5a8a; }
-/* 每一步一行:环节名 + 状态标签 + 单号 + 时间,空间不够自动换行(与 ProjectFlow 的 .pf-step-row 同款) */
+/* 每一步一行:环节名 + 状态标签 + 产品编号 + 时间,空间不够自动换行(与 ProjectFlow 的 .pf-step-row 同款) */
 .pfl-step-body { min-width: 0; flex: 1; }
 .pfl-step-row { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
 .pfl-step-name { font-weight: 600; color: #1f2d3d; }
-.pfl-step-no { font-size: 12px; color: #8a97a5; font-variant-numeric: tabular-nums; }
+/* 2026-11-20:原来这里是单据编号,改显示该步骤所属产品的产品编号(单号只在多单据清单里) */
+.pfl-step-code { font-size: 12px; color: #8a97a5; font-variant-numeric: tabular-nums; }
 /* 最后操作时间(2026-11-17 取代原来的「处理人」):等宽数字,竖排时逐行对齐好扫 */
 .pfl-step-at { font-size: 12px; color: #5b6b7c; font-variant-numeric: tabular-nums; }
 .pfl-step-detail { margin: 2px 0 0; font-size: 12px; line-height: 1.5; color: #a0641a; }
+/* 提交/审批副行：比主行弱一档（12px 次级灰），只在有数据时出现 */
+.pfl-step-approval { margin: 2px 0 0; font-size: 12px; line-height: 18px; color: #5c6b7a; }
 
 /* 展开行底部「单据信息」区(与 ProjectFlow 的 .pf-meta 同构:虚线分隔 + 横排 label/value) */
 .pfl-meta {
@@ -350,8 +389,6 @@ onBeforeUnmount(() => window.removeEventListener('resize', syncWidth))
 
 @media (max-width: 1100px) {
   .pfl-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pfl-head { flex-direction: column; align-items: flex-start; }
-  .pfl-source { text-align: left; max-width: none; }
 }
 
 /* 窄屏(≤768):表格只留 4 列(见脚本里的 wide);展开行若不限宽,
@@ -364,4 +401,14 @@ onBeforeUnmount(() => window.removeEventListener('resize', syncWidth))
   .pfl-flow { padding-left: 8px; max-width: calc(100vw - 56px); }
   .pfl-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+.pfl-step-actor { margin-left: 8px; font-size: 12px; color: #595959; }
+.pfl-step-count { margin-left: 6px; font-size: 12px; color: #0958d9; cursor: pointer; }
+.pfl-docs { margin: 4px 0 0 20px; padding: 0; list-style: none; }
+/* 多单据清单:产品编号 + 单据编号 + 最后操作时间 + 填写人;窄屏自动换行,不撑出横向滚动 */
+.pfl-doc { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 12px; color: #595959; padding: 2px 0; cursor: pointer; }
+.pfl-doc-code { color: #1f2d3d; font-variant-numeric: tabular-nums; }
+.pfl-doc-no { color: #0958d9; font-variant-numeric: tabular-nums; }
+.pfl-doc-at { color: #5b6b7c; font-variant-numeric: tabular-nums; }
+.pfl-doc-by { color: #595959; }
+.pfl-doc:hover { background: #f0f6ff; }
 </style>

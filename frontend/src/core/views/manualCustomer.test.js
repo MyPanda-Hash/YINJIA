@@ -23,11 +23,23 @@ test('不填编号 → 只写单上，不调建档接口', () => {
   assert.ok(at > 0, '缺 submitManualRef')
   const seg = vue.slice(at, at + 1200)
   assert.match(seg, /if \(!code\)/, '必须先判空编号')
-  assert.match(seg, /head\[key\] = name[\s\S]{0,200}tt\('未填客户编号/, '空编号分支只写本单并提示')
+  assert.match(seg, /props\.head\[key\] = name[\s\S]{0,200}tt\('未填客户编号/, '空编号分支只写本单并提示')
   // 空编号分支必须在调用接口之前 return
   const callAt = seg.indexOf("/px/khdaUpsert")
   const retAt = seg.indexOf('return')
   assert.ok(retAt > 0 && retAt < callAt, '空编号时不能调用建档接口')
+})
+
+test('手填客户读写本单字段必须走 props.head（script setup 里没有裸 head）', () => {
+  // 2026-11-20 实测：openManualRef / submitManualRef 里写裸 `head[...]` ⇒ 点「＋新客户」直接
+  // ReferenceError: head is not defined，弹窗根本打不开；模板能用裸 head 是编译器给模板的绑定，
+  // <script setup> 的函数里必须走 props.head。
+  const at = vue.indexOf('function openManualRef')
+  assert.ok(at > 0, '缺 openManualRef')
+  const seg = vue.slice(at, vue.indexOf('async function submitManualRef') + 1600)
+  assert.doesNotMatch(seg.replace(/props\.head/g, ''), /\bhead\[/, '不允许再出现裸 head[...]')
+  assert.match(seg, /props\.head\?\.\[manualRefField\.value\]/, '弹窗要用本单当前客户名做初值')
+  assert.equal((seg.match(/props\.head\[key\] = name/g) || []).length, 2, '两条提交分支都要写回本单')
 })
 
 test('填了编号 → 调 /px/khdaUpsert 并按结果给不同提示', () => {

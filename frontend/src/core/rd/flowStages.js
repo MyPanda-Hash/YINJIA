@@ -2,7 +2,7 @@
  * flowStages.js — 研发「项目流程管控」的环节判定(纯函数,单测钉边界)。
  *
  * 【它做什么】把 PxController#rdFlow 取回的一条项目事实(立项申请表 / 两处单据状态 /
- * 实施计划 / 进度查询行 / 审批留痕)翻译成 **10 步流程** + 「当前卡在哪一步、该谁动手、停留几天」。
+ * 实施计划 / 进度查询行 / 审批留痕)翻译成 **9 步流程** + 「当前卡在哪一步、该谁动手、停留几天」。
  *
  * 【为什么在前端】判定规则全是"字段空不空 + 留痕取哪一条"的纯逻辑,放在这里可以用 node:test
  * 把 12 种真实边界逐条钉住(草稿/待审批/已审未定级/未分发/未确认责任人/未确认收到/计划未建/
@@ -22,10 +22,16 @@
  *   · 进进度查询 = rd_progress_detail.[说明] 有该立项单号的行。
  */
 
-/** 固定 10 步(顺序即业务链顺序,前端时间轴直接用它) */
+/** 固定 9 步(顺序即业务链顺序,前端时间轴直接用它)
+ *
+ *  2026-11-23 用户口径：「立项申请填写的日期按提交审批的时候开始算，这个是按建立草稿的开始算了，
+ *  可以把填写和提交审批合并为，立项申请填写提交单据」——
+ *  原来 ①「立项申请填写」取的是 asp_time1（**建草稿**那一刻），②「提交审批」才是真正开始走流程的时间；
+ *  用户要的是合并后只留一步、时间取**提交审批**。故两步并作 `applyFilled` 一步，
+ *  判定条件 = 已提交（留痕 SUBMIT / pending='Y' / 已审批），时间与人都取提交那一刻。
+ */
 export const STAGES = [
-  { key: 'applyFill', name: '立项申请填写' },
-  { key: 'applySubmit', name: '立项申请提交审批' },
+  { key: 'applyFilled', name: '立项申请填写提交单据' },
   { key: 'applyApprove', name: '立项申请审批通过' },
   { key: 'gradeDispatch', name: '定级分发（等级 + 对接人）' },
   { key: 'confirmOwner', name: '确认项目责任人' },
@@ -111,21 +117,22 @@ export function buildFlow(p, names = {}, now = '') {
     steps.set(key, { key, name: STAGES.find((x) => x.key === key).name, done: !!done, at: s(at), actor: s(actor), detail, warn })
   }
 
-  // ① 立项申请填写:有这张单就算(它存在才查得到)
-  put('applyFill', !!s(ap.approvalNo), {
-    at: ap.createdAt,
-    actor: person(ap.createdBy, names),
-    detail: [s(ap.customer) && `客户：${s(ap.customer)}`, s(ap.projectName) && `机型：${s(ap.projectName)}`]
-      .filter(Boolean).join(' / '),
-  })
-
-  // ② 提交审批:留痕 SUBMIT 优先,其次 pending='Y' / 已审批(老单没留痕)
+  // ① 立项申请填写提交单据（合并步,2026-11-23）
+  //   提交留痕 SUBMIT 优先,其次 pending='Y' / 已审批(老单没留痕) —— 「已提交」才算走完这一步。
+  //   at = **提交审批**的时间（不再用 ap.createdAt 那个建草稿时间，用户口径明确要改）。
   const apSubmit = lastTrail(trail, 'RD_APPROVAL', 'SUBMIT')
   const submitted = !!apSubmit || s(st.pending) === 'Y' || archivedOrApproved
-  put('applySubmit', submitted, {
-    at: apSubmit ? apSubmit.at : s(st.pendingAt) || s(st.shsj),
+  const submitAt = apSubmit ? apSubmit.at : s(st.pendingAt) || s(st.shsj)
+  const applicant = s(ap.initiator) || person(ap.createdBy, names)
+  put('applyFilled', submitted, {
+    at: submitted ? submitAt : '',
+    // 提交人（= 谁提交的这张单）；没提交时这个人是空的，交给 detail 说「待谁填写并提交」
     actor: apSubmit ? person(apSubmit.operator, names) : person(st.pendingBy, names),
-    detail: submitted ? '' : `待${s(ap.initiator) || person(ap.createdBy, names) || '申请人'}提交审批`,
+    detail: [
+      s(ap.customer) && `客户：${s(ap.customer)}`,
+      s(ap.projectName) && `机型：${s(ap.projectName)}`,
+      !submitted && `待${applicant || '申请人'}填写并提交`,
+    ].filter(Boolean).join(' / '),
   })
 
   // ③ 审批通过
@@ -253,7 +260,7 @@ export function buildFlow(p, names = {}, now = '') {
   const cur = s(ap.owner)
   const pendingWith = (() => {
     if (!currentKey) return { account: '', name: '' }
-    if (currentKey === 'applySubmit') return { account: s(ap.createdBy), name: s(ap.initiator) || plainName(ap.createdBy, names) || '申请人' }
+    if (currentKey === 'applyFilled') return { account: s(ap.createdBy), name: s(ap.initiator) || plainName(ap.createdBy, names) || '申请人' }
     if (currentKey === 'applyApprove' || currentKey === 'planArchive') return { account: '', name: '审批人' }
     if (currentKey === 'gradeDispatch') {
       const who = s(st.shr)

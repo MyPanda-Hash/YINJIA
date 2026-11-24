@@ -21,11 +21,13 @@ export const menuTree = [
         code: 'rdProject', title: '项目管理', icon: 'DocumentAdd', children: [
           { code: 'rdApproval', title: '立项申请', path: '/panelx/list/RD_APPROVAL', icon: 'DocumentAdd', panelCode: 'RD_APPROVAL', operationName: '新增流程' },
           { code: 'rdPlan', title: '项目实施计划', path: '/panelx/list/RD_PLAN', icon: 'Calendar', panelCode: 'RD_PLAN', operationName: '新增流程' },
-          { code: 'rdProgress', title: '项目进度查询', path: '/panelx/list/RD_PROGRESS', icon: 'DataLine', panelCode: 'RD_PROGRESS' },
+                    // 2026-11-19 销售问题汇总 P13：「项目进度查询改为：项目控制列表」
+          { code: 'rdProgress', title: '项目控制列表', path: '/panelx/list/RD_PROGRESS', icon: 'DataLine', panelCode: 'RD_PROGRESS' },
           // 2026-10-20 用户口径:「填完立项申请提交审批后不知道文件到哪个流程了……在项目管理里面加上一个
           //   项目流程管控,通过立项申请表的编号查流程走到哪里」。只读盯单页(页面级虚拟面板 PROJECT_FLOW,
           //   定义见后端 PagePanelRegistry),按立项单号把 10 个环节逐条判出来:卡在谁手上、停留几天。
-          { code: 'rdFlow', title: '项目流程管控', path: '/rd/projectFlow', icon: 'Connection', panelCode: 'PROJECT_FLOW' },
+                    // 2026-11-19 销售问题汇总 P13：「项目流程管控改为：项目进度查询」
+          { code: 'rdFlow', title: '项目进度查询', path: '/rd/projectFlow', icon: 'Connection', panelCode: 'PROJECT_FLOW' },
         ],
       },
       // 2026-11-06 用户口径：「现在要加新面板，这个单独做一个二级目录：样品就在研发管理里面」
@@ -88,6 +90,14 @@ export const menuTree = [
               //   (页签 = 内部委托-测试申请单 / 销售端-测试/检测申请表 / 委托测试汇总表,
               //    按《3.实验室使用记录表\测试申请单.xlsx》3 个 sheet 复刻);面板编码 RD_DOM_TEST 不变。
               { code: 'rdDomTest', title: '测试申请单', path: '/panelx/list/RD_DOM_TEST', panelCode: 'RD_DOM_TEST', icon: 'DocumentAdd' },
+              // 测试申请汇总表(2026-11-19 用户口径:「做一个类似于样品检验汇总单一样的按照人员进行一个汇总分类的
+              //   有关测试申请单的测试申请汇总面板,还可以点击跳转到对应的测试申请单」)。
+              // 位置:紧贴「测试申请单」—— 数据源就是这张单的两个页签(内部委托-测试申请单 / 销售端-测试/检测申请表),
+              //   **不新造分组**:品质管理下没有测试申请分组(测试申请单历来在研发管理 › 测试记录 › 实验室使用记录表);
+              //   与「样品检验汇总表紧跟检验委托单」同一摆法。
+              // 权限:复用 RD_DOM_TEST 的查看权(菜单 panelCode / 路由 meta.panelCode / 后端 requirePanelView 同源),
+              //   不新造页面级虚拟面板码、不加 yj_role_panel 行。
+              { code: 'rdTestApplySummary', title: '测试申请汇总表', path: '/qc/testApplySummary', panelCode: 'RD_DOM_TEST', icon: 'DataAnalysis' },
               { code: 'rdEquipUse', title: '设备使用登记表', path: '/panelx/list/RD_EQUIP_USE', panelCode: 'RD_EQUIP_USE', icon: 'Monitor' },
               { code: 'rdInstrUse', title: '仪器使用记录表', path: '/panelx/list/RD_INSTR_USE', panelCode: 'RD_INSTR_USE', icon: 'Odometer' },
               // 2026-11-20 用户口径:「为当前的试验仪器记录表创建一个汇总表,汇总表需要查看的内容如图1所示。

@@ -24,6 +24,43 @@ export const SAMPLE_DETAIL_PREFIXES = [
   '去除率%样品',
 ]
 
+/**
+ * 「3.数据记录表」里由**样品数**驱动的三组动态列(顺序 = 纸面顺序)。
+ * 压力组的「流速」与压力共用同一格(combo),不单独成列 —— 与 DataRecordSheet 的 DT_GROUPS 同源。
+ * 分组标题文案留在组件里走 i18n;这里只钉「组名 → 字段前缀」。
+ */
+export const SAMPLE_SHEET_GROUPS = [
+  { name: '压力', prefix: '压力（PSI)样品', label: '取样前样品：压力（PSI)/流速（L/min）' },
+  { name: '出水', prefix: '出水含量（ug/L）样品', label: '出水含量（ug/L）' },
+  { name: '去除率', prefix: '去除率%样品', label: '去除率%' },
+]
+
+/**
+ * 该字段名是否属于「由样品数驱动的动态样品列」(明细组前缀 + 正整数序号)。
+ *
+ * <p>这类列**必须随「样品数」同步增删,不允许被列偏好隐藏**。2026-11-20 生产事故:
+ * 该面板 {@code yj_field} 里 `出水含量（ug/L）样品2..6` / `去除率%样品2..6` 被历史
+ * 「表格调整」置成 hidden=1/visible=0(见 tools/migrate-filter-eff-dyncols-visible-20261120.sql),
+ * 而表头/表体都是 `v-if="!dtHidden(key)"` ⇒ 点右上角 ＋ 时只有「取样前样品」跟着加列,
+ * 另两组永远只剩样品1(本地库这些行是 visible=1,所以本地复现不了)。</p>
+ */
+export function isDynamicSampleKey(key) {
+  const k = String(key ?? '')
+  const prefix = SAMPLE_DETAIL_PREFIXES.find((p) => k.startsWith(p))
+  if (!prefix) return false
+  return /^[1-9]\d*$/.test(k.slice(prefix.length))
+}
+
+/**
+ * 某样品组 1..count 的字段名(非法 count 安静返回 [],不抛错)。
+ * 列数恒等于 count —— 表头 colspan / colgroup / 表体三处都从这里取,防止各算各的。
+ */
+export function sampleDetailKeys(prefix, count) {
+  const n = Number(count)
+  if (!prefix || !Number.isFinite(n) || n < 1) return []
+  return Array.from({ length: Math.floor(n) }, (_, i) => `${prefix}${i + 1}`)
+}
+
 /** 第 n 个样品的字段名(与 yj_field.label 同名) */
 export function sampleHeadKey(prefix, n) {
   return `${prefix}${n}`

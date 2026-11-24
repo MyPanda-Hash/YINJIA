@@ -14,32 +14,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { resolveCustomerCode as codeOf } from './approvalCustomerCode.js'
 
 const vue = readFileSync(new URL('./DocSheet.vue', import.meta.url), 'utf8')
-
-/** 与 DocSheet.applyApprovalDocNo 同一套取值顺序（改那边必须同步这里，否则测试会空转） */
-function codeOf(source) {
-  const CODE_KEYS = ['客户编码', '客户代码', 'dm', '客户编号', '编码']
-  for (const k of CODE_KEYS) {
-    const v = source?.[k]
-    if (v !== undefined && v !== null && String(v).trim() !== '') return String(v).trim()
-  }
-  const NAME_KEYS = ['客户名', '客户名称', 'mc']
-  for (const k of NAME_KEYS) {
-    const name = source?.[k]
-    if (name === undefined || name === null) continue
-    // 与实现同一套正则：编码位置不固定，全串扫
-    const m = String(name).match(/[A-Za-z]{1,4}-[0-9][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*/)
-    if (m && m[0]) return m[0]
-  }
-  // 兜底：扫所有值（键名不可靠）
-  for (const v of Object.values(source || {})) {
-    if (v === null || v === undefined) continue
-    const m = String(v).match(/[A-Za-z]{1,4}-[0-9][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*/)
-    if (m && m[0]) return m[0]
-  }
-  return ''
-}
+const mod = readFileSync(new URL('./approvalCustomerCode.js', import.meta.url), 'utf8')
 
 test('从客户名抠编码：B-85-06 青岛伊可普 → B-85-06', () => {
   assert.equal(codeOf({ mc: 'B-85-06 青岛伊可普' }), 'B-85-06')
@@ -67,10 +45,10 @@ test('显式编码列优先于从名字抠', () => {
 })
 
 test('实现里这两条链路都在（防只剩其一）', () => {
-  assert.match(vue, /const CODE_KEYS = \['客户编码', '客户代码', 'dm', '客户编号', '编码'\]/, '显式编码列')
-  assert.match(vue, /const NAME_KEYS = \['客户名', '客户名称', 'mc'\]/, '客户名兜底')
-  assert.match(vue, /\[A-Za-z\]\{1,4\}-\[0-9\]\[A-Za-z0-9\]\*\(\?:-\[A-Za-z0-9\]\+\)\*/, '编码段正则（字母+连字符+数字）')
-  assert.doesNotMatch(vue, /match\(\/\^\(\[A-Za-z0-9\]/, '不得再只看开头（生产实测编码在名字后面）')
+  assert.match(mod, /export const CODE_KEYS = \['客户编码', '客户代码', 'dm', '客户编号', '编码'\]/, '显式编码列')
+  assert.match(mod, /export const NAME_KEYS = \['客户名', '客户名称', 'mc'\]/, '客户名兜底')
+  assert.match(mod, /\[A-Za-z\]\{1,4\}-\[0-9\]\[A-Za-z0-9\]\*\(\?:-\[A-Za-z0-9\]\+\)\*/, '编码段正则（字母+连字符+数字）')
+  assert.doesNotMatch(mod, /match\(\/\^\(\[A-Za-z0-9\]/, '不得再只看开头（生产实测编码在名字后面）')
   assert.match(vue, /props\.head\['文档编号'\] = code \+ ymd/, '规则 = 客户编码 + 日期')
   assert.match(vue, /String\(d\.getFullYear\(\)\)[\s\S]{0,120}padStart\(2, '0'\)/, '日期 YYYYMMDD')
 })
@@ -80,4 +58,14 @@ test('键名不可靠时按值兜底（客户参照行实测踩到）', () => {
   assert.equal(codeOf({ 某列A: '浙江德凌电器有限公司', 某列B: 'A-60', 电话: '18658439031' }), 'A-60')
   // 全行都没有编码形态 ⇒ 仍不填
   assert.equal(codeOf({ 某列A: '青岛伊可普电器有限公司', 电话: '18658439031' }), '')
+})
+
+test('取不到编码也要把「客户编号」写进 head（不许先 return 再写）', () => {
+  // 2026-11-20 用户报障复盘：旧实现把 `props.head['客户编号'] = code` 放在 `if (!code) return`
+  // 之后 ⇒ 编码为空时该行永远不执行，上一次选客户留下的旧编号也不会被清掉。
+  // 口径：能取到就写编码；取不到就写空串（纸面据 v-if 不显示前缀），但**必须先写再决定是否 return**。
+  const write = vue.indexOf("props.head['客户编号'] = code")
+  const early = vue.indexOf('if (!code) return')
+  assert.ok(write > 0, 'DocSheet.vue 缺少「客户编号」写入')
+  assert.ok(early < 0 || write < early, '「客户编号」写入必须在 if (!code) return 之前')
 })

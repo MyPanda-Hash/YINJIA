@@ -145,10 +145,12 @@ test('未知面板:不做任何写入', () => {
  *   三格同时改为只读(recordSheetConfigs ro:true + yj_field.editable=0,见
  *   tools/migrate-prodinfo-approver-cells-20261111.sql)。
  */
-test('产品信息表:一级默认陈秀丽、二级留空(选择前为空,选后回填)', () => {
+test('产品信息表:两级审核人都不给默认值(审批后才填进去)', () => {
+  // 2026-11-19 用户口径：「审批人没有默认显示名字，在审批之后才填进去」
+  //   ⇒ 一级不再默认「陈秀丽」，两格新建时都是空；值由审批动作写入。
   const form = {}
   applyDocDefaults('RD_PROD_INFO', form, USER, { isNew: true, today: T })
-  assert.equal(form['审核人（一级审批人）'], '陈秀丽')
+  assert.equal(form['审核人（一级审批人）'] ?? '', '', '一级不再给默认值')
   // 二级不得有默认值:有默认值就会在"一级还没选人"时显示一个假签核人
   assert.equal(form['审核人（二级审批人）'] ?? '', '', '二级审核人选择前必须为空，不能给默认值')
   // 防回归:绝不能再退回物理列名做键(那两个名字在 yj_field.label 里不存在 ⇒ 两头都丢)

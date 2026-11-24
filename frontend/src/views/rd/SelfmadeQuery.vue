@@ -30,23 +30,36 @@
              其后是本系统补充的 材料名 / 录入日期 / 二维码 -->
         <el-table-column prop="主批次" :label="tt('主批次')" width="130" />
         <el-table-column prop="子批次" :label="tt('子批次')" width="140" />
-        <!-- 附件格可点开预览（2026-11-19 用户口径）：只读 FileAttachCell，锚点 = 面板+单号+`字段-明细id`；
-             没有附件时显示「—」，与 Excel 一致。 -->
+        <!-- 附件格可点开预览（2026-11-19 用户口径）：只读 FileAttachCell。
+             附件清单由后端 selfmadeRows 统一解析（行 id 本单/跨单 → 序号 → 文件名 → 字段名单行兜底），
+             前端不再自己猜锚点 —— 历史单据保存换号后，附件可能还挂在旧单号下。
+             清单为空但列里存着文件名时，**保留文件名文本**（2026-11-20 用户报障：不能把已有信息藏成「—」），
+             点击提示「仅记录文件名，原文件未入库」；真没有才显示「—」。 -->
         <el-table-column :label="tt('流程卡')" width="150">
           <template #default="{ row }">
             <FileAttachCell
-              v-if="row['流程卡'] && row['明细id']" :panel-code="'RD_SELFMADE'" :doc-no="row['单据编号']"
-              :field-key="`流程卡-${row['明细id']}`" :model-value="String(row['流程卡'] || '')" :can-edit="false"
+              v-if="attachList(row, '流程卡').length" :panel-code="'RD_SELFMADE'" :doc-no="row['单据编号']"
+              :field-key="row['明细id'] ? `流程卡-${row['明细id']}` : '流程卡'" :attachments="attachList(row, '流程卡')"
+              :can-edit="false"
             />
+            <span
+              v-else-if="legacyText(row, '流程卡')" class="smq-file smq-legacy"
+              @click="showLegacyOnly(row, '流程卡')"
+            >{{ legacyText(row, '流程卡') }}</span>
             <span v-else class="smq-file">—</span>
           </template>
         </el-table-column>
         <el-table-column :label="tt('配料表')" width="150">
           <template #default="{ row }">
             <FileAttachCell
-              v-if="row['配料表'] && row['明细id']" :panel-code="'RD_SELFMADE'" :doc-no="row['单据编号']"
-              :field-key="`配料表-${row['明细id']}`" :model-value="String(row['配料表'] || '')" :can-edit="false"
+              v-if="attachList(row, '配料表').length" :panel-code="'RD_SELFMADE'" :doc-no="row['单据编号']"
+              :field-key="row['明细id'] ? `配料表-${row['明细id']}` : '配料表'" :attachments="attachList(row, '配料表')"
+              :can-edit="false"
             />
+            <span
+              v-else-if="legacyText(row, '配料表')" class="smq-file smq-legacy"
+              @click="showLegacyOnly(row, '配料表')"
+            >{{ legacyText(row, '配料表') }}</span>
             <span v-else class="smq-file">—</span>
           </template>
         </el-table-column>
@@ -78,6 +91,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import request from '@/core/request'
 import QRCode from 'qrcode'
@@ -90,7 +104,37 @@ const FIELDS = ['主批次', '材料名', '子批次', '异常情况描述', '�
 const q = reactive({ name: '', batchFrom: '', batchTo: '', field: '主批次', keyword: '' })
 const qr = reactive({ open: false, dataUrl: '', text: '' })
 
-const fileText = (v) => (String(v || '').trim() ? tt('已上传') : '—')
+/**
+ * 查询页附件清单（后端 selfmadeRows 已按「行 id 本单/跨单 → 序号 → 文件名 → 字段名」解析好）。
+ * 键 = 字段名 + '附件'；没有清单时返回空数组。
+ */
+function attachList(row, field) {
+  const list = row?.[`${field}附件`]
+  return Array.isArray(list) ? list : []
+}
+/**
+ * 列里存的文件名文本（2026-11-20 用户报障）：
+ * 附件行没解析出来时，**不能把列里已有的文件名也藏成「—」** —— 保留文本至少让人知道上传过什么；
+ * 点击由 showLegacyOnly 提示「仅记录文件名，原文件未入库」。
+ */
+function legacyText(row, field) {
+  if (attachList(row, field).length) return ''
+  return String(row?.[field] || '').trim()
+}
+/** legacy 文本点击：说明只有文件名、原文件没入库（不假装能预览） */
+function showLegacyOnly(row, field) {
+  const names = legacyText(row, field)
+  ElMessageBox.alert(
+    `${tt('仅记录文件名，原文件未入库')}：${names}`,
+    tt('提示'),
+    { type: 'info', confirmButtonText: tt('知道了') },
+  )
+}
+/** 导出/展示用：优先用解析出的真实附件名，旧数据没有清单时退回表内文件名串 */
+function fileNamesOf(row, field) {
+  const names = attachList(row, field).map((a) => a?.fileName).filter(Boolean).join('、')
+  return names || String(row?.[field] || '')
+}
 
 /** 合并列（索引按当前列序）：0 主批次 / 5 录入人 / 6 材料名 / 8 二维码 */
 const MERGE_COLS = [0, 5, 6, 8]
@@ -133,7 +177,7 @@ async function exportExcel() {
   const XLSX = await import('xlsx')
   const aoa = [[tt('主批次'), tt('子批次'), tt('材料名'), tt('流程卡'), tt('配料表'), tt('异常情况描述'), tt('录入人'), tt('录入日期')]]
   for (const r of rows.value) {
-    aoa.push([r['主批次'] || '', r['子批次'] || '', r['材料名'] || '', r['流程卡'] || '', r['配料表'] || '', r['异常情况描述'] || '', r['录入人'] || '', r['录入日期'] || ''])
+    aoa.push([r['主批次'] || '', r['子批次'] || '', r['材料名'] || '', fileNamesOf(r, '流程卡'), fileNamesOf(r, '配料表'), r['异常情况描述'] || '', r['录入人'] || '', r['录入日期'] || ''])
   }
   const ws = XLSX.utils.aoa_to_sheet(aoa)
   const wb = XLSX.utils.book_new()
@@ -175,7 +219,10 @@ onMounted(load)
 .smq-card { border: 1px solid #f0f0f0; border-radius: 6px; padding: 12px; }
 .smq-denied { padding: 24px; text-align: center; color: #909399; }
 .smq-empty { margin: 16px 0 0; text-align: center; color: #909399; font-size: 13px; }
-.smq-file { font-size: 12px; color: #0958d9; }
+.smq-file { font-size: 12px; color: #909399; }
+/* legacy 文件名：可点，但只给提示（原文件没入库，不能假装可预览） */
+.smq-legacy { color: #1d6fd1; cursor: pointer; text-decoration: underline dotted; word-break: break-all; }
+.smq-legacy:hover { color: #0a58ca; }
 .smq-qr { text-align: center; }
 .smq-qr-img { width: 200px; height: 200px; }
 .smq-qr-text { margin: 8px 0 0; font-size: 13px; color: #222; }
