@@ -1,0 +1,10 @@
+SET NOCOUNT ON;
+BEGIN TRAN;
+DELETE FROM dbo.bl_material_out WHERE 单据编号 = N'LL-2026-11-0055';
+DELETE FROM dbo.bd_material_out WHERE 单据编号 = N'LL-2026-11-0055';
+DELETE FROM dbo.yj_doc_status WHERE panel_code = 'MATERIAL_OUT' AND doc_no = N'LL-2026-11-0055';
+DELETE FROM dbo.s_allno WHERE dh = N'LL-2026-11-0055';
+UPDATE dbo.yj_user SET dept_id = NULL WHERE username = 'admin';
+COMMIT;
+SELECT 'out' AS t, COUNT(*) AS n FROM dbo.bd_material_out WHERE 单据编号 = N'LL-2026-11-0055';
+SELECT 'dept' AS t, dept_id FROM dbo.yj_user WHERE username = 'admin';
