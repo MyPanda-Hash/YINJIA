@@ -140,7 +140,11 @@ export const planSheetCfg = {
       ], required: true,
       hint: '必填' },
     { num: '3', label: '测试内容', key: '测试内容', max: 100, h: 43, kind: 'textarea' },
-    { num: '4', label: '测试产品打样要求', key: '测试产品打样要求', max: 100, h: 103, kind: 'textarea' },
+    // 2026-11-24 用户报障「红框的位置这个单据没有办法进行一个修改，输入内容」：
+    //   库列 rd_plan.测试产品打样要求 = nvarchar(500)，而这里原写 max:100 ⇒ 内容写满 100 字的
+    //   那张单（生产实测 id=21 恰好 100 字）textarea 顶格后**再输入无任何反应**，看起来像"这格锁了"；
+    //   其它单据没写满所以正常。上限一律对齐物理列容量，别凭"看着够了"随手写小。
+    { num: '4', label: '测试产品打样要求', key: '测试产品打样要求', max: 500, h: 103, kind: 'textarea' },
     { num: '5', label: '测试目标', key: '测试目标', max: 50, h: 81, kind: 'textarea' },
     {
       num: '6', label: '测试方案', h: 160,
