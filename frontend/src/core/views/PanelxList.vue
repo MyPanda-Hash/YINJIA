@@ -9109,43 +9109,6 @@ async function ensureRdFlowUsers() {
 
 async function openLiaison() {
   if (!rdFlow.canDispatchLiaison) return
-
-/* ── 纸面缩放(2026-11-24) ────────────────────────────────────────────────
- * 用户报障:「面板看起来有点小，其他人都没有就他有，也调不大」。
- * 根因:定死纸宽的面板(立项申请 1242px)在窄窗被**自动**等比缩小(下限 0.6),
- * 而自动缩放封顶 1 且没有手动入口 ⇒ 窄屏用户只能看着纸面变小。
- * 处置:保「适应宽度」为默认,另给 缩小/放大(10% 一档,最大 150%),按面板记在 localStorage。
- * 口径(纯函数)见 sheetZoom.js;屏幕专用 —— 导出/打印会把 zoom 归 1。 */
-const sheetZoomUser = ref(null)      // null = 适应宽度
-const sheetZoomEffective = ref(1)    // DocSheet 算出来的实际值(自动模式下显示成百分比)
-const sheetZoomPaperW = computed(() => fixedSheetWidth(panelCode.value))
-/** 只有定死纸宽的面板才有「缩放」这回事(自适应宽的纸本来就不缩放) */
-const sheetZoomEnabled = computed(() => sheetZoomPaperW.value > 0)
-const sheetZoomBase = computed(() => (sheetZoomUser.value === null ? sheetZoomEffective.value : sheetZoomUser.value))
-/** 始终显示实际百分比:自动模式也报数(灰字),不然会与右侧「适应宽度」按钮重复 */
-const sheetZoomLabel = computed(() => Math.round((sheetZoomEffective.value || 1) * 100) + '%')
-const canSheetZoomIn = computed(() => sheetZoomBase.value < MAX_SHEET_ZOOM - 0.001)
-const canSheetZoomOut = computed(() => sheetZoomBase.value > MIN_SHEET_ZOOM + 0.001)
-function onSheetZoomChange(v) {
-  sheetZoomEffective.value = Number(v) || 1
-}
-function sheetZoomIn() {
-  sheetZoomUser.value = clampZoom(sheetZoomBase.value + ZOOM_STEP)
-}
-function sheetZoomOut() {
-  sheetZoomUser.value = clampZoom(sheetZoomBase.value - ZOOM_STEP)
-}
-/** 回到「适应宽度」:清掉记住的值 */
-function sheetZoomFit() {
-  sheetZoomUser.value = null
-}
-// 换面板就换成那张纸记住的值(各面板互不影响)
-watch(panelCode, (code) => { sheetZoomUser.value = loadStoredZoom(code) }, { immediate: true })
-// 用户改了就记住;回到适应宽度则清除
-watch(sheetZoomUser, (v) => {
-  if (v === null) clearStoredZoom(panelCode.value)
-  else saveStoredZoom(panelCode.value, v)
-})
   if (!(await ensureRdFlowUsers())) return
   liaisonUser.value = rdFlow.liaison || ''
   liaisonVisible.value = true
@@ -9272,6 +9235,43 @@ function onGroupAction(a) {
 const sideCollapsed = ref(false)
 // ══════════ 文书式面板:导出 = 整张文书打印/存PDF(浏览器原生,所见即所得) ══════════
 const approvalSheetRef = ref(null)
+
+/* ── 纸面缩放(2026-11-24) ────────────────────────────────────────────────
+ * 用户报障:「面板看起来有点小，其他人都没有就他有，也调不大」。
+ * 根因:定死纸宽的面板(立项申请 1242px)在窄窗被**自动**等比缩小(下限 0.6),
+ * 而自动缩放封顶 1 且没有手动入口 ⇒ 窄屏用户只能看着纸面变小。
+ * 处置:保「适应宽度」为默认,另给 缩小/放大(10% 一档,最大 150%),按面板记在 localStorage。
+ * 口径(纯函数)见 sheetZoom.js;屏幕专用 —— 导出/打印会把 zoom 归 1。 */
+const sheetZoomUser = ref(null)      // null = 适应宽度
+const sheetZoomEffective = ref(1)    // DocSheet 算出来的实际值(自动模式下显示成百分比)
+const sheetZoomPaperW = computed(() => fixedSheetWidth(panelCode.value))
+/** 只有定死纸宽的面板才有「缩放」这回事(自适应宽的纸本来就不缩放) */
+const sheetZoomEnabled = computed(() => sheetZoomPaperW.value > 0)
+const sheetZoomBase = computed(() => (sheetZoomUser.value === null ? sheetZoomEffective.value : sheetZoomUser.value))
+/** 始终显示实际百分比:自动模式也报数(灰字),不然会与右侧「适应宽度」按钮重复 */
+const sheetZoomLabel = computed(() => Math.round((sheetZoomEffective.value || 1) * 100) + '%')
+const canSheetZoomIn = computed(() => sheetZoomBase.value < MAX_SHEET_ZOOM - 0.001)
+const canSheetZoomOut = computed(() => sheetZoomBase.value > MIN_SHEET_ZOOM + 0.001)
+function onSheetZoomChange(v) {
+  sheetZoomEffective.value = Number(v) || 1
+}
+function sheetZoomIn() {
+  sheetZoomUser.value = clampZoom(sheetZoomBase.value + ZOOM_STEP)
+}
+function sheetZoomOut() {
+  sheetZoomUser.value = clampZoom(sheetZoomBase.value - ZOOM_STEP)
+}
+/** 回到「适应宽度」:清掉记住的值 */
+function sheetZoomFit() {
+  sheetZoomUser.value = null
+}
+// 换面板就换成那张纸记住的值(各面板互不影响)
+watch(panelCode, (code) => { sheetZoomUser.value = loadStoredZoom(code) }, { immediate: true })
+// 用户改了就记住;回到适应宽度则清除
+watch(sheetZoomUser, (v) => {
+  if (v === null) clearStoredZoom(panelCode.value)
+  else saveStoredZoom(panelCode.value, v)
+})
 /** 删除组下拉动作:收起菜单后走统一入口(删除带整单确认) */
 function pickDelAction(a) {
   openDelMenu.value = false
