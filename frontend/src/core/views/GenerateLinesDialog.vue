@@ -67,11 +67,6 @@
             <el-button v-if="showWhBin" link type="primary" size="small"
                        :title="tt('把本单第一行填好的仓库与仓位套用到本单所有行')"
                        @click="applyWhBinToAll(doc)">{{ tt('仓库仓位应用到所有行') }}</el-button>
-            <!-- 删除整单(2026-11-24 用户口径「又删除按钮，可以删除掉不需要单据的明细」):
-                 合单页面上"这张订单不要了"要能整段撤掉,不必逐行删 -->
-            <el-button v-if="merge" link type="danger" size="small"
-                       :title="tt('把这张单据整单从合单页面移除')"
-                       @click="removeDoc(doc)">{{ tt('删除本单') }}</el-button>
             <span class="gl-picked">{{ tt('已选') }} {{ (pickedByDoc[doc.sourceNo] || []).length }} {{ tt('行') }}</span>
           </span>
         </div>
@@ -95,6 +90,17 @@
             <template #default="{ row }">
               <el-checkbox :model-value="isPicked(doc, row)" :disabled="!selectable(doc, row)"
                            @change="(v) => togglePick(doc, row, v)" />
+            </template>
+          </el-table-column>
+          <!-- 删行 = 行首一个「叉」,点一下就把这一行从本次合单里移除(2026-11-24 用户口径:
+               「直接在明细中加入一个叉点击后删除」)。
+               · 放在勾选列右边第一格:96vw 宽表横向滚动时它也在视野里,不用滚到最后一列才找得到;
+               · **唯一的删除入口**(不再另挂「删除本单 / 操作列」,免得两个删除分不清);
+               · 只挂合单模式 —— 批量生单是"逐张各出一张单",删行没有语义。
+               删光某张单的行,该单自动撤掉(见 removeLine)。 -->
+          <el-table-column v-if="merge" width="34" align="center">
+            <template #default="{ row }">
+              <span class="gl-x" :title="tt('删除这一行')" @click.stop="removeLine(doc, row)">✕</span>
             </template>
           </el-table-column>
           <el-table-column prop="行号" :label="tt('行号')" width="55" />
@@ -144,15 +150,6 @@
               <el-tag size="small" :type="isPrintedRow(row) ? (row['已生单'] ? 'info' : 'warning') : 'success'">
                 {{ tt(isPrintedRow(row) ? (row['已生单'] ? '已生单' : '已打印') : '未打印') }}
               </el-tag>
-            </template>
-          </el-table-column>
-          <!-- 删除行(2026-11-24 用户口径「可以删除掉不需要单据的明细」):
-               只挂合单模式 —— 批量生单是"逐张各出一张单",删行没有语义 -->
-          <el-table-column v-if="merge" :label="tt('操作')" width="86" align="center">
-            <template #default="{ row }">
-              <el-button link type="danger" size="small"
-                         :title="tt('把这一行从本次合单里移除')"
-                         @click="removeLine(doc, row)">{{ tt('删除行') }}</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -635,6 +632,21 @@ async function confirm() {
    不清掉会把勾选框顶到格子外面(行内那颗在正文格子里没这个问题,故只针对表头) */
 .gl-doc :deep(th .el-checkbox) { margin-right: 0; }
 .gl-picked { color: #5d6c67; font-size: 12.5px; }
+/* 行首那个「叉」:平时淡灰、够得着,悬停变红底白叉 —— 一眼知道能点,也不抢明细的注意力 */
+.gl-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 14px;
+  line-height: 1;
+  color: #98a5b0;
+  cursor: pointer;
+  user-select: none;
+}
+.gl-x:hover { color: #fff; background: #f56c6c; }
 .gl-empty { color: #909399; }
 .gl-foot { margin-right: auto; font-size: 12.5px; color: #46586e; }
 .gl-fail { color: #f56c6c; margin-left: 10px; }

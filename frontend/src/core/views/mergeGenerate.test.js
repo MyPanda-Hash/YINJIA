@@ -111,7 +111,7 @@ test('④ 行号:行级「采购单号」= 合单前的订单号;占用仍用合
   assert.match(body, /p\.lineKey\(\)/, '占用按来源行键记(合单前那一行的已送量),两种行号各司其职')
 })
 
-test('⑤ 合单页面:能选单补单(只补没有的明细),也能删整单/删整行', () => {
+test('⑤ 合单页面:能选单补单(只补没有的明细),删除 = 明细行首一个叉', () => {
   // 选单按钮在合单页面顶部(用户口径「在合单生单页面多一个选择单据的按钮」)
   const bar = glDialog.slice(glDialog.indexOf('class="gl-bar"'), glDialog.indexOf('class="gl-doc"'))
   assert.match(bar, /v-if="merge"/, '选单按钮只在合单模式出现(批量生单是逐张出单,没有选单语义)')
@@ -128,12 +128,21 @@ test('⑤ 合单页面:能选单补单(只补没有的明细),也能删整单/�
   assert.match(addBody, /adoptDoc\(src\)/, '新单据整段纳入(默认值/勾选与首次打开同源)')
   assert.match(addBody, /该单据的明细已全部在合单页面中，无需重复添加/, '全都在了就说明白,不要静默什么都不做')
 
-  // 删除:整单 + 整行
-  assert.match(glDialog, /function removeDoc\(doc\)/, '要能删整张单据')
+  // 删除:明细行首一个「叉」,点一下删这一行(2026-11-24 用户口径「直接在明细中加入一个叉点击后删除」)
   assert.match(glDialog, /function removeLine\(doc, row\)/, '要能删单行明细')
-  assert.match(glDialog, /tt\('删除本单'\)/, '单据行头要有「删除本单」')
-  assert.match(glDialog, /tt\('删除行'\)/, '明细行尾要有「删除行」')
+  assert.match(glDialog, /class="gl-x"[^>]*@click\.stop="removeLine\(doc, row\)"/,
+    '明细每行要有一个可点的叉(删这一行)')
+  assert.match(glDialog, /tt\('删除这一行'\)/, '叉要有 title,且走 tt()')
+  assert.match(glDialog, /function removeDoc\(doc\)/, '删空某张单的行时要能整单撤掉(removeLine 内部调用)')
   assert.match(glDialog, /if \(!doc\.lines\.length\) removeDoc\(doc\)/, '删空了就整单撤掉,别留一段空表')
+  // 单一入口:不再另挂「删除本单 / 操作列」,免得两个删除分不清
+  assert.ok(!/tt\('删除本单'\)/.test(glDialog), '「删除本单」按用户口径撤掉(删除只剩行首那个叉)')
+  assert.ok(!/tt\('删除行'\)/.test(glDialog), '「操作」列的删除行按用户口径已并入行首的叉')
+  assert.ok(!/tt\('操作'\)/.test(glDialog), '去掉末尾那列「操作」')
+  // 叉放在勾选列右边第一格:96vw 宽表横向滚动时也在视野内
+  const xAt = glDialog.indexOf('class="gl-x"')
+  const lineNoAt = glDialog.indexOf('prop="行号"')
+  assert.ok(xAt > 0 && lineNoAt > xAt, '叉必须在「行号」列之前(行首第一格,不用滚到最右)')
 })
 
 test('⑥ 下游:检验/退回逐行带采购单号;入库行用它落「源单编号」;转ERP 行级 src_bill_no 用它', () => {
