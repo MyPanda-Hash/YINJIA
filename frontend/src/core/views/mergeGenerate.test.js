@@ -35,6 +35,7 @@ const pushHandler = readFileSync(new URL('../../../../backend/src/main/java/com/
 const pxController = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/controller/PxController.java', import.meta.url), 'utf8')
 const buttonService = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/service/ButtonService.java', import.meta.url), 'utf8')
 const kingdee = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/service/KingdeePushService.java', import.meta.url), 'utf8')
+const voucherFlow = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/service/VoucherFlowService.java', import.meta.url), 'utf8')
 const en = readFileSync(new URL('../../i18n/locales/en.js', import.meta.url), 'utf8')
 
 /** 取 onButton 里「合单生单」那一层分支(到「批量生单」那一段为止) */
@@ -64,12 +65,25 @@ test('① 入口:只有采购订单的「生单 ▼」多出「合单生单」,�
   assert.match(panelx, /list\.length < 2/, '合单至少要两张(后端 generateMerged 同口径)')
 })
 
-test('② 选单窗:金蝶口径 —— 已审核+有未送量、同一供应商锁定、已加入的不可再选', () => {
+test('② 选单窗:金蝶口径 —— 已审核+有未送量、勾一张就只剩同一供应商、支持模糊搜索', () => {
   // 数据源与生单页面/后端校验同一份口径(行级剩余量),不是"只查单据头"的通用列表接口
   assert.match(pickDialog, /engine\.purchaseFlowSources\(/, '候选单必须走 /px/voucherFlow/sources(带剩余量)')
   assert.match(pickDialog, /condition\['供应商'\] = lockSupplier\.value/, '锁了供应商就把条件带上(服务端过滤)')
   assert.match(pickDialog, /const lockSupplier = computed\(\(\) => String\(props\.supplier \|\| chosenSupplier\.value \|\| ''\)\.trim\(\)\)/,
     '供应商锁:父组件给了用父组件的(合单页已有单据),否则由本次第一张勾选锁定')
+  // 「勾选后一个后只出现同一供应商」——锁上就**重查**(不是把别家涂灰),并且保住刚勾的那张
+  assert.match(pickDialog, /if \(sup && sup !== chosenSupplier\.value\) \{[\s\S]{0,200}?load\(1, \{ keepPicked: true \}\)/,
+    '勾第一张就把列表收窄到这家供应商(keepPicked 保住这一勾)')
+  assert.match(pickDialog, /const keepNos = keepPicked \? \(picked\.value \|\| \[\]\)\.map\(noOf\) : \[\]/,
+    '重查后要按单号回填勾选,否则"勾了一下就没了"')
+  // 「支持模糊搜索」——关键字走服务端 broad-OR(单号/供应商/物料名),不再只按单号查
+  assert.match(pickDialog, /keyword: String\(keyword\.value \|\| ''\)\.trim\(\)/, '关键字要透传给 /px/voucherFlow/sources')
+  assert.match(pickDialog, /tt\('关键字：单号\/供应商\/物料'\)/, '关键字输入框要说明搜什么,且走 tt()')
+  assert.match(engine, /pageNo = 1, pageSize = 20, keyword = '' \}\)/, '引擎要能带 keyword')
+  assert.match(pxController, /String keyword = body\.get\("keyword"\) == null \? null : String\.valueOf\(body\.get\("keyword"\)\)/,
+    '控制器要把 keyword 交给服务')
+  assert.match(voucherFlow, /queryService\.queryFormDataList\(sourcePanel, keyword, cond, pageNo, pageSize\)/,
+    '服务端关键字要直通 queryFormDataList 的 broad-OR(单号/供应商/物料名都能命中)')
   assert.match(pickDialog, /function selectableRow\(row\)/, '选择列的可用判据要**只**看供应商锁')
   assert.ok(!/if \(addedOf\(row\)\) return false/.test(pickDialog),
     '已在合单里的单也要能再选(用户口径「也可以重新添加」)—— 去重由合单页面按 lineKey 做')
@@ -164,6 +178,8 @@ test('多语言:合单 + 选单相关文案都有英文译文', () => {
     '只能选同一供应商的采购订单', '该单据的明细已全部在合单页面中，无需重复添加',
     '合单生单至少要两张采购订单，当前只有', '没有可加入的已审核采购订单',
     '把这张单据整单从合单页面移除', '把这一行从本次合单里移除',
+    // 2026-11-24 第二轮:模糊搜索 + 勾一张就只剩同一供应商
+    '关键字：单号/供应商/物料', '列表已只显示这一家的单据，可用关键字继续模糊搜索',
     '选单加入合单：已加入的明细只补还没进来的行，不会重复']) {
     const rx = new RegExp(`'${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}':\\s*'([^']*)'`)
     const m = en.match(rx)

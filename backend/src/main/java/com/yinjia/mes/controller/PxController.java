@@ -914,7 +914,8 @@ public class PxController {
     }
 
     /** 选单来源查询(已审核 + 占用过滤,对齐 T+ SelectVoucher)。
-     *  权限按目标面板校验(选单是为了在目标面板生单,来源数据是选单必需的参照)。 */
+     *  权限按目标面板校验(选单是为了在目标面板生单,来源数据是选单必需的参照)。
+     *  body.keyword(可选):关键字模糊搜索,直通 queryFormDataList 的 broad-OR —— 单号/供应商/物料名都能搜。 */
     @PostMapping("/voucherFlow/sources")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> voucherFlowSources(@RequestBody Map<String, Object> body) {
@@ -924,7 +925,8 @@ public class PxController {
         Map<String, Object> condition = (Map<String, Object>) body.getOrDefault("condition", Map.of());
         int pageNo = body.get("pageNo") == null ? 1 : Integer.parseInt(String.valueOf(body.get("pageNo")));
         int pageSize = body.get("pageSize") == null ? 20 : Integer.parseInt(String.valueOf(body.get("pageSize")));
-        return ApiResult.ok(voucherFlowService.sources(sourcePanel, targetPanel, condition, pageNo, pageSize));
+        String keyword = body.get("keyword") == null ? null : String.valueOf(body.get("keyword"));
+        return ApiResult.ok(voucherFlowService.sources(sourcePanel, targetPanel, condition, pageNo, pageSize, keyword));
     }
 
     /** 选单生单后写占用(来源行不再出现在选单列表;删除下游草稿自动释放) */

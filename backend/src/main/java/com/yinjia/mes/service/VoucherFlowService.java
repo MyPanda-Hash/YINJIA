@@ -45,14 +45,27 @@ public class VoucherFlowService {
     }
 
     /** 选单来源:已审核 + 未完全占用的行(带 _lineKey/已生单数量/已退回数量/剩余数量/可送上限) */
-    @SuppressWarnings("unchecked")
     public Map<String, Object> sources(String sourcePanel, String targetPanel,
                                        Map<String, Object> condition, int pageNo, int pageSize) {
+        return sources(sourcePanel, targetPanel, condition, pageNo, pageSize, null);
+    }
+
+    /**
+     * 选单来源(带**关键字模糊搜索**,2026-11-24 用户口径「合单生单选择时……支持模糊搜索」)。
+     *
+     * <p>keyword 直通 {@code queryFormDataList} 的 broad-OR 搜索:单据头各列 + 明细行各列都 LIKE
+     * (见 QueryService.appendDocFilters),于是"敲物料名/供应商片段/单号片段"都能命中 ——
+     * 与列表页右上角那个搜索框同一口径,不再只能按单号查。
+     */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> sources(String sourcePanel, String targetPanel,
+                                       Map<String, Object> condition, int pageNo, int pageSize,
+                                       String keyword) {
         // 单据状态不作为 SQL 列条件(状态由工作流注册表推导,物理列可能滞后);
         // 先全量查询,再按 loadDocs 合并出的单据状态在 Java 侧过滤"已审核"。
         Map<String, Object> cond = new LinkedHashMap<>(condition == null ? Map.of() : condition);
         cond.remove("单据状态");
-        Map<String, Object> result = queryService.queryFormDataList(sourcePanel, null, cond, pageNo, pageSize);
+        Map<String, Object> result = queryService.queryFormDataList(sourcePanel, keyword, cond, pageNo, pageSize);
         double overRatio = batchService.overRatio();
         List<Map<String, Object>> out = new ArrayList<>();
         for (Object o : (List<Object>) result.getOrDefault("list", List.of())) {

@@ -10,7 +10,13 @@
        ① 采购订单列表 → 点「合单生单」→ **本弹窗**(选单)→ 确定 → 打开合单页面(GenerateLinesDialog,merge);
        ② 合单页面里再点「选择单据」→ 还是本弹窗 → 确定 → 只把**还没加入的明细行**补进合单页面。
        金蝶口味的要点:只列**已审核**且**还有未送数量**的源单(服务端 /px/voucherFlow/sources 已按此过滤)、
-       勾选即选单、**同一供应商**才能合(混了别家当场拦,不让用户抱着幻想点到"确定合单生单"才发现)。
+       勾选即选单、**同一供应商**才能合(勾了第一张就把列表收窄到这一家,不是把别家涂灰)。
+
+     【两轮用户补充】
+       · 2026-11-24 一轮:「勾选后一个后只出现同一供应商」⇒ 第一次勾选即锁供应商并**重查**(服务端收窄),
+         列表里干脆不出现别家;全部取消勾选则自动解除锁定。
+       · 「支持模糊搜索」⇒ 顶部关键字走服务端 broad-OR(单号 / 供应商 / 物料编码 / 物料名称都能命中),
+         与列表页搜索框同一口径;锁定后仍可在这家的范围内继续模糊筛。
 
      【数据来源为什么不是 queryFormDataList】
        选单要能看出"这张订单还剩多少可送",否则用户只能凭单号猜。/px/voucherFlow/sources 返的是
@@ -36,11 +42,14 @@
           {{ tt('只能选同一供应商的采购订单') }}: {{ lockSupplier }}
           <el-button v-if="!supplier" link type="primary" size="small" @click="clearLock">{{ tt('清除') }}</el-button>
         </span>
-        <el-input v-model="keyword" size="small" style="width: 150px" clearable
-                  :placeholder="tt('单据编号')" @keyup.enter="load(1)" @clear="load(1)" />
-        <!-- 供应商可手打片段:合单必须同一家,先按供应商收窄才找得到"两张同家的单"。
+        <span v-if="lockSupplier" class="mpd-tip">{{ tt('列表已只显示这一家的单据，可用关键字继续模糊搜索') }}</span>
+        <!-- 关键字:模糊搜索(单号 / 供应商 / 物料编码 / 物料名称 都能命中) —— 与列表页搜索框同一口径,
+             勾了第一张单后这里就在"这一家"的范围里继续模糊筛 -->
+        <el-input v-model="keyword" size="small" style="width: 210px" clearable
+                  :placeholder="tt('关键字：单号/供应商/物料')" @keyup.enter="load(1)" @clear="load(1)" />
+        <!-- 供应商可手打片段(还没锁定时):合单必须同一家,先按供应商收窄才找得到"两张同家的单"。
              服务端「供应商」是参照字段(默认等值),片段搜索靠控制键 `_fuzzy`(= 该字段按 LIKE) -->
-        <el-input v-if="!lockSupplier" v-model="supplierKw" size="small" style="width: 160px" clearable
+        <el-input v-if="!lockSupplier" v-model="supplierKw" size="small" style="width: 150px" clearable
                   :placeholder="tt('供应商')" @keyup.enter="load(1)" @clear="load(1)" />
         <el-date-picker v-model="dateFrom" size="small" type="date" value-format="YYYY-MM-DD"
                         :placeholder="tt('开始日期')" style="width: 130px" clearable @change="load(1)" />
@@ -101,7 +110,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
@@ -143,6 +152,8 @@ const dateFrom = ref('')
 const dateTo = ref('')
 /** 本次勾选的供应商(父组件还没锁定时由第一次勾选锁定,金蝶选单是同一套「选了这家就只剩这家」) */
 const chosenSupplier = ref('')
+/** load 回填勾选态期间为 true:此时不跑「勾选 → 锁供应商/重查」那套副作用 */
+let syncing = false
 
 /** 真正生效的供应商锁定:父组件给了就用父组件的(合单页面已有单据),否则用本次勾选出来的 */
 const lockSupplier = computed(() => String(props.supplier || chosenSupplier.value || '').trim())
@@ -177,12 +188,29 @@ function selectableRow(row) {
   return !lockSupplier.value || supplierOf(row) === lockSupplier.value
 }
 
+/**
+ * 勾选变化(2026-11-24 用户口径「勾选了一个后只出现同一供应商」)。
+ *
+ * 口径:
+ *   · 勾了**第一张单** ⇒ 把供应商锁成这一家,并且**重新查询(服务端收窄)** —— 不是把别家涂灰,
+ *     而是干脆不列出来(列表里只剩同一供应商);
+ *   · 锁定后仍可继续勾(同一家的其他单),不会再触发查询(只在供应商变化时查一次);
+ *   · 全部取消勾选 ⇒ 解除锁定、恢复全量候选(相当于自动点一次「清除」)。
+ *   · `syncing` 期间(load 里回填勾选)不跑这套副作用,否则回填会把锁又清掉。
+ */
 function onSel(sel) {
   picked.value = sel
-  // 父组件没锁定供应商时,用第一张勾选的单锁定(勾了 A 家,别家的行自动不可勾)
-  if (!props.supplier) {
-    if (!sel.length) chosenSupplier.value = ''
-    else chosenSupplier.value = supplierOf(sel[0])
+  if (syncing) return
+  if (props.supplier) return
+  if (!sel.length) {
+    if (chosenSupplier.value) { chosenSupplier.value = ''; load(1) }
+    return
+  }
+  const sup = supplierOf(sel[0])
+  if (sup && sup !== chosenSupplier.value) {
+    chosenSupplier.value = sup
+    // keepPicked:重新查询后把刚勾的那张保住(不 keep 会"勾了一下就没了")
+    load(1, { keepPicked: true })
   }
 }
 function clearLock() {
@@ -204,7 +232,9 @@ function onRowClick(row, column, event) {
   tableRef.value?.toggleRowSelection(row, on)
 }
 
-async function load(page = 1) {
+async function load(page = 1, opts = {}) {
+  const keepPicked = opts.keepPicked === true
+  const keepNos = keepPicked ? (picked.value || []).map(noOf) : []
   pageNo.value = page || 1
   loading.value = true
   try {
@@ -216,24 +246,37 @@ async function load(page = 1) {
       // 参照字段默认等值匹配;手打片段要 LIKE ⇒ 显式声明该字段按模糊走(见 QueryService `_fuzzy`)
       condition['_fuzzy'] = '供应商'
     }
-    const kw = String(keyword.value || '').trim()
-    if (kw) condition['单据编号'] = kw
     if (dateFrom.value) condition['开始日期'] = dateFrom.value
     if (dateTo.value) condition['结束日期'] = dateTo.value
     const res = await engine.purchaseFlowSources({
       sourcePanel: props.sourcePanel,
       targetPanel: props.targetPanel,
       sourceKey: props.sourceKey,
+      // 关键字走服务端 broad-OR(单号/供应商/物料名都能命中),不再只按单号查
+      keyword: String(keyword.value || '').trim(),
       condition,
       pageNo: pageNo.value,
       pageSize,
     })
     rows.value = (res?.list || []).map((r) => ({ ...r, __no: noOf(r) }))
-    picked.value = []
     // 重新查询 = 重新开始:上一轮勾选锁出来的供应商不能继续压着新的查询条件
-    // (否则「先点了 A 家 → 再按 B 家搜」会被旧锁顶掉,列表永远是 A 家)
-    if (!props.supplier) chosenSupplier.value = ''
+    // (否则「先点了 A 家 → 再按 B 家搜」会被旧锁顶掉,列表永远是 A 家);
+    // 但"锁定后为了只显示同一供应商"那一次重查要保住当前勾选,故 keepPicked 时不解除。
+    if (!props.supplier && !keepPicked) chosenSupplier.value = ''
+    syncing = true
+    picked.value = []
+    await nextTick()
+    if (keepNos.length) {
+      const want = new Set(keepNos)
+      for (const row of rows.value) {
+        if (!want.has(noOf(row)) || !selectableRow(row)) continue
+        tableRef.value?.toggleRowSelection(row, true)
+      }
+    }
+    await nextTick()
+    syncing = false
   } catch (e) {
+    syncing = false
     rows.value = []
     picked.value = []
     ElMessage.error(engine.errMsg(e) || tt('候选单据加载失败'))
@@ -279,6 +322,7 @@ function confirm() {
 /* 供应商锁定:用主色描边,让"本次只能选这一家"一眼可见 */
 .mpd-lock { background: #eef6ff; border-color: #b9d7f5; color: #1e6fb8; display: inline-flex; align-items: center; gap: 4px; }
 .mpd-between { color: #909399; }
+.mpd-tip { color: #8b9893; }
 .mpd-pager { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #46586e; }
 .mpd-sum { margin-right: auto; }
 .mpd-page-no { min-width: 24px; text-align: center; font-weight: 600; }

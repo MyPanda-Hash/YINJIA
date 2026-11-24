@@ -2573,6 +2573,8 @@ export default {
     '把这张单据整单从合单页面移除': 'Remove this whole document from the merge sheet',
     '把这一行从本次合单里移除': 'Remove this line from the merge',
     '选单加入合单：已加入的明细只补还没进来的行，不会重复': 'Pick documents to merge: only lines not yet on the sheet are added, never duplicated',
+    '关键字：单号/供应商/物料': 'Keyword: doc no. / supplier / item',
+    '列表已只显示这一家的单据，可用关键字继续模糊搜索': 'Only this supplier is listed now — use the keyword to search within it',
     '可送数量': 'Shippable qty',
     '可加入': 'Available',
     '已添加': 'Added',

@@ -625,9 +625,10 @@ export async function extFieldRetire(payload) {
 
 // ==================== 选单流转(对齐 T+ SelectVoucher;占用跟踪 form_flow_link) ====================
 
-/** 选单来源查询:已审核 + 未被占用行(带 _lineKey/剩余数量) */
-export async function outsourceFlowSources({ sourcePanel, targetPanel, sourceKey, businessType = '', condition = {}, pageNo = 1, pageSize = 20 }) {
-  return unwrap(await request.post('/px/voucherFlow/sources', { sourcePanel, targetPanel, sourceKey, businessType, condition, pageNo, pageSize }))
+/** 选单来源查询:已审核 + 未被占用行(带 _lineKey/剩余数量)
+ *  keyword(可选)= 关键字模糊搜索(单号/供应商/物料名都能命中,与列表页搜索同一口径) */
+export async function outsourceFlowSources({ sourcePanel, targetPanel, sourceKey, businessType = '', condition = {}, pageNo = 1, pageSize = 20, keyword = '' }) {
+  return unwrap(await request.post('/px/voucherFlow/sources', { sourcePanel, targetPanel, sourceKey, businessType, condition, pageNo, pageSize, keyword }))
 }
 
 /** 采购流选单来源(与选单来源同服务,统一占用语义) */
