@@ -109,9 +109,13 @@
               <th class="c-batchname">
                 <div class="qr-batch-head">
                   <span class="qr-batch-label">{{ tt('批次号') }}</span>
-                  <div class="qr-batch-edit">
+                  <!-- 可编辑态:标签下面就是改名输入框(改 = 清单项 + 该批所有行一起改);
+                       只读态(提交审批/审核通过后):**批号必须照原样留在纸上** ——
+                       2026-11-25 用户报障「填写完成后不仅不显示批次号」:原来这里只有
+                       v-if="editable" 的输入框,审批通过后整列只剩「批次号」三个字,
+                       批号在整张纸面上无处可查(导出 Excel 的表头却还带着它)。 -->
+                  <div v-if="editable" class="qr-batch-edit">
                     <el-input
-                      v-if="editable"
                       :model-value="batchDraftOf(bi)"
                       size="small"
                       class="qr-cell-input qr-batch-input"
@@ -121,12 +125,13 @@
                       @blur="onBatchCommit(bi)"
                     />
                     <span
-                      v-if="editable && batches.length > 1"
+                      v-if="batches.length > 1"
                       class="qr-batch-del no-print"
                       :title="tt('删除批次')"
                       @click="deleteBatch(bi)"
                     >×</span>
                   </div>
+                  <span v-else class="qr-batch-value" :title="b">{{ b }}</span>
                 </div>
               </th>
               <th class="c-result">{{ tt('本批结果判断') }}</th>
@@ -1269,6 +1274,16 @@ defineExpose({ exportProcInspExcel })
 .qr-batch-input :deep(.el-input__inner) {
   font-size: 11px;
 }
+/* 只读态的批号文本(与可编辑态输入框同一位置、同一字号):批号在纸上不能消失 */
+.qr-batch-value {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  color: #1f4e79;
+  text-align: center;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
 .qr-batch-del {
   flex: none;
   font-weight: 700;
@@ -1277,16 +1292,19 @@ defineExpose({ exportProcInspExcel })
   padding: 0 1px;
   line-height: 1;
 }
-/* 明细各列:要求/方法左对齐(文字长),批次号与结果居中 */
+/* 明细五个数据列:**一套口径** —— 居中 + 行高 18px + 顶对齐。
+   2026-11-25 用户口径「表格需实现可手动换行,且格式一致居中」:
+     原来 要求/方法 左对齐、行高 17px,项目/结果 居中,批次结果列"编辑态左、只读态居中"
+     ⇒ 同一张纸四套口径,填写时与填写完成后是两个样子(用户报障「各行的格式还不一样」)。
+   顶对齐保留(2026-11-23 定的:多行文本把行高撑高时,单行格不会看着掉到下一行)。 */
+.qr-grid td.c-item,
 .qr-grid td.c-mtd,
-.qr-grid td.c-req {
-  text-align: left;
-  vertical-align: top;
-  line-height: 17px;
-}
-.qr-grid td.c-item {
+.qr-grid td.c-req,
+.qr-grid td.c-batchtext,
+.qr-grid td.c-result {
   text-align: center;
   vertical-align: top;
+  line-height: 18px;
 }
 /* 检验项目(多行域):与只读态 .qr-cell-text 同为居中;项目名里没有空格可断,
    必须按字符断行,否则长项目名会横向溢出格子(2026-11-23 报障)。 */
@@ -1302,9 +1320,6 @@ defineExpose({ exportProcInspExcel })
   color: #1f4e79;
   background: #fbfdff;
   word-break: break-all;
-}
-.qr-grid td.c-result {
-  text-align: center;
 }
 .c-op {
   width: 34px;
@@ -1360,31 +1375,33 @@ defineExpose({ exportProcInspExcel })
   font-size: 12px;
   line-height: 20px;
 }
-.qr-grid td.c-result .qr-cell-input :deep(.el-select__placeholder) {
+.qr-grid td.c-result .qr-cell-input :deep(.el-select__placeholder),
+.qr-grid td.c-result .qr-cell-input :deep(.el-select__selected-item) {
   text-align: center;
+  line-height: 18px;
 }
 .qr-grid td.c-mtd .qr-cell-input :deep(.el-input__inner),
 .qr-grid td.c-req .qr-cell-input :deep(.el-input__inner) {
-  text-align: left;
+  text-align: center;
 }
 .qr-cell-wrap :deep(.el-textarea__inner) {
-  text-align: left;
+  /* 2026-11-25:录入态的 textarea 也居中 —— 与只读态 .qr-cell-text 同一口径
+     (原来这里 text-align:left,同一个格"填写时靠左、填写完成后居中") */
+  text-align: center;
   padding: 2px;
   line-height: 18px;
   resize: none;
   font-family: inherit;
 }
+/* 只读文本:居中 + 行高 18px + pre-wrap(手工换行两种状态都留得住)
+   —— 列级选择器不再需要:五个数据列现在同一套口径。 */
 .qr-cell-text {
   display: inline-block;
   min-height: 18px;
   white-space: pre-wrap;
-  text-align: left;
-  width: 100%;
-}
-.qr-grid td.c-item .qr-cell-text,
-.qr-grid td.c-result .qr-cell-text,
-.qr-grid td.c-batchtext .qr-cell-text {
   text-align: center;
+  line-height: 18px;
+  width: 100%;
 }
 /* 表尾(检验人|检验结论 / 审核人|处理意见)与抬头同一套格子 */
 .qr-foot-table {
