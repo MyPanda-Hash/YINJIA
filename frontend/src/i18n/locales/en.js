@@ -4440,6 +4440,7 @@ export default {
     '已送合计': 'Delivered total',
     '待编号': 'Pending No.',
     '{n} 批待编号': '{n} batch(es) pending No.',
+    '未登记台账': 'Not in batch ledger',
     '生单时按当天日期生成': 'Generated from the current date when the document is created',
     '随单头批次号一致,不可修改': 'Follows the header batch no.; not editable',
     '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）': 'Only checked lines are generated; max deliverable = ordered qty × (1 + over-delivery ratio) − sent + returned (over-delivery capped at 50%)',

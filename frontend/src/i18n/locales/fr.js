@@ -2507,6 +2507,7 @@ export default {
     '已送合计': 'Total livré',
     '待编号': 'N° en attente',
     '{n} 批待编号': '{n} lot(s) sans n°',
+    '未登记台账': 'Absent du registre de lots',
     '生单时按当天日期生成': 'Généré depuis la date du jour à la création du document',
     '随单头批次号一致,不可修改': "Identique au numéro de lot de l'en-tête ; non modifiable",
     '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）': 'Seules les lignes cochées sont générées ; max = qté commandée × (1 + taux) − livré + retourné (sur-livraison max 50 %)',

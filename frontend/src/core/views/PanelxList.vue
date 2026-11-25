@@ -1274,18 +1274,23 @@
         </template>
         <div class="batch-pop-body" v-loading="batchTab.loading">
           <el-table :data="batchTab.rows" border size="small" max-height="330">
-            <el-table-column prop="batchNo" :label="tt('批次号')" min-width="180" />
+            <el-table-column prop="batchNo" :label="tt('批次号')" min-width="180">
+              <template #default="{ row }">{{ row.batchNo || '—' }}</template>
+            </el-table-column>
             <el-table-column prop="createTime" :label="tt('日期')" width="150" />
             <el-table-column prop="batchQty" :label="tt('数量')" width="90" align="right" />
-            <el-table-column :label="tt('状态')" width="90" align="center">
-              <template #default="{ row }">{{ tt(row.status === 'ACTIVE' ? '有效' : row.status === 'PENDING' ? '待编号' : '已释放') }}</template>
+            <el-table-column :label="tt('状态')" width="110" align="center">
+              <template #default="{ row }">{{ tt(batchStatusKey(row.status)) }}</template>
             </el-table-column>
-            <el-table-column :label="tt('去向单号')" min-width="150">
+            <el-table-column :label="tt('去向单号')" min-width="190">
               <!-- 整条链上的单据(含起点)全部作废/已删除/不存在时,后端 targetFormNo 为空并置 targetInvalid
-                   —— 不给作废单号,列里显示「已作废」而不是一个点进去空白的单号(2026-09-21) -->
+                   —— 不给作废单号,但**回显它当初指向的哪张单**(firstTargetFormNo,2026-11-25):
+                   只显示「已作废」的话,现场连"该去哪张单上排查"都无从下手。 -->
               <template #default="{ row }">
-                <span v-if="row.targetInvalid || !row.targetFormNo" class="bpb-void">{{ tt('已作废') }}</span>
-                <span v-else>{{ row.targetFormNo }}</span>
+                <span v-if="batchTargetDisplay(row).clickable">{{ batchTargetDisplay(row).text }}</span>
+                <span v-else class="bpb-void">
+                  <template v-if="batchTargetDisplay(row).text">{{ batchTargetDisplay(row).text }} </template>{{ tt('已作废') }}
+                </span>
               </template>
             </el-table-column>
             <el-table-column :label="tt('操作')" width="80" align="center">
@@ -2917,6 +2922,7 @@ import { applyInspectorDefault } from '@core/qc/qcInspector'
 import { applyCalcRules } from '@core/panel/calcRules'
 import { blankRowOf } from '@core/panel/detailRows'
 import { sumKeepScale } from '@core/panel/sumTotals'
+import { batchStatusKey, batchTargetDisplay } from '@core/selection/batchStatus'
 import { qtyDecimalsOf, formatQtyByUnit, floorTo } from '@core/panel/unitPrecision'
 import { SHEET_MARGIN, SHEET_MM, SHEET_PAGE_H, SHEET_PAGE_W, planSheetPages, sheetPrintBody } from '@core/panel/sheetPrintHtml'
 import { printInPage } from '@core/panel/printChannel'

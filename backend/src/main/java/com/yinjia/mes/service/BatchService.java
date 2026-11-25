@@ -412,8 +412,78 @@ public class BatchService {
                     + (includeReleased ? "" : " AND status IN ('ACTIVE','PENDING')")
                     + " ORDER BY batch_seq, id", srcPanel, srcNo);
         } catch (Exception ignore) { /* 表未建 */ }
-        for (Map<String, Object> row : out) resolveEndTarget(row);
+        for (Map<String, Object> row : out) {
+            row.put("orphan", false);
+            resolveEndTarget(row);
+        }
+        appendOrphanRows(srcPanel, srcNo, out);
         return out;
+    }
+
+    /**
+     * 补「孤儿占用」行(2026-11-25,客户问「关联的单据不应该都能看到吗」)。
+     *
+     * <p><b>为什么需要它</b>:上面只列 {@code yj_doc_batch} 台账行,而台账行不是每条占用都有:
+     * <ul>
+     *   <li><b>统一生单/选单/手工</b>建出来的暂收单走的是 {@code linkBatch(..., batchId=null)},
+     *       只写 {@code form_flow_link} 占用、**不建台账行** ⇒ 它算进「已送」,浮层里永远没有它;</li>
+     *   <li>台账行被释放(RELEASED)或与单据的批次键对不上时,同样被过滤掉
+     *       (生产实例:订单 {@code YJ-20260921-10} ↔ 暂收单 {@code SL-2026-10-0053},
+     *       占用 ACTIVE、单据已审核,但批次键 240 的台账行不在 ACTIVE/PENDING,浮层只剩另一批);</li>
+     * </ul>
+     * 于是出现"已送 35000/35000/5000、浮层却只有 2 批且都没有这张单"的怪象 —— 有量、没记录。
+     *
+     * <p><b>口径</b>:凡本来源单 {@code link_status='ACTIVE'} 的目标单据,若在**已列出的台账行**里
+     * 找不到同一个目标单号(按台账登记的首跳单号 firstTargetFormNo 比对),就合成一行:
+     * 批次号取占用上的 {@code batch_no}(可能为空)、数量 = 该单 Σlinked_quantity、
+     * 日期 = 最早占用时间、{@code status='UNREGISTERED'}(前端显示「未登记台账」)、
+     * 去向单号 = 该单(再沿链走到终点,与台账行同一套 {@link #resolveEndTarget})。
+     *
+     * <p>纯展示语义:**只读、不写库**、不参与按量占用/剩余量/生单校验,也不影响取号
+     * (nextBatchNo 与 batch_seq 都不看这些合成行)。
+     */
+    private void appendOrphanRows(String srcPanel, String srcNo, List<Map<String, Object>> out) {
+        if (srcNo == null || srcNo.isBlank() || out == null) return;
+        Set<String> known = new LinkedHashSet<>();
+        for (Map<String, Object> r : out) {
+            String no = str(r.get("firstTargetFormNo"));
+            if (!no.isEmpty()) known.add(no);
+            String tgt = str(r.get("targetFormNo"));
+            if (!tgt.isEmpty()) known.add(tgt);
+        }
+        List<Map<String, Object>> orphans;
+        try {
+            orphans = jdbc.queryForList("SELECT target_panel_code AS targetPanel, target_form_no AS targetFormNo,"
+                    + " SUM(COALESCE(linked_quantity,0)) AS batchQty, MAX(batch_no) AS batchNo,"
+                    + " CONVERT(varchar(19), MIN(create_time), 120) AS createTime, COUNT(*) AS linkCount"
+                    + " FROM form_flow_link"
+                    + " WHERE source_panel_code=? AND source_form_no=? AND link_status='ACTIVE'"
+                    + "   AND target_panel_code IS NOT NULL AND target_form_no IS NOT NULL"
+                    + "   AND LTRIM(RTRIM(target_form_no))<>''"
+                    + " GROUP BY target_panel_code, target_form_no"
+                    + " ORDER BY MIN(create_time), target_form_no", srcPanel, srcNo);
+        } catch (Exception e) {
+            log.warn("[批次台账] {} {} 读孤儿占用失败(跳过):{}", srcPanel, srcNo, e.getMessage());
+            return;
+        }
+        for (Map<String, Object> o : orphans) {
+            String tgtNo = str(o.get("targetFormNo"));
+            if (tgtNo.isEmpty() || known.contains(tgtNo)) continue;   // 台账里已有这单:正常行已覆盖
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("batchId", null);
+            row.put("batchNo", str(o.get("batchNo")));
+            row.put("batchSeq", 0);
+            row.put("batchQty", o.get("batchQty"));
+            row.put("status", "UNREGISTERED");
+            row.put("targetPanel", str(o.get("targetPanel")));
+            row.put("targetFormNo", tgtNo);
+            row.put("createTime", o.get("createTime"));
+            row.put("linkCount", o.get("linkCount"));
+            row.put("orphan", true);
+            resolveEndTarget(row);                                    // 去向单号 = 链路终点(与台账行同口径)
+            out.add(row);
+            known.add(tgtNo);
+        }
     }
 
     // ==================== 台账去向单号 = 链路终点(2026-09-21) ====================
