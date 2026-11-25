@@ -1,0 +1,48 @@
+
+============================================================
+  YINJIA-MES 部署  ref=bab9e30d1d
+============================================================
+[ok] 已连接 ecs-38508784 (http://36.140.66.163:5985/wsman)
+
+[0] 环境体检
+      work-dir  True
+      app-jar   True
+      复用已下载的 Maven: C:\yj-deploy\apache-maven-3.9.9\bin\mvn.cmd
+
+[1] 服务器拉取 GitHub 源码
+      源: https://codeload.github.com/MyPanda-Hash/YINJIA/zip/bab9e30d1d
+      ?? 145.1 MB,?? 14.9 ?
+      SRC-ROOT C:\yj-deploy\_src\YINJIA-bab9e30d1d
+
+[2] 服务器本地构建
+      构建中(前端 npm build + Maven package,通常 3~8 分钟)...
+      ???? OK
+      static ?? OK
+      BUILD-OK size=0MB sha=1
+
+[3] 备份数据库(已跳过 --app-only)
+
+[4] 停止应用
+      已停
+
+[5] 归档旧 jar 并换上新 jar
+      JAR-SWAPPED sha=B07A340E21CBF8C503DA9F3A3B8E48C7306F9A556A6E4086EB08F3D6A80DC2EC
+      ROLLBACK C:\yinjia\backup\app-20261125-192552.jar
+
+[6] 启动并验证
+      登录验证通过(第 1 次探测)
+
+[7] 验收
+      jar    B07A340E21CBF8C503DA9F3A3B8E48C7306F9A556A6E4086EB08F3D6A80DC2EC
+      size   94.3 MB
+      ledger 901
+      chunk  assets/index-qOLodT1L.js
+      built  2026-11-25 19:25:51
+
+============================================================
+  完成
+============================================================
+  新 jar   : C:\yinjia\app.jar
+  回滚点   : C:\yinjia\backup\app-20261125-192552.jar
+
+  提示: 如需回滚,重新跑本脚本并带 --rollback-to <回滚点路径>

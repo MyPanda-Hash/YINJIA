@@ -218,8 +218,10 @@ test('⑬ 商品档案要预取并缓存（进面板就拉，打开弹窗不再�
   assert.match(sheet, /matPickCache/, '要有商品档案缓存容器')
   assert.match(sheet, /prefetchMatPickRows/, '要有预取函数')
   // matPickCache 是 ref ⇒ 取值要走 .value（别写死成裸变量）
-  assert.match(sheet, /if \(matPickCache\.value\.length\)[\s\S]{0,200}matPickRows\.value = matPickCache\.value\.slice\(\)/,
-    '打开弹窗时要先命中缓存（命中就不再请求）')
+  // 2026-11-23 起命中缓存后还要过一遍「排除半成品」过滤（产品BOM 只导采购物料），
+  //   不再是裸 slice()；断言跟当前口径，仍要求「先命中缓存、命中就不再请求」。
+  assert.match(sheet, /if \(matPickCache\.value\.length\)[\s\S]{0,300}matPickRows\.value = matPickCache\.value\.filter\(isPurchasableMaterial\)/,
+    '打开弹窗要先命中缓存（命中就不再请求），并按「排除半成品」过滤')
   // 预取挂在 onMounted 上
   const mount = sheet.slice(sheet.indexOf('onMounted(() => {'))
   assert.match(mount.slice(0, 600), /prefetchMatPickRows\(\)/,

@@ -2,6 +2,13 @@
    migrate-sample-reg-seq-20261120.sql
    「内部检测目录」(SAMPLE_REG → 表 qc_sample_reg)序号按 Excel 目录顺序重排 1~55
 
+   【2026-11-24 修订:生产已新增 2 个检测项目 ⇒ 总数不再等于 55】
+     生产实测可见 57 行 = 映射内 55 行 + 新增 2 行(「安全浸泡(14项金属)」「矿化(钾钠钙镁锶)」,
+     11-20 之后登记)。原自检写死「可见行、去重序号都必须正好 55」⇒ 生产直接 RAISERROR 拒跑。
+     现在改为:**映射内 55 行仍重排 1~55;未命中映射的可见行按(原序号,id)顺延排到 56 起**;
+     自检口径改为「映射内的行序号与映射逐行一致 + 全部可见行**去重序号数 = 可见行数**(无重号)」。
+     脚本改了字节 ⇒ DbSync 会判"未执行"重跑;逻辑幂等,重跑结果不变。
+
    【用户口径 2026-11-20】
      截图「内部检测目录」列表:「帮我修改一下这个排列顺序吧,这个当前序号是乱的。」
      追问后确认:「按 excel 排序即可,其他不用改动」
@@ -94,6 +101,21 @@ UPDATE r
   JOIN @m m ON LTRIM(RTRIM(r.[检测元素])) = m.elem
  WHERE ISNULL(r.asp_cancel, N'N') <> N'Y';
 
+/* ---------- 未命中映射的可见行(2026-11-24 起新登记的检测项目):顺延排到 56 起 ---------- */
+DECLARE @extra int = @vis - @hit;
+IF @extra > 0
+BEGIN
+  ;WITH x AS (
+    SELECT r.id, ROW_NUMBER() OVER (ORDER BY ISNULL(r.[序号], 9999), r.id) AS rn
+      FROM dbo.qc_sample_reg r
+     WHERE ISNULL(r.asp_cancel, N'N') <> N'Y'
+       AND NOT EXISTS (SELECT 1 FROM @m m WHERE LTRIM(RTRIM(r.[检测元素])) = m.elem)
+  )
+  UPDATE r SET r.[序号] = 55 + x.rn
+    FROM dbo.qc_sample_reg r JOIN x ON x.id = r.id;
+  PRINT N'  [UPD] 未纳入映射的可见行 ' + CAST(@extra AS nvarchar(10)) + N' 行,序号顺延到 56 起';
+END
+
 /* ---------- 三态③:赋值后逐行核对(不符 = 改失败) ---------- */
 IF EXISTS (SELECT 1
              FROM dbo.qc_sample_reg r
@@ -106,20 +128,22 @@ BEGIN
   RETURN;
 END
 
-IF (SELECT COUNT(DISTINCT [序号]) FROM dbo.qc_sample_reg WHERE ISNULL(asp_cancel, N'N') <> N'Y') <> 55
+/* 全部可见行去重序号数 = 可见行数 ⇒ 无重号(允许 56+ 的新增行存在) */
+DECLARE @dist int = (SELECT COUNT(DISTINCT [序号]) FROM dbo.qc_sample_reg WHERE ISNULL(asp_cancel, N'N') <> N'Y');
+IF @dist <> @vis
 BEGIN
   ROLLBACK TRANSACTION;
-  RAISERROR(N'[FAIL] %s:重排后可见行的序号不是 1~55 各一次(有重号/断号),已回滚', 16, 1, @dbn);
+  RAISERROR(N'[FAIL] %s:重排后可见行的序号有重号/断号(去重数 %d ≠ 可见行 %d),已回滚', 16, 1, @dbn, @dist, @vis);
   RETURN;
 END
 
 COMMIT TRANSACTION;
 
-RAISERROR(N'[OK] %s:内部检测目录序号已按 Excel 顺序重排 1~55(只改数据,列表默认排序未动)', 10, 1, @dbn);
+RAISERROR(N'[OK] %s:内部检测目录序号已按 Excel 顺序重排 1~55;新增行顺延 56 起(只改数据,列表默认排序未动)', 10, 1, @dbn);
 
-/* 收尾:未命中映射的可见行(本轮应为 0)打印出来,方便日后新增项目时核对 */
+/* 收尾:未命中映射的可见行(已顺延编号)打印出来,方便日后新增项目时核对 */
 IF @vis > @hit
-  SELECT N'[提示] 未纳入映射的可见行(序号保持原样)' AS 项,
+  SELECT N'[提示] 未纳入映射的可见行(已顺延排到 56 起)' AS 项,
          r.id AS id, r.[序号] AS 序号, r.[检测元素] AS 检测元素
     FROM dbo.qc_sample_reg r
    WHERE ISNULL(r.asp_cancel, N'N') <> N'Y'

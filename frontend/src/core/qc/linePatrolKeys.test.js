@@ -48,6 +48,22 @@ test('产品信息确认只保留 1 组编号/型号（用户口径「现在就�
   assert.doesNotMatch(seg, /field:\s*'型号2'/, '不得再有第二组（field 型号2）')
 })
 
+test('一填二：输入「编号」同时写「型号」（2026-11-25 用户口径「编号和型号是一个东西」）', () => {
+  // ① setCell 里必须有镜像写入
+  const at = vue.indexOf('function setCell')
+  assert.ok(at > 0, '缺 setCell()')
+  const end = vue.indexOf('/** v-for 的 key', at)
+  assert.ok(end > at, '找不到 setCell 结尾')
+  const seg = vue.slice(at, end)
+  assert.match(seg, /key === '编号1' && modelFollows\(row\)/, 'setCell 必须在写 编号1 时同步 型号1')
+  assert.match(seg, /row\['型号1'\] = val/, '同步落点是 型号1')
+
+  // ② 人工改过型号就不再自动跟（否则会把现场真填的型号覆盖掉）
+  assert.match(seg, /key === '型号1'\) modelAuto\.set\(row, val\.trim\(\) === ''\)/, '人工改型号 ⇒ 关掉跟随（清空 ⇒ 恢复跟随）')
+  assert.match(vue, /function modelFollows\(row\)/, '缺 modelFollows()')
+  assert.match(vue, /const modelAuto = new WeakMap\(\)/, '缺 modelAuto 标记（按行记）')
+})
+
 test('新建草稿不默认铺块（2026-11-20 第 2 条：需要自己手动新增行）', () => {
   // 只留「＋ 新增巡线记录」入口；源码里不许再有自动铺块的实现
   assert.doesNotMatch(vue, /DEFAULT_BLOCKS/, '不得再有 DEFAULT_BLOCKS（自动铺 3 块）')

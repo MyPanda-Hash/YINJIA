@@ -42,5 +42,7 @@ test('测试方案行仍是 3 个子区、行高 160（配置未动）', () => {
   assert.ok(row, '缺测试方案行')
   assert.equal(row.h, 160, '行高仍是设计值')
   assert.deepEqual(row.subs.map((s) => s.label), ['测试条件', '测试方法', '测试标准'])
-  for (const s of row.subs) assert.equal(s.max, 150, '每格 150 字上限不变')
+  // 2026-11-24：上限从 150 提到 500 —— 三列物理列都是 nvarchar(500)，写 150 会在内容写满时
+  // 把该格锁死（与「测试产品打样要求 max:100」同一个坑，见 paperFieldCaps.test.js）。
+  for (const s of row.subs) assert.equal(s.max, 500, '每格上限 = 列容量 500')
 })

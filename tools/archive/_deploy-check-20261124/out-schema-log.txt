@@ -1,0 +1,53 @@
+      [注意] 使用 Basic 认证（明文 HTTP，仅限本次部署会话）
+[ok] 已连接 ecs-38508784 (http://36.140.66.163:5985/wsman)
+[ok] connected ecs-38508784
+
+===== HSDZ_MES (rc=0) =====
+??????????? "HSDZ_MES"?
+LEDGER_ROWS 882
+REGISTERED 0
+MAX_APPLIED 2026-11-23 21:23:47
+MISSING migrate-batch-link-qty-sync-20261124.sql
+MISSING migrate-drop-inv-process-inspection-20261124.sql
+MISSING migrate-finish-in-produced-qty-20261124.sql
+MISSING migrate-i18n-upstream-newfields-20261124.sql
+MISSING migrate-instr-summary-page-20261120.sql
+MISSING migrate-qc-bhcp-finished-20261124.sql
+MISSING migrate-qc-bhc-resp-per-section-20261123.sql
+MISSING migrate-qc-bhc-ship-insp-link-20261120.sql
+MISSING migrate-qc-flow-rename-20261120.sql
+MISSING migrate-qc-insp-detail-doclinks-20261123.sql
+MISSING migrate-qc-insp-detail-panels-20261123.sql
+MISSING migrate-qc-line-patrol-approval-20261120.sql
+MISSING migrate-qc-ship-insp-rename-20261120.sql
+MISSING migrate-route-dates-optional-20261120.sql
+MISSING migrate-route-process-control-optional-20261119.sql
+MISSING migrate-sample-reg-list-order-20261120.sql
+MISSING migrate-sample-reg-seq-20261120.sql
+OBJ_qc_bhc_cp 0 0
+COL_bl_finish_in_???? -1 -1 -1
+
+===== HSDZ_MES_TEST (rc=0) =====
+??????????? "HSDZ_MES_TEST"?
+LEDGER_ROWS 718
+REGISTERED 0
+MAX_APPLIED 2026-11-23 21:24:09
+MISSING migrate-batch-link-qty-sync-20261124.sql
+MISSING migrate-drop-inv-process-inspection-20261124.sql
+MISSING migrate-finish-in-produced-qty-20261124.sql
+MISSING migrate-i18n-upstream-newfields-20261124.sql
+MISSING migrate-instr-summary-page-20261120.sql
+MISSING migrate-qc-bhcp-finished-20261124.sql
+MISSING migrate-qc-bhc-resp-per-section-20261123.sql
+MISSING migrate-qc-bhc-ship-insp-link-20261120.sql
+MISSING migrate-qc-flow-rename-20261120.sql
+MISSING migrate-qc-insp-detail-doclinks-20261123.sql
+MISSING migrate-qc-insp-detail-panels-20261123.sql
+MISSING migrate-qc-line-patrol-approval-20261120.sql
+MISSING migrate-qc-ship-insp-rename-20261120.sql
+MISSING migrate-route-dates-optional-20261120.sql
+MISSING migrate-route-process-control-optional-20261119.sql
+MISSING migrate-sample-reg-list-order-20261120.sql
+MISSING migrate-sample-reg-seq-20261120.sql
+OBJ_qc_bhc_cp 0 0
+COL_bl_finish_in_???? -1 -1 -1

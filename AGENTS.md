@@ -372,5 +372,6 @@ YINJIA-MES = light-mes 面板引擎(Vue3) + Spring Boot + SQL Server `HSDZ_MES`,
 | 送料浮层「关联单据」可见性(浮层只列批次台账 ⇒ 统一生单/选单/手工建的暂收单看不见;`BatchService.appendOrphanRows` 补合成行)+ 「单据批次号 ≠ 占用批次号」的根因(2026-10-16 日期对齐脚本只改了有「批次号」列的表) | `docs/development/送料浮层-关联单据可见性-20261125.md` |
 | 工单排产看板数量口径(三处同源;台账唯一权威键 = 工单行 id) | `docs/development/工单排产看板-本线任务量口径.md` |
 | 工艺清单归档 → 基础数据清单(组装工艺清单→组装物料清单;烧结/X烧结工艺清单→混料物料清单;唯一归档入口 `markArchived`,表 `bs_mix_bom`/面板 `MIX_BOM`) | `docs/development/工艺清单归档同步基础数据清单-20261118.md` |
+| 出货检验纸面(表观/功能)批号消失与统一居中(2026-11-25;只读态印批号 + 明细五列居中/18px + 手工换行) | `docs/development/出货检验纸面-批次号消失与统一居中-20261125.md` |
 | 开发与质量踩坑台账(§5.5 前端导出/探针:jsPDF px、html2canvas、`$el` fragment、离屏克隆全宽截图、CJK 键、`char(2)` 尾空格) | `docs/development/开发与质量.md`(**涉 PDF/截图导出/CDP 探针/PS 工具/定长列比较,先读该节**) |
 | 通用设计资产库(供其它项目参考) | `https://github.com/MyPanda-Hash/CHENGXIAO` |
