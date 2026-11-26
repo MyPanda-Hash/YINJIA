@@ -26,7 +26,15 @@
     "confirmThreshold": 200,
     "confirmTimeoutSeconds": 5,
     "logRetentionDays": 365,
-    "backupRetentionDays": 365
+    "backupRetentionDays": 365,
+    "inboundWatch": {
+      "_说明": "采购入库单驱动采购订单行执行量刷新(2026-11-26 方案二)。enabled=false 或 --no-inbound 可关掉;其余项一般不用填",
+      "enabled": true,
+      "firstRunDays": 7,
+      "overlapMinutes": 20,
+      "maxPages": 10,
+      "maxPoNos": 200
+    }
   },
   "stock": {
     "enabled": true,

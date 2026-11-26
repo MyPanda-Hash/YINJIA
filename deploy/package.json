@@ -6,7 +6,8 @@
   "scripts": {
     "probe": "node sync.mjs --probe",
     "dry": "node sync.mjs --dry-run",
-    "sync": "node sync.mjs"
+    "sync": "node sync.mjs",
+    "test": "node --test"
   },
   "dependencies": {
     "mssql": "^10.0.2"

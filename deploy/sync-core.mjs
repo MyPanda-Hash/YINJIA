@@ -17,6 +17,8 @@ import { fetchAppToken, kingdeeGet } from './kingdee-client.mjs';
 import { makeLogger, confirmBatch, backupBeforeWrite } from './safety.mjs';
 import { setSecret, dec, cryptoStats, resetCryptoStats } from './kingdee-crypto.mjs';
 import { EXTRA, EXTRA_LINES } from './kingdee-extra-fields.mjs';
+// 2026-11-26 方案二:金蝶「采购入库单」驱动的采购订单行执行量刷新(谁收了货 ⇒ 哪张订单必刷)
+import { inboundWatchedPoNos } from './inbound-watch.mjs';
 
 /** 全并集自动映射(生成器产出):dec=解密 / join=数组拼接 / str=文本;键缺省置 null;
  *  a 支持 dotted 路径(如 bomentity.contact_country_name = 子实体首行取值) */
@@ -845,7 +847,7 @@ async function pendingPoNos(pool, mssql) {
   return [...out].slice(0, 200);
 }
 
-export async function runCore({ mode, configPath, dryRun = false, probe = false, assumeYes = false, refresh = [], refreshBill = [] }) {
+export async function runCore({ mode, configPath, dryRun = false, probe = false, assumeYes = false, refresh = [], refreshBill = [], noInbound = false, inboundWindowDays = null }) {
   configPath = configPath || join(HERE, 'config.json');
   if (!existsSync(configPath)) {
     console.error(`✗ 未找到配置文件 ${configPath}\n  请复制 config.example.json 为 config.json 并填入凭证/数据库信息`);
@@ -868,6 +870,9 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
     logRetentionDays: s.logRetentionDays || 365,
     backupRetentionDays: s.backupRetentionDays || 365,
   };
+  // 2026-11-26 方案二:入库单驱动刷新(配置 sync.inboundWatch;`--no-inbound` 可整轮关掉)
+  const inboundCfg = s.inboundWatch && typeof s.inboundWatch === 'object' ? s.inboundWatch : {};
+  opt.inboundWatch = { ...inboundCfg, enabled: !noInbound && s.inboundWatch !== false && inboundCfg.enabled !== false };
   logger = makeLogger({ baseDir: HERE, retentionDays: opt.logRetentionDays });
   const docs = DOCS.filter((d) => opt.types.includes(d.code));
   // --refresh=CODE[,CODE…](或 =* / =ALL):忽略库内已有指纹,对这些类型全量重取详情再 upsert。
@@ -938,15 +943,47 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
   // 转ERP 时金蝶以「部分数据已经构建了关联关系,无法再构建关联关系」拒绝(那一行已关联满)。
   // 处置:MES 里**已审核但还没转ERP**的采购入库单 / 送料暂收单 所引用的采购订单,本轮强制补拉。
   let autoRefreshPos = [];
+  // ── ① 方案二(2026-11-26):金蝶里**谁收了货** ⇒ 这些采购订单本轮必刷 ───────────────
+  // 触发源 = 采购入库单(含别人在金蝶手工录的、批次 PC0000/空批次的单),按 modify_time 增量扫;
+  // 数量仍以金蝶订单行的 in_qty / un_out_qty 为唯一真值(超收负数、退货、换算率都由金蝶算)。
+  // 为什么必须有它:窗口外的订单不会重取明细,现场看到的「未入库」是旧数 ⇒ 重复收料/超收死行。
+  let inboundPos = [];
+  if (opt.inboundWatch.enabled && docs.some((d) => d.code === 'PU_ORDER')) {
+    try {
+      inboundPos = await inboundWatchedPoNos({
+        kingdeeCfg: cfg.kingdee, token, state, saveState,
+        options: opt.inboundWatch,
+        overrideDays: Number.isFinite(inboundWindowDays) && inboundWindowDays > 0 ? inboundWindowDays : undefined,
+        dryRun, log,
+      });
+      if (inboundPos.length) {
+        log(`【采购订单】入库单触发的 ${inboundPos.length} 张订单将强制补拉(不受 ${opt.windowDays} 天窗口限制)`);
+      }
+    } catch (e) {
+      log(`【采购入库】入库单触发扫描失败,本轮跳过该兜底(不影响其余同步):${e.message}`);
+    }
+  }
+  autoRefreshPos.push(...inboundPos);
+  // ── ② 待转ERP 单据引用的订单(2026-11-26 上半场)──────────────────────────────
+  let pendingPos = [];
   if (pool && docs.some((d) => d.code === 'PU_ORDER')) {
     try {
-      autoRefreshPos = await pendingPoNos(pool, mssql);
-      if (autoRefreshPos.length) {
-        log(`【采购订单】待转ERP单据引用的 ${autoRefreshPos.length} 张订单将强制补拉(不受 ${opt.windowDays} 天窗口限制)`);
+      pendingPos = await pendingPoNos(pool, mssql);
+      if (pendingPos.length) {
+        log(`【采购订单】待转ERP单据引用的 ${pendingPos.length} 张订单将强制补拉(不受 ${opt.windowDays} 天窗口限制)`);
       }
     } catch (e) {
       log(`【采购订单】算「待补拉订单」失败,本轮跳过该兜底:${e.message}`);
     }
+  }
+  autoRefreshPos.push(...pendingPos);
+  // 合并去重 + 单轮上限:补拉太多会把一轮拖长(每张 1 次详情 ≈120ms);没轮到的下一轮还会被扫到
+  // (入库单水位线未覆盖它们时仍会再次命中,待转ERP 那批则每轮都在名单里)。
+  const REFRESH_POS_CAP = 400;
+  autoRefreshPos = [...new Set(autoRefreshPos)];
+  if (autoRefreshPos.length > REFRESH_POS_CAP) {
+    log(`【采购订单】本轮需补拉 ${autoRefreshPos.length} 张,超过单轮上限 ${REFRESH_POS_CAP},其余顺延下一轮`);
+    autoRefreshPos = autoRefreshPos.slice(0, REFRESH_POS_CAP);
   }
   /** 补拉名单(Set 版):指纹过滤里要按它强制重取详情,见 changedRows 里的说明 */
   const autoRefreshNos = new Set(autoRefreshPos);
@@ -989,7 +1026,7 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
           for (const r of (data.rows || [])) { rows.push(r); have.add(String(r.bill_no)); }
         }
         const hit = [...refreshNos].filter((no) => have.has(no)).length;
-        log(`【${doc.label}】强制补拉 ${refreshNos.size} 张(${refreshBillSet.size ? '点名 ' + refreshBillSet.size + ' + ' : ''}待转ERP兜底 ${autoRefreshPos.length}) → 命中 ${hit} 张`);
+        log(`【${doc.label}】强制补拉 ${refreshNos.size} 张(${refreshBillSet.size ? '点名 ' + refreshBillSet.size + ' + ' : ''}入库单 ${inboundPos.length} + 待转ERP ${pendingPos.length}) → 命中 ${hit} 张`);
       }
       if (doc.afterList) doc.afterList(rows, ctx); // 登记分类映射(供后续条目解析 id→名称/编码)
 

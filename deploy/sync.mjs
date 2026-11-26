@@ -32,6 +32,10 @@
 //                                      日常已由「明细每日复核日戳」兜底(每天各重取一次),此参数用于
 //                                      当场补某一张,不必等下一轮或全量 --refresh。
 //   node sync.mjs --config=D:\path\config.json
+//   node sync.mjs --no-inbound         跳过「采购入库单驱动订单行刷新」那步(排查时用)
+//   node sync.mjs --inbound-window-days=31 --yes
+//                                      入库单**回看 N 天**(忽略水位线,一次性补扫):
+//                                      用于上线首跑、或同步停了一段时间后把期间的收货补齐。
 // 安全规范:写入前自动备份受影响单据前像(backup/*.jsonl);超阈值(默认200条)要求确认;
 //           日志按日写 logs/sync-YYYY-MM-DD.log 与 logs/stock-sync-YYYY-MM-DD.log,均保留至少一年。
 //           库存侧另有自己的闸门(0 行/行数骤降/锁)与前像 backup/stock-*.jsonl。
@@ -77,6 +81,9 @@ try {
     assumeYes: has('yes'),
     refresh: (argOf('refresh') || '').split(',').map((x) => x.trim()).filter(Boolean),
     refreshBill: (argOf('refresh-bill') || '').split(',').map((x) => x.trim()).filter(Boolean),
+    // 2026-11-26 方案二:入库单驱动的订单行刷新(入口仍是本文件,计划任务不需要改参数)
+    noInbound: has('no-inbound'),
+    inboundWindowDays: Number(argOf('inbound-window-days')) || null,
   });
 } catch (e) {
   const line = `[${new Date().toISOString().replace('T', ' ').slice(0, 19)}] ✗ 同步失败: ${e.message}`;
