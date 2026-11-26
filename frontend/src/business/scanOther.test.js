@@ -55,16 +55,17 @@ test('清单合并键 = 物料|批号|仓库(三者任一不同就是另一行)'
   )
 })
 
-test('数量校验:领料受库存约束,退料只要 > 0', () => {
-  assert.deepEqual(checkQty(SIDE_PICK, 0, 10), { ok: false, reason: 'no-qty' })
-  assert.deepEqual(checkQty(SIDE_PICK, 11, 10), { ok: false, reason: 'exceed' })
-  assert.deepEqual(checkQty(SIDE_PICK, 10, 10), { ok: true })
-  assert.deepEqual(checkQty(SIDE_PICK, 1, 0), { ok: false, reason: 'no-stock' })
+test('数量校验:2026-11-26 起库存只提示不拦截(硬拦只剩数量≤0)', () => {
+  assert.deepEqual(checkQty(SIDE_PICK, 0, 10), { ok: false, blocking: true, reason: 'no-qty' })
+  // 超可用量 / 可用量为 0:放行 + warn(界面提示,照常提交;真实库存以金蝶为准)
+  assert.deepEqual(checkQty(SIDE_PICK, 11, 10), { ok: true, blocking: false, warn: true, reason: 'exceed' })
+  assert.deepEqual(checkQty(SIDE_PICK, 1, 0), { ok: true, blocking: false, warn: true, reason: 'no-stock' })
+  assert.deepEqual(checkQty(SIDE_PICK, 10, 10), { ok: true, blocking: false })
   // 退料:手上这批货,没有"已领多少"可比 ⇒ 不看现存量
-  assert.deepEqual(checkQty(SIDE_RET, 999, 0), { ok: true })
-  assert.deepEqual(checkQty(SIDE_RET, 0, 0), { ok: false, reason: 'no-qty' })
+  assert.deepEqual(checkQty(SIDE_RET, 999, 0), { ok: true, blocking: false })
+  assert.deepEqual(checkQty(SIDE_RET, 0, 0), { ok: false, blocking: true, reason: 'no-qty' })
   // 小数(kg/米)按 4 位比较,不能因浮点尾差误判超量
-  assert.deepEqual(checkQty(SIDE_PICK, 0.1 + 0.2, 0.3), { ok: true })
+  assert.deepEqual(checkQty(SIDE_PICK, 0.1 + 0.2, 0.3), { ok: true, blocking: false })
 })
 
 test('mergeLine:新行/同键累加/领料累加超量被拦/退料无上限/不改入参', () => {
@@ -81,9 +82,10 @@ test('mergeLine:新行/同键累加/领料累加超量被拦/退料无上限/不
   assert.equal(second.lines[0].qty, 7)
   assert.equal(base[0].qty, 3, '入参不能被就地改坏')
 
+  // 2026-11-26:累加超量不再被拦(真实库存以金蝶为准,界面只提示)
   const over = mergeLine(base, cand(), 8, SIDE_PICK)   // 3+8=11 > 存量 10
-  assert.equal(over.ok, false)
-  assert.equal(over.reason, 'exceed')
+  assert.equal(over.ok, true, '超可用量照样并入清单')
+  assert.equal(over.lines[0].qty, 11)
 
   const ret = mergeLine(base, cand({ 现存量: 0 }), 100, SIDE_RET)
   assert.equal(ret.ok, true, '退料不看现存量')

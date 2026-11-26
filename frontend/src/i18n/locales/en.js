@@ -5330,6 +5330,8 @@ export default {
     '仓库档案没加载出来，请返回重进': 'Warehouse list failed to load — please go back and reopen',
     // 2026-11-24 补齐本页此前漏译的三条(单测 scanOther.test.js 已加守卫)
     '加入清单': 'Add to list',
+    '超过当前可用量（MES 库存以金蝶为准，仍可加入清单）': 'Exceeds the current available qty (MES stock follows Kingdee; you can still add it)',
+    '该批号可用量为 0（MES 库存以金蝶为准，仍可加入清单）': 'Available qty for this batch is 0 (MES stock follows Kingdee; you can still add it)',
     '还没有扫码加入的物料': 'No materials scanned yet',
     '该批号可用量为 0': 'This lot has no available quantity',
     '数量要大于 0': 'Quantity must be greater than 0',

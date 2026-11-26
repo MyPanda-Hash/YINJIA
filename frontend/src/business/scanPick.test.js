@@ -109,19 +109,19 @@ test('数量:正常/等于现存量(含小数)', () => {
   assert.equal(checkPickQty({ qty: 0.3, available: 0.3 }).ok, true)
 })
 
-test('数量:超出现存量 → exceed', () => {
-  assert.deepEqual(checkPickQty({ qty: 101, available: 100 }), { ok: false, reason: 'exceed' })
-  assert.deepEqual(checkPickQty({ qty: 0.31, available: 0.3 }), { ok: false, reason: 'exceed' })
+test('数量:2026-11-26 起库存只提示不拦截(硬拦只剩数量≤0)', () => {
+  // 超过现存量 / 该批号无库存:放行 + warn(界面提示;真实库存以金蝶为准)
+  assert.deepEqual(checkPickQty({ qty: 101, available: 100 }), { ok: true, blocking: false, warn: true, reason: 'exceed' })
+  assert.deepEqual(checkPickQty({ qty: 0.31, available: 0.3 }), { ok: true, blocking: false, warn: true, reason: 'exceed' })
+  assert.equal(checkPickQty({ qty: 1, available: 0 }).warn, true)
+  assert.equal(checkPickQty({ qty: 1, available: 0 }).blocking, false)
 })
 
-test('数量:非正数 → no-qty', () => {
+test('数量:非正数 → 仍然硬拦(拦的是输错)', () => {
   assert.equal(checkPickQty({ qty: 0, available: 100 }).reason, 'no-qty')
   assert.equal(checkPickQty({ qty: -1, available: 100 }).reason, 'no-qty')
   assert.equal(checkPickQty({ qty: NaN, available: 100 }).reason, 'no-qty')
-})
-
-test('数量:该批号没有库存 → no-stock(即使数量填了)', () => {
-  assert.equal(checkPickQty({ qty: 1, available: 0 }).reason, 'no-stock')
+  assert.equal(checkPickQty({ qty: 0, available: 100 }).blocking, true)
 })
 
 test('建单:明细必填列齐 + 金额按数量×单价', () => {

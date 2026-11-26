@@ -152,20 +152,25 @@ export function withWarehouse(cand, wh) {
 /**
  * 数量校验。领料受库存约束,退料只要求 > 0。
  *
+ * <p><b>2026-11-26 用户口径</b>:「移动端给提示就行不拦截」。真实库存以金蝶为准,
+ * MES 这边现存量随时会被同步抹平/回填,拿它当硬闸会出现"明明有货却领不出去"。
+ * ⇒ **只有数量 ≤ 0 才是硬拦**(拦的是输错,不是库存);可用量为 0 / 超过可用量
+ * 一律 `ok: true` + `warn: true` + `reason`,由界面给一句提示,照常提交。
+ *
  * @param {string} side pick|ret
  * @param {number} qty 本次数量
  * @param {number} available 该(物料,仓库,批号)的现存量(退料时无意义,传 0 即可)
- * @returns {{ ok: boolean, reason?: 'no-qty'|'no-stock'|'exceed' }}
+ * @returns {{ ok: boolean, reason?: 'no-qty'|'no-stock'|'exceed', warn?: boolean, blocking?: boolean }}
  */
 export function checkQty(side, qty, available) {
   const n = Number(qty)
-  if (!Number.isFinite(n) || n <= 0) return { ok: false, reason: 'no-qty' }
-  if (isRet(side)) return { ok: true }
+  if (!Number.isFinite(n) || n <= 0) return { ok: false, blocking: true, reason: 'no-qty' }
+  if (isRet(side)) return { ok: true, blocking: false }
   const stock = Number(available)
-  if (!Number.isFinite(stock) || stock <= 0) return { ok: false, reason: 'no-stock' }
+  if (!Number.isFinite(stock) || stock <= 0) return { ok: true, blocking: false, warn: true, reason: 'no-stock' }
   // 允许小数(kg/米):按 4 位比较,避开 0.1+0.2 的浮点尾差
-  if (Math.round(n * 10000) > Math.round(stock * 10000)) return { ok: false, reason: 'exceed' }
-  return { ok: true }
+  if (Math.round(n * 10000) > Math.round(stock * 10000)) return { ok: true, blocking: false, warn: true, reason: 'exceed' }
+  return { ok: true, blocking: false }
 }
 
 /**

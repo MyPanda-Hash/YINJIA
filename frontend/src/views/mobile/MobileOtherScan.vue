@@ -116,6 +116,8 @@
         <span class="mo-qty-unit">{{ current?.['计量单位'] || '' }}</span>
         <el-button type="primary" size="large" :disabled="!canAdd" @click="addLine">{{ tt('加入清单') }}</el-button>
       </div>
+      <!-- 2026-11-26 用户口径:库存只提示不拦截(真实库存以金蝶为准,MES 现存量随时会被同步抹平/回填) -->
+      <div v-if="qtyWarn" class="mo-qty-hint">{{ qtyWarn }}</div>
     </div>
 
     <div class="mo-list">
@@ -310,6 +312,22 @@ const canAdd = computed(() => {
   if (!current.value) return false
   if (showWh.value && !warehouseCode.value) return false
   return checkQty(props.side, qty.value, Number(current.value['现存量'])).ok
+})
+
+/**
+ * 库存提示(2026-11-26 用户口径「移动端给提示就行不拦截」)。
+ *
+ * <p>超过可用量 / 该批号可用量为 0 时只给一句话,不挡「加入清单」也不挡提交 ——
+ * 真实库存以金蝶为准,MES 的现存量随时会被同步抹平或回填,拿它做硬闸会让现场"有货却领不出去"。
+ * 硬拦只剩「数量 ≤ 0」那一种(拦的是输错,不是库存)。
+ */
+const qtyWarn = computed(() => {
+  if (!current.value) return ''
+  const c = checkQty(props.side, qty.value, Number(current.value['现存量']))
+  if (!c.warn) return ''
+  return c.reason === 'exceed'
+    ? tt('超过当前可用量（MES 库存以金蝶为准，仍可加入清单）')
+    : tt('该批号可用量为 0（MES 库存以金蝶为准，仍可加入清单）')
 })
 
 onMounted(() => {
@@ -702,6 +720,8 @@ async function submit() {
 .mo-qty { display: flex; align-items: center; gap: 10px; padding: 12px; background: var(--el-fill-color-lighter); }
 .mo-qty-label { font-size: 13px; color: var(--el-text-color-regular); flex: none; }
 .mo-qty-unit { font-size: 13px; color: var(--el-text-color-secondary); min-width: 24px; }
+/* 库存提示(2026-11-26):只是提醒,不挡操作 —— 颜色用 warning,不带红色/禁用态 */
+.mo-qty-hint { padding: 6px 12px 0; font-size: 12px; line-height: 1.5; color: var(--el-color-warning); }
 .mo-list { margin-bottom: 14px; }
 .mo-list-head { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--el-text-color-regular); margin-bottom: 6px; }
 .mo-list-count { display: inline-block; min-width: 20px; text-align: center; padding: 0 6px; border-radius: 10px; background: var(--el-color-primary-light-9); color: var(--el-color-primary); font-size: 12px; }

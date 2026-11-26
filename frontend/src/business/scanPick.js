@@ -88,17 +88,22 @@ export function matchPickRows(rows, parsed) {
 /**
  * 判定一次领料动作是否可提交。
  *
+ * <p><b>2026-11-26 用户口径</b>:「移动端给提示就行不拦截」。真实库存以金蝶为准,后端
+ * `StockLedgerService` 也已不做数量校验(`mes.stock.guard.*`)⇒ 前端不该再用 MES 那个随时
+ * 会被金蝶同步抹平的现存量把现场挡死。**硬拦只剩数量 ≤ 0**;可用量为 0 / 超出可用量
+ * 返回 `ok: true` + `warn: true`,由界面给提示。
+ *
  * @param {{ qty: number, available: number }} p qty=本次领用, available=该(物料,仓库,批号)的现存量
- * @returns {{ ok: boolean, reason?: 'no-qty'|'exceed'|'no-stock' }}
+ * @returns {{ ok: boolean, reason?: 'no-qty'|'exceed'|'no-stock', warn?: boolean, blocking?: boolean }}
  */
 export function checkPickQty({ qty, available }) {
   const n = Number(qty)
   const stock = Number(available)
-  if (!Number.isFinite(n) || n <= 0) return { ok: false, reason: 'no-qty' }
-  if (!Number.isFinite(stock) || stock <= 0) return { ok: false, reason: 'no-stock' }
+  if (!Number.isFinite(n) || n <= 0) return { ok: false, blocking: true, reason: 'no-qty' }
+  if (!Number.isFinite(stock) || stock <= 0) return { ok: true, blocking: false, warn: true, reason: 'no-stock' }
   // 允许小数(kg/米),按 4 位比较,避免 0.1+0.2 的浮点尾差误判
-  if (Math.round(n * 10000) > Math.round(stock * 10000)) return { ok: false, reason: 'exceed' }
-  return { ok: true }
+  if (Math.round(n * 10000) > Math.round(stock * 10000)) return { ok: true, blocking: false, warn: true, reason: 'exceed' }
+  return { ok: true, blocking: false }
 }
 
 /**
@@ -213,8 +218,10 @@ export function sumAvailable(rows) {
  * 用户口径(2026-10-20):「条码的批号就按照批号日期预填,日期在前就先扣,如果不够就扣下一日期
  * 批次号的数量,再生成下一条明细」⇒ 一次领用可能产出**多条明细行**,每条一个批号。
  *
- * 不预占、不互斥:同一批号可被多张草稿重复领,真正的拦截在**审核**那一刻
- * (`StockLedgerService.applyOut` 现存量不足直接抛错)。
+ * 不预占、不互斥:同一批号可被多张草稿重复领。
+ * <p>⚠ 2026-11-26 起**审核那一刻也不再因现存量不足抛错**了 —— MES 不做库存数量校验
+ * (`StockLedgerService` 的 `mes.stock.guard.*` 默认放行,真实库存以金蝶为准)。
+ * 这条注释原本写的是"真正拦截在审核",现在不成立,别再按它设计前端拦截。
  *
  * @param {any[]} rows 同一物料的 v_stock_pick 行(可含多仓;按 FIFO 依次扣)
  * @param {number} need 本次要领的数量
