@@ -801,6 +801,50 @@ async function writeImportLog({ mssql, pool, doc, total, inserted, updated, fail
   return { batchNo, batchId, rows: rowNo };
 }
 
+/**
+ * MES 里「已审核但还没转ERP」的采购入库单 / 送料暂收单 所引用的采购订单号(2026-11-26)。
+ *
+ * <p>这些订单的**行级执行量**必须每轮刷新:它们超期后不在增量窗口里,数量会冻结在旧值,
+ * 现场据此重复收料,转ERP 时被金蝶以「已经构建了关联关系」拒绝(详见 runCore 里的说明)。
+ *
+ * <p>合单的单头是多张订单拼的人读串(「订单1、订单2」)⇒ 按分隔符拆开逐个补拉。
+ * @returns {Promise<string[]>} 去重后的订单号(上限 200 张,防单轮拖太久)
+ */
+async function pendingPoNos(pool, mssql) {
+  // 列守卫:旧库/陈旧账套可能还没有「是否已转ERP」列(本地 HSDZ_MES 实测缺),
+  // 缺列时**不能**整段 SQL 直接报错 —— 退化成"凡是已审核的入库/暂收单都算待转"(宁多拉不漏拉)。
+  const colOk = async (table) => {
+    try {
+      const r = await new mssql.Request(pool).query(
+        `SELECT CASE WHEN COL_LENGTH('dbo.${table}', N'是否已转ERP') IS NULL THEN 0 ELSE 1 END AS ok`);
+      return !!(r.recordset && r.recordset[0] && r.recordset[0].ok);
+    } catch { return false; }
+  };
+  const [piOk, recvOk] = await Promise.all([colOk('bd_purchase_in'), colOk('sl_recv')]);
+  const pending = (t) => (t ? `AND ISNULL(h.是否已转ERP, N'否') <> N'是'` : '');
+  const rs = await new mssql.Request(pool).query(`
+    SELECT DISTINCT LTRIM(RTRIM(x.no)) AS no FROM (
+      SELECT 采购订单号 AS no FROM dbo.bd_purchase_in h
+       WHERE 1 = 1 ${pending(piOk)}
+         AND EXISTS (SELECT 1 FROM dbo.yj_doc_status s WHERE s.panel_code = N'PURCHASE_IN'
+                     AND s.doc_no = h.单据编号 AND s.shr IS NOT NULL AND ISNULL(s.canceled, 'N') <> N'Y')
+      UNION ALL
+      SELECT 采购订单号 FROM dbo.sl_recv h
+       WHERE 1 = 1 ${pending(recvOk)}
+         AND EXISTS (SELECT 1 FROM dbo.yj_doc_status s WHERE s.panel_code = N'QC_RECV'
+                     AND s.doc_no = h.单据编号 AND s.shr IS NOT NULL AND ISNULL(s.canceled, 'N') <> N'Y')
+    ) x
+    WHERE x.no IS NOT NULL AND LTRIM(RTRIM(x.no)) <> N''`);
+  const out = new Set();
+  for (const row of rs.recordset || []) {
+    for (const part of String(row.no).split(/[、,，;；\s]+/)) {
+      const no = part.trim();
+      if (no) out.add(no);
+    }
+  }
+  return [...out].slice(0, 200);
+}
+
 export async function runCore({ mode, configPath, dryRun = false, probe = false, assumeYes = false, refresh = [], refreshBill = [] }) {
   configPath = configPath || join(HERE, 'config.json');
   if (!existsSync(configPath)) {
@@ -886,6 +930,26 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
   }
 
   let totalIn = 0, totalUp = 0, totalFail = 0;
+  // ── 2026-11-26:每轮强制补拉「还在等入库/等转ERP」的采购订单 ────────────────────
+  // 病根:增量模式按 **modify_start_time = 近 N 天(默认 31)** 过滤,采购订单一旦超过窗口
+  // 没被改过,明细就再也不会重取 ⇒ 行已执行数量/行未执行数量 冻结在首次同步那一刻。
+  // 生产实例(2026-11-26 客户报障):采购订单 YJ-20261014-03 金蝶 modify_time=2026-10-17(已出窗),
+  // 金蝶该行早已全收 1000,MES 仍显示「未入库 1000」⇒ 现场据此又收了一次 300,
+  // 转ERP 时金蝶以「部分数据已经构建了关联关系,无法再构建关联关系」拒绝(那一行已关联满)。
+  // 处置:MES 里**已审核但还没转ERP**的采购入库单 / 送料暂收单 所引用的采购订单,本轮强制补拉。
+  let autoRefreshPos = [];
+  if (pool && docs.some((d) => d.code === 'PU_ORDER')) {
+    try {
+      autoRefreshPos = await pendingPoNos(pool, mssql);
+      if (autoRefreshPos.length) {
+        log(`【采购订单】待转ERP单据引用的 ${autoRefreshPos.length} 张订单将强制补拉(不受 ${opt.windowDays} 天窗口限制)`);
+      }
+    } catch (e) {
+      log(`【采购订单】算「待补拉订单」失败,本轮跳过该兜底:${e.message}`);
+    }
+  }
+  /** 补拉名单(Set 版):指纹过滤里要按它强制重取详情,见 changedRows 里的说明 */
+  const autoRefreshNos = new Set(autoRefreshPos);
   try {
     for (const doc of docs) {
       // 列表:订单=已审核+时间窗(端点前移规避实测的边界漏单);档案=无过滤全量+指纹跳过(指引 §四.3)
@@ -913,14 +977,19 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
       rows.length = 0; rows.push(...limited);
       // --refresh-bill:点名的单若不在本轮列表里(超出 31 天窗口 / 已不在 bill_status=C 列表),
       // 按单号单独补一次列表查询塞进来 —— 否则"点名了却什么都没做"会静默通过。
-      if (refreshBillSet.size && !doc.archive) {
+      // 2026-11-26:采购订单额外并入「待转ERP单据引用的订单」(autoRefreshPos),同一条补拉通道。
+      const refreshNos = doc.code === 'PU_ORDER' && autoRefreshPos.length
+        ? new Set([...refreshBillSet, ...autoRefreshPos])
+        : refreshBillSet;
+      if (refreshNos.size && !doc.archive) {
         const have = new Set(rows.map((r) => String(r.bill_no || '')).filter(Boolean));
-        const missing = [...refreshBillSet].filter((no) => !have.has(no));
+        const missing = [...refreshNos].filter((no) => !have.has(no));
         for (const no of missing) {
           const data = await kingdeeGet(cfg.kingdee, token, doc.listPath, { bill_no: no, page: '1', page_size: '5' });
           for (const r of (data.rows || [])) { rows.push(r); have.add(String(r.bill_no)); }
         }
-        log(`【${doc.label}】--refresh-bill 点名 ${[...refreshBillSet].join(',')} → 命中 ${[...refreshBillSet].filter((no) => have.has(no)).length} 张(其余未取到,检查单号/状态)`);
+        const hit = [...refreshNos].filter((no) => have.has(no)).length;
+        log(`【${doc.label}】强制补拉 ${refreshNos.size} 张(${refreshBillSet.size ? '点名 ' + refreshBillSet.size + ' + ' : ''}待转ERP兜底 ${autoRefreshPos.length}) → 命中 ${hit} 张`);
       }
       if (doc.afterList) doc.afterList(rows, ctx); // 登记分类映射(供后续条目解析 id→名称/编码)
 
@@ -986,6 +1055,10 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
         if (forced) return true; // --refresh:无条件重取(存量补拉新接字段)
         // --refresh-bill:点名单强制重取(单张补同步;不受指纹影响)
         if (refreshBillSet.size && refreshBillSet.has(String(row.bill_no || '').trim())) return true;
+        // 2026-11-26:补拉进来的老订单也必须**真的重取详情** —— 它们的表头指纹(状态/关闭/日期/供应商)
+        // 往往早就一致了,变的只有行级「已执行/未执行数量」。若照样按指纹跳过,补拉等于白拉
+        // (实测:YJ-20261014-03 补拉后仍写 0/1000,就是被这层指纹挡住的)。
+        if (autoRefreshNos.has(String(row.bill_no || '').trim())) return true;
         return !(knownFps.has(id) && knownFps.get(id) === fpOf(row));
       });
       const skipped = rows.length - changedRows.length;
