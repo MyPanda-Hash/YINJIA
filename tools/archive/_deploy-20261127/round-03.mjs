@@ -1,0 +1,14 @@
+const task = await taskSpace(1);
+const page = task.page("p1");
+await page.fill("@33", "admin");
+await page.fill("@35", "123456");
+await page.click("@38", { label: "进入系统" });
+await page.waitForURL((u) => !String(u).includes("/login"), { timeout: 20000 });
+await page.waitForTimeout(2500);
+console.log({ afterLogin: await page.url() });
+await page.goto("http://36.140.66.163:8090/#/panelx/list/MATERIAL_OUT");
+await page.waitForTimeout(4000);
+console.log({ listUrl: await page.url(), title: await page.title() });
+const shot = await page.screenshot({ path: "D:/workspace/yinjia/tools/archive/_deploy-20261127/round-03-material-out.png" });
+console.log("SHOT=" + shot);
+console.log(await page.snapshot());
