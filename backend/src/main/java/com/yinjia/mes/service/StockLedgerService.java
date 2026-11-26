@@ -3,6 +3,9 @@ package com.yinjia.mes.service;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.List;
 import java.util.Map;
 
@@ -12,13 +15,16 @@ import java.util.Map;
  * 已接入面板:
  *   PURCHASE_IN 采购入库单(入库,+,行可无批号) — 材料入库链
  *   MATERIAL_OUT 生产领料单(出库,-,行必须扫码带批号,台账行必须已存在) — 生产过程层·扫码领料
- * 守卫:仓库档案必须存在(名称→bs_wh 编码);出库现存量不足拒绝;冲回为负拒绝;整笔回滚。
+ * 守卫(2026-11-26 起):仓库档案必须存在(名称→bs_wh 编码)照旧;**库存数量校验默认不做**
+ * (真实库存以金蝶为准,见 {@link #GUARD_ISSUE} / {@link #GUARD_REVERSE});整笔回滚不变。
  *
  * 2026-09-30(库存三表):除 kucun 结存之外,同一事务内还写**流水**(inh/outh,见 {@link StockFlowService}),
  * 流水为唯一真源、kucun 退为结存缓存 —— 两者必须同键同量,否则静态检查「结存 == Σ流水」会报差。
  */
 @Service
 public class StockLedgerService {
+
+    private static final Logger log = LoggerFactory.getLogger(StockLedgerService.class);
 
     private final JdbcTemplate jdbc;
     private final StockFlowService stockFlow;
@@ -49,6 +55,28 @@ public class StockLedgerService {
      * ⚠ 该开关**默认关闭**:日常录单/审核的库存控制一个字都没变。
      */
     private static final boolean HIST_BACKFILL = "true".equalsIgnoreCase(System.getProperty("mes.hist.backfill"));
+
+    /**
+     * 库存数量守卫 —— <b>出库方向</b>(现存量不足 / 台账无该批库存)。
+     *
+     * <p><b>2026-11-26 用户口径</b>:「真实库存是以金蝶为准的,我们这边不要做检验也可以」。
+     * 起因(客户报障):采购入库单 {@code PI-2026-11-0169} 转ERP 失败 → 金蝶没这张单 →
+     * 5 分钟一轮的「以金蝶为准」同步把 {@code kucun.yl} 覆盖成 0 → 弃审要冲回 −500 被守卫拒绝 ⇒
+     * **单据既推不了金蝶也删不掉**(死锁)。既然 MES 只是金蝶的镜子,数量校验就不该把单据焊死。
+     *
+     * <p>默认**不拦**:不足时照常记账,余量记成负数(库存状况/负数在面板上一眼可见),
+     * 下一轮同步按金蝶覆盖自动抹平。要恢复"不足就拒绝",加 JVM 参数 {@code -Dmes.stock.guard.issue=true}。
+     */
+    private static final boolean GUARD_ISSUE = "true".equalsIgnoreCase(System.getProperty("mes.stock.guard.issue"));
+
+    /**
+     * 库存数量守卫 —— <b>冲回方向</b>(弃审/作废后余额为负)。
+     *
+     * <p>同上口径,默认**不拦**:冲回后余额可能为负,只记 WARN 留痕,不再拒绝弃审 ——
+     * 否则「已审核但未转ERP」的单据(同步抹平后余额 0)永远弃审不了,也就永远删不掉。
+     * 要恢复旧行为:{@code -Dmes.stock.guard.reverse=true}。
+     */
+    private static final boolean GUARD_REVERSE = "true".equalsIgnoreCase(System.getProperty("mes.stock.guard.reverse"));
 
     /**
      * 出库是否按批号核销(2026-10-19 用户口径:**否**)。
@@ -493,7 +521,15 @@ public class StockLedgerService {
         }
         if (!forward || qty < 0) {
             Double yl = bal(code, ckdm, lot);
-            if (!HIST_BACKFILL && yl != null && yl < -0.0001) throw new IllegalStateException("冲回将使现存量为负(物料 " + code + " 批 " + lot + " 余额 " + yl + "),库存已被消耗,不可冲回");
+            if (yl != null && yl < -0.0001) {
+                if (GUARD_REVERSE && !HIST_BACKFILL) {
+                    throw new IllegalStateException("冲回将使现存量为负(物料 " + code + " 批 " + lot + " 余额 " + yl + "),库存已被消耗,不可冲回");
+                }
+                // 2026-11-26:默认放行(用户口径:真实库存以金蝶为准)。常见成因不是"货被领用",而是
+                // 「本单未转ERP ⇒ 金蝶没有这笔 ⇒ 同步把 kucun.yl 抹成 0」,此时冲回必然为负。
+                log.warn("[库存] 冲回后余额为负(已放行,以金蝶为准,下一轮同步会覆盖):物料 {} 仓 {} 批 {} 余额 {}",
+                        code, ckdm == null ? "" : ckdm, lot == null ? "(无)" : lot, yl);
+            }
         }
         return n;
     }
@@ -528,8 +564,9 @@ public class StockLedgerService {
                 sign * qty, sign * qty, user, code, ckdm, lot, lot);
         if (n == 0) {
             if (!forward) throw new IllegalStateException("冲回失败:台账无该行(物料 " + code + " 批 " + lot + ")");
-            if (!HIST_BACKFILL) throw new IllegalStateException("台账无该批库存(物料 " + code + " 批 " + lot + " 仓 " + ckdm + "),不能出库");
-            // 历史回填:补一行 0 结存再扣(金蝶该键在 MES 台账尚无行,属区间外/其它类型移动造成的缺口)
+            if (GUARD_ISSUE && !HIST_BACKFILL) throw new IllegalStateException("台账无该批库存(物料 " + code + " 批 " + lot + " 仓 " + ckdm + "),不能出库");
+            // 历史回填 / 不做数量校验(2026-11-26):补一行 0 结存再扣 —— kucun 没有该键时也要能出
+            // (金蝶同步会把"金蝶没有的键"清零但不建行,未同步的入库键也可能缺席)
             jdbc.update("INSERT INTO kucun (wzdm, ckdm, lot_no, in_date, rkl, yl, asp_user1, asp_time1, asp_cancel)"
                             + " VALUES (?, ?, ?, GETDATE(), 0, 0, ?, GETDATE(), 'N')", code, ckdm, lot, "stock:" + user);
             n = jdbc.update("UPDATE kucun SET ckl = ckl + ?, yl = yl - ?, update_date = GETDATE(),"
@@ -538,10 +575,18 @@ public class StockLedgerService {
                     sign * qty, sign * qty, user, code, ckdm, lot, lot);
         }
         Double yl = bal(code, ckdm, lot);
-        if (!HIST_BACKFILL && yl != null && yl < -0.0001) {
-            throw new IllegalStateException(forward
-                    ? "现存量不足(物料 " + code + " 批 " + lot + " 出库后余额将变 " + yl + "),不能出库"
-                    : "冲回将使现存量异常(物料 " + code + " 批 " + lot + " 余额 " + yl + "),不可弃审");
+        if (yl != null && yl < -0.0001) {
+            if (forward) {
+                if (GUARD_ISSUE && !HIST_BACKFILL) {
+                    throw new IllegalStateException("现存量不足(物料 " + code + " 批 " + lot + " 出库后余额将变 " + yl + "),不能出库");
+                }
+                log.warn("[库存] 出库后余额为负(已放行,以金蝶为准):物料 {} 仓 {} 批 {} 余额 {}", code, ckdm, lot, yl);
+            } else {
+                if (GUARD_REVERSE && !HIST_BACKFILL) {
+                    throw new IllegalStateException("冲回将使现存量异常(物料 " + code + " 批 " + lot + " 余额 " + yl + "),不可弃审");
+                }
+                log.warn("[库存] 冲回后余额为负(已放行,以金蝶为准):物料 {} 仓 {} 批 {} 余额 {}", code, ckdm, lot, yl);
+            }
         }
     }
 
@@ -588,12 +633,17 @@ public class StockLedgerService {
 
         if (forward) {
             // 守卫:汇总余额不足则拒绝(负数由红字冲回单承担,不在这里硬扣)
-            if (!HIST_BACKFILL && avail + 0.0001 < qty) {
+            // 2026-11-26:默认不拦(真实库存以金蝶为准);不足部分照下面 ③ 记成负数,下一轮同步抹平。
+            if (GUARD_ISSUE && !HIST_BACKFILL && avail + 0.0001 < qty) {
                 Double ownBal = bal(code, ckdm, lot);
                 throw new IllegalStateException("现存量不足(物料 " + code + " 仓 " + ckdm + " 可用合计 "
                         + round4(avail) + ",本次出库 " + round4(qty)
                         + ";本批号 " + (lot == null ? "(无)" : lot) + " 余额 " + (ownBal == null ? 0 : round4(ownBal))
                         + "),不能出库");
+            }
+            if (avail + 0.0001 < qty) {
+                log.warn("[库存] 出库可用量不足(已放行,以金蝶为准;超出部分记到本批号行):物料 {} 仓 {} 批 {} 可用合计 {} 本次出库 {}",
+                        code, ckdm, lot == null ? "(无)" : lot, round4(avail), round4(qty));
             }
             double remain = qty;
             // ① 本行批号优先
