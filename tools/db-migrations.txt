@@ -5233,3 +5233,9 @@ migrate-inv-split-by-lot-20261124.sql
 #   配套代码(同提交):BatchService.batches() 的 appendOrphanRows —— 即使脚本没跑,界面也把这类占用
 #   显示成「未登记台账」,不再凭空消失。幂等 + 事务内自检。两账套均执行。
 migrate-batch-ledger-orphan-repair-20261125.sql
+# 2026-11-26 关闭 10 行「孤儿」待检验目录行(暂收单/检验单批量清理的收尾):
+#   造数的 8 张来料检验单 IJ-2026-10-0205~0212 已作废, qc_catalog_detail 仍有 10 行指着它们
+#   (面板按钮删不掉: assertNoLinkedDocs 按 qc_insp.asp_cancel 判活, 而作废写的是 yj_doc_status.canceled)。
+#   脚本按 8 个检验单号锁范围(与 id 无关), 只关闭「该检验单在本库确已作废」的行;
+#   幂等(重复跑 0 行 [PASS]) + 事务内行数断言。两账套均可执行(测试库未做清理时为空跑)。
+migrate-close-orphan-qc-catalog-20261126.sql

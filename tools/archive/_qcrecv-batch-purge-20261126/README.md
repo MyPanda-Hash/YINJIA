@@ -143,7 +143,7 @@
 | 这 10 行（`qc_catalog_detail.id` 54~63）仍写着已作废的检验单号 | `JYML-2026-10-0001` 的明细行 |
 | 界面上**看不到** | 「检验数据记录明细表」的 statusGate 只放「已完成检验」的行，这 10 行现在都是「正在检验中」（目录 28 行 = 9 行真·已完成 + 19 行正在检验中，其中 10 行是本批残留、9 行是 11 月正常待检） |
 | 面板按钮**删不掉** | `QcCatalogService.assertNoLinkedDocs` 用 `SELECT COUNT(*) FROM qc_insp WHERE 单据编号=? AND asp_cancel<>'Y'` 判"挂靠单据还活着"；而作废写的是 `yj_doc_status.canceled`（物理行 `asp_cancel` 仍 NULL）⇒ 守卫恒判活着 |
-| 处置 | 附 `_close-orphan-catalog-rows-20261126.sql`：只把这 10 行置 `asp_cancel='Y'`（与按钮同效），带"必须已作废"守卫与行数断言，可重复执行。⚠ 需在**服务器本机**跑（1433/5985 从开发机不可达，本次没法代跑） |
+| 处置 | 已改为**正式迁移** `tools/migrate-close-orphan-qc-catalog-20261126.sql`（已登记进 `tools/db-migrations.txt`）：只把这 10 行置 `asp_cancel='Y'`（与按钮同效），带"必须已作废"守卫与行数断言，可重复执行。⚠ 需在**服务器本机**跑（1433/5985 从开发机不可达，本次没法代跑） |
 
 > 根因是守卫口径缺陷（`countAlive` 没认 `yj_doc_status.canceled`），彻底修要改 `QcCatalogService` 并部署；
 > 本次部署通道不通，故按数据侧收尾，代码侧留待下次一并修。
@@ -171,7 +171,7 @@
 | `audit-refs.mjs` | **关联完整性审计**：把已删单号拿到 8 个关联面板逐字段比对，找悬挂引用 |
 | `audit-stock*.mjs` | 库存台账/流水对已删单号的检索 |
 | `clean-orphans.mjs` | 清理 10 张检验数据记录 + 尝试删目录行（后者被守卫挡住，见第八节） |
-| `_close-orphan-catalog-rows-20261126.sql` | 关掉残留 10 行目录行（服务器本机执行，幂等 + 守卫） |
+| `tools/migrate-close-orphan-qc-catalog-20261126.sql` | 关掉残留 10 行目录行（已入迁移链，幂等 + 按检验单号锁范围 + 行数断言） |
 | `cleanup-list.json` `cleanup-list.csv` | 命中清单（284 暂收单 + 8 检验单） |
 | `deleted-docs.csv` | 删除台账（含采购订单、物料、数量、批次） |
 | `oct_recover.csv` | 10 月 52 张逐个对照（指纹 / 金蝶已入库-未入库 / 检验单 / 入库单） |
