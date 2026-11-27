@@ -1,0 +1,13 @@
+﻿import { readFileSync } from "node:fs";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+import mssql from "mssql";
+const HERE = dirname(fileURLToPath(import.meta.url));
+const cfg = JSON.parse(readFileSync(join(HERE, "config.json"), "utf8").replace(/^\uFEFF/, ""));
+const pool = await mssql.connect({ ...cfg.database, options: { trustServerCertificate: true } });
+const q = async (s) => (await pool.request().query(s)).recordset;
+console.log("引用 erp_stock_sync_log 的面板/视图:");
+console.log(await q(`SELECT TOP 20 panel_code, panel_name FROM yj_panel WHERE panel_code IN (N'ERP_STOCK_LOG', N'ERP_SYNC_LOG', N'ERP_LOG', N'STOCK_SYNC_LOG') OR panel_name LIKE N'%同步日志%' OR panel_name LIKE N'%同步%'`));
+console.log("表上的最近 3 条(本地账套参考):");
+console.log(await q(`SELECT TOP 3 批次号, 开始时间, 状态, 金蝶行数 FROM erp_stock_sync_log ORDER BY id DESC`));
+await pool.close();
