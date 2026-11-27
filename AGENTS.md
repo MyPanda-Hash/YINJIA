@@ -375,6 +375,7 @@ YINJIA-MES = light-mes 面板引擎(Vue3) + Spring Boot + SQL Server `HSDZ_MES`,
 | 库存批次追溯 / 金蝶库存同步 | `docs/development/上线前必验-库存批次追溯.md`、`docs/development/金蝶库存同步-以金蝶为准.md` |
 | 金蝶订单同步**行 id 契约**(明细行 identity id 是 `form_flow_link.source_line_key` 与 `bl_pu_label.采购订单行id` 的唯一锚点 ⇒ 同步只许按「单据编号+行号」UPDATE 保 id,**禁止整单删插**;回归脚本 `deploy/_test-lineupsert-20261116.mjs`、存量回填 `tools/migrate-erp-linekey-repair-20261116.sql`) | `docs/development/金蝶订单同步-行id稳定与下游占用.md` |
 | 采购链四单字段基线 | `docs/development/采购链四单字段与显示字段.md` |
+| 来料不合格分支改道(**2026-11-28**:特采单正名「不合格品处理单(来料)」;检验数据记录判「不合格」→ 审批通过自动生成处理单 → 两级审批通过回填来料检验单明细「特采」→ 检验单审核按特采分流:是=采购入库/否则=暂收退料;退料单退出中间环节、退料单「特采」字段下线) | `docs/development/来料不合格分支改道-不合格品处理单-20261128.md` |
 | 采购订单「金蝶已入库/未入库」冻结在旧值(31 天修改窗 + 表头指纹双重过滤;`sync-core.pendingPoNos` 强制补拉「待转ERP」单涉及的订单 + 指纹旁路)⇒ 现场据此重复收料、转ERP 被金蝶以「已经构建了关联关系」拒绝 | `docs/development/采购订单执行量同步-31天窗口冻结-20261126.md` |
 | 采购订单行执行量**根治(方案二)**:把金蝶「采购入库单」当触发源(按 modify_time 扫,取 `src_bill_no` 并入 `autoRefreshPos` ⇒ 不受 31 天窗/表头指纹限制),数量仍以金蝶订单行 `in_qty/un_out_qty` 为准;实现 `deploy/inbound-watch.mjs`,水位线 `deploy/state.json:inboundWatchUntil`,`--inbound-window-days` 一次性补扫 | `docs/development/金蝶采购入库单驱动订单行刷新-20261126.md` |
 | 生单界面显示「金蝶已入库/未入库」:生单候选行带 `金蝶已入库数量/金蝶未入库数量`(`PushGenerateHandler.putKingdeeQty`,来源 `bl_pu_order.行已执行/未执行数量`);`剩余 > 金蝶未入库` 标橙提示超收;**只显示不改上限**(超送规则未动) | `docs/development/生单界面显示金蝶未入库-20261127.md` |

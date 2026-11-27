@@ -31,16 +31,20 @@ test('① 采购订单生单:订单号写进每一行(暂收行「采购单号�
     '只认采购订单(含供应商门户副本)—— 下游站点绝不能拿 sourceNo 覆盖,否则采购单号会被写成暂收单号')
 })
 
-test('② 检验/退回 → 入库:行级订单号落「源单编号」;特采单落表头「采购单号」且行级优先', () => {
+test('② 检验/退回 → 入库:行级订单号落「源单编号」;不合格品处理单落表头「采购单号」且行级优先', () => {
   assert.match(button, /if \(r\.get\("采购单号"\) != null\) line\.put\("源单编号", r\.get\("采购单号"\)\)/,
     '检验审核自动生入库行 → 源单编号')
   assert.match(button, /if \(r\.get\("采购单号"\) != null\) line\.put\("采购单号", r\.get\("采购单号"\)\)/,
     '检验审核自动生退回行 → 采购单号')
-  // 特采单:表头采购单号取退料行(行级)优先
-  assert.match(button, /Object poNo = r\.get\("采购单号"\)/, '特采头采购单号必须行级优先')
-  // 特采 → 入库行也落源单编号
-  assert.match(button, /if \(poLine != null && !String\.valueOf\(poLine\)\.isBlank\(\)\) line\.put\("源单编号", poLine\)/,
-    '特采审核自动生入库行 → 源单编号')
+  // 不合格品处理单(来料,原特采单):表头采购单号取检验行(行级)优先,取不到才回落检验单头
+  // 2026-11-28 发起口改为「检验数据记录判不合格 → 自动生成」,行级优先这条口径不变
+  assert.match(button, /Object poNo = row\.get\("采购单号"\)/, '处理单头采购单号必须行级优先')
+  assert.match(button, /if \(poNo == null \|\| nz\(poNo\)\.isEmpty\(\)\) poNo = ih\.get\("采购订单号"\)/,
+    '行级为空才回落检验单头')
+  // 让步接收入库(特采=是)的行也要落源单编号
+  assert.match(button, /if \(r\.get\("采购单号"\) != null && !String\.valueOf\(r\.get\("采购单号"\)\)\.isBlank\(\)\) \{/,
+    '让步接收自动生入库行 → 源单编号')
+  assert.match(button, /line\.put\("源单编号", r\.get\("采购单号"\)\)/, '让步接收入库行的源单编号取行级订单号')
 })
 
 test('③ 转ERP:采购入库单按行取源单编号,表头多单串被显式忽略', () => {

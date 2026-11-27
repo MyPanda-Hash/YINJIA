@@ -1,0 +1,15 @@
+const fs = require('fs');
+const target = 'D:/YINJIA-main/backend/src/main/java/com/yinjia/mes/service/ButtonService.java';
+const block = fs.readFileSync('D:/YINJIA-main/tools/archive/_qc-ngflow-2026/newblock.java.txt', 'utf8');
+let src = fs.readFileSync(target, 'utf8');
+const START = '    // ==================== 特采:暂收退料单 → 特采单 → 采购入库单(2026-10-04) ====================';
+const END = '    /** 修改预警数量(库存状况行内编辑)';
+const i = src.indexOf(START);
+const j = src.indexOf(END);
+if (i < 0) throw new Error('START not found');
+if (j < 0) throw new Error('END not found');
+if (j < i) throw new Error('END before START');
+const before = src.slice(0, i);
+const after = src.slice(j);
+fs.writeFileSync(target, before + block.trimEnd() + '\n\n' + after, 'utf8');
+console.log('replaced', j - i, 'chars with', block.length, 'chars');

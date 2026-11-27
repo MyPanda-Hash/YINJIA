@@ -1291,9 +1291,9 @@ public class PanelConfigService {
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
             // 暂收退回单:选单=来料检验单;生单灰(无下游)。
-            // 2026-10-04:**不放「特采」按钮** —— 用户口径「应该是**一个明细的 bool 字段**不是按钮,删除按钮」,
-            // 特采发起 = 明细行勾「特采」(QC_RETURN 明细是否字段),本单审核/审批通过时自动逐行生成特采单
-            // (ButtonService.returnAutoSpecialAccept)。
+            // 2026-10-04「不放特采按钮」的口径仍成立,但**发起口已经换了**(2026-11-28):
+            // 退料单明细的「特采」字段已下线,特采改由「检验数据记录判不合格 → 不合格品处理单(来料)」发起
+            // (ButtonService.inspRecNgGenerate)。本单现在只承接**不特采**的不合格数量(退回供应商)。
             java.util.Map.entry("QC_RETURN", List.of(
                     new String[]{"新增", "新增"},
                     new String[]{"选单", "选来料检验单"},

@@ -102,7 +102,16 @@ export default {
     '还没有来料检验单': 'No incoming inspection yet',
     '还没有检验数据记录：来料检验单生单时会按物料各建一张（在来料检验单上生单后回来刷新即可）': "No inspection data record yet: one is created per material when the incoming inspection sheet is created (create it on the inspection sheet, then refresh here)",
     '还没有暂收退回单': 'No return note yet',
-    '还没有特采单': 'No concession yet',
+    // ---- 不合格品处理单(来料)(2026-11-28:特采单正名;检验结论=不合格自动生单、回填检验单「特采」)----
+    '还没有不合格品处理单(来料):检验数据记录判「不合格」并审批通过后自动生成': 'No incoming nonconforming disposal yet: it is created automatically once the inspection data record is judged “Nonconforming” and approved',
+    '待不合格品处理': 'To dispose nonconforming',
+    '不合格品处理': 'Nonconforming disposal',
+    '不合格品处理单(来料)': 'Incoming Nonconforming Disposal',
+    '不合格品处理单': 'Nonconforming Disposal',
+    '不合格品处理单号': 'Nonconforming Disposal No.',
+    '跳转到该不合格品处理单': 'Jump to the nonconforming disposal',
+    '特采→采购入库': 'Concession → purchase receipt',
+'还没有特采单': 'No concession yet',
 
 
     // ---- 品质流程监控 QC_FLOW(2026-11-12:一条来料批次 × 送料/检验/入库 三单状态)----

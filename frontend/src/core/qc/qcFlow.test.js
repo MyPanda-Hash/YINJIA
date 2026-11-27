@@ -122,23 +122,25 @@ test('缺字段的行不炸(接口降级/老数据):主链仍是 todo,分支不�
   assert.deepEqual(buildChain(null).main.map((s) => s.state), ['todo', 'skip', 'todo'])
 })
 
-/* ── ②b 不合格分支(2026-11-12 第二轮:检验→退货→特采→入库) ── */
-test('不合格分支:有退回单/特采单时显示,节点各自带状态与面板码', () => {
+/* ── ②b 不合格分支(2026-11-28 改口径:检验数据记录判不合格 → 不合格品处理单(来料) → 特采分流) ── */
+test('不合格分支:有不合格品处理单/退回单时显示,节点各自带状态与面板码', () => {
   const chain = buildChain({
     需检验: 1,
     送料暂收单号: 'SL-2026-10-0085', 送料状态: '已审核',
     检验单号: 'IJ-2026-10-0030', 检验状态: '已审核', 合格数量: 0, 不合格数量: 100, 检验结论: '不合格',
+    不合格品处理单号: 'TCI-2026-11-0003', 不合格品处理状态: '审批中', 不合格品处理日期: '2026-11-28',
     退货单号: 'TH-2026-10-0007', 退货状态: '已审核', 退货日期: '2026-10-21',
-    特采单号: 'TCI-2026-10-0003', 特采状态: '审批中', 特采日期: '2026-10-22',
   })
   assert.equal(chain.showNg, true)
-  assert.deepEqual(chain.ng.map((n) => n.panel), ['QC_RETURN', 'QC_TC_IN'])
-  assert.deepEqual(chain.ng.map((n) => n.state), ['done', 'warn'])
-  assert.equal(chain.ng[0].no, 'TH-2026-10-0007')
-  assert.equal(chain.ng[1].status, '审批中')
+  // 2026-11-28:分支顺序 = 业务发生顺序(不合格品处理单先出,不特采才有退回单)
+  assert.deepEqual(chain.ng.map((n) => n.panel), ['QC_TC_IN', 'QC_RETURN'])
+  assert.deepEqual(chain.ng.map((n) => n.state), ['warn', 'done'])
+  assert.equal(chain.ng[0].no, 'TCI-2026-11-0003')
+  assert.equal(chain.ng[0].name, '不合格品处理单(来料)')
+  assert.equal(chain.ng[0].status, '审批中')
 })
 
-test('不合格分支:检验判了不合格但还没开退回单 → 分支显示两个「未生成」待办', () => {
+test('不合格分支:检验判了不合格但还没开不合格品处理单 → 两格都显示「未生成」待办', () => {
   const chain = buildChain({
     需检验: 1, 送料暂收单号: 'SL-1', 送料状态: '已审核',
     检验单号: 'IJ-1', 检验状态: '已审核', 检验结论: '不合格',
@@ -204,7 +206,7 @@ test('六个节点的面板码与页面菜单/后端 PagePanelRegistry 约定一
   assert.deepEqual(Object.values(FLOW_PANELS).map((p) => p.code),
     ['QC_RECV', 'QC_INSP', 'QC_INSP_REC', 'PURCHASE_IN', 'QC_RETURN', 'QC_TC_IN'])
   assert.deepEqual(Object.values(FLOW_PANELS).map((p) => p.name),
-    ['送料暂收单', '来料检验单', '检验数据记录', '采购入库单', '暂收退回单', '特采单'])
+    ['送料暂收单', '来料检验单', '检验数据记录', '采购入库单', '暂收退回单', '不合格品处理单(来料)'])
 })
 
 test('检验数据记录的跳转同样过权限闸:没 QC_INSP_REC 查看权 → 不跳', () => {

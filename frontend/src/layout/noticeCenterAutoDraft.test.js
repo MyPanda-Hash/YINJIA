@@ -54,8 +54,12 @@ test('「请补充」= 仓库审核;生产销售只收暂收退料单', () => {
 
 test('收件人按角色/配置解析,不得退回按审批权解析', () => {
   assert.match(messageService, /public List<String> accountsOfRoles\(/, 'MessageService 缺按角色取账号')
-  assert.match(buttonService, /messageService\s*\.draftNotifyTargets\(targetPanel, "fill", DRAFT_FILL_ROLES\)/,
+  // 2026-11-28:收件角色按**下游面板**解析(不合格品处理单发给品质审核 pzsh,其余仍发仓库审核),
+  // 但必须仍然走 draftNotifyTargets(fill) —— 变量名 fillRoles 只是承载了面板级覆盖后的角色表。
+  assert.match(buttonService, /messageService\s*\.draftNotifyTargets\(targetPanel, "fill", (DRAFT_FILL_ROLES|fillRoles)\)/,
     '「请补充」必须走 draftNotifyTargets(fill)')
+  assert.match(buttonService, /DRAFT_FILL_ROLES_BY_PANEL\.getOrDefault\(targetPanel, DRAFT_FILL_ROLES\)/,
+    '面板级收件角色覆盖必须走 DRAFT_FILL_ROLES_BY_PANEL(不合格品处理单 → pzsh)')
   assert.match(buttonService, /messageService\s*\.draftNotifyTargets\(targetPanel, "fyi", fyiRoles\)/,
     '「知会」必须走 draftNotifyTargets(fyi)')
   assert.ok(!/notifyAutoDraft[\s\S]{0,900}approversOf/.test(buttonService),

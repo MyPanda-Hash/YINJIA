@@ -353,9 +353,11 @@ export const qcSheetCfgs = {
     signCells: qcSignStd('责任人'),
   },
 
-  // 来料品质特采单(YJ-QR-60 表单,独立面板 + 独立表,挂 品质管理 > 来料品质)
+  // 不合格品处理单(来料)(YJ-QR-60 表单,独立面板 + 独立表,挂 品质管理 > 来料品质)
   // 2026-09-22:原「质量单据·特采申请单」QC_TC 与本单同表同版式、属重复,已整体下线
-  // (面板行/表/版式键一并删除,见 tools/migrate-qc-tc-drop.sql)→ 特采只此一个入口,前缀 TCI。
+  // (面板行/表/版式键一并删除,见 tools/migrate-qc-tc-drop.sql)→ 本单只此一个入口,前缀 TCI。
+  // 2026-11-28 用户口径「先将特采单改为不合格品处理单（来料）」:纸面标题由「特采申请单」正名为
+  // 「不合格品处理单 / 来料」,与 YJ-QR-64(自制物料)/YJ-QR-92 那一族同款两段式标题;表体一字未动。
   // 版式 1:1 对齐原扫描图(YJ-QR-60):表体 x48..495=447px → 纸面 938px(比例 2.098),以下
   //   列宽 / 行高全部取实测值换算,不用估:「申请单位」竖排列 31px→65px(vcol,一行一字 vcell)、
   //   其后标签列 50px→105px(labelW)、三组「标签|值」50+66 / 82+79 / 62+77 → 243 / 338 / 292(flex);
@@ -363,7 +365,7 @@ export const qcSheetCfgs = {
   //   部门会签名格取 170px(nameW),与标签列右沿同一条线 → 整张表是一张网格。
   QC_TC_IN: {
     docno: 'YJ-QR-60',
-    titlePart1: '特采申请单', titlePart2: '', titlePart3: '',
+    titlePart1: '不合格品处理单', titlePart2: '来料', titlePart3: '',
     info: qcInfo('采购部'),
     vcol: 65,
     labelW: 105,

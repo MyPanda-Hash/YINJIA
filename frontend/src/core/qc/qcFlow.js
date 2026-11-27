@@ -1,6 +1,6 @@
 /**
  * 「来料品质流程监控」(原名「品质流程监控」,2026-11-20 用户口径改名;面板码不变)的**纯逻辑**:
- * 把后端一行数据摊成「送料 →(检验单 ∥ 检验数据记录)→ 入库」主链 + 「不合格 → 退回 / 特采」分支,
+ * 把后端一行数据摊成「送料 →(检验单 ∥ 检验数据记录)→ 入库」主链 + 「不合格 → 不合格品处理 / 退回」分支,
  * 并给出每个节点的时态与跳转目标。
  *
  * 为什么单独成模块而不是写在 QcFlowMonitor.vue 里:
@@ -12,7 +12,7 @@
  * 口径与后端 QcFlowService 一一对应:
  *   状态 5 档 = yj_doc_status 折叠(已作废 > 已中止 > 审批中 > 已审核 > 草稿);
  *   「免检」= 该物料 bs_inv.来料检验 <> '是' 且还没有检验单(免检批次不走来料检验);
- *   分支链只在「有退回单/特采单,或检验被判不合格」时才显示(全合格批次不占版面)。
+ *   分支链只在「有不合格品处理单/退回单,或检验被判不合格」时才显示(全合格批次不占版面)。
  *
  * 检验数据记录(2026-11-20 用户口径「和来料检验单作为并列关系的指向采购入库单」):
  *   主链上是**与来料检验单并列**的一个节点(qcFlow.rec),两单都审完「当前环节」才离开「检验」;
@@ -23,7 +23,7 @@ import { canViewPanel } from '../auth/panelAccess.js'
 
 /**
  * 六张单对应的目标面板(面板码是跳转的唯一凭据)。
- * recv/insp/rec/in 是主链(insp 与 rec 并列);ret(暂收退回单)/tc(特采单)是不合格分支。
+ * recv/insp/rec/in 是主链(insp 与 rec 并列);tc(不合格品处理单(来料))/ret(暂收退回单)是不合格分支。
  */
 export const FLOW_PANELS = Object.freeze({
   recv: Object.freeze({ code: 'QC_RECV', name: '送料暂收单' }),
@@ -31,7 +31,7 @@ export const FLOW_PANELS = Object.freeze({
   rec: Object.freeze({ code: 'QC_INSP_REC', name: '检验数据记录' }),
   in: Object.freeze({ code: 'PURCHASE_IN', name: '采购入库单' }),
   ret: Object.freeze({ code: 'QC_RETURN', name: '暂收退回单' }),
-  tc: Object.freeze({ code: 'QC_TC_IN', name: '特采单' }),
+  tc: Object.freeze({ code: 'QC_TC_IN', name: '不合格品处理单(来料)' }),
 })
 
 /** 单据状态 → 展示档位(tone 同时给看板节点底色与列表 el-tag 用) */
@@ -107,7 +107,7 @@ export function makeNode(key, no, status, date, opt = {}) {
 
 /**
  * 一行 → 主链(送料→检验→入库,其中「检验」由 检验单 + 检验数据记录 两格并列构成)
- * + 不合格分支(退回→特采)。
+ * + 不合格分支(不合格品处理 → 让步接收入库 / 退回供应商)。
  *
  * @param {object} row 后端 /px/qcFlow/list 的一行
  * @returns {{main: Array, rec: object, ng: Array, showNg: boolean, needInsp: boolean}}
@@ -128,13 +128,15 @@ export function buildChain(row) {
     insp,
     makeNode('in', row?.['入库单号'], row?.['入库状态'], row?.['入库日期']),
   ]
+  // 分支顺序 = 业务发生顺序:不合格品处理单(来料)先出(它决定让步接收与否),
+  // 暂收退回单只在「不特采」时才生成 —— 与后端 inspRouteDefects 的分流口径一致。
   const ng = [
+    makeNode('tc', row?.['不合格品处理单号'], row?.['不合格品处理状态'], row?.['不合格品处理日期']),
     makeNode('ret', row?.['退货单号'], row?.['退货状态'], row?.['退货日期']),
-    makeNode('tc', row?.['特采单号'], row?.['特采状态'], row?.['特采日期']),
   ]
-  // 分支链什么时候出现:有退回/特采单,或检验判了不合格(含部分不合格)。
+  // 分支链什么时候出现:有不合格品处理单/退回单,或检验判了不合格(含部分不合格)。
   // 全合格 / 免检 / 还没检的批次不显示,免得每行都挂着两条"未生成"。
-  const hasNgDoc = !!(String(row?.['退货单号'] ?? '').trim() || String(row?.['特采单号'] ?? '').trim())
+  const hasNgDoc = !!(String(row?.['不合格品处理单号'] ?? '').trim() || String(row?.['退货单号'] ?? '').trim())
   const showNg = hasNgDoc || verdict === '不合格' || verdict === '部分不合格'
   return { main, rec, ng, showNg, needInsp }
 }

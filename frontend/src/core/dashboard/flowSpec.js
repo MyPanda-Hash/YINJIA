@@ -4,7 +4,7 @@
  * 用户口径:「我的桌面缺失对生产过程和库存的一个流程管理视图,可以根据图片以及下面文字设计一个
  * 对生产过程和库存的流程管控」+ 两张链路的逐步说明(生产:销售订单→订单结转→生产工单→排产→领料→
  * 报工→续序/完工→检验→产成品入库;2026-10-18 用户口径复核:先排产再领料、报工完成才检验、最后入库;库存:采购订单→暂收单→(来料检验?)→来料检验单→
- * 检验数据记录+检验目录→合格→采购入库 / 不合格→退货单(特采)→特采单(二级审批)→采购入库;
+ * 检验数据记录+检验目录→合格→采购入库 / 不合格→不合格品处理单(来料,二级审批)→回填特采→采购入库或暂收退料;
  * 库存报表是查询表;出库有预警,低于预警无法审核)。
  *
  * 本文件只放**数据**:节点放第几条泳道、主数字读哪个口径、什么条件算积压/阻断、点了跳哪。
@@ -198,7 +198,7 @@ export const CHAINS = [
     key: 'stock',
     name: '库存流转',
     tone: 'stock',
-    intro: '采购订单 → 暂收单 →(来料检验?)→ 检验/退货/特采 → 采购入库 → 转 ERP',
+    intro: '采购订单 → 暂收单 →(来料检验?)→ 检验 → 不合格品处理 / 退货 → 采购入库 → 转 ERP',
     lanes: [
       {
         key: 'in', name: '采购与收料', hint: '暂收单按商品的「来料检验」字段决定走不走检验',
@@ -226,7 +226,7 @@ export const CHAINS = [
         ],
       },
       {
-        key: 'qc', name: '检验与判定', hint: '来料检验单审核后按合格数量 / 不合格数量分流',
+        key: 'qc', name: '检验与判定', hint: '合格数量直接进采购入库;不合格数量按检验单明细「特采」分流',
         nodes: [
           {
             key: 'qcinsp', name: '来料检验单', code: 'QC_INSP', route: '/panelx/list/QC_INSP',
@@ -238,12 +238,12 @@ export const CHAINS = [
             ],
             block: ['nodes.QC_INSP.pending'],
             warn: ['nodes.QC_INSP.ngQty'],
-            note: '合格 → 采购入库单;不合格 → 退货单(特采=是,审批)',
+            note: '合格 → 采购入库单;不合格 → 不合格品处理单(来料)定让步接收与否,再由「特采」分流',
           },
           {
             key: 'qcrec', name: '检验数据记录', code: 'QC_INSP_REC', route: '/panelx/list/QC_INSP_REC',
             main: { label: '记录单', ref: 'nodes.QC_INSP_REC.docs' },
-            note: '检验单每条明细对应一张数据记录',
+            note: '检验单每条明细对应一张记录;结论=不合格 → 审批通过自动生成不合格品处理单',
           },
           {
             key: 'qccat', name: '待检验目录', code: 'QC_CATALOG', route: '/panelx/list/QC_CATALOG',
@@ -253,7 +253,7 @@ export const CHAINS = [
         ],
       },
       {
-        key: 'put', name: '入库 / 退货 / 特采', hint: '特采必须二级审批通过才放行进采购入库',
+        key: 'put', name: '入库 / 不合格品处理 / 退货', hint: '不合格品处理单二级审批通过才回填「特采」,特采=是才放行进采购入库',
         nodes: [
           {
             key: 'purchasein', name: '采购入库单', code: 'PURCHASE_IN', route: '/panelx/list/PURCHASE_IN',
@@ -273,17 +273,17 @@ export const CHAINS = [
               { label: '草稿', ref: 'nodes.QC_RETURN.draft' },
             ],
             warn: ['nodes.QC_RETURN.draft'],
-            note: '不合格数量退料;「特采 = 是」的行转特采流程',
+            note: '只有不特采的不合格数量才走本单(退回供应商)',
           },
           {
-            key: 'tc', name: '特采单', code: 'QC_TC_IN', route: '/panelx/list/QC_TC_IN',
+            key: 'tc', name: '不合格品处理单(来料)', code: 'QC_TC_IN', route: '/panelx/list/QC_TC_IN',
             main: { label: '单据数', ref: 'nodes.QC_TC_IN.docs' },
             subs: [
               { label: '待审批', ref: 'nodes.QC_TC_IN.pending' },
               { label: '草稿', ref: 'nodes.QC_TC_IN.draft' },
             ],
             block: ['nodes.QC_TC_IN.pending'],
-            note: '二级审批:通过后放行 → 采购入库单',
+            note: '二级审批通过 → 回填来料检验单「特采」=是 → 不合格数量进采购入库(让步接收)',
           },
         ],
       },

@@ -260,8 +260,8 @@ public class FlowBoardService {
                 "组装成品检验合格后自动生成的入库草稿,等仓库审核记账", "warn");
         add(out, "purchaseDraft", "采购入库待审核", v(nodes, "PURCHASE_IN", "draft"), "PURCHASE_IN",
                 "来料检验合格数量生成/暂收直接生成的入库单", "warn");
-        add(out, "tcPending", "特采待审批", v(nodes, "QC_TC_IN", "pending"), "QC_TC_IN",
-                "不合格转特采:二级审批通过才放行进采购入库", "block");
+        add(out, "ncPending", "不合格品处理待审批", v(nodes, "QC_TC_IN", "pending"), "QC_TC_IN",
+                "来料不合格:检验数据记录判不合格即自动生成,二级审批通过后回填检验单「特采」", "block");
         add(out, "warnBelow", "库存低于预警", wn.get("below"), "STOCK_DETAIL",
                 "结余低于该批次预警数量:出库审核会被拦下", "block");
         out.sort((a, b) -> n(b.get("value")) - n(a.get("value")));

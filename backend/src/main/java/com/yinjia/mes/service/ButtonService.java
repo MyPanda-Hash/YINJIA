@@ -3424,15 +3424,16 @@ public class ButtonService {
         // 生产报工审核后副作用(报工记账/工序任务/转序派线/检验单/入库回填/结案重算/不良品记账)
         // —— 与「审批通过」共用同一方法,避免再次出现"只在审核路径生效"的漏挂(见 runWoAuditHooks 注释)
         runWoAuditHooks(def, no, currentUserName());
-        // 来料检验单审核 → 自动生单(2026-09-16 双出口口径):合格数量>0 的行生成采购入库单草稿,
-        // 不合格数量>0 的行生成暂收退回单草稿(此前暂收退回单为手工按钮,现改为审核自动创建)
+        // 来料检验单审核 → 自动生单(2026-09-16 双出口口径;2026-11-28 起**按明细行「特采」分流**):
+        //   合格数量>0 → 采购入库单(实收=合格数量);
+        //   不合格数量>0 → 特采=是(源 = 不合格品处理单已审批通过)⇒ 采购入库单(让步接收);
+        //                  特采≠是 ⇒ 暂收退回单(退回供应商,照旧转 ERP 采购退货)。
+        // 两条合并进 inspRouteDefects(幂等):不合格品处理单后审批通过时再调一次补分流。
         inspAutoPurchaseIn(def.code(), no, currentUserName());
-        inspAutoReturn(def.code(), no, currentUserName());
-        // 暂收退料单审核 → 把**勾了明细行「特采」开关**的行逐行生成特采单(2026-10-04 口径:
-        // 「暂收退料单审批后才进入特采」)—— 这就是特采的唯一发起时机,没有手工按钮
-        returnAutoSpecialAccept(def.code(), no, currentUserName());
-        // 特采单审核=审批通过 → 自动生成采购入库单(全部数量,不走退料)。
-        // 注:2026-10-04 起**特采不再由检验单审核产生** —— 检验不良行只生成暂收退料单。
+        inspRouteDefects(def.code(), no, currentUserName());
+        // 检验数据记录审核通过 → 检验结论=不合格时自动生成不合格品处理单(来料)
+        inspRecNgGenerate(def.code(), no, currentUserName());
+        // 不合格品处理单审批通过(= 二级批准)→ 回填检验行「特采」,并在检验单已审核时补分流
         tcInApprovedGenerate(def.code(), no, currentUserName());
         // 项目实施计划归档 → 自动同步项目进度查询(研发管理)
         if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
@@ -3532,12 +3533,15 @@ public class ButtonService {
         // 来料检验单弃审联动:自动生成的采购入库单为草稿则作废+释放占用+清入库单号回填;
         // 已审核(可能已记台账)则拒绝,提示先弃审入库单——防止"检验弃审了、库存已入账"的错位
         inspUnauditCascade(def.code(), no, currentUserName());
-        // 暂收退料单弃审联动(2026-10-04 特采改经退料单):由它点「特采」生成的特采单草稿一并作废+释放;
-        // 特采单已审核则拒绝(先弃审那张入库单),防「退料单弃审了、特采链还活着」的错位
+        // 暂收退料单弃审联动(2026-10-04 老链路,存量的「退料单→特采单」还认):
+        // 由它点「特采」生成的特采单草稿一并作废+释放;特采单已审核则拒绝(先弃审那张入库单)
         returnUnauditCascade(def.code(), no, currentUserName());
-        // 特采单弃审联动(2026-10-04):由它生成的采购入库单草稿作废+释放;
-        // 已审核(可能已记台账)则拒绝 —— 先弃审那张入库单
+        // 不合格品处理单弃审联动(2026-10-04 建 / 2026-11-28 改口径):作废它生成的采购入库单草稿,
+        // 同时把来料检验行「特采」清回 0 并按"不特采"补生暂收退回单
         tcInUnauditCascade(def.code(), no, currentUserName());
+        // 检验数据记录弃审联动(2026-11-28):由它生成的不合格品处理单草稿一并作废+释放并清回处理单号;
+        // 处理单已审批(已回填特采)则拒绝 —— 防「记录退回去了、处理单还挂着」
+        inspRecUnauditCascade(def.code(), no, currentUserName());
         // 送料暂收单弃审联动:由它生成且已审核的来料检验单一并弃审(递归走检验单自身联动,
         // 其下游入库/退料已审核会被拒绝并提示)——否则暂收改完保存时检验单仍"已审核"
         // 被镜像同步跳过,出现"暂收改了检验没改"的错位(2026-09-17 用户报同步失效的根因)
@@ -4534,12 +4538,13 @@ public class ButtonService {
         // 来料检验单审批通过(与「审核」同效为已审核) → 同样触发自动生单(2026-09-16 修复:
         // 此前钩子只挂在审核路径,走 提交审批→审批通过 的检验单不生成采购入库单/暂收退回单,
         // 用户只好点手工生单按钮,而手工路径实收数量映射错误且退回单被死过滤器挡住)
+        // 2026-11-28:不合格分支改按明细行「特采」分流(= 不合格品处理单是否已审批通过),见 inspRouteDefects
         inspAutoPurchaseIn(def.code(), no, operator);
-        inspAutoReturn(def.code(), no, operator);
-        // 暂收退料单审批通过 → 同「审核」口径:勾了「特采」的行生成特采单
-        // (2026-10-04 口径「暂收退料单审批后才进入特采」:审核与审批通过两条路都要触发)
-        returnAutoSpecialAccept(def.code(), no, operator);
-        // 特采单审批通过 → 生成采购入库单(2026-10-04 起特采由暂收退料单发起,检验审核不再产特采单)
+        inspRouteDefects(def.code(), no, operator);
+        // 检验数据记录审批通过 → 检验结论=不合格时自动生成不合格品处理单(来料)
+        // (2026-11-28 用户口径:「检验结论选择不合格,审批通过后自动生成和进入不合格处理单」)
+        inspRecNgGenerate(def.code(), no, operator);
+        // 不合格品处理单审批通过 → 回填检验行「特采」+ 检验单已审核时补分流
         tcInApprovedGenerate(def.code(), no, operator);
         // 批次号自洽(与「审核」钩子同口径):生单时已写号,此处兜"手工新建/口径上线前的老单"
         batchService.syncBatchNo(def, no, operator);
@@ -4605,11 +4610,12 @@ public class ButtonService {
         // 2026-10-15:二级(最终)审批通过同样要跑生产报工的审核后副作用 —— 见 approveApproval 的同款注释
         runWoAuditHooks(def, no, operator);
         inspAutoPurchaseIn(def.code(), no, operator);
-        inspAutoReturn(def.code(), no, operator);
+        inspRouteDefects(def.code(), no, operator);
+        inspRecNgGenerate(def.code(), no, operator);
         if (ADMIN_L2_PANELS.contains(def.code())) {
             // 质量单据:纸面「批准」格 = 超级管理员;二级批准通过才算真正通过,
-            // 故「生成采购入库单」的生单钩子挂在这里(一级通过时**不**生单,见 approveApproval;
-            // 对特采单以外的质量单据 —— 含 2026-11-04 接入的出厂检验报告 —— 该钩子内部直接返回,无副作用)。
+            // 故「按特采分流 / 回填特采」的生单钩子挂在这里(一级通过时**不**动作,见 approveApproval;
+            // 对不合格品处理单以外的质量单据 —— 含 2026-11-04 接入的出厂检验报告 —— 该钩子内部直接返回,无副作用)。
             writeBackSignCell(def, no, "审批人", "审批时间", operator);
             tcInApprovedGenerate(def.code(), no, operator);
             // 消息:批准通过 → 提交人(编制人) + 一级审核人,两端都知情
@@ -6242,6 +6248,14 @@ public class ButtonService {
      */
     private static final java.util.List<String> DRAFT_FILL_ROLES = java.util.List.of("cksh");
 
+    /**
+     * 按**下游面板**覆盖「草稿待补充」的收件角色(2026-11-28):
+     * 不合格品处理单(来料)是**品质**的纸,不该发给仓库审核 ⇒ 改发 {@code pzsh}(品质审核);
+     * 其余面板不在表里,沿用 {@link #DRAFT_FILL_ROLES}(仓库审核)。
+     */
+    private static final java.util.Map<String, java.util.List<String>> DRAFT_FILL_ROLES_BY_PANEL =
+            java.util.Map.of("QC_TC_IN", java.util.List.of("pzsh"));
+
     /** 只**知情**的角色(按下游面板区分;采购入库单 = 空 ⇒ 生产销售收不到它) */
     private static final java.util.Map<String, java.util.List<String>> DRAFT_FYI_ROLES = java.util.Map.of(
             "PURCHASE_IN", java.util.List.of(),
@@ -6268,8 +6282,9 @@ public class ButtonService {
         java.util.Map<String, Object> params = java.util.Map.of(
                 "docNo", targetNo, "actor", actor, "sourceNo", inspNo);
         notify(() -> {
+            java.util.List<String> fillRoles = DRAFT_FILL_ROLES_BY_PANEL.getOrDefault(targetPanel, DRAFT_FILL_ROLES);
             java.util.List<String> fill = messageService
-                    .draftNotifyTargets(targetPanel, "fill", DRAFT_FILL_ROLES)
+                    .draftNotifyTargets(targetPanel, "fill", fillRoles)
                     .stream().filter((u) -> !u.equals(actor)).toList();
             return messageService.send(fill, MessageService.AUTO_DRAFT_TO_FILL, targetPanel, targetNo, params, actor);
         });
@@ -6308,7 +6323,9 @@ public class ButtonService {
                 "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号,"
                         // 行级采购单号(2026-11-13 合单生单):合单后一张检验单跨多张采购订单,
                         // 入库行必须逐行带自己的订单号(转ERP 行级 src_bill_no),所以这里要取回来。
-                        + " 采购单号,"
+                        // ⚠ 仓位:标签叫「仓位」、物理列叫 **仓位编码**(AGENTS §5① label ≠ 列名);
+                        //   下面 r.get("仓位") 取的是别名 —— 2026-11-28 之前漏取,「先吃上游仓位」那段恒走预设。
+                        + " 采购单号," + " 仓位编码 AS 仓位,"
                         + " 送检数量, 部门名称, 生产日期, 备注, 现存量"
                         + " FROM qc_insp_detail"
                         // 2026-10-04:特采判定已移到「暂收退料单」按钮 —— 检验行不再分流,
@@ -6458,12 +6475,7 @@ public class ButtonService {
         try { return Integer.valueOf(tail.trim()); } catch (NumberFormatException e) { return null; }
     }
 
-    private void inspAutoReturn(String panelCode, String no, String user) {
-        if (!"QC_INSP".equals(panelCode)) return;
-        Integer linked = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM form_flow_link WHERE source_panel_code='QC_INSP' AND source_form_no=?"
-                        + " AND target_panel_code='QC_RETURN' AND link_status='ACTIVE'", Integer.class, no);
-        if (linked != null && linked > 0) return; // 已自动生单(重审幂等;下游作废释放后可再生成)
+    private void inspAutoReturn(String no, String user) {
         // ⚠ 列名口径(2026-10-15 修正):面板上数量列叫「送检数量」、不良列叫「不合格数量」——
         //   2026-09-20 改过名(PanelConfigService.java:1148),本方法当时漏改,仍在读旧列
         //   「数量」「不良数量」:这两列没有 yj_field、没有任何代码写它们(两账套实测非空值恒 0 行),
@@ -6474,13 +6486,22 @@ public class ButtonService {
                 "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号,"
                         + " ISNULL(NULLIF(送检数量,0), 数量) AS 送检数量,"
                         + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量,"
+                        + " ISNULL(特采, 0) AS 特采,"
                         + " 备注, 单位, 计量单位, 单价, 采购订单行号, 采购单号, 现存量"
                         + " FROM qc_insp_detail"
-                        // 2026-10-04:不再排除特采行 —— 特采改由本退料单审批通过后的「特采」按钮发起,
-                        // 退料单因此成为特采的前置单据(它的「送检数量」就是特采单总数量的来源)
+                        // 2026-11-28 分流口径:不合格数量按明细行「特采」决定去向 ——
+                        //   特采=1 ⇒ 让步接收,进采购入库(inspAutoSpecialIn),这里不生成退回单;
+                        //   特采=0/空 ⇒ 退回供应商,生成本单。
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
-        List<Map<String, Object>> defect = rows.stream()
-                .filter(r -> numOr(r.get("不合格数量")) > 0).toList();
+        // 逐行筛:① 没有不合格数量 ② 特采=是(走入库) ③ 已分流过(幂等) ④ 处理单还在途(等它定)⇒ 都不退料
+        List<Map<String, Object>> defect = new ArrayList<>();
+        for (Map<String, Object> r : rows) {
+            if (numOr(r.get("不合格数量")) <= 0.000001) continue;
+            if (numOr(r.get("特采")) > 0.5) continue;
+            if (defectRouted(no, r.get("id"))) continue;
+            if (ngDisposalInFlight(no, nz(r.get("物料编码")), nz(r.get("物料名称")))) continue;
+            defect.add(r);
+        }
         if (defect.isEmpty()) return;
         List<Map<String, Object>> heads = jdbc.queryForList(
                 "SELECT 业务员, 供应商代码, 供应商, 部门, 部门名称, 采购订单号, 批次号, 批次键 FROM qc_insp"
@@ -6595,7 +6616,7 @@ public class ButtonService {
             if ("草稿".equals(st) || "修改中".equals(st)) {
                 voidDoc(registry.panel("QC_TC_IN"), tcNo, user);
             } else {
-                throw new IllegalStateException("特采单 " + tcNo + " 已审核(已生成采购入库单),请先弃审该入库单再弃审检验单");
+                throw new IllegalStateException("不合格品处理单 " + tcNo + " 已审核(已生成采购入库单),请先弃审该入库单再弃审检验单");
             }
         }
     }
@@ -6616,371 +6637,467 @@ public class ButtonService {
             if ("草稿".equals(st) || "修改中".equals(st)) {
                 voidDoc(registry.panel("QC_TC_IN"), tcNo, user);
             } else {
-                throw new IllegalStateException("本退料单生成的特采单 " + tcNo + " 已审核(已生成采购入库单),"
-                        + "请先弃审那张入库单与特采单,再弃审退料单");
+                throw new IllegalStateException("本退料单生成的不合格品处理单 " + tcNo + " 已审核(已生成采购入库单),"
+                        + "请先弃审那张入库单与处理单,再弃审退料单");
             }
         }
     }
 
-    // ==================== 特采:暂收退料单 → 特采单 → 采购入库单(2026-10-04) ====================
+    // ==================== 来料不合格:检验数据记录 → 不合格品处理单(来料) → 特采回填 → 分流 ====================
+    //
+    // 用户口径(2026-11-28,原文):
+    //   ①「先将特采单改为不合格品处理单（来料），放在品质的来料检验里面。」
+    //   ②「现在流程不需要经过退料单了，取消暂收单的特采字段。」
+    //   ③「检验数据记录里面的检验结论选择不合格，审批通过后自动生成和进入不合格处理单，
+    //      并且检验结论处可以链接进入不合格处理单。」
+    //   ④「进入不合格处理单（来料）都不变。审批通过后，在来料检验单会回填一个特采字段，
+    //      通过这个特采字段，可以判断不合格数量是采购入库还是暂收退料。」
+    //   ⑤ 追问确认:「只要不合格处理单审批通过就回填特采，没用就默认不特采。」
+    //   ⇒ 特采=1 的唯一来源 = 不合格品处理单**审批通过**;其余情况(没有处理单/未通过/已弃审)= 0。
+    //
+    // 链路(与旧链路「暂收退料单勾特采 → 特采单」的区别:发起口前移到检验数据记录,退料单退出中间环节):
+    //   送料暂收单 → 来料检验单 ┬ 合格数量 ─────────────────────────────────────────────→ 采购入库单
+    //                          ├ 检验数据记录(结论=不合格) --审批通过--> 不合格品处理单(来料)草稿
+    //                          │                                        --审批通过--> 来料检验单明细 特采=1
+    //                          └ 不合格数量:特采=1 ⇒ 采购入库单(让步接收)
+    //                                        特采=0 ⇒ 暂收退回单(退回供应商,转 ERP 采购退货)
+    //
+    // ⚠ 分流时机(两条触发点,靠 form_flow_link 幂等去重):
+    //   · 来料检验单 审核/审批通过 → inspRouteDefects(此时特采已回填就直接走"让步接收");
+    //   · 不合格品处理单 审批通过/弃审 → 回填(或清除)特采后立刻调一次 inspRouteDefects(检验单已审核时补分流)。
+    //   处理单还在途(草稿/审批中)时**挂起不退料** —— 否则先退料再让步接收要来回作废,现场观感极差。
 
     /**
-     * 暂收退料单审核/审批通过 → 把**勾了明细行「特采」开关**的行,逐行生成特采单(QC_TC_IN,一物料一单)。
+     * 检验数据记录(QC_INSP_REC)审核/审批通过 → 检验结论=不合格时自动生成**一张不合格品处理单(来料)**
+     * (面板 QC_TC_IN;2026-11-28 由「特采单」正名而来),并把单号回填到本记录的「不合格品处理单号」。
      *
-     * <p>用户口径(2026-10-04,含同日修订):
-     * 「特采由暂收退料单发起,**退料单审批通过后**才进入特采;退料单要记录来料检验单送检数据的数量,
-     *   后面才可以填入到特采单;特采通过后再到采购入库单。」
-     * 修订:「应该是**一个明细的 bool 字段**不是按钮,删除按钮。」—— 故发起方式是**退料单明细行上的
-     * 「特采」勾选开关**,生单时机是**本单审核/审批通过**那一刻(不再有工具栏按钮、不再有手工触发)。
+     * <p>粒度(用户口径):「一张不合格的检验数据记录 = 一张不合格品处理单」(沿用原特采单"一物料一单")。
+     * 记录本身就是一物料一份(检验报告 YJ-QR-96),所以这里一记录一单,不汇总。
      *
-     * <p>行为:
-     * <ol>
-     *   <li>只处理 <b>特采 = 1</b>(勾选)且未作废的明细行;没勾任何行 ⇒ 本方法什么都不做;</li>
-     *   <li>每个勾选行生成**一张**特采单,头带出 供应商 / 采购单号(=采购订单号) / 产品名称(=物料名称) /
-     *       <b>总数量 = 本行「送检数量」</b>(数值 + 计量单位拼合,2026-09-24 口径)/
-     *       <b>不合格品数量 = 本行「退货数量」</b> / 不合格品比例(自动算) / 检验单号 / 暂收退料单号 / 批次键;
-     *       物料编码与规格型号写进「备注」供编制人参考(特采单纸面 YJ-QR-60 无物料编码栏);</li>
-     *   <li>行级占用写 form_flow_link(QC_RETURN→QC_TC_IN,linked_quantity=送检数量):
-     *       幂等 —— 同一退料行已有 ACTIVE 特采单占用时跳过(弃审后重审会先作废下游、占用释放,故可重生);</li>
-     *   <li>特采单留草稿,业务补 特采理由/各部门意见 后走两级审批;
-     *       批准通过时由 {@link #tcInApprovedGenerate} 生成采购入库单。</li>
-     * </ol>
+     * <p>头字段来源(取得到就填,取不到留空,不阻断生单):
+     * 供应商 / 采购单号 ← 来源来料检验单头(采购单号**行级优先**,合单后表头可能是多单串);
+     * 产品名称 ← 记录物料名称;总数量 ← 检验行「送检数量」(无则记录「来料数量」)+ 计量单位;
+     * 不合格品数量 ← 检验行「不合格数量」;不合格品比例 = 不合格/送检;
+     * 不良说明 ← 记录「处理意见」(品质在报告上写的结论);检验单号 / 检验数据记录单号 / 批次号 /
+     * 批次键 / 现存量 = 隐藏链路列(下游入库单/监控取数要靠它们)。
      *
-     * <p>数量兜底:退料行的「送检数量」为空时(2026-10-04 之前的老单,或检验单本身没填送检数量),
-     * 按「退货数量」作特采单总数量 —— 不让老单因为缺一个历史字段就特采不了(此时比例=100%)。
+     * <p>幂等:① 记录上已有活着的「不合格品处理单号」⇒ 跳过;② 已有 ACTIVE 链 QC_INSP_REC→QC_TC_IN ⇒ 跳过。
+     * 重审、弃审后重审都不会生第二张。处理单留草稿,品质补 特采理由/各部门意见 后走两级审批
+     * (QC_TC_IN 在 ADMIN_L2_PANELS:一级审批通过 → 二级超级管理员批准)。
      */
-    private void returnAutoSpecialAccept(String panelCode, String no, String user) {
-        if (!"QC_RETURN".equals(panelCode)) return;
-        PanelRegistry.PanelDef def = registry.panel("QC_RETURN");
-        // 退料行数量列按目标面板注册择标签(inspAutoReturn 同款血统兼容:退货数量 / 数量 二择一)
-        String qtyLabel = pickDetailLabel(def, "退货数量", "数量");
-        if (qtyLabel == null) return;                                   // 该血统没有数量列:无可特采
-        // 只取**勾了特采**的行(列存在性由迁移脚本保证;列不在时本方法整体不生效)
-        List<Map<String, Object>> rows;
-        try {
-            rows = jdbc.queryForList(
-                    "SELECT id, 物料编码, 物料名称, ISNULL(规格型号, N'') AS 规格型号, 计量单位, 单位,"
-                            // 行级采购单号(2026-11-13 合单/全链):特采单是"一物料一单、只有表头",
-                            // 订单号要落在表头,取值必须取**退料行**的这一行(合单后表头可能是多单串)
-                            + " 采购单号, 采购订单行号,"
-                            + " 送检数量, " + qtyLabel + " AS 退货数量, 现存量"
-                            + " FROM qc_return_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
-                            + " AND ISNULL(特采, 0) = 1 ORDER BY id", no);
-        } catch (org.springframework.dao.DataAccessException e) {
-            return;                                                     // 列未建(迁移未跑):静默跳过,不阻断审核
-        }
-        if (rows.isEmpty()) return;                                     // 没勾任何行:不进特采
-        List<Map<String, Object>> heads = jdbc.queryForList(
-                "SELECT 检验单号, 供应商, 采购订单号, 批次号 FROM qc_return"
-                        + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
-        if (heads.isEmpty()) return;
-        Map<String, Object> h = heads.get(0);
-        String inspNo = str(h.get("检验单号"));
-        // 来源检验单头:批次键 / 供应商代码 / 采购订单号 的真源(退料单头没有这几列),
-        // 生成的采购入库单要凭它们对齐 inspAutoPurchaseIn 的口径
-        Map<String, Object> ih = new LinkedHashMap<>();
-        if (inspNo != null) {
-            List<Map<String, Object>> l = jdbc.queryForList(
+    private void inspRecNgGenerate(String panelCode, String no, String user) {
+        if (!"QC_INSP_REC".equals(panelCode)) return;
+        List<Map<String, Object>> recs = jdbc.queryForList(
+                "SELECT id, ISNULL(检验结论, N'') AS 检验结论, ISNULL(物料名称, N'') AS 物料名称,"
+                        + " ISNULL(物料编码, N'') AS 物料编码, ISNULL(物料批次, N'') AS 物料批次,"
+                        + " ISNULL(来料检验单号, N'') AS 来料检验单号, ISNULL(来料数量, N'') AS 来料数量,"
+                        + " ISNULL(计量单位, N'') AS 计量单位, ISNULL(处理意见, N'') AS 处理意见,"
+                        + " ISNULL(不合格品处理单号, N'') AS 不合格品处理单号"
+                        + " FROM qc_insp_rec WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        if (recs.isEmpty()) return;
+        Map<String, Object> rec = recs.get(0);
+        if (!"不合格".equals(nz(rec.get("检验结论")))) return;   // 只对「不合格」进处理单;合格/未填都不生
+        String inspNo = nz(rec.get("来料检验单号"));
+        String matCode = nz(rec.get("物料编码"));
+        String matName = nz(rec.get("物料名称"));
+        // 幂等①:记录上已有活着的处理单号
+        String existed = nz(rec.get("不合格品处理单号"));
+        if (!existed.isEmpty() && !"已作废".equals(String.valueOf(docStatusOf("QC_TC_IN", existed).get("status")))) return;
+        // 幂等②:链路已 ACTIVE(记录列被清过也能兜住)
+        Integer linked = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM form_flow_link WHERE source_panel_code='QC_INSP_REC' AND source_form_no=?"
+                        + " AND target_panel_code='QC_TC_IN' AND link_status='ACTIVE'", Integer.class, no);
+        if (linked != null && linked > 0) return;
+        // ── 来源检验单头 + 检验行 ──
+        Map<String, Object> ih = Map.of();
+        if (!inspNo.isEmpty()) {
+            List<Map<String, Object>> hs = jdbc.queryForList(
                     "SELECT 供应商代码, 供应商, 采购订单号, 批次号, 批次键 FROM qc_insp"
                             + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", inspNo);
-            if (!l.isEmpty()) ih = l.get(0);
+            if (!hs.isEmpty()) ih = hs.get(0);
         }
-        for (Map<String, Object> r : rows) {
-            double send = numOr(r.get("送检数量"));
-            double bad = numOr(r.get("退货数量"));
-            double tot = send > 0.000001 ? send : bad;                  // 兜底:没记录送检数量则按退货数量
-            if (tot <= 0.000001) continue;                              // 该行没有数量可特采
-            String lineKey = no + "#" + r.get("id");
-            Integer linked = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM form_flow_link WHERE source_panel_code='QC_RETURN' AND source_line_key=?"
-                            + " AND target_panel_code='QC_TC_IN' AND link_status='ACTIVE'", Integer.class, lineKey);
-            if (linked != null && linked > 0) continue;                 // 幂等:该行已生成过特采单
-            Map<String, Object> head = new LinkedHashMap<>();
-            head.put("单据日期", LocalDate.now().toString());
-            Object sup = h.get("供应商") != null ? h.get("供应商") : ih.get("供应商");
-            if (sup != null) head.put("供应商", sup);
-            // 采购单号(2026-11-13):**行级优先** —— 合单后退料单头可能是"订单1、订单2"的人读串,
-            // 而特采单是"一物料一单",它的采购单号必须是这一行自己的订单号(下游入库单要拿它挂源单)。
-            Object poNo = r.get("采购单号") != null && !String.valueOf(r.get("采购单号")).isBlank()
-                    ? r.get("采购单号")
-                    : (h.get("采购订单号") != null && !String.valueOf(h.get("采购订单号")).isBlank()
-                    ? h.get("采购订单号") : ih.get("采购订单号"));
-            if (poNo != null && !String.valueOf(poNo).isBlank()) head.put("采购单号", poNo);
-            head.put("产品名称", r.get("物料名称"));
-            // 现存量(2026-11-12 用户口径):特采单是**一物料一单**、只有表头,故落在表头;
-            // 值取退料行(它由检验行镜像、检验行由暂收行/采购订单带来),隐藏字段仅供追溯
-            if (r.get("现存量") != null) head.put("现存量", r.get("现存量"));
-            head.put("不合格品数量", bad);
-            head.put("不合格品比例", trimZero(Math.round(bad / tot * 1000.0) / 10.0) + "%");
-            // 总数量 = 数值+单位拼合(2026-09-24 用户口径:三面板数量与单位合在一起,不拆列;
-            // 列是 nvarchar。计量单位列保留隐藏做链路)。生成入库时按前缀数字解析(见 tcInApprovedGenerate)
-            Object uom = r.get("计量单位") != null ? r.get("计量单位") : r.get("单位");
-            head.put("总数量", trimZero(tot) + (uom == null ? "" : String.valueOf(uom)));
-            if (inspNo != null) head.put("检验单号", inspNo);           // 隐藏链路列:再上一站,采购入库单取数靠它
-            head.put("暂收退料单号", no);                                // 隐藏链路列:本行的来源单据
-            // 检验数据记录单号(2026-10-19 用户口径 task 5:「品质部意见生成特采要带检验数据记录单号的链接,
-            // 可以跳转」)? 品质部在特采单上写意见时要能一键翻到那张检验报告(YJ-QR-96)。
-            // 真源 = 检验目录行(qc_catalog_detail:检验单号 + 物料编码 → 检验数据记录单号),
-            // 由 QcCatalogService.syncFromInspection 在检验单生单时就写好;取不到(手工补的报告、
-            // 目录行被取消)就留空 —— 纸面不显示链接,不阻断生单。
-            String recNo = specialAcceptRecNo(inspNo, str(r.get("物料编码")));
-            if (!recNo.isEmpty()) head.put("检验数据记录单号", recNo);
-            if (ih.get("批次键") != null) head.put("批次键", ih.get("批次键"));
-            if (ih.get("批次号") != null) head.put("批次号", ih.get("批次号"));
-            head.put("备注", "特采行:物料编码=" + r.get("物料编码") + ",规格型号=" + r.get("规格型号")
-                    + ";送检 " + trimZero(send) + " / 退货(不合格) " + trimZero(bad));
-            Map<String, Object> saved = save(registry.panel("QC_TC_IN"), head, false);
-            String tcNo = String.valueOf(saved.get("编号"));
-            jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
-                            + " target_panel_code, target_form_no, target_line_key, inventory_code,"
-                            + " source_quantity, linked_quantity, batch_no, batch_id, link_status, create_by)"
-                            + " VALUES ('QC_RETURN', ?, ?, 'QC_TC_IN', ?, NULL, ?, ?, ?, ?, ?, 'ACTIVE', ?)",
-                    no, lineKey, tcNo, r.get("物料编码"),
-                    r.get("送检数量"), tot, ih.get("批次号"), ih.get("批次键"), user);
+        Map<String, Object> row = inspRowOf(inspNo, matCode, matName);
+        double badQty = numOr(row.get("不合格数量"));
+        double sendQty = numOr(row.get("送检数量"));
+        if (sendQty <= 0.000001) sendQty = numOr(rec.get("来料数量"));
+        double totQty = sendQty > 0.000001 ? sendQty : badQty;
+        String unit = nz(rec.get("计量单位"));
+        if (unit.isEmpty()) unit = nz(row.get("计量单位"));
+        Map<String, Object> head = new LinkedHashMap<>();
+        head.put("单据日期", LocalDate.now().toString());
+        if (!nz(ih.get("供应商")).isEmpty()) head.put("供应商", ih.get("供应商"));
+        // 采购单号:行级优先(合单后表头可能是"订单1、订单2"的人读串,而处理单是一物料一单)
+        Object poNo = row.get("采购单号");
+        if (poNo == null || nz(poNo).isEmpty()) poNo = ih.get("采购订单号");
+        if (poNo != null && !nz(poNo).isEmpty()) head.put("采购单号", poNo);
+        head.put("产品名称", matName);
+        head.put("总数量", trimZero(totQty) + unit);              // 数量+单位拼合(与原特采单同口径)
+        head.put("不合格品数量", badQty);
+        if (totQty > 0.000001) {
+            head.put("不合格品比例", trimZero(Math.round(badQty / totQty * 1000.0) / 10.0) + "%");
         }
+        String disposal = nz(rec.get("处理意见"));
+        if (!disposal.isEmpty()) head.put("不良说明", disposal);   // 品质在检验报告上写的处理意见
+        if (!inspNo.isEmpty()) head.put("检验单号", inspNo);
+        head.put("检验数据记录单号", no);                          // 纸面「品质部意见」旁的可点链接
+        if (row.get("现存量") != null) head.put("现存量", row.get("现存量"));
+        if (ih.get("批次键") != null) head.put("批次键", ih.get("批次键"));
+        Object batchNo = ih.get("批次号");
+        if (batchNo == null || nz(batchNo).isEmpty()) batchNo = rec.get("物料批次");
+        if (batchNo != null && !nz(batchNo).isEmpty()) head.put("批次号", batchNo);
+        head.put("备注", "来料不合格:物料编码=" + matCode + ",规格型号=" + nz(row.get("规格型号"))
+                + ";送检 " + trimZero(sendQty) + " / 不合格 " + trimZero(badQty));
+        Map<String, Object> saved = save(registry.panel("QC_TC_IN"), head, false);
+        String ngNo = String.valueOf(saved.get("编号"));
+        // 回填记录单号:检验数据记录「检验结论」旁那条链接的锚点(前端 QcInspRecSheet.gotoNg)
+        jdbc.update("UPDATE qc_insp_rec SET 不合格品处理单号 = ?, asp_user2 = ?, asp_time2 = GETDATE()"
+                + " WHERE 单据编号 = ?", ngNo, user, no);
+        // 链路:记录 → 处理单(行键 = 记录单号#记录行id)
+        jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
+                        + " target_panel_code, target_form_no, target_line_key, inventory_code,"
+                        + " source_quantity, linked_quantity, batch_no, batch_id, link_status, create_by)"
+                        + " VALUES ('QC_INSP_REC', ?, ?, 'QC_TC_IN', ?, NULL, ?, ?, ?, ?, ?, 'ACTIVE', ?)",
+                no, no + "#" + rec.get("id"), ngNo, matCode, sendQty, badQty,
+                batchNo, ih.get("批次键"), user);
+        notifyAutoDraft("QC_TC_IN", ngNo, no, user);
     }
 
     /**
-     * 该 (检验单号, 物料编码) 对应的**检验数据记录单号**(检验报告 YJ-QR-96 的单号)。
-     *
-     * <p>用途(2026-10-19 用户口径 task 5):特采单「品质部意见」区要挂一条**可点击的检验数据记录单号**,
-     * 点它跳到那张检验报告;生特采时就把号带上,不必让人再自己去检验目录里翻。
-     * 真源是检验目录行 {@code qc_catalog_detail}(由 {@code QcCatalogService.syncFromInspection}
-     * 在检验单生单时写好:检验单号 + 物料编码 → 检验数据记录单号)。
-     * 查不到(手工补的报告 / 目录行被取消 / 老链路没有目录行)返回空串 —— 调用方据此不写该字段,
-     * 纸面上就不出现链接,不阻断生单。表/列缺失也按"没有"处理(迁移未跑的环境不会因此 500)。
+     * 取来料检验行:优先按 (检验单号, 物料编码) 精确命中;物料编码为空的历史记录按物料名称兜底。
+     * 取不到返回 Map.of()(调用方按 0/空处理,不抛错 —— 处理单该生还是要生,不能因为链路列缺就卡住品质)。
      */
-    private String specialAcceptRecNo(String inspNo, String invCode) {
-        if (inspNo == null || inspNo.isBlank() || invCode == null || invCode.isBlank()) return "";
-        try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT TOP 1 检验数据记录单号 FROM qc_catalog_detail"
-                            + " WHERE 检验单号 = ? AND 物料编码 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
-                            + " AND ISNULL(检验数据记录单号,N'') <> N'' ORDER BY id DESC", inspNo, invCode);
-            return rows.isEmpty() ? "" : str(rows.get(0).get("检验数据记录单号"));
-        } catch (org.springframework.dao.DataAccessException ignore) {
-            return "";
+    private Map<String, Object> inspRowOf(String inspNo, String matCode, String matName) {
+        if (inspNo == null || inspNo.isEmpty()) return Map.of();
+        List<Map<String, Object>> rs = jdbc.queryForList(
+                "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号,"
+                        + " ISNULL(NULLIF(送检数量,0), 数量) AS 送检数量,"
+                        + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量, 合格数量,"
+                        + " 仓库代码, 计量单位, 单位, 单价, 采购订单行号, 采购单号, 部门名称, 生产日期, 备注, 现存量,"
+                        + " ISNULL(特采, 0) AS 特采"
+                        + " FROM qc_insp_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " AND ((? <> N'' AND 物料编码 = ?) OR (? = N'' AND ? <> N'' AND 物料名称 = ?))"
+                        + " ORDER BY id", inspNo, matCode, matCode, matCode, matName, matName);
+        return rs.isEmpty() ? Map.of() : rs.get(0);
+    }
+
+    /**
+     * 不合格品处理单 → 来源来料检验单号。
+     * 三级取数:①链路 QC_INSP_REC→QC_TC_IN(记录上的 来料检验单号,2026-11-28 起的正规链路)
+     * → ②处理单头「检验单号」→ ③按「批次号 + 产品名称=物料名称」兜底(存量老单)。
+     */
+    private String ngInspNoOf(String ngNo) {
+        if (ngNo == null || ngNo.isEmpty()) return "";
+        List<Map<String, Object>> recs = jdbc.queryForList(
+                "SELECT TOP 1 r.来料检验单号 AS inspNo FROM form_flow_link f"
+                        + " JOIN qc_insp_rec r ON r.单据编号 = f.source_form_no"
+                        + " WHERE f.source_panel_code='QC_INSP_REC' AND f.target_panel_code='QC_TC_IN'"
+                        + "   AND f.target_form_no = ? AND f.link_status='ACTIVE'"
+                        + "   AND ISNULL(r.asp_cancel,'N') <> 'Y'"
+                        + " ORDER BY f.id DESC", ngNo);
+        if (!recs.isEmpty() && !nz(recs.get(0).get("inspNo")).isEmpty()) return nz(recs.get(0).get("inspNo"));
+        List<Map<String, Object>> tcs = jdbc.queryForList(
+                "SELECT 检验单号, 产品名称, 批次号 FROM qc_tc_in"
+                        + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", ngNo);
+        if (tcs.isEmpty()) return "";
+        Map<String, Object> tc = tcs.get(0);
+        if (!nz(tc.get("检验单号")).isEmpty()) return nz(tc.get("检验单号"));
+        // ③ 兜底:批次号 + 该批次下确有这个物料的检验行
+        String batchNo = nz(tc.get("批次号"));
+        String product = nz(tc.get("产品名称"));
+        if (batchNo.isEmpty()) return "";
+        List<String> ins = jdbc.queryForList(
+                "SELECT TOP 1 i.单据编号 FROM qc_insp i WHERE ISNULL(i.asp_cancel,'N') <> 'Y'"
+                        + " AND i.批次号 = ? AND (? = N'' OR EXISTS (SELECT 1 FROM qc_insp_detail x"
+                        + "   WHERE x.单据编号 = i.单据编号 AND ISNULL(x.asp_cancel,'N') <> 'Y' AND x.物料名称 = ?))"
+                        + " ORDER BY i.id DESC", String.class, batchNo, product, product);
+        return ins.isEmpty() ? "" : nz(ins.get(0));
+    }
+
+    /**
+     * 不合格品处理单 → 它在来料检验单里对应的**明细行 id**。
+     * 判据:(检验单号, 物料编码) → 该物料的检验行;物料编码缺失时按处理单「产品名称 = 物料名称」。
+     * 一行都没有返回 null(调用方退化成"整单/按物料名称"写入)。
+     */
+    private Integer ngInspRowIdOf(String ngNo, String inspNo) {
+        if (inspNo == null || inspNo.isEmpty()) return null;
+        List<Map<String, Object>> tcs = jdbc.queryForList(
+                "SELECT 产品名称 FROM qc_tc_in WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", ngNo);
+        if (tcs.isEmpty()) return null;
+        String product = nz(tcs.get(0).get("产品名称"));
+        // 记录链路上的物料编码(最准):记录本身带 物料编码
+        List<Integer> ids = jdbc.queryForList(
+                "SELECT TOP 1 x.id FROM form_flow_link f"
+                        + " JOIN qc_insp_rec r ON r.单据编号 = f.source_form_no"
+                        + " JOIN qc_insp_detail x ON x.单据编号 = r.来料检验单号"
+                        + "   AND x.物料编码 = r.物料编码 AND ISNULL(x.asp_cancel,'N') <> 'Y'"
+                        + " WHERE f.source_panel_code='QC_INSP_REC' AND f.target_panel_code='QC_TC_IN'"
+                        + "   AND f.target_form_no = ? AND f.link_status='ACTIVE'"
+                        + " ORDER BY f.id DESC", Integer.class, ngNo);
+        if (!ids.isEmpty()) return ids.get(0);
+        List<Integer> byName = jdbc.queryForList(
+                "SELECT TOP 1 id FROM qc_insp_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " AND 物料名称 = ? ORDER BY id", Integer.class, inspNo, product);
+        return byName.isEmpty() ? null : byName.get(0);
+    }
+
+    /** 该检验行对应的**活着的**不合格品处理单号(没有返回 "")——判"在途/已批"都用它 */
+    private String ngDisposalNoOf(String inspNo, String matCode, String matName) {
+        if (inspNo == null || inspNo.isEmpty()) return "";
+        List<String> nos = jdbc.queryForList(
+                "SELECT TOP 1 r.不合格品处理单号 FROM qc_insp_rec r"
+                        + " WHERE ISNULL(r.asp_cancel,'N') <> 'Y' AND r.来料检验单号 = ?"
+                        + "   AND ISNULL(r.不合格品处理单号, N'') <> N''"
+                        + "   AND (ISNULL(r.物料编码, N'') = ? OR (ISNULL(r.物料编码, N'') = N'' AND r.物料名称 = ?))"
+                        + " ORDER BY CASE WHEN r.物料编码 = ? THEN 0 ELSE 1 END, r.id DESC",
+                String.class, inspNo, nz(matCode), nz(matName), nz(matCode));
+        if (!nos.isEmpty()) {
+            String ngNo = nz(nos.get(0));
+            if (!ngNo.isEmpty() && !"已作废".equals(String.valueOf(docStatusOf("QC_TC_IN", ngNo).get("status")))) {
+                return ngNo;
+            }
+        }
+        // 兜底:处理单头 检验单号 + 产品名称(处理单可能不是从记录生成的,如手工建的)
+        List<String> byHead = jdbc.queryForList(
+                "SELECT TOP 1 单据编号 FROM qc_tc_in WHERE ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " AND 检验单号 = ? AND 产品名称 = ? ORDER BY id DESC",
+                String.class, inspNo, nz(matName));
+        return byHead.isEmpty() ? "" : nz(byHead.get(0));
+    }
+
+    /** 该检验行是否还有**在途**不合格品处理单(草稿/审批中)——在途则挂起不退料,等它出结论 */
+    private boolean ngDisposalInFlight(String inspNo, String matCode, String matName) {
+        String ngNo = ngDisposalNoOf(inspNo, matCode, matName);
+        if (ngNo.isEmpty()) return false;
+        String st = String.valueOf(docStatusOf("QC_TC_IN", ngNo).get("status"));
+        return "草稿".equals(st) || "审批中".equals(st) || "待二级审批".equals(st) || "修改中".equals(st);
+    }
+
+    /**
+     * 某一检验行是否**已经分流**过(让步接收入库 / 暂收退回 任一)。
+     * 判据 = form_flow_link 上该检验行键(inspNo#rowId)的 ACTIVE 占用:
+     *   · target=QC_RETURN ⇒ 已生成暂收退回单;
+     *   · target=PURCHASE_IN 且 备用1='特采' ⇒ 已生成"让步接收"的采购入库单
+     *     (合格品入库那条也是 QC_INSP→PURCHASE_IN,靠 备用1 区分,别混)。
+     * 作废下游时 voidDoc 会把链置 RELEASED ⇒ 本判据自然失效,可重新分流(与旧链路口径一致)。
+     */
+    private boolean defectRouted(String inspNo, Object rowId) {
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM form_flow_link WHERE source_line_key = ? AND link_status = 'ACTIVE'"
+                        + " AND (target_panel_code = 'QC_RETURN'"
+                        + "      OR (target_panel_code = 'PURCHASE_IN' AND ISNULL(备用1, N'') = N'特采'))",
+                Integer.class, inspNo + "#" + rowId);
+        return n != null && n > 0;
+    }
+
+    /** 面板入口(审核/审批通过钩子):只认来料检验单 */
+    private void inspRouteDefects(String panelCode, String no, String user) {
+        if (!"QC_INSP".equals(panelCode)) return;
+        inspRouteDefects(no, user);
+    }
+
+    /**
+     * **不合格数量分流**(2026-11-28 唯一判据):
+     *   明细行「特采」= 1 ⇒ 采购入库单(让步接收,数量=不合格数量,行上 特采=是);
+     *   否则(0/空)      ⇒ 暂收退回单(退回供应商,数量=不合格数量,照旧转 ERP 采购退货)。
+     *
+     * <p>为什么要在两个时机都调:处理单可能比检验单先批完,也可能后批完。两边都走这里,
+     * 靠 {@link #defectRouted} 幂等去重,先到的那次生效,后到的不重复生单。
+     *
+     * <p>检验单没审完(草稿/审批中)直接返回 —— 合格数量那部分的入库也还没生,提前分流会错位。
+     */
+    private void inspRouteDefects(String inspNo, String user) {
+        if (inspNo == null || inspNo.isEmpty()) return;
+        String st = String.valueOf(docStatusOf("QC_INSP", inspNo).get("status"));
+        if (!"已审核".equals(st) && !"已归档".equals(st)) return;
+        inspAutoSpecialIn(inspNo, user);
+        inspAutoReturn(inspNo, user);
+    }
+
+    /**
+     * 检验单「特采=是」行的不合格数量 → 采购入库单(让步接收)。
+     * 一物料一行一张单;头/行口径对齐 {@link #inspAutoPurchaseIn}(供应商/采购订单号/批次号/批次键),
+     * 数量取**不合格数量**(合格那部分已由 inspAutoPurchaseIn 入过,取送检数量会重复入账)。
+     * 来源单据 = 不合格品处理单(来料)的现名(改名后自动跟随,不写死字面量),
+     * 来源单号 = 处理单号(取不到时退回检验单号)。
+     */
+    private void inspAutoSpecialIn(String inspNo, String user) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号,"
+                        + " ISNULL(NULLIF(送检数量,0), 数量) AS 送检数量,"
+                        + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量,"
+                        + " 仓库代码, 仓位编码 AS 仓位, 计量单位, 单位, 单价, 采购订单行号, 采购单号, 部门名称, 生产日期, 备注, 现存量"
+                        + " FROM qc_insp_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " AND ISNULL(特采, 0) = 1 AND ISNULL(不合格数量, 0) > 0 ORDER BY id", inspNo);
+        if (rows.isEmpty()) return;
+        List<Map<String, Object>> heads = jdbc.queryForList(
+                "SELECT 供应商代码, 供应商, 采购订单号, 批次号, 批次键 FROM qc_insp"
+                        + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", inspNo);
+        if (heads.isEmpty()) throw new IllegalStateException("检验单头不存在:" + inspNo);
+        Map<String, Object> ih = heads.get(0);
+        PanelRegistry.PanelDef piDef = registry.panel("PURCHASE_IN");
+        String srcName = registry.panel("QC_TC_IN").name();
+        for (Map<String, Object> r : rows) {
+            if (defectRouted(inspNo, r.get("id"))) continue;         // 已分流:幂等
+            double qty = numOr(r.get("不合格数量"));
+            if (qty <= 0.000001) continue;
+            String ngNo = ngDisposalNoOf(inspNo, nz(r.get("物料编码")), nz(r.get("物料名称")));
+            Map<String, Object> line = new LinkedHashMap<>();
+            line.put("存货编码", r.get("物料编码"));
+            line.put("存货名称", r.get("物料名称"));
+            line.put("规格型号", r.get("规格型号"));
+            line.put("实收数量", qty);                                // 让步接收数量 = 不合格数量
+            line.put("计量单位", r.get("计量单位") != null ? r.get("计量单位") : r.get("单位"));
+            if (r.get("单位") != null) line.put("单位", r.get("单位"));
+            line.put("单价", r.get("单价"));
+            line.put("是否来料检验", "是");
+            line.put("特采", "是");                                   // 本单就是让步接收那批
+            if (r.get("送检数量") != null) line.put("送检数量", r.get("送检数量"));
+            if (r.get("部门名称") != null) line.put("部门名称", r.get("部门名称"));
+            if (r.get("生产日期") != null) line.put("生产日期", r.get("生产日期"));
+            if (r.get("备注") != null && !String.valueOf(r.get("备注")).isBlank()) line.put("备注", r.get("备注"));
+            if (r.get("采购订单行号") != null) line.put("采购订单行号", r.get("采购订单行号"));
+            // 行级订单号落「源单编号」(= 金蝶 src_bill_no),合单后靠它逐行挂对源单
+            if (r.get("采购单号") != null && !String.valueOf(r.get("采购单号")).isBlank()) {
+                line.put("源单编号", r.get("采购单号"));
+            }
+            if (r.get("现存量") != null) line.put("现存量", r.get("现存量"));
+            if (ih.get("批次号") != null && !String.valueOf(ih.get("批次号")).isBlank()) {
+                line.put("批次号", ih.get("批次号"));
+            }
+            Object wh = r.get("仓库代码");
+            if (wh != null && !String.valueOf(wh).isBlank()) line.put("仓库", wh);
+            Object bin = r.get("仓位");
+            if (bin != null && !String.valueOf(bin).isBlank()) {
+                line.put("仓位", bin);
+            } else {
+                Object binA = presetBinFor(str(r.get("物料编码")), str(wh));
+                if (binA != null) line.put("仓位", binA);
+            }
+            Map<String, Object> head = new LinkedHashMap<>();
+            head.put("单据日期", LocalDate.now().toString());          // 创建当日,不继承检验单日期
+            head.put("供应商", ih.get("供应商"));
+            head.put("供应商编码", ih.get("供应商代码"));
+            String headPo = r.get("采购单号") != null && !String.valueOf(r.get("采购单号")).isBlank()
+                    ? String.valueOf(r.get("采购单号")) : nz(ih.get("采购订单号"));
+            if (!headPo.isBlank()) head.put("采购订单号", headPo);
+            if (ih.get("批次键") != null) head.put("批次键", ih.get("批次键"));
+            if (ih.get("批次号") != null && !String.valueOf(ih.get("批次号")).isBlank()) {
+                head.put("批次号", ih.get("批次号"));
+            }
+            head.put(colLabel(piDef, "来源单据", "来源单据"), srcName);
+            head.put(colLabel(piDef, "来源单号", "来源单号"), ngNo.isEmpty() ? inspNo : ngNo);
+            head.put("detail", Map.of("items", List.of(line)));
+            Map<String, Object> saved = save(piDef, head, false);
+            String piNo = String.valueOf(saved.get("编号"));
+            List<Integer> tgtIds = jdbc.queryForList(
+                    "SELECT id FROM bl_purchase_in WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id",
+                    Integer.class, piNo);
+            if (!tgtIds.isEmpty()) {
+                // ⚠ 链路 source 保持 QC_INSP:检验单弃审要能连带作废这张入库单(inspUnauditCascade 按
+                //   source_panel_code='QC_INSP' 找);处理单号记在 备用2,供处理单弃审反向定位。
+                //   备用1='特采' 是分流判据(defectRouted),别省。
+                jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
+                                + " target_panel_code, target_form_no, target_line_key, inventory_code,"
+                                + " source_quantity, linked_quantity, batch_no, batch_id, link_status, create_by, 备用1, 备用2)"
+                                + " VALUES ('QC_INSP', ?, ?, 'PURCHASE_IN', ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, N'特采', ?)",
+                        inspNo, inspNo + "#" + r.get("id"), piNo, piNo + "#" + tgtIds.get(0),
+                        r.get("物料编码"), r.get("送检数量"), qty, ih.get("批次号"), ih.get("批次键"),
+                        user, ngNo);
+            }
+            // 检验行「入库单号」只在为空时回填:合格品那张入库单号已写在列上,不能抢
+            jdbc.update("UPDATE qc_insp_detail SET 入库单号 = ?, asp_user2 = ?, asp_time2 = GETDATE()"
+                    + " WHERE id = ? AND ISNULL(RTRIM(入库单号), '') = ''", piNo, user, r.get("id"));
+            notifyAutoDraft("PURCHASE_IN", piNo, inspNo, user);
         }
     }
 
     /**
-     * 特采单(QC_TC_IN)审核=审批通过 → 自动生成**一张采购入库单**(2026-10-22 修正口径):
-     * - 仅对「有来源链路」的特采单生效;纯手工新建的特采单不自动生成(无来源上下文,避免凭空入库);
-     * - **数量 = 来源检验行的「不合格数量」** —— 特采 = 让步接收「不合格那部分」;
-     *   合格那部分已由检验单审核自动生成的采购入库单(inspAutoPurchaseIn,入合格数量)走掉,
-     *   这里**不再**取特采单「总数量」(那是送检数量 = 合格 + 不合格,取它会把合格品入两次)。
-     *   历史口径(2026-09-22~2026-10-22)是「特采=全部数量入库」,已按用户口径改正。
-     * - 头/行对齐 inspAutoPurchaseIn(供应商/供应商编码/采购订单号/批次号/批次键,外部单据号已下线),
-     *   行上 是否来料检验=是,特采=是(本条链就是特采,不再看检验行的任何标志);
-     * - 行级占用写 form_flow_link(QC_TC_IN→PURCHASE_IN);检验行「入库单号」**仅在为空时**回填,
-     *   不覆盖合格品入库单已写入的号码(溯源链走 form_flow_link);
-     * - **批次号在生单时随链带入**(2026-10-04 口径:号在「采购订单→送料暂收单」那一跳就定稿、逐站继承,
-     *   不再有"入库审核取号 + 回填全链";入库单上没有号时由 BatchService.syncBatchNo 兜底取号)。
-     *   幂等:该特采单已有 ACTIVE 入库单占用(重审)跳过。
+     * 不合格品处理单(QC_TC_IN)审批通过(二级批准)→ **回填来料检验单明细「特采」= 1**,并补分流。
      *
-     * <p><b>双来源(2026-10-04 口径切换的兼容)</b>:
-     * <ul>
-     *   <li><b>新</b> QC_RETURN→QC_TC_IN —— 暂收退料单「特采」按钮生成(退料行 → 再经
-     *       QC_INSP→QC_RETURN 溯源到检验行);</li>
-     *   <li><b>旧</b> QC_INSP→QC_TC_IN —— 2026-09-22~10-04 口径(检验明细勾了特采,检验审核直接生成)。
-     *       那批存量特采单**保留且照常可审批**,故这里一并认。</li>
-     * </ul>
-     * 两条都取不到来源链路 ⇒ 判为手工特采单,不自动生成。
+     * <p>用户口径(2026-11-28):「审批通过后,在来料检验单会回填一个特采字段,通过这个特采字段,
+     * 可以判断不合格数量是采购入库还是暂收退料」+「只要不合格处理单审批通过就回填特采,
+     * 没用就默认不特采」⇒ 本方法只做两件事:回填、按回填结果分流(检验单已审核时当场分流,
+     * 未审核则等它审核时由 inspRouteDefects 分流)。
+     *
+     * <p>历史(2026-10-04~2026-11-27)本方法叫「特采单审批通过 → 直接生成采购入库单」;
+     * 现在生单动作搬到 {@link #inspAutoSpecialIn},由「特采」字段驱动,与"合格数量入库"同处一个分流点。
      */
     private void tcInApprovedGenerate(String panelCode, String no, String user) {
         if (!"QC_TC_IN".equals(panelCode)) return;
-        Integer linked = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM form_flow_link WHERE source_panel_code='QC_TC_IN' AND source_form_no=?"
-                        + " AND target_panel_code='PURCHASE_IN' AND link_status='ACTIVE'", Integer.class, no);
-        if (linked != null && linked > 0) return;                   // 重审幂等:已生成过入库单
-        // ── 来源解析:先认新链路(退料单),再认旧链路(检验单) ──
-        String inspNo = null;
-        Integer rowId = null;
-        List<Map<String, Object>> rl = jdbc.queryForList(
-                "SELECT source_form_no AS thNo, source_line_key AS lineKey FROM form_flow_link"
-                        + " WHERE source_panel_code='QC_RETURN' AND target_panel_code='QC_TC_IN' AND target_form_no=?"
-                        + " AND link_status='ACTIVE'", no);
-        if (!rl.isEmpty()) {
-            // 退料行 → 检验单号 / 检验行
-            String thNo = str(rl.get(0).get("thNo"));
-            String thLineKey = str(rl.get(0).get("lineKey"));
-            if (thNo != null) {
-                List<Map<String, Object>> ths = jdbc.queryForList(
-                        "SELECT 检验单号 FROM qc_return WHERE 单据编号=? AND ISNULL(asp_cancel,'N') <> 'Y'", thNo);
-                if (!ths.isEmpty()) inspNo = str(ths.get(0).get("检验单号"));
-            }
-            if (thLineKey != null) {
-                List<Map<String, Object>> il = jdbc.queryForList(
-                        "SELECT source_form_no AS inspNo, source_line_key AS lineKey FROM form_flow_link"
-                                + " WHERE source_panel_code='QC_INSP' AND target_panel_code='QC_RETURN'"
-                                + " AND target_line_key = ? AND link_status='ACTIVE'", thLineKey);
-                if (!il.isEmpty()) {
-                    if (inspNo == null) inspNo = str(il.get(0).get("inspNo"));
-                    rowId = idOfLineKey(str(il.get(0).get("lineKey")));
-                }
-            }
-        }
-        if (inspNo == null) {
-            List<Map<String, Object>> src = jdbc.queryForList(
-                    "SELECT source_form_no AS inspNo, source_line_key AS lineKey FROM form_flow_link"
-                            + " WHERE source_panel_code='QC_INSP' AND target_panel_code='QC_TC_IN' AND target_form_no=?"
-                            + " AND link_status='ACTIVE'", no);
-            if (src.isEmpty()) return;                              // 手工特采单:不自动生成
-            inspNo = String.valueOf(src.get(0).get("inspNo"));
-            rowId = idOfLineKey(str(src.get(0).get("lineKey")));
-        }
-        List<Map<String, Object>> tcs = jdbc.queryForList(
-                "SELECT 总数量, 采购单号, 产品名称, 现存量 FROM qc_tc_in WHERE 单据编号=? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
-        if (tcs.isEmpty()) throw new IllegalStateException("特采单不存在:" + no);
-        Map<String, Object> tc = tcs.get(0);
-        List<Map<String, Object>> iheads = jdbc.queryForList(
-                "SELECT 业务员, 供应商代码, 供应商, 部门, 部门名称, 采购订单号, 批次号, 批次键 FROM qc_insp"
-                        + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N') <> 'Y'", inspNo);
-        if (iheads.isEmpty()) throw new IllegalStateException("来源检验单不存在:" + inspNo);
-        Map<String, Object> ih = iheads.get(0);
-        List<Map<String, Object>> drows;
+        String inspNo = ngInspNoOf(no);
+        Integer rowId = ngInspRowIdOf(no, inspNo);
         if (rowId != null) {
-            drows = jdbc.queryForList("SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 合格数量,"
-                    + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号, 采购单号,"
-                    + " 送检数量, 部门名称, 生产日期, 备注, 现存量 FROM qc_insp_detail WHERE id = ? AND ISNULL(asp_cancel,'N') <> 'Y'", rowId);
+            jdbc.update("UPDATE qc_insp_detail SET 特采 = 1, asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
+                    user, rowId);
+            log.info("[让步接收] 不合格品处理单 {} 审批通过 → 检验行 {} 特采=是(不合格数量将进采购入库)", no, rowId);
+        } else if (!inspNo.isEmpty()) {
+            // 行定位不到的兜底:按处理单「产品名称 = 物料名称」写整单该物料的行
+            int n = jdbc.update("UPDATE qc_insp_detail SET 特采 = 1, asp_user2 = ?, asp_time2 = GETDATE()"
+                            + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                            + " AND 物料名称 = (SELECT TOP 1 产品名称 FROM qc_tc_in WHERE 单据编号 = ?)",
+                    user, inspNo, no);
+            log.info("[让步接收] 不合格品处理单 {} 审批通过 → 检验单 {} 按物料名称回填特采 {} 行", no, inspNo, n);
         } else {
-            // 链路断了的兜底:按「检验单号 + 物料名称」取检验行(特采单头的产品名称就是从检验行物料名称带下来的)
-            drows = jdbc.queryForList("SELECT TOP 1 id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 合格数量,"
-                    + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号, 采购单号,"
-                    + " 送检数量, 部门名称, 生产日期, 备注, 现存量 FROM qc_insp_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
-                    + " AND (物料名称 = ? OR 物料编码 IS NULL) ORDER BY id", inspNo, str(tc.get("产品名称")));
+            log.warn("[让步接收] 不合格品处理单 {} 找不到来源来料检验单,特采字段未回填(不影响审批)", no);
         }
-        if (drows.isEmpty()) throw new IllegalStateException("来源检验行不存在(特采单 " + no + " 的检验单号 " + inspNo + ")");
-        Map<String, Object> r = drows.get(0);
-        // ── 入库数量 = **不合格数量**(用户 2026-10-22 口径)──
-        // 为什么不再取「特采单总数量」:总数量是**送检数量**(= 合格 + 不合格,见 returnAutoSpecialAccept),
-        // 而合格那部分已经由「检验单审核 → 采购入库单」走掉了(inspAutoPurchaseIn 入的是合格数量),
-        // 特采只承担不合格那部分。此前取总数量 ⇒ 合格品被入两次。
-        //   实测(测试账套 IJ-2026-10-0099,送检 100 / 合格 60 / 不合格 40):
-        //     合格品入库 PI-2026-10-0090 = 60,特采入库 PI-2026-10-0091 曾 = 100 ⇒ 虚增 60。
-        // 特采单的「总数量」字段保持送检数量不变(它是送检口径,纸面 YJ-QR-60 要它)。
-        double qty = numOr(r.get("不合格数量"));
-        if (qty <= 0.000001) {
-            // 兜底:老链路的检验行可能只记了「不良数量」或口径不同;仍取不到 ⇒ 不生成 0 数量入库单
-            qty = numOr(r.get("不良数量"));
-        }
-        if (qty <= 0.000001) {
-            throw new IllegalStateException("来源检验行没有不合格数量(检验单 " + inspNo
-                    + "),特采单 " + no + " 无数量可入库;请先在检验单上填写不合格数量");
-        }
-        // 防呆:不合格数量不应超过送检数量(检验数据自相矛盾时宁可拒绝,也不要凭空入库)
-        double sentQty = numOr(r.get("送检数量"));
-        if (sentQty > 0.000001 && qty - sentQty > 0.000001) {
-            throw new IllegalStateException("不合格数量 " + qty + " 大于送检数量 " + sentQty
-                    + "(检验单 " + inspNo + "),特采入库数量异常,已拒绝生成");
-        }
-        // 特采单总数量仅用于日志/追溯(送检口径),不参与入库数量
-        double tcTotalQty;
-        try {
-            java.util.regex.Matcher m = java.util.regex.Pattern.compile("^-?\\d+(\\.\\d+)?").matcher(str(tc.get("总数量")));
-            tcTotalQty = m.find() ? Double.parseDouble(m.group()) : 0;
-        } catch (Exception e) { tcTotalQty = 0; }
-        if (tcTotalQty > 0.000001 && qty - tcTotalQty > 0.000001) {
-            throw new IllegalStateException("不合格数量 " + qty + " 大于特采单总数量 " + tcTotalQty + "(特采单 " + no + ")");
-        }
-        Map<String, Object> line = new LinkedHashMap<>();
-        line.put("存货编码", r.get("物料编码"));
-        line.put("存货名称", r.get("物料名称"));
-        line.put("规格型号", r.get("规格型号"));
-        line.put("实收数量", qty);                                  // 特采入库=不合格数量(合格部分已由检验单入库)
-        line.put("计量单位", r.get("计量单位") != null ? r.get("计量单位") : r.get("单位"));
-        line.put("单价", r.get("单价"));
-        // 是否来料检验:该批物料走过检验 = 是(与 inspAutoPurchaseIn 同口径)
-        line.put("是否来料检验", "是");
-        // 特采(2026-10-04 口径):本单就是**特采单审批通过**生成的 —— 恒为「是」;
-        // 不再取检验行的标志(检验明细的「特采」字段已于同日下线,检验行不再是特采的判定方)
-        line.put("特采", "是");
-        if (r.get("送检数量") != null) line.put("送检数量", r.get("送检数量"));
-        if (r.get("部门名称") != null) line.put("部门名称", r.get("部门名称"));
-        if (r.get("生产日期") != null) line.put("生产日期", r.get("生产日期"));
-        if (r.get("备注") != null && !String.valueOf(r.get("备注")).isBlank()) line.put("备注", r.get("备注"));
-        if (r.get("采购订单行号") != null) line.put("采购订单行号", r.get("采购订单行号"));
-        // 行级订单号(2026-11-13 全链口径):入库行落「源单编号」(= 金蝶 src_bill_no)。
-        // 值取**检验行**的采购单号,退到特采单头(它是本物料那一个订单号)—— 合单后靠它逐行挂对源单。
-        Object poLine = r.get("采购单号") != null && !String.valueOf(r.get("采购单号")).isBlank()
-                ? r.get("采购单号") : tc.get("采购单号");
-        if (poLine != null && !String.valueOf(poLine).isBlank()) line.put("源单编号", poLine);
-        // 现存量(2026-11-12 用户口径):特采链也要留痕 —— 优先取检验行(真源),检验行没有则回落特采单头
-        Object stockQty = r.get("现存量") != null ? r.get("现存量") : tc.get("现存量");
-        if (stockQty != null) line.put("现存量", stockQty);
-        // 批次号随链带入入库行(2026-10-04 口径:号在生单那一刻就有,逐站继承,不再逆流回填)
-        if (ih.get("批次号") != null && !String.valueOf(ih.get("批次号")).isBlank()) {
-            line.put("批次号", ih.get("批次号"));
-        }
-        // 行仓库(2026-09-23 正名):同 inspAutoPurchaseIn —— 落「仓库」(字段已全局正名)
-        Object wh = r.get("仓库代码");
-        if (wh != null && !String.valueOf(wh).isBlank()) line.put("仓库", wh);
-        // 仓位预设(2026-10-09):同 inspAutoPurchaseIn —— 物料默认 ⇢ 该仓默认,该仓启用仓位管理才预设
-        Object binT = presetBinFor(str(r.get("物料编码")), str(wh));
-        if (binT != null) line.put("仓位", binT);
-        Map<String, Object> head = new LinkedHashMap<>();
-        head.put("单据日期", LocalDate.now().toString());
-        head.put("供应商", ih.get("供应商"));
-        head.put("供应商编码", ih.get("供应商代码"));
-        String poNo = tc.get("采购单号") != null && !String.valueOf(tc.get("采购单号")).isBlank()
-                ? String.valueOf(tc.get("采购单号")) : String.valueOf(ih.get("采购订单号") == null ? "" : ih.get("采购订单号"));
-        // 表头采购订单号:优先**行级**(本行那个订单号);检验单头在合单后可能是"订单1、订单2"的人读串,
-        // 拿它当单值会让下游按号查询/挂源单落空。逐行订单号在「源单编号」上,这里只放单值便于查看。
-        String headPo = r.get("采购单号") != null && !String.valueOf(r.get("采购单号")).isBlank()
-                ? String.valueOf(r.get("采购单号")) : poNo;
-        if (!headPo.isBlank()) head.put("采购订单号", headPo);
-        head.put("批次键", ih.get("批次键"));
-        // 批次号:继承来源检验单/特采链的号(2026-10-04 口径);为空时由 saveDoc→BatchService.syncBatchNo
-        // 按「供应商编码 + 当天」兜底取号,保证入库单绝不会没有批次号。
-        if (ih.get("批次号") != null && !String.valueOf(ih.get("批次号")).isBlank()) {
-            head.put("批次号", ih.get("批次号"));
-        }
-        // 来源 / 来源单号 = 特采单(2026-11-11 用户口径:特采来的那批也要在入库单表头看得见来源和单号)。
-        // 旧注释「不写 外部单据号/来源单据/来源单号 —— 入库单用采购订单号就够了(2026-09-21 口径)」
-        // 已被本条口径取代:来源列已在表头末尾显示,特采这条链不写就会是空的。
-        PanelRegistry.PanelDef piDef = registry.panel("PURCHASE_IN");
-        head.put(colLabel(piDef, "来源单据", "来源单据"), "特采单");
-        head.put(colLabel(piDef, "来源单号", "来源单号"), no);
-        head.put("detail", Map.of("items", List.of(line)));
-        Map<String, Object> saved = save(piDef, head, false);
-        String piNo = String.valueOf(saved.get("编号"));
-        List<Integer> tgtIds = jdbc.queryForList(
-                "SELECT id FROM bl_purchase_in WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id",
-                Integer.class, piNo);
-        if (!tgtIds.isEmpty()) {
-            jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
-                            + " target_panel_code, target_form_no, target_line_key, inventory_code,"
-                            + " source_quantity, linked_quantity, batch_id, link_status, create_by)"
-                            + " VALUES ('QC_TC_IN', ?, ?, 'PURCHASE_IN', ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)",
-                    no, no, piNo, piNo + "#" + tgtIds.get(0), r.get("物料编码"),
-                    r.get("数量"), qty, ih.get("批次键"), user);
-        }
-        // 检验行回填入库单号(与 inspAutoPurchaseIn 同口径,便于追溯)。
-        // ⚠ 2026-10-22 修正:合格品入库(inspAutoPurchaseIn)已把**合格品**那张入库单号写在本列,
-        //   这里无条件覆盖会把合格品入库单的号码冲掉(实测 IJ-2026-10-0099:合格 PI-2026-10-0090 被
-        //   特采 PI-2026-10-0091 顶掉)。特采入库单的溯源走 form_flow_link(QC_TC_IN→PURCHASE_IN),
-        //   故本列**只在为空时**才写,不抢已有关联。
-        jdbc.update("UPDATE qc_insp_detail SET 入库单号 = ?, asp_user2 = ?, asp_time2 = GETDATE()"
-                        + " WHERE id = ? AND ISNULL(RTRIM(入库单号), '') = ''",
-                piNo, user, r.get("id"));
+        inspRouteDefects(inspNo, user);
     }
 
-    /** 特采单弃审联动:自动生成的采购入库单草稿作废+释放;已审核(可能已记台账)则挡弃审,提示先弃审入库单。 */
+    /**
+     * 不合格品处理单弃审联动(2026-11-28):
+     * ① 清掉回填到来料检验行的「特采」= 1(弃审 = 让步接收作废 ⇒ 默认不特采);
+     * ② 由它分流出去的采购入库单——草稿作废+释放占用;已审核(可能已记台账)则挡弃审,提示先弃审入库单;
+     * ③ 检验单已审核的话按"不特采"补生成暂收退回单(否则该行不合格数量会一直悬着没有人处理)。
+     * 历史链(暂收退料单→特采单,2026-10-04 那代)的入库单按 source_panel_code='QC_TC_IN' 也一起找到,照旧作废。
+     */
     private void tcInUnauditCascade(String panelCode, String no, String user) {
         if (!"QC_TC_IN".equals(panelCode)) return;
+        String inspNo = ngInspNoOf(no);
+        Integer rowId = ngInspRowIdOf(no, inspNo);
+        if (rowId != null) {
+            jdbc.update("UPDATE qc_insp_detail SET 特采 = 0, asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
+                    user, rowId);
+        }
         List<String> piNos = jdbc.queryForList(
-                "SELECT DISTINCT target_form_no FROM form_flow_link WHERE source_panel_code='QC_TC_IN' AND source_form_no=?"
-                        + " AND target_panel_code='PURCHASE_IN' AND link_status='ACTIVE'", String.class, no);
+                "SELECT DISTINCT target_form_no FROM form_flow_link WHERE target_panel_code = 'PURCHASE_IN'"
+                        + " AND link_status = 'ACTIVE'"
+                        + " AND ((source_panel_code = 'QC_TC_IN' AND source_form_no = ?) OR ISNULL(备用2, N'') = ?)",
+                String.class, no, no);
         for (String piNo : piNos) {
             String st = String.valueOf(docStatusOf("PURCHASE_IN", piNo).get("status"));
             if ("草稿".equals(st) || "修改中".equals(st)) {
                 voidDoc(registry.panel("PURCHASE_IN"), piNo, user);
             } else {
-                throw new IllegalStateException("特采单生成的采购入库单 " + piNo + " 已审核,请先弃审该入库单再弃审特采单");
+                throw new IllegalStateException("不合格品处理单生成的采购入库单 " + piNo
+                        + " 已审核,请先弃审该入库单再弃审本单");
+            }
+        }
+        inspRouteDefects(inspNo, user);
+    }
+
+    /**
+     * 检验数据记录弃审联动:它自动生成的不合格品处理单(草稿)一并作废+释放,并清掉记录上的处理单号;
+     * 处理单已审批(已回填特采、可能已生成入库单)则挡弃审,提示先弃审处理单。
+     * 与「检验单弃审 → 下游草稿作废」同一口径,防止「记录退回去了、处理单还挂着」的错位。
+     */
+    private void inspRecUnauditCascade(String panelCode, String no, String user) {
+        if (!"QC_INSP_REC".equals(panelCode)) return;
+        List<String> ngNos = jdbc.queryForList(
+                "SELECT DISTINCT target_form_no FROM form_flow_link WHERE source_panel_code='QC_INSP_REC'"
+                        + " AND source_form_no=? AND target_panel_code='QC_TC_IN' AND link_status='ACTIVE'",
+                String.class, no);
+        for (String ngNo : ngNos) {
+            String st = String.valueOf(docStatusOf("QC_TC_IN", ngNo).get("status"));
+            if ("草稿".equals(st) || "修改中".equals(st)) {
+                voidDoc(registry.panel("QC_TC_IN"), ngNo, user);
+                jdbc.update("UPDATE qc_insp_rec SET 不合格品处理单号 = NULL, asp_user2 = ?, asp_time2 = GETDATE()"
+                        + " WHERE 单据编号 = ?", user, no);
+            } else {
+                throw new IllegalStateException("检验数据记录生成的不合格品处理单 " + ngNo
+                        + " 已审批(已回填特采),请先弃审该处理单再弃审本记录");
             }
         }
     }
-
 
     /** 修改预警数量(库存状况行内编辑):空值=清空行级阈值,回退全局阈值100 */
 

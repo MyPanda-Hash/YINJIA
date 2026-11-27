@@ -370,6 +370,16 @@
               />
               <!-- 空值提示带 title:说清"这格记的是谁、什么时候写、之后会不会变" -->
               <span v-else class="qr-cell-text qr-sign" :title="signHint(cell)">{{ signText(cell) }}</span>
+              <!-- 不合格品处理单链接(2026-11-28 用户口径:「检验结论处可以链接进入不合格处理单」):
+                   单号由后端 ButtonService.inspRecNgGenerate 在检验结论=不合格且审批通过时自动生成并回填
+                   (qc_insp_rec.不合格品处理单号);非不合格/还没生成的单子上没有号 ⇒ 整条不渲染。
+                   ⚠ 必须挂在本格的 v-if/v-else 链**之后**:插在中间会把「空值说明」那支的 v-else 抢走。 -->
+              <a
+                v-if="cell.key === VERDICT_KEY && ngNo"
+                class="qr-nglink no-print"
+                :title="tt('跳转到该不合格品处理单')"
+                @click.stop="gotoNg"
+              >{{ tt('不合格品处理单') }} {{ ngNo }}</a>
             </td>
           </template>
         </tr>
@@ -609,6 +619,15 @@ const inspNo = computed(() => String(props.head?.['来料检验单号'] ?? '').t
 function gotoInsp() {
   if (!inspNo.value) return
   router.push({ path: '/panelx/list/QC_INSP', query: { docNo: inspNo.value } })
+}
+
+/* ── 不合格品处理单(来料)链接(2026-11-28 用户口径「检验结论处可以链接进入不合格处理单」)──
+   号由后端 ButtonService.inspRecNgGenerate 在「检验结论=不合格」且审批通过那一刻生成处理单并回填
+   (qc_insp_rec.不合格品处理单号,隐藏链路列);这里只做跳转,与上面的来料检验单号链接同一套做法。 */
+const ngNo = computed(() => String(props.head?.['不合格品处理单号'] ?? '').trim())
+function gotoNg() {
+  if (!ngNo.value) return
+  router.push({ path: '/panelx/list/QC_TC_IN', query: { docNo: ngNo.value } })
 }
 
 function isDateField(key) {
@@ -947,6 +966,24 @@ watch(
 /* 检验结论下拉(2026-10-19 task 2):格内铺满、高度与其它整宽格一致 */
 .qr-verdict-sel {
   width: 100%;
+}
+
+/* 检验结论旁的「不合格品处理单」链接(2026-11-28):与标题右侧那条同色系,
+   但走行内排布(值格内、下拉下方一行),窄格自动省略号;打印不出现(.no-print)。 */
+.qr-nglink {
+  display: block;
+  margin-top: 2px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #1f5fa8;
+  cursor: pointer;
+  user-select: none;
+}
+.qr-nglink:hover {
+  text-decoration: underline;
 }
 
 /* ═══ 抬头 / 表尾 ═══ */

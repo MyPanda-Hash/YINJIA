@@ -65,7 +65,7 @@
       <span class="qcf-stat is-wait"><em>{{ tt('需检验') }}</em><b>{{ stat.needInsp }}</b></span>
       <span class="qcf-stat is-wait"><em>{{ tt('待检验') }}</em><b>{{ stat.waitInsp }}</b></span>
       <span class="qcf-stat is-bad"><em>{{ tt('待退货') }}</em><b>{{ stat.waitRet }}</b></span>
-      <span class="qcf-stat is-warn"><em>{{ tt('待特采') }}</em><b>{{ stat.waitTc }}</b></span>
+      <span class="qcf-stat is-warn"><em>{{ tt('待不合格品处理') }}</em><b>{{ stat.waitNg }}</b></span>
       <span class="qcf-stat is-wait"><em>{{ tt('待入库') }}</em><b>{{ stat.waitIn }}</b></span>
       <span class="qcf-stat is-bad"><em>{{ tt('异常') }}</em><b>{{ stat.bad }}</b></span>
       <span v-if="stat.hidden" class="qcf-stat is-muted"><em>{{ tt('已隐藏') }}</em><b>{{ stat.hidden }}</b></span>
@@ -168,7 +168,7 @@
                 </div>
               </template>
             </div>
-            <!-- 不合格分支:只在「有退回/特采单」或「检验判了不合格」时出现,全合格批次不占版面 -->
+            <!-- 不合格分支:只在「有不合格品处理单/退回单」或「检验判了不合格」时出现,全合格批次不占版面 -->
             <div v-if="chainOf(row).showNg" class="qcf-lane qcf-lane-ng">
               <span class="qcf-lane-tag">{{ tt('不合格') }}</span>
               <template v-for="(s, i) in chainOf(row).ng" :key="s.key">
@@ -288,10 +288,12 @@
                 <a class="qcf-link" :title="nodeTitleOf(row, 'ret')"
                    @click.stop="openDoc('QC_RETURN', row['退货单号'])">{{ tt('退货') }} {{ row['退货单号'] }}</a>
               </div>
-              <div v-if="row['特采单号']" class="qcf-l-sub">
+              <div v-if="row['不合格品处理单号']" class="qcf-l-sub">
                 <a class="qcf-link" :title="nodeTitleOf(row, 'tc')"
-                   @click.stop="openDoc('QC_TC_IN', row['特采单号'])">{{ tt('特采') }} {{ row['特采单号'] }}</a>
+                   @click.stop="openDoc('QC_TC_IN', row['不合格品处理单号'])">{{ tt('不合格品处理') }} {{ row['不合格品处理单号'] }}</a>
               </div>
+              <!-- 不合格数量去向(2026-11-28):特采=1 ⇒ 让步接收进采购入库;否则走暂收退料 -->
+              <div v-if="Number(row['特采'] || 0) === 1" class="qcf-l-sub is-tc">{{ tt('特采→采购入库') }}</div>
             </template>
           </el-table-column>
           <el-table-column :label="tt('停留天数')" width="84" align="right">
@@ -328,7 +330,7 @@ const STATE_OPTIONS = [
   { value: '未完成', label: '未完成' },
   { value: '待检验', label: '待检验' },
   { value: '待退货', label: '待退货' },
-  { value: '待特采', label: '待特采' },
+  { value: '待不合格品处理', label: '待不合格品处理' },
   { value: '待入库', label: '待入库' },
   { value: '异常', label: '异常' },
   { value: '已完成', label: '已完成' },
@@ -435,7 +437,7 @@ const stat = computed(() => {
     needInsp: Math.max(0, total - count('免检', (r) => !Number(r?.['需检验'] || 0))),
     waitInsp: count('待检验', (r) => r?.['当前环节'] === '检验'),
     waitRet: count('待退货', (r) => r?.['当前环节'] === '退货'),
-    waitTc: count('待特采', (r) => r?.['当前环节'] === '特采'),
+    waitNg: count('待不合格品处理', (r) => r?.['当前环节'] === '不合格品处理'),
     waitIn: count('待入库', (r) => r?.['当前环节'] === '入库'),
     bad: count('异常', (r) => !!r?.['异常']),
     // 已隐藏条数由后端单独数(默认查询里根本不含它们,前端口径算不出来)
@@ -450,7 +452,7 @@ function rowKey(row) {
 
 /**
  * 主链(送料 / 检验 / 入库)+ 不合格分支(退回 / 特采)节点,并给节点补数量副标:
- * 检验给 合格/不合格,入库给 实收,退货给 退货数量,特采给 不合格品数量。
+ * 检验给 合格/不合格,入库给 实收,不合格品处理单给 不合格品数量,退货单给 退货数量。
  * 时态与状态文案由 @core/qc/qcFlow.buildChain 定,这里只补 quantities 与 tt 文案。
  */
 function chainOf(row) {
@@ -458,7 +460,7 @@ function chainOf(row) {
   const insp = inspQty(row)
   const inNo = String(row?.['入库单号'] || '').trim()
   const retQty = row?.['退货数量']
-  const tcQty = row?.['特采数量']
+  const tcQty = row?.['不合格品处理数量']
   return {
     ...chain,
     main: chain.main.map((s) => {
@@ -470,7 +472,7 @@ function chainOf(row) {
     }),
     ng: chain.ng.map((s) => {
       if (s.key === 'ret') return { ...s, qty: retQty != null ? `${tt('退货')} ${num(retQty)}` : '' }
-      if (s.key === 'tc') return { ...s, qty: tcQty != null ? `${tt('特采')} ${num(tcQty)}` : '' }
+      if (s.key === 'tc') return { ...s, qty: tcQty != null ? `${tt('不合格')} ${num(tcQty)}` : '' }
       return s
     }),
   }
@@ -529,7 +531,7 @@ function nodeTitle(s) {
       rec: '还没有检验数据记录：来料检验单生单时会按物料各建一张（在来料检验单上生单后回来刷新即可）',
       in: '该批次还没有采购入库单：在送料暂收单上点「生成检验或入库单」即可直达入库（免检物料不需要检验）',
       ret: '还没有暂收退回单',
-      tc: '还没有特采单',
+      tc: '还没有不合格品处理单(来料):检验数据记录判「不合格」并审批通过后自动生成',
     }[s.key] || '该环节还没有单据'
     return tt(msg)
   }
@@ -542,7 +544,7 @@ function nodeTitleOf(row, key) {
   if (key === 'insp') return nodeTitle({ no: row?.['检验单号'], panel: 'QC_INSP' })
   if (key === 'rec') return nodeTitle({ no: row?.['检验数据记录单号'], panel: 'QC_INSP_REC' })
   if (key === 'ret') return nodeTitle({ no: row?.['退货单号'], panel: 'QC_RETURN' })
-  if (key === 'tc') return nodeTitle({ no: row?.['特采单号'], panel: 'QC_TC_IN' })
+  if (key === 'tc') return nodeTitle({ no: row?.['不合格品处理单号'], panel: 'QC_TC_IN' })
   return nodeTitle({ no: row?.['入库单号'], panel: 'PURCHASE_IN' })
 }
 
@@ -551,7 +553,7 @@ function stageTone(row) {
   if (row?.['异常']) return 'void'
   if (stage === '完成') return 'done'
   if (stage === '退货') return 'void'
-  if (stage === '特采') return 'warn'
+  if (stage === '不合格品处理') return 'warn'
   if (stage === '检验') return 'warn'
   if (stage === '入库') return 'draft'
   return 'doing'

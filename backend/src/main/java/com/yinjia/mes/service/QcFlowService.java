@@ -16,8 +16,8 @@ import java.util.Map;
  * 来料品质流程监控(原名「品质流程监控」,2026-11-20 用户口径改名;面板码仍然是 {@code QC_FLOW})。
  *
  * <p><b>一行是什么</b>:一行 = **送料暂收单的一条物料行**(= 一个来料批次),把这条批次在
- * 「送料暂收单 {@code sl_recv} → 来料检验单 {@code qc_insp} →(不合格时)暂收退回单 {@code qc_return}
- * →(让步接收时)特采单 {@code qc_tc_in} → 采购入库单 {@code bd_purchase_in}」上的落点摊平到一行 ——
+ * 「送料暂收单 {@code sl_recv} → 来料检验单 {@code qc_insp} →(不合格时)不合格品处理单(来料) {@code qc_tc_in}
+ * → 暂收退回单 {@code qc_return}(不特采)／采购入库单 {@code bd_purchase_in}(让步接收)」上的落点摊平到一行 ——
  * 这是「一条来料批次走到哪一步、卡在谁手上」的最小单元,也是用户点名要的「物料批号 + 物料编码」那一层粒度。
  *
  * <p><b>检验数据记录(2026-11-20 用户口径)</b>:「当前的采购入库需要两个单据的审核完成,当前只显示了来料检验单
@@ -28,9 +28,10 @@ import java.util.Map;
  * <p><b>不合格分支(2026-11-12 第二轮)</b>:检验之后是**两条路**,不是一条直线:
  * <ul>
  *   <li>合格 → 采购入库单;</li>
- *   <li>不合格 → 暂收退回单(退回供应商)→ 若让步接收则再开特采单 → 特采审批通过后 → 采购入库单。</li>
+ *   <li>不合格 → 检验数据记录判「不合格」→ 不合格品处理单(来料)→ 审批通过回填检验单「特采」:
+ *       特采=是 → 采购入库单(让步接收);否则 → 暂收退回单(退回供应商)。</li>
  * </ul>
- * 两个分支单都带自己的状态与跳转(暂收退回单 / 特采单)。
+ * 两个分支单都带自己的状态与跳转(不合格品处理单(来料) / 暂收退回单)。
  *
  * <p><b>隐藏(2026-11-12 第二轮用户口径)</b>:「入库单转ERP后就隐藏了……隐藏后的单据是可以重新打开的」。
  * 判定 = **末尾单据已转 ERP**:有采购入库单就看它的 {@code 是否已转ERP};没有入库单(纯退货退回)就看
@@ -47,9 +48,10 @@ import java.util.Map;
  * <ol>
  *   <li>送料 → 检验:{@code qc_insp.暂收单号 = sl_recv.单据编号} + 检验行 {@code 物料编码} 相同(同批次优先);</li>
  *   <li>检验 → 退货:{@code qc_return.检验单号 = 检验单号};取不到再按「批次号 + 明细物料编码」兜;</li>
- *   <li>检验 → 特采:{@code qc_tc_in.检验单号 = 检验单号};取不到再按「批次号 + 产品名称=物料名称」兜;</li>
- *   <li>检验/送料/退货/特采 → 入库,按可信度三级:
- *       ① 检验行上直接记了入库单号;② 入库单 {@code 来源单号} = 检验单号 / 暂收单号 / 退货单号 / 特采单号;
+ *   <li>检验 → 不合格品处理:优先按检验数据记录上的「不合格品处理单号」,
+ *       其次 {@code qc_tc_in.检验单号 = 检验单号};取不到再按「批次号 + 产品名称=物料名称」兜;</li>
+ *   <li>检验/送料/退货/不合格品处理 → 入库,按可信度三级:
+ *       ① 检验行上直接记了入库单号;② 入库单 {@code 来源单号} = 检验单号 / 暂收单号 / 退货单号 / 不合格品处理单号;
  *       ③ **批号推定**:入库行 {@code 批次号/批号} = 送料行 {@code 批次号} 且 存货编码相同。
  *       每条命中都带 {@code 入库匹配方式} 一起下发 —— ③ 是推定,界面上要标出来,别当铁证;</li>
  *   <li>是否免检:{@code bs_inv.来料检验 = '是'} 才走来料检验;其余物料送料审核完就直接入库
@@ -76,7 +78,7 @@ public class QcFlowService {
     /**
      * 看板数据(只读,现算)。
      *
-     * @param body 可选条件:{@code 状态}(全部/未完成/已完成/待检验/待退货/待特采/待入库/异常,默认未完成)、
+     * @param body 可选条件:{@code 状态}(全部/未完成/已完成/待检验/待不合格品处理/待退货/待入库/异常,默认未完成)、
      *             {@code keyword}(单号/物料/批号/供应商片段)、{@code 日期起}/{@code 日期止}(送料日期)、
      *             {@code 仅需检验}、{@code 含已隐藏}(默认 false:不返回已转 ERP 的行)、
      *             {@code limit}(1~800,默认 300)
@@ -101,7 +103,7 @@ public class QcFlowService {
                     .append(" OR 物料编码 LIKE ? OR 物料名称 LIKE ? OR 物料批号 LIKE ?")
                     .append(" OR ISNULL(检验单号,N'') LIKE ? OR ISNULL(检验数据记录单号,N'') LIKE ?")
                     .append(" OR ISNULL(入库单号,N'') LIKE ?")
-                    .append(" OR ISNULL(退货单号,N'') LIKE ? OR ISNULL(特采单号,N'') LIKE ?)");
+                    .append(" OR ISNULL(退货单号,N'') LIKE ? OR ISNULL(不合格品处理单号,N'') LIKE ?)");
             for (int i = 0; i < 11; i++) args.add(like);
         }
         if (from != null) {
@@ -115,15 +117,15 @@ public class QcFlowService {
         if ("未完成".equals(state)) {
             // 未完成 = 真正还在走的(送料/检验/退货/特采/入库);已作废/已中止/全不合格的另行归「异常」,
             //   否则默认视图会被一堆废单占满(测试库 1059 张状态行里 427 张已作废)。
-            w.append(" AND 当前环节 IN (N'送料', N'检验', N'退货', N'特采', N'入库') AND 异常 = 0");
+            w.append(" AND 当前环节 IN (N'送料', N'检验', N'不合格品处理', N'退货', N'入库') AND 异常 = 0");
         } else if ("已完成".equals(state)) {
             w.append(" AND 当前环节 = N'完成'");
         } else if ("待检验".equals(state)) {
             w.append(" AND 当前环节 = N'检验'");
         } else if ("待退货".equals(state)) {
             w.append(" AND 当前环节 = N'退货'");
-        } else if ("待特采".equals(state)) {
-            w.append(" AND 当前环节 = N'特采'");
+        } else if ("待不合格品处理".equals(state)) {
+            w.append(" AND 当前环节 = N'不合格品处理'");
         } else if ("待入库".equals(state)) {
             w.append(" AND 当前环节 = N'入库'");
         } else if ("异常".equals(state)) {
@@ -141,7 +143,7 @@ public class QcFlowService {
         List<Map<String, Object>> rows = jdbc.queryForList(sql, args.toArray());
         for (Map<String, Object> r : rows) {
             r.put("停留天数", stuckDays(str(r.get("当前环节")), str(r.get("送料日期")),
-                    str(r.get("检验日期")), str(r.get("退货日期")), str(r.get("特采日期")), str(r.get("入库日期"))));
+                    str(r.get("检验日期")), str(r.get("退货日期")), str(r.get("不合格品处理日期")), str(r.get("入库日期"))));
         }
 
         // 被隐藏了多少条(同一批筛选条件下、已转ERP 的那些):界面用它在开关上显示「显示已隐藏 N 条」
@@ -186,7 +188,7 @@ public class QcFlowService {
     }
 
     /**
-     * 行取数(不含筛选/排序):送料行 × 检验行 × 退货行 × 特采单 × 入库行 × 五张单的状态 × 商品档案检验口径。
+     * 行取数(不含筛选/排序):送料行 × 检验行 × 退货行 × 不合格品处理单 × 入库行 × 各单的状态 × 商品档案检验口径。
      *
      * <p>分两层写:`core` 把各单和状态取齐,外层再据此判「当前环节」。
      * 为什么不在一层写 —— SQL Server **不允许在同一个 SELECT 里引用刚起的别名**(`需检验`)。
@@ -203,8 +205,8 @@ public class QcFlowService {
                 + statusOf("d2", "ins.检验头状态", "ins.检验审核时间") + " END";
         String retStatus = "CASE WHEN ret.退货单号 IS NULL THEN NULL ELSE "
                 + statusOf("d4", "ret.退货头状态", "ret.退货审核时间") + " END";
-        String tcStatus = "CASE WHEN tc.特采单号 IS NULL THEN NULL ELSE "
-                + statusOf("d5", "tc.特采头状态", "tc.特采审核时间") + " END";
+        String ngStatus = "CASE WHEN ng.不合格品处理单号 IS NULL THEN NULL ELSE "
+                + statusOf("d5", "ng.不合格品处理单头状态", "ng.不合格品处理审核时间") + " END";
         String pinStatus = "CASE WHEN put.入库单号 IS NULL THEN NULL ELSE "
                 + statusOf("d3", "put.入库头状态", "put.入库审核时间") + " END";
         // 检验数据记录(QC_INSP_REC / JYSJ,2026-11-20 新增):它与来料检验单**并列**,两单都审完才轮得到入库。
@@ -263,12 +265,14 @@ public class QcFlowService {
                     %s AS 退货状态,
                     ISNULL(ret.退货已转ERP, N'') AS 退货已转ERP,
                     ISNULL(ret.退货ERP单号, N'') AS 退货ERP单号,
-                    /* ── 不合格分支二:特采单(让步接收) ── */
-                    tc.特采单号 AS 特采单号,
-                    CONVERT(nvarchar(10), tc.特采日期, 120) AS 特采日期,
-                    tc.不合格品数量 AS 特采数量,
-                    ISNULL(tc.最终处理结果, N'') AS 特采结果,
-                    %s AS 特采状态,
+                    /* ── 不合格分支二:不合格品处理单(来料,2026-11-28 由「特采单」正名) ── */
+                    ng.不合格品处理单号 AS 不合格品处理单号,
+                    CONVERT(nvarchar(10), ng.不合格品处理日期, 120) AS 不合格品处理日期,
+                    ng.不合格品数量 AS 不合格品处理数量,
+                    ISNULL(ng.最终处理结果, N'') AS 不合格品处理结果,
+                    %s AS 不合格品处理状态,
+                    /* 检验行的「特采」回填(2026-11-28 用户口径:靠它判断不合格数量进采购入库还是暂收退料) */
+                    ISNULL(ins.特采, 0) AS 特采,
                     /* ── 入库 ── */
                     put.入库单号 AS 入库单号,
                     CONVERT(nvarchar(10), put.入库日期, 120) AS 入库日期,
@@ -299,7 +303,8 @@ public class QcFlowService {
                   /* 来料检验单:同一暂收单 + 同一物料;同批次优先,再取最新一张 */
                   OUTER APPLY (SELECT TOP 1 i.单据编号 AS 检验单号, i.检验日期, i.检验员,
                                       i.单据状态 AS 检验头状态, i.审核时间 AS 检验审核时间,
-                                      x.送检数量, x.合格数量, x.不合格数量, x.入库单号 AS 检验入库单号
+                                      x.送检数量, x.合格数量, x.不合格数量, ISNULL(x.特采, 0) AS 特采,
+                                      x.入库单号 AS 检验入库单号
                                  FROM dbo.qc_insp i
                                  JOIN dbo.qc_insp_detail x
                                    ON x.单据编号 = i.单据编号 AND ISNULL(x.asp_cancel,'N') <> 'Y'
@@ -337,17 +342,18 @@ public class QcFlowService {
                                                           AND rx.物料编码 = d.物料编码)))
                                 ORDER BY CASE WHEN ins.检验单号 IS NOT NULL AND r.检验单号 = ins.检验单号 THEN 0 ELSE 1 END,
                                          r.id DESC) ret
-                  /* 特采单(让步接收):先按检验单号,再按「批次号 + 产品名称=物料名称」兜底 */
-                  OUTER APPLY (SELECT TOP 1 t.单据编号 AS 特采单号, t.单据日期 AS 特采日期,
+                  /* 不合格品处理单(来料,2026-11-28 由「特采单」正名;让步接收的真正决定方):
+                     先按检验单号,再按「批次号 + 产品名称=物料名称」兜底 */
+                  OUTER APPLY (SELECT TOP 1 t.单据编号 AS 不合格品处理单号, t.单据日期 AS 不合格品处理日期,
                                       t.不合格品数量, t.最终处理结果,
-                                      t.单据状态 AS 特采头状态, t.审核时间 AS 特采审核时间
+                                      t.单据状态 AS 不合格品处理单头状态, t.审核时间 AS 不合格品处理审核时间
                                  FROM dbo.qc_tc_in t
                                 WHERE ISNULL(t.asp_cancel,'N') <> 'Y'
                                   AND ((ins.检验单号 IS NOT NULL AND t.检验单号 = ins.检验单号)
                                        OR (ISNULL(d.批次号, N'') <> N'' AND t.批次号 = d.批次号
                                            AND t.产品名称 = d.物料名称))
                                 ORDER BY CASE WHEN ins.检验单号 IS NOT NULL AND t.检验单号 = ins.检验单号 THEN 0 ELSE 1 END,
-                                         t.id DESC) tc
+                                         t.id DESC) ng
                   /* 采购入库单:① 检验行记的入库单号 → ② 入库单来源单号(检验/暂收/退货/特采)
                      → ③ 批号推定(标出来给用户判断) */
                   OUTER APPLY (SELECT TOP 1 q.入库单号, q.入库日期, q.实收数量, q.匹配方式, q.是否来料检验,
@@ -371,7 +377,7 @@ public class QcFlowService {
                                        ON b.单据编号 = l.单据编号 AND ISNULL(b.asp_cancel,'N') <> 'Y'
                                     WHERE ISNULL(l.asp_cancel,'N') <> 'Y'
                                       AND l.存货编码 = d.物料编码
-                                      AND b.来源单号 IN (ins.检验单号, h.单据编号, ret.退货单号, tc.特采单号)
+                                      AND b.来源单号 IN (ins.检验单号, h.单据编号, ret.退货单号, ng.不合格品处理单号)
                                    UNION ALL
                                    SELECT b.单据编号, b.单据日期, l.实收数量, N'批号推定', l.是否来料检验,
                                           b.单据状态, b.审核时间, b.是否已转ERP, b.ERP单号, 3, l.id
@@ -409,28 +415,28 @@ public class QcFlowService {
                                 WHERE s.panel_code = N'QC_RETURN' AND s.doc_no = ret.退货单号) d4
                   OUTER APPLY (SELECT TOP 1 s.canceled, s.stopped, s.pending, s.shr
                                  FROM dbo.yj_doc_status s
-                                WHERE s.panel_code = N'QC_TC_IN' AND s.doc_no = tc.特采单号) d5
+                                WHERE s.panel_code = N'QC_TC_IN' AND s.doc_no = ng.不合格品处理单号) d5
                   /* 检验数据记录的状态:归档一族连 archived 一起取,见 recStatus */
                   OUTER APPLY (SELECT TOP 1 s.canceled, s.stopped, s.pending, s.shr, s.archived
                                  FROM dbo.yj_doc_status s
                                 WHERE s.panel_code = N'QC_INSP_REC' AND s.doc_no = rec.记录单号) d6
                  WHERE ISNULL(d.asp_cancel,'N') <> 'Y'
-                """.formatted(recvStatus, inspStatus, recStatus, retStatus, tcStatus, pinStatus);
+                """.formatted(recvStatus, inspStatus, recStatus, retStatus, ngStatus, pinStatus);
         // 当前环节:送料未审 → 检验(来料检验单 + 检验数据记录**两单都审完**) → (不合格)退货
-        //   → (让步)特采 → 入库 → 完成。
+        //   → 不合格品处理(让步则回填特采) → 入库或退货 → 完成。
         // 异常(作废/中止)单独出标记,不参与环节判定(异常单也要看得见卡在哪一步)。
         String stage = """
                 CASE
                   WHEN c.送料状态 <> N'已审核' THEN N'送料'
                   WHEN c.需检验 = 1 AND (c.检验单号 IS NULL OR c.检验状态 <> N'已审核'
                        OR c.检验数据记录单号 IS NULL OR c.检验数据记录状态 <> N'已审核') THEN N'检验'
-                  WHEN c.特采单号 IS NOT NULL AND c.特采状态 IN (N'草稿', N'审批中') THEN N'特采'
-                  WHEN c.特采单号 IS NULL AND c.退货单号 IS NOT NULL
-                       AND c.退货状态 IN (N'草稿', N'审批中') THEN N'退货'
-                  WHEN c.特采单号 IS NULL AND c.退货单号 IS NULL AND c.入库单号 IS NULL
-                       AND c.检验结论 = N'不合格' THEN N'退货'
+                  WHEN c.不合格品处理单号 IS NOT NULL
+                       AND c.不合格品处理状态 IN (N'草稿', N'审批中') THEN N'不合格品处理'
+                  WHEN c.退货单号 IS NOT NULL AND c.退货状态 IN (N'草稿', N'审批中') THEN N'退货'
+                  WHEN c.入库单号 IS NULL AND c.退货单号 IS NULL
+                       AND c.检验结论 = N'不合格' THEN N'不合格品处理'
                   WHEN c.入库单号 IS NOT NULL AND c.入库状态 <> N'已审核' THEN N'入库'
-                  WHEN c.入库单号 IS NULL AND c.特采单号 IS NULL AND c.退货单号 IS NOT NULL
+                  WHEN c.入库单号 IS NULL AND c.退货单号 IS NOT NULL
                        AND c.退货状态 = N'已审核' THEN N'完成'
                   WHEN c.入库单号 IS NULL THEN N'入库'
                   ELSE N'完成' END AS 当前环节
@@ -444,7 +450,7 @@ public class QcFlowService {
         int done = 0;
         int waitInsp = 0;
         int waitRet = 0;
-        int waitTc = 0;
+        int waitNg = 0;
         int waitIn = 0;
         int abnormal = 0;
         int noInspect = 0;
@@ -455,7 +461,7 @@ public class QcFlowService {
             else if (!bad) undone++;
             if ("检验".equals(stage)) waitInsp++;
             if ("退货".equals(stage)) waitRet++;
-            if ("特采".equals(stage)) waitTc++;
+            if ("不合格品处理".equals(stage)) waitNg++;
             if ("入库".equals(stage)) waitIn++;
             if (bad) abnormal++;
             if (num(r.get("需检验")) == 0) noInspect++;
@@ -466,7 +472,7 @@ public class QcFlowService {
         s.put("已完成", done);
         s.put("待检验", waitInsp);
         s.put("待退货", waitRet);
-        s.put("待特采", waitTc);
+        s.put("待不合格品处理", waitNg);
         s.put("待入库", waitIn);
         s.put("异常", abnormal);
         s.put("免检", noInspect);
@@ -475,13 +481,13 @@ public class QcFlowService {
 
     /**
      * 停留天数:停在哪个环节就从**那个环节单据的日期**算到今天(送料未审 → 送料日期;待检/检验中 → 检验日期,
-     * 没有检验单就退回送料日期;待退货 → 退货日期;待特采 → 特采日期;待入库 → 入库日期);
+     * 没有检验单就退回送料日期;待不合格品处理 → 处理单日期;待退货 → 退货日期;待入库 → 入库日期);
      * 缺单据时逐级退回上一张单的日期,已完成给 0。
      *
      * <p>为什么要"退回":缺单据的批次没有那个日期,不能因此显示「-」—— 它恰恰是最该被催的那些行。
      */
     private static int stuckDays(String stage, String recvDate, String inspDate,
-                                 String retDate, String tcDate, String inDate) {
+                                 String retDate, String ngDate, String inDate) {
         String base;
         if ("送料".equals(stage)) {
             base = recvDate;
@@ -489,12 +495,12 @@ public class QcFlowService {
             base = firstNonEmpty(inspDate, recvDate);
         } else if ("退货".equals(stage)) {
             base = firstNonEmpty(retDate, inspDate, recvDate);
-        } else if ("特采".equals(stage)) {
-            base = firstNonEmpty(tcDate, retDate, inspDate, recvDate);
+        } else if ("不合格品处理".equals(stage)) {
+            base = firstNonEmpty(ngDate, retDate, inspDate, recvDate);
         } else if ("入库".equals(stage)) {
-            base = firstNonEmpty(inDate, tcDate, retDate, inspDate, recvDate);
+            base = firstNonEmpty(inDate, ngDate, retDate, inspDate, recvDate);
         } else {
-            base = firstNonEmpty(inDate, tcDate, retDate, inspDate, recvDate);
+            base = firstNonEmpty(inDate, ngDate, retDate, inspDate, recvDate);
         }
         LocalDate d = parseDate(base);
         if (d == null) return 0;
