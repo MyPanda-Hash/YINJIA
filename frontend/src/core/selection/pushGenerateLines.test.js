@@ -5,7 +5,10 @@ import {
   capOf,
   defaultPickKeys,
   docSummary,
+  hasKingdeeQty,
   isPrintedRow,
+  kingdeeShort,
+  kingdeeUnrecvOf,
   mixedBatchBlocked,
   pickedCount,
   picksOf,
@@ -128,4 +131,35 @@ test('picksOf:数组/Set 都归一成 Set(组件里存数组,纯函数收哪样�
   assert.deepEqual([...picksOf(['A#1', 'A#2'])], ['A#1', 'A#2'])
   assert.deepEqual([...picksOf(new Set(['A#1']))], ['A#1'])
   assert.equal(picksOf(undefined).size, 0)
+})
+
+/* ── 金蝶行级执行量(2026-11-27 客户口径)─────────────────────────────
+   客户报障实例:采购订单行 数量 5000 / 金蝶未入库 4000(别人在金蝶手工收过 1000),
+   MES「剩余」还是 5000 ⇒ 现场照剩余生单 5000,转ERP 超收 1000。
+   界面要把「金蝶未入库」并排显示,并把"剩余 > 金蝶未入库"标黄。 */
+
+test('hasKingdeeQty:只有带回传值才算有(空/缺键 = 没这列)', () => {
+  assert.equal(hasKingdeeQty(orderRow('A#1', 5000, 0, 0, { 金蝶未入库数量: 4000 })), true)
+  assert.equal(hasKingdeeQty(orderRow('A#1', 5000, 0, 0, { 金蝶未入库数量: 0 })), true, '0 是有效值(已收满)')
+  assert.equal(hasKingdeeQty(orderRow('A#1', 5000)), false, '销售订单/工单链路没有这两个键')
+  assert.equal(hasKingdeeQty(orderRow('A#1', 5000, 0, 0, { 金蝶未入库数量: '' })), false)
+  assert.equal(hasKingdeeQty(null), false)
+})
+
+test('kingdeeUnrecvOf:取不到给 null(界面显示「-」,不冒充 0)', () => {
+  assert.equal(kingdeeUnrecvOf({ 金蝶未入库数量: 4000 }), 4000)
+  assert.equal(kingdeeUnrecvOf({ 金蝶未入库数量: '0' }), 0)
+  assert.equal(kingdeeUnrecvOf({}), null)
+  assert.equal(kingdeeUnrecvOf({ 金蝶未入库数量: 'abc' }), null)
+})
+
+test('kingdeeShort:剩余 > 金蝶未入库 才是坑(剩余 ≤ 未入库 属于正常:生单了还没收)', () => {
+  // 客户实例:能送 5000,金蝶只欠 4000 ⇒ 标黄
+  assert.equal(kingdeeShort(orderRow('A#1', 5000, 0, 0, { 金蝶未入库数量: 4000 })), true)
+  // 已经生单 3000 还没收:剩余 2000 ≤ 未入库 4000 ⇒ 不该告警
+  assert.equal(kingdeeShort(orderRow('A#1', 5000, 3000, 0, { 金蝶未入库数量: 4000 })), false)
+  // 收满了(未入库 0)但 MES 还没生单 ⇒ 提示别再生
+  assert.equal(kingdeeShort(orderRow('A#1', 5000, 0, 0, { 金蝶未入库数量: 0 })), true)
+  // 没有回传值 ⇒ 不告警(其它链路)
+  assert.equal(kingdeeShort(orderRow('A#1', 5000)), false)
 })

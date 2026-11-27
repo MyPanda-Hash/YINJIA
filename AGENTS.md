@@ -377,6 +377,7 @@ YINJIA-MES = light-mes 面板引擎(Vue3) + Spring Boot + SQL Server `HSDZ_MES`,
 | 采购链四单字段基线 | `docs/development/采购链四单字段与显示字段.md` |
 | 采购订单「金蝶已入库/未入库」冻结在旧值(31 天修改窗 + 表头指纹双重过滤;`sync-core.pendingPoNos` 强制补拉「待转ERP」单涉及的订单 + 指纹旁路)⇒ 现场据此重复收料、转ERP 被金蝶以「已经构建了关联关系」拒绝 | `docs/development/采购订单执行量同步-31天窗口冻结-20261126.md` |
 | 采购订单行执行量**根治(方案二)**:把金蝶「采购入库单」当触发源(按 modify_time 扫,取 `src_bill_no` 并入 `autoRefreshPos` ⇒ 不受 31 天窗/表头指纹限制),数量仍以金蝶订单行 `in_qty/un_out_qty` 为准;实现 `deploy/inbound-watch.mjs`,水位线 `deploy/state.json:inboundWatchUntil`,`--inbound-window-days` 一次性补扫 | `docs/development/金蝶采购入库单驱动订单行刷新-20261126.md` |
+| 生单界面显示「金蝶已入库/未入库」:生单候选行带 `金蝶已入库数量/金蝶未入库数量`(`PushGenerateHandler.putKingdeeQty`,来源 `bl_pu_order.行已执行/未执行数量`);`剩余 > 金蝶未入库` 标橙提示超收;**只显示不改上限**(超送规则未动) | `docs/development/生单界面显示金蝶未入库-20261127.md` |
 | 送料浮层「关联单据」可见性(浮层只列批次台账 ⇒ 统一生单/选单/手工建的暂收单看不见;`BatchService.appendOrphanRows` 补合成行)+ 「单据批次号 ≠ 占用批次号」的根因(2026-10-16 日期对齐脚本只改了有「批次号」列的表) | `docs/development/送料浮层-关联单据可见性-20261125.md` |
 | 工单排产看板数量口径(三处同源;台账唯一权威键 = 工单行 id) | `docs/development/工单排产看板-本线任务量口径.md` |
 | 工艺清单归档 → 基础数据清单(组装工艺清单→组装物料清单;烧结/X烧结工艺清单→混料物料清单;唯一归档入口 `markArchived`,表 `bs_mix_bom`/面板 `MIX_BOM`) | `docs/development/工艺清单归档同步基础数据清单-20261118.md` |

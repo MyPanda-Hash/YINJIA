@@ -1,0 +1,20 @@
+const task = await taskSpace('gl-kingdee-unrecv-20261127');
+const page = task.page('p1');
+const info = await page.evaluate(() => {
+  const t = (el) => (el ? (el.innerText || '').replace(/\s+/g, ' ').trim() : '');
+  const dlg = [...document.querySelectorAll('.el-dialog')].find((d) => d.offsetParent !== null);
+  if (!dlg) return { ok: false };
+  const tables = [...dlg.querySelectorAll('table')];
+  const tb = tables.find((x) => x.querySelectorAll('tbody tr').length) || tables[0];
+  const head = [...tb.querySelectorAll('thead th')].map((x) => t(x));
+  const rows = [...tb.querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('td')].map((x) => t(x)));
+  const idx = {
+    行号: head.indexOf('行号'), 物料: head.indexOf('物料编码'), 数量: head.indexOf('数量'),
+    剩余: head.indexOf('剩余'), 金蝶: head.indexOf('金蝶未入库'), 上限: head.indexOf('可送上限'),
+  };
+  const line = (r) => `${r[idx['行号']]} ${r[idx['物料']]} 数量=${r[idx['数量']]} 剩余=${r[idx['剩余']]} 金蝶未入库=${r[idx['金蝶']]} 可送=${r[idx['上限']]}`;
+  const warn = [...dlg.querySelectorAll('.bsd-jd-short, .gl-jd-short')].map((el) => ({ text: t(el), title: el.getAttribute('title') }));
+  return { ok: true, title: t(dlg.querySelector('.el-dialog__title')), head, sample: rows.slice(0, 3).map(line), gl008: rows.filter((r) => /YJ-GL-008/.test(r.join('|'))).map(line), warn };
+});
+console.log(JSON.stringify(info, null, 1));
+await page.screenshot({ path: 'C:/Users/Lenovo/ego/gl-kingdee-unrecv-20261127/r06-batch-dialog.png' });

@@ -46,6 +46,10 @@
           %<span class="gl-tip">{{ tt('（本次生效；最高 50%，额度按来源行数量算）') }}</span>
         </span>
         <span class="gl-tip">{{ tt('勾选要生单的明细行并填写本次数量；未勾选的行不会进入新单据') }} · {{ tt('未勾选的明细行置灰、不能填写') }}</span>
+        <!-- 金蝶未入库 vs 剩余 的口径提示(2026-11-27 客户口径:他们主要看金蝶那个) -->
+        <span v-if="hasKingdee" class="gl-tip gl-jd-tip">
+          {{ tt('「金蝶未入库」= 金蝶还欠的货（含别人在金蝶手工收的）；「剩余」= 本系统还能送多少 —— 两者不一样时以金蝶为准') }}
+        </span>
       </div>
 
       <div v-for="doc in docs" :key="doc.sourceNo" class="gl-doc">
@@ -112,6 +116,24 @@
           <el-table-column prop="数量" :label="tt('数量')" width="90" align="right" />
           <el-table-column prop="已送数量" :label="tt('已生单')" width="85" align="right" />
           <el-table-column prop="剩余数量" :label="tt('剩余')" width="85" align="right" />
+          <!-- 金蝶行级执行量(2026-11-27 客户口径:「生单界面要加入金蝶的未入库数量,我主要看这个,
+               不然它和金蝶不同步」):
+                 · 「剩余」= 本系统还能送多少(已生单占用量);
+                 · 「金蝶未入库」= 金蝶还欠的货(已审核采购入库量之外);
+               别人在金蝶里手工收过货(批号 PC0000)时,两者会差 —— 差的时候照「剩余」生单会超收,
+               故这里并排显示,并把"剩余 > 金蝶未入库"的行标黄提示。
+               源面板没有这两个字段(销售订单/工单等链路)时整列不出现。 -->
+          <el-table-column v-if="hasKingdee" :label="tt('金蝶已入库')" width="100" align="right">
+            <template #default="{ row }">{{ jdNum(row['金蝶已入库数量']) }}</template>
+          </el-table-column>
+          <el-table-column v-if="hasKingdee" :label="tt('金蝶未入库')" width="100" align="right">
+            <template #default="{ row }">
+              <span :class="{ 'gl-jd-short': jdShort(row) }"
+                    :title="jdShort(row) ? tt('照「剩余」生单会超过金蝶未入库量（多出来的会超收）') : ''">
+                {{ jdNum(row['金蝶未入库数量']) }}
+              </span>
+            </template>
+          </el-table-column>
           <!-- 仓库 / 仓位(2026-11-13 用户口径「从采购订单生单的时候就开始预填仓库仓位」):
                采购订单这一跳按行选,可以每行不一样;点行头「仓库仓位应用到所有行」把第一个填好的
                仓库+仓位铺满本单所有行。选完随生单提交,沿 暂收 → 检验 → 采购入库 一路带下去。 -->
@@ -189,8 +211,8 @@ import { ElMessage } from 'element-plus'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import {
-  buildDocsPayload, capOf, defaultPickKeys, docSummary, isPrintedRow,
-  mixedBatchBlocked, picksOf, sumPicked,
+  buildDocsPayload, capOf, defaultPickKeys, docSummary, hasKingdeeQty, isPrintedRow,
+  kingdeeShort, kingdeeUnrecvOf, mixedBatchBlocked, picksOf, sumPicked,
 } from '@core/selection/pushGenerateLines'
 // 生单时的「仓库 / 仓位」预填(2026-11-13 用户口径):取数、级联候选、提交键都在这一份纯函数里
 import { binsOfWarehouse, defaultBinOf, loadWhBinSources, whBinPayload } from '@core/selection/genWhBin'
@@ -296,6 +318,13 @@ const merge = computed(() => !!props.merge)
 const OVER_RATIO_PANELS = new Set(['PU_ORDER', 'SUPPLIER_PU_ORDER'])
 const showOverRatio = computed(() => meta.batchFlow && OVER_RATIO_PANELS.has(String(props.sourcePanel)))
 const totalQty = computed(() => sumPicked(docs.value, pickedByDoc, qtyOf))
+
+const hasKingdee = computed(() => docs.value.some((d) => (d.lines || []).some((r) => hasKingdeeQty(r))))
+/** 单元格显示:空值给「-」,别显示 0 冒充"还欠 0" */
+const jdNum = (v) => (v === null || v === undefined || v === '' ? '-' : v)
+/** 「剩余」比「金蝶未入库」还大 ⇒ 照剩余生单一定超收(标黄 + 悬浮提示) */
+const jdShort = (row) => kingdeeShort(row)
+
 const count = computed(() => {
   let n = 0
   for (const d of docs.value) n += (pickedByDoc[d.sourceNo] || []).length
@@ -621,6 +650,9 @@ async function confirm() {
 .gl-merge { background: #eef6ff; border-color: #b9d7f5; color: #1e6fb8; }
 .gl-ratio { display: inline-flex; align-items: center; gap: 4px; }
 .gl-tip { color: #8b9893; }
+/* 金蝶未入库列(2026-11-27):口径提示与"会超收"的黄色标记 —— 同一套颜色在 BatchSendDialog 复用 */
+.gl-jd-tip { flex-basis: 100%; color: #b26a00; }
+.gl-jd-short { color: #d46b08; font-weight: 600; border-bottom: 1px dashed #f0a020; cursor: help; }
 .gl-doc { border: 1px solid #e4e9ef; border-radius: 4px; padding: 6px 8px 8px; background: #fff; }
 .gl-doc-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
 .gl-doc-no { font-weight: 600; color: #1e6fb8; }

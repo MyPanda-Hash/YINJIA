@@ -80,6 +80,16 @@
         <el-table-column prop="已送数量" :label="tt('已送')" width="80" align="right" />
         <el-table-column prop="已退回数量" :label="tt('已退回')" width="80" align="right" />
         <el-table-column prop="剩余数量" :label="tt('剩余')" width="80" align="right" />
+        <!-- 金蝶行级执行量(2026-11-27 客户口径,与合单生单同一套):剩余 = 本系统还能送多少,
+             金蝶未入库 = 金蝶还欠的货;别人在金蝶手工收过货时两者会差,差的时候照剩余送会超收。 -->
+        <el-table-column v-if="hasKingdee" :label="tt('金蝶未入库')" width="100" align="right">
+          <template #default="{ row }">
+            <span :class="{ 'bsd-jd-short': jdShort(row) }"
+                  :title="jdShort(row) ? tt('照「剩余」生单会超过金蝶未入库量（多出来的会超收）') : ''">
+              {{ jdNum(row['金蝶未入库数量']) }}
+            </span>
+          </template>
+        </el-table-column>
         <el-table-column :label="tt('可送上限')" width="95" align="right">
           <template #default="{ row }">{{ capOf(row) }}</template>
         </el-table-column>
@@ -188,10 +198,12 @@ import { usePanelRuntime } from '@core/panel-runtime'
 // 生单行构造:勾选是权威(未勾选的行不生成)—— 纯函数,见 core/selection/batchSendLines.js
 // 可送上限同源纯函数 overAllowance(2026-09-22 口径:按订单全部数量算,超送最高 50%)
 import { buildBatchSendLines, defaultPickKeys, sumPickedQty, overAllowance } from '@core/selection/batchSendLines'
+// 金蝶行级执行量(2026-11-27 客户口径):与合单生单共用同一份纯函数(有单测)
 // 生单时的「仓库 / 仓位」预填(2026-11-13 用户口径):取数/级联候选/提交键都在这一份纯函数里
 import { binsOfWarehouse, defaultBinOf, loadWhBinSources, whBinPayload } from '@core/selection/genWhBin'
 // 未勾选的行置灰 + 不可填(2026-11-17 客户口径;四个打印/生单弹窗共用同一份,见该模块头注释)
 import { pickRowClass, pickRowLocked } from '@core/selection/pickRowStyle'
+import { hasKingdeeQty, kingdeeShort } from '@core/selection/pushGenerateLines'
 
 const engine = usePanelRuntime()
 
@@ -286,6 +298,14 @@ const rowClassPrinted = computed(() => pickRowClass(printedKeys.value))
 /** 本次合计:只算**已勾选**的行(两层都算;未勾选行即使填了量也不送,合计必须与生单结果一致) */
 const totalQty = computed(() =>
   sumPickedQty(rows.value, pickedKeys.value, qtyOf) + sumPickedQty(printedRows.value, printedKeys.value, qtyOf))
+
+/* ── 金蝶行级执行量(2026-11-27 客户口径,与合单生单同一份行契约)─────────────
+   数据来自后端 batchLines 的候选行(`金蝶已入库数量` / `金蝶未入库数量`);
+   源面板没有这两个字段时 hasKingdeeQty=false,列不出现。 */
+const hasKingdee = computed(() => allRows.value.some((r) => hasKingdeeQty(r)))
+const jdNum = (v) => (v === null || v === undefined || v === '' ? '-' : v)
+/** 剩余 > 金蝶未入库 ⇒ 照剩余送料会超收(标黄 + 悬浮提示) */
+const jdShort = (row) => kingdeeShort(row)
 /** 本次生效超送比例(0~1;**最高 50%** —— 2026-09-22 用户口径,超出按 50 算) */
 const ratio = computed(() => Math.max(0, Math.min(50, Number(overRatioPct.value) || 0)) / 100)
 /** 行的可送上限 = 订单数量×(1+本次比例)−已送+已退回(按**全部数量**算;比例一改即时重算,后端同口径再校验) */
@@ -538,4 +558,6 @@ async function confirm() {
 .bsd-ratio-saved { color: #3f8f5b; }
 .bsd-foot { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: #46586e; }
 .bsd-tip { color: #8b9893; }
+/* 金蝶未入库列(2026-11-27):与合单生单同色,提示"照剩余送会超收" */
+.bsd-jd-short { color: #d46b08; font-weight: 600; border-bottom: 1px dashed #f0a020; cursor: help; }
 </style>

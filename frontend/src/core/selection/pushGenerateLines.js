@@ -159,3 +159,35 @@ export function mixedBatchBlocked(docs = [], pickedByDoc = {}, qtyOf = {}) {
   }
   return ''
 }
+
+/* ── 金蝶行级执行量(2026-11-27 客户口径)─────────────────────────────
+   客户原话:「生单界面要加入金蝶的未入库数量,我主要看这个,不然它和金蝶不同步」。
+   后端 /px/push/lines 的候选行带 `金蝶已入库数量` / `金蝶未入库数量`
+   (源头 bl_pu_order.行已执行数量 / 行未执行数量,见 PushGenerateHandler.putKingdeeQty);
+   销售订单 / 生产工单等链路没有这两个键 ⇒ 返回 false / 空,界面不显示该列。 */
+
+/** 该行是否带金蝶回传的行级执行量(空值算"没有",避免显示成 0 冒充"还欠 0") */
+export function hasKingdeeQty(row) {
+  if (!row) return false
+  const v = row['金蝶未入库数量']
+  return !(v === null || v === undefined || v === '')
+}
+
+/** 金蝶未入库量(取不到给 null,供界面显示「-」) */
+export function kingdeeUnrecvOf(row) {
+  if (!hasKingdeeQty(row)) return null
+  const v = Number(row['金蝶未入库数量'])
+  return Number.isFinite(v) ? v : null
+}
+
+/**
+ * 「剩余」比「金蝶未入库」还大 ⇒ 照剩余生单一定超收(界面标黄 + 悬浮提示)。
+ *
+ * <p>为什么不是反过来也比:剩余 < 金蝶未入库 是**正常**的 —— 那说明 MES 已经生单、
+ * 只是货还没收(生单≠入库,见 2026-11-23 口径文档)。只有"能送的比金蝶还欠的多"才是坑。
+ */
+export function kingdeeShort(row) {
+  const un = kingdeeUnrecvOf(row)
+  if (un === null) return false
+  return Number((row && row['剩余数量']) || 0) - un > 0.000001
+}

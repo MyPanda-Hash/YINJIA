@@ -5867,6 +5867,11 @@ export default {
     '取消全选': 'Deselect all',
     '本次数量': 'This Qty',
     '可生单': 'Generatable',
+    // 生单界面·金蝶行级执行量(2026-11-27 客户口径:生单要看金蝶未入库,否则和金蝶不同步)
+    '金蝶已入库': 'Kingdee received',
+    '金蝶未入库': 'Kingdee unreceived',
+    '照「剩余」生单会超过金蝶未入库量（多出来的会超收）': 'Generating by "Remaining" exceeds the unreceived quantity in Kingdee (the excess becomes over-receipt)',
+    '「金蝶未入库」= 金蝶还欠的货（含别人在金蝶手工收的）；「剩余」= 本系统还能送多少 —— 两者不一样时以金蝶为准': '"Kingdee unreceived" = what Kingdee still expects (including receipts entered directly in Kingdee); "Remaining" = what this system can still send. When they differ, trust Kingdee',
     '未打印': 'Not printed',
     '继承来源单': 'Inherited from source',
     '批次号随来源单继承，不能在这里改': 'Batch No. is inherited from the source document and cannot be changed here',

@@ -303,6 +303,27 @@ public class PushGenerateHandler implements PanelActionHandler {
 
     private double round2(double v) { return Math.round(v * 100.0) / 100.0; }
 
+    /**
+     * 把金蝶回传的**行级**执行量原样带到生单候选行上(2026-11-27 客户口径)。
+     *
+     * <p>客户原话:「生单界面要加入金蝶的未入库数量,我主要看这个,不然它和金蝶不同步」。
+     * 起因:采购订单行「数量 5000」在 MES 里还算「剩余 5000」,但金蝶那边因为有人在金蝶里
+     * 手工收过 1000(批号 PC0000)只剩 4000 未入库 —— 现场照「剩余」生单就会超收,
+     * 转ERP 时那行变成负数,永远闭不了环(2026-11-23/11-26 两次踩到)。
+     *
+     * <p>为什么只搬字段、不改上限:「剩余/可送上限」是**生单口径**(已生单占用量),
+     * 「金蝶未入库」是**收货口径**(金蝶已审核入库量),两个口径都有用,谁也不替谁 ——
+     * 界面上并排显示,由现场判断(客户口径:他们主要看金蝶那个)。
+     *
+     * <p>键名与采购订单面板明细列一致(`金蝶已入库数量` / `金蝶未入库数量`),
+     * 值来自 {@code bl_pu_order.行已执行数量 / 行未执行数量};源面板没有这两个字段时给 null,
+     * 前端据此决定要不要出这两列。
+     */
+    private static void putKingdeeQty(Map<String, Object> row, Map<String, Object> it) {
+        row.put("金蝶已入库数量", it.get("金蝶已入库数量"));
+        row.put("金蝶未入库数量", it.get("金蝶未入库数量"));
+    }
+
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> itemsOf(Map<String, Object> doc) {
         Object d = doc == null ? null : doc.get("detail");
@@ -401,6 +422,7 @@ public class PushGenerateHandler implements PanelActionHandler {
             // kg/米 → 3 位;不再出现 24×1.2−24=4.799999999999997 这种纸面小数。
             int rowDecimals = intOf(row.get("小数位数"));
             row.put("可送上限", BatchService.overAllowance(carved, used, ret, ratio, rowDecimals));
+            putKingdeeQty(row, it);
             rows.add(row);
 
             // 隔离行:每个存活打印记录一行(含已生单的,便于用户看见"这批已经用过了")
@@ -422,6 +444,7 @@ public class PushGenerateHandler implements PanelActionHandler {
                 ir.put("打印单号", lb.get("单据编号"));
                 ir.put("打印时间", lb.get("打印时间"));
                 ir.put("已生单", pending <= 0.000001);
+                putKingdeeQty(ir, it);
                 rows.add(ir);
             }
         }
@@ -987,6 +1010,7 @@ public class PushGenerateHandler implements PanelActionHandler {
             row.put("已退回数量", 0d);
             row.put("剩余数量", left);
             row.put("可送上限", left);
+            putKingdeeQty(row, it); // 采购订单这一跳同样带金蝶行级执行量(其它来源面板没有这两个键 ⇒ null)
             rows.add(row);
         }
         return rows;
