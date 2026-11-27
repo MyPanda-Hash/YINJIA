@@ -222,6 +222,7 @@ FIELD	detail	70	计量单位	计量单位	参照	90	E--V		UOM	计量单位名称
 FIELD	detail	80	送检数量	送检数量	小数	100	E--V		GFDA	mc	mc					12865
 FIELD	detail	90	合格数量	合格数量	小数	100	ER-V		GFDA	mc	mc					12867
 FIELD	detail	100	不合格数量	不合格数量	小数	100	E--V		GFDA	mc	mc					12869
+FIELD	detail	105	特采	特采	是否	80	---V							Special acceptance		15577
 FIELD	detail	110	报废数量	报废数量	小数	100	E-H-		GFDA	mc	mc					12872
 FIELD	detail	120	损耗	损耗	小数	90	E--V		GFDA	mc	mc					12874
 FIELD	detail	130	损耗率	损耗率	小数	90	E--V		GFDA	mc	mc					12876
@@ -368,7 +369,7 @@ COL	qc_insp_detail	损耗率	decimal(9)	null	损耗率(损耗/送检数量,按 0
 COL	qc_insp_detail	条码	nvarchar(200)	null	条码(材料二维码/供应商标签条码,扫码全检的载体)
 COL	qc_insp_detail	成品编号	nvarchar(120)	null	成品编号(件级成品/半成品编号,供扫码追溯)
 COL	qc_insp_detail	生产日期	nvarchar(40)	null	生产日期(供应商生产/制造日期)
-COL	qc_insp_detail	特采	bit(1)	NOT NULL	特采:勾选=该行走特采(让步接收)——检验审核不直接生成入库/退料,改为生成特采单;特采单审核通过后全部数量进采购入库单(不走退料)
+COL	qc_insp_detail	特采	bit(1)	NOT NULL	特采:1=让步接收(不合格数量进采购入库),0=退回供应商(进暂收退回单)。2026-11-28 起由「不合格品处理单(来料)审批通过」回填,前端只读,人工不改;检验单审核/处理单审批通过两处都按它分流
 COL	qc_insp_detail	备用1	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	qc_insp_detail	备用2	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	qc_insp_detail	备用3	nvarchar(1000)	null	预留扩展字段(未绑定)
@@ -407,7 +408,6 @@ FIELD	detail	60	单位	单位	参照	70	E-H-		UOM	计量单位名称	计量单�
 FIELD	detail	70	单价	单价	小数	90	E--V							Unit Price		7547
 FIELD	detail	80	退货数量	退货数量	小数	100	ER-V									1799
 FIELD	detail	85	送检数量	送检数量	小数	100	---V									11585
-FIELD	detail	88	特采	特采	是否	60	E--V									11587
 FIELD	detail	90	计量单位	计量单位	参照	90	E--V		UOM	计量单位名称	计量单位名称			Unit of measurement		7546
 FIELD	detail	100	采购订单行号	采购订单行号	文本	110	E--V									7545
 FIELD	detail	101	采购单号	采购单号	文本	140	---V							Src PO No.		14511
@@ -536,7 +536,7 @@ COL	qc_return_detail	备用18	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	qc_return_detail	备用19	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	qc_return_detail	备用20	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	qc_return_detail	送检数量	decimal(9)	null	送检数量:来料检验单明细的送检数量(检验单审核自动生成本退料单时随链带入,只读);特采按钮按它填特采单「总数量」
-COL	qc_return_detail	特采	bit(1)	NOT NULL	特采:勾选=该行做特采(让步接收)。本退料单**审核/审批通过**时,勾了的行逐行生成特采单(总数量=本行送检数量、不合格品数量=本行退货数量);特采单审批通过后全部数量进采购入库单(不走退料)
+COL	qc_return_detail	特采	bit(1)	NOT NULL	特采(已停用 2026-11-28 起):原「退料行勾特采 → 生成特采单」的发起开关。特采改由「检验数据记录判不合格 → 不合格品处理单(来料)」发起,yj_field 已删除,本列仅留档历史数据,新代码不得再读写
 COL	qc_return_detail	现存量	decimal(9)	null	现存量(采购链透传字段,2026-11-12 新增,隐藏):采购订单行上的库存快照 —— 金蝶 inv_qty 在**制单那一刻**的库存数量(行上无仓库 = 全仓合计),不是实时库存;沿 采购订单→送料暂收→来料检验→暂收退回 逐站下传(退料行由检验行镜像),仅供追溯。实时库存见 kucun。
 COL	qc_return_detail	采购单号	nvarchar(400)	null	暂收退回行的来源采购订单号(行级),口径同来料检验行。
 
@@ -993,7 +993,7 @@ COL	bl_purchase_in	批次号	nvarchar(100)	null	送料批次号(采购订单分�
 COL	bl_purchase_in	送检数量	decimal(9)	null	送检数量(来源来料检验单,2026-09-21 补齐)
 COL	bl_purchase_in	部门名称	nvarchar(400)	null	部门名称(来源来料检验单,2026-09-21 补齐)
 COL	bl_purchase_in	生产日期	nvarchar(40)	null	生产日期(来源来料检验单,2026-09-21 补齐)
-COL	bl_purchase_in	特采	nvarchar(20)	null	特采:是=本行由特采单(QC_TC_IN)审批通过后生成 —— 即来料检验判定为特采(让步接收)的物料,全部数量入库;否=普通来料检验合格入库或免检直达。来源:检验单明细「特采」开关经 特采单 闸门带下,生单时写入,只读
+COL	bl_purchase_in	特采	nvarchar(20)	null	特采:是=本行由「不合格品处理单(来料)」(QC_TC_IN,2026-11-28 前叫特采单)审批通过后生成,即让步接收的不合格数量入库;否=普通来料检验合格入库或免检直达。生单时写入,只读
 COL	bl_purchase_in	换算率_conversion_rate	nvarchar(1000)	null	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
 COL	bl_purchase_in	cur_settle_amount_for	nvarchar(1000)	null	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
 COL	bl_purchase_in	仓库	nvarchar(2000)	null	
@@ -1017,3 +1017,4 @@ COL	bl_purchase_in	备用17	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	bl_purchase_in	备用18	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	bl_purchase_in	备用19	nvarchar(1000)	null	预留扩展字段(未绑定)
 COL	bl_purchase_in	备用20	nvarchar(1000)	null	预留扩展字段(未绑定)
+COL	bl_purchase_in	源行id	int(4)	null	多仓库入库的拆分组锚点:组内所有行(含原行)都记原始行 id,原行 id=源行id 的那行是父行;空=没拆过(2026-11-17)

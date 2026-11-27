@@ -93,44 +93,45 @@ ord	panel_code	col_name	label	place	seq	data_type	width	flags	alias	ref_panel	re
 19	QC_INSP	部门	部门	header	90	参照	140	E--V		DEPT	部门名称	部门名称				
 20	QC_INSP	不合格数量	不合格数量	detail	100	小数	100	E--V		GFDA	mc	mc				
 21	QC_INSP	部门编码	部门编码	header	100	参照	140	E--V		DEPT	部门编码	部门名称				
-22	QC_INSP	检验员	检验员	header	110	参照	100	E--V		EMP	员工名称	员工名称				
-23	QC_INSP	报废数量	报废数量	detail	110	小数	100	E-H-		GFDA	mc	mc				
-24	QC_INSP	检验日期	检验日期	header	120	日期	120	E--V		GFDA	mc	mc				
-25	QC_INSP	损耗	损耗	detail	120	小数	90	E--V		GFDA	mc	mc				
-26	QC_INSP	检验编号	检验编号	query,header	130	文本	130	E--V		GFDA	mc	mc				
-27	QC_INSP	损耗率	损耗率	detail	130	小数	90	E--V		GFDA	mc	mc				
-28	QC_INSP	检验方案	检验方案	header	140	参照	140	E--V		QC_PLAN	方案名称	方案名称			Inspection Plan	
-29	QC_INSP	生产日期	生产日期	detail	140	日期	120	E--V		GFDA	mc	mc				
-30	QC_INSP	执行标准	执行标准	query,header	150	文本	180	E--V		GFDA	mc	mc				
-31	QC_INSP	批次号	批次号	detail	150	文本	150	---V								
-32	QC_INSP	处置方式	处置方式	detail	160	下拉框	100	E-H-		GFDA	mc	mc		SELECT v FROM (VALUES (N'入库'),(N'退货'),(N'让步入库')) AS t(v)		
-33	QC_INSP	检验类型	检验类型	header	160	下拉框	100	E--V		GFDA	mc	mc		SELECT v FROM (VALUES (N'全检'),(N'抽检'),(N'免检')) AS t(v)		
-34	QC_INSP	总结论	总结论	query,header	170	下拉框	100	E--V		GFDA	mc	mc		SELECT v FROM (VALUES (N'合格'),(N'不合格'),(N'让步接收')) AS t(v)		
-35	QC_INSP	条码	条码	query,detail	170	文本	140	E-H-		GFDA	mc	mc				
-36	QC_INSP	成品编号	成品编号	detail	180	文本	130	E-H-		GFDA	mc	mc				
-37	QC_INSP	附件1	附件1	header	180	附件	220	E--V		GFDA	mc	mc				
-38	QC_INSP	物料描述	物料描述	detail	190	文本	160	E-H-		GFDA	mc	mc				
-39	QC_INSP	附件2	附件2	header	190	附件	220	E--V		GFDA	mc	mc				
-40	QC_INSP	箱数	箱数	detail	200	小数	80	E-H-		GFDA	mc	mc				
-41	QC_INSP	附件3	附件3	header	200	附件	220	E--V		GFDA	mc	mc				
-42	QC_INSP	日期	日期	detail	210	文本	100	E-H-		GFDA	mc	mc			Date	
-43	QC_INSP	附件4	附件4	header	210	附件	220	E--V		GFDA	mc	mc				
-44	QC_INSP	结案	结案	detail	220	文本	80	E-H-		GFDA	mc	mc				
-45	QC_INSP	附件5	附件5	header	220	附件	220	E--V		GFDA	mc	mc				
-46	QC_INSP	部门	部门	detail	230	参照	100	E-H-		DEPT	部门名称	部门名称			Department	
-47	QC_INSP	附件6	附件6	header	230	附件	220	E--V		GFDA	mc	mc				
-48	QC_INSP	备注	备注	header,detail	240	文本	220	E-H-		GFDA	mc	mc			Remark	
-49	QC_INSP	单据状态	单据状态	query,header	240	文本	90	--H-		GFDA	mc	mc			Doc status	
-50	QC_INSP	部门名称	部门名称	detail	250	文本	100	E-H-		GFDA	mc	mc			Department Name	
-51	QC_INSP	审核人	审核人	header	260	参照	90	---V		EMP	员工名称	员工名称			Approved by	
-52	QC_INSP	入库单号	入库单号	detail	260	文本	130	---V		GFDA	mc	mc			Receipt No.	
-53	QC_INSP	现存量	现存量	detail	265	小数	100	--H-							Current inventory	
-54	QC_INSP	审核时间	审核时间	header	270	文本	140	---V		GFDA	mc	mc			Approved at	
-55	QC_INSP	仓库代码	仓库代码	detail	270	文本	120	E--V		GFDA	mc	mc			Warehouse Code	
-56	QC_INSP	仓位编码	仓位	detail	275	参照	120	E--V		WHLOC	仓位编码	仓位编码	仓库=$仓库代码		Bin	
-57	QC_INSP	仓位名称	仓位名称	detail	276	文本	120	E-H-								
-58	QC_INSP	仓位id	仓位id	detail	277	文本	120	E-H-								
-59	QC_INSP	批次键	批次键	header	280	整数	80	--H-		GFDA	mc	mc				
+22	QC_INSP	特采	特采	detail	105	是否	80	---V							Special acceptance	
+23	QC_INSP	检验员	检验员	header	110	参照	100	E--V		EMP	员工名称	员工名称				
+24	QC_INSP	报废数量	报废数量	detail	110	小数	100	E-H-		GFDA	mc	mc				
+25	QC_INSP	检验日期	检验日期	header	120	日期	120	E--V		GFDA	mc	mc				
+26	QC_INSP	损耗	损耗	detail	120	小数	90	E--V		GFDA	mc	mc				
+27	QC_INSP	检验编号	检验编号	query,header	130	文本	130	E--V		GFDA	mc	mc				
+28	QC_INSP	损耗率	损耗率	detail	130	小数	90	E--V		GFDA	mc	mc				
+29	QC_INSP	检验方案	检验方案	header	140	参照	140	E--V		QC_PLAN	方案名称	方案名称			Inspection Plan	
+30	QC_INSP	生产日期	生产日期	detail	140	日期	120	E--V		GFDA	mc	mc				
+31	QC_INSP	执行标准	执行标准	query,header	150	文本	180	E--V		GFDA	mc	mc				
+32	QC_INSP	批次号	批次号	detail	150	文本	150	---V								
+33	QC_INSP	处置方式	处置方式	detail	160	下拉框	100	E-H-		GFDA	mc	mc		SELECT v FROM (VALUES (N'入库'),(N'退货'),(N'让步入库')) AS t(v)		
+34	QC_INSP	检验类型	检验类型	header	160	下拉框	100	E--V		GFDA	mc	mc		SELECT v FROM (VALUES (N'全检'),(N'抽检'),(N'免检')) AS t(v)		
+35	QC_INSP	总结论	总结论	query,header	170	下拉框	100	E--V		GFDA	mc	mc		SELECT v FROM (VALUES (N'合格'),(N'不合格'),(N'让步接收')) AS t(v)		
+36	QC_INSP	条码	条码	query,detail	170	文本	140	E-H-		GFDA	mc	mc				
+37	QC_INSP	成品编号	成品编号	detail	180	文本	130	E-H-		GFDA	mc	mc				
+38	QC_INSP	附件1	附件1	header	180	附件	220	E--V		GFDA	mc	mc				
+39	QC_INSP	物料描述	物料描述	detail	190	文本	160	E-H-		GFDA	mc	mc				
+40	QC_INSP	附件2	附件2	header	190	附件	220	E--V		GFDA	mc	mc				
+41	QC_INSP	箱数	箱数	detail	200	小数	80	E-H-		GFDA	mc	mc				
+42	QC_INSP	附件3	附件3	header	200	附件	220	E--V		GFDA	mc	mc				
+43	QC_INSP	日期	日期	detail	210	文本	100	E-H-		GFDA	mc	mc			Date	
+44	QC_INSP	附件4	附件4	header	210	附件	220	E--V		GFDA	mc	mc				
+45	QC_INSP	结案	结案	detail	220	文本	80	E-H-		GFDA	mc	mc				
+46	QC_INSP	附件5	附件5	header	220	附件	220	E--V		GFDA	mc	mc				
+47	QC_INSP	部门	部门	detail	230	参照	100	E-H-		DEPT	部门名称	部门名称			Department	
+48	QC_INSP	附件6	附件6	header	230	附件	220	E--V		GFDA	mc	mc				
+49	QC_INSP	备注	备注	header,detail	240	文本	220	E-H-		GFDA	mc	mc			Remark	
+50	QC_INSP	单据状态	单据状态	query,header	240	文本	90	--H-		GFDA	mc	mc			Doc status	
+51	QC_INSP	部门名称	部门名称	detail	250	文本	100	E-H-		GFDA	mc	mc			Department Name	
+52	QC_INSP	审核人	审核人	header	260	参照	90	---V		EMP	员工名称	员工名称			Approved by	
+53	QC_INSP	入库单号	入库单号	detail	260	文本	130	---V		GFDA	mc	mc			Receipt No.	
+54	QC_INSP	现存量	现存量	detail	265	小数	100	--H-							Current inventory	
+55	QC_INSP	审核时间	审核时间	header	270	文本	140	---V		GFDA	mc	mc			Approved at	
+56	QC_INSP	仓库代码	仓库代码	detail	270	文本	120	E--V		GFDA	mc	mc			Warehouse Code	
+57	QC_INSP	仓位编码	仓位	detail	275	参照	120	E--V		WHLOC	仓位编码	仓位编码	仓库=$仓库代码		Bin	
+58	QC_INSP	仓位名称	仓位名称	detail	276	文本	120	E-H-								
+59	QC_INSP	仓位id	仓位id	detail	277	文本	120	E-H-								
+60	QC_INSP	批次键	批次键	header	280	整数	80	--H-		GFDA	mc	mc				
 1	QC_RETURN	单据编号	单据编号	query,header	10	文本	140	-R-V							Document Number	
 2	QC_RETURN	单据日期	单据日期	query,header	20	日期	120	ER-V							Document Date	
 3	QC_RETURN	物料编码	物料编码	query,detail	20	参照	120	ER-V		INV	存货编码	存货名称			Material Code	
@@ -146,31 +147,30 @@ ord	panel_code	col_name	label	place	seq	data_type	width	flags	alias	ref_panel	re
 13	QC_RETURN	退货数量	退货数量	detail	80	小数	100	ER-V								
 14	QC_RETURN	仓库	仓库	query,header	80	参照	150	E--V		WH	仓库名称	仓库名称			Warehouse	
 15	QC_RETURN	送检数量	送检数量	detail	85	小数	100	---V								
-16	QC_RETURN	特采	特采	detail	88	是否	60	E--V								
-17	QC_RETURN	退货原因	退货原因	header	90	文本	260	E--V							Reason for return	
-18	QC_RETURN	计量单位	计量单位	detail	90	参照	90	E--V		UOM	计量单位名称	计量单位名称			Unit of measurement	
-19	QC_RETURN	经手人	经手人	header	100	参照	100	E--V		EMP	员工名称	员工名称			Person in charge	
-20	QC_RETURN	采购订单行号	采购订单行号	detail	100	文本	110	E--V								
-21	QC_RETURN	采购单号	采购单号	detail	101	文本	140	---V							Src PO No.	
-22	QC_RETURN	现存量	现存量	detail	105	小数	100	--H-							Current inventory	
-23	QC_RETURN	单据状态	单据状态	query,header	110	文本	90	---V							Doc status	
-24	QC_RETURN	不良原因	不良原因	query,detail	110	参照	150	E--V		REJECT	不合格原因	不合格原因				
-25	QC_RETURN	审核人	审核人	header	120	参照	90	---V		EMP	员工名称	员工名称			Approved by	
-26	QC_RETURN	报废数量	报废数量	detail	120	小数	100	E-H-								
-27	QC_RETURN	审核时间	审核时间	header	130	文本	140	---V							Approved at	
-28	QC_RETURN	剩余数量	剩余数量	detail	130	小数	100	E-H-								
-29	QC_RETURN	备注	备注	header,detail	140	文本	220	E--V							Remark	
-30	QC_RETURN	附件1	附件1	header	150	附件	220	E--V								
-31	QC_RETURN	附件2	附件2	header	160	附件	220	E--V								
-32	QC_RETURN	附件3	附件3	header	170	附件	220	E--V								
-33	QC_RETURN	附件4	附件4	header	180	附件	220	E--V								
-34	QC_RETURN	附件5	附件5	header	190	附件	220	E--V								
-35	QC_RETURN	附件6	附件6	header	200	附件	220	E--V								
-36	QC_RETURN	批次号	批次号	detail	206	文本	150	---V								
-37	QC_RETURN	ERP单号	ERP单号	header	300	文本	130	---V								
-38	QC_RETURN	是否已转ERP	是否已转ERP	header	310	文本	130	---V								
-39	QC_RETURN	转ERP操作人	转ERP操作人	header	320	文本	130	---V								
-40	QC_RETURN	转ERP时间	转ERP时间	header	330	文本	130	---V								
+16	QC_RETURN	退货原因	退货原因	header	90	文本	260	E--V							Reason for return	
+17	QC_RETURN	计量单位	计量单位	detail	90	参照	90	E--V		UOM	计量单位名称	计量单位名称			Unit of measurement	
+18	QC_RETURN	经手人	经手人	header	100	参照	100	E--V		EMP	员工名称	员工名称			Person in charge	
+19	QC_RETURN	采购订单行号	采购订单行号	detail	100	文本	110	E--V								
+20	QC_RETURN	采购单号	采购单号	detail	101	文本	140	---V							Src PO No.	
+21	QC_RETURN	现存量	现存量	detail	105	小数	100	--H-							Current inventory	
+22	QC_RETURN	单据状态	单据状态	query,header	110	文本	90	---V							Doc status	
+23	QC_RETURN	不良原因	不良原因	query,detail	110	参照	150	E--V		REJECT	不合格原因	不合格原因				
+24	QC_RETURN	审核人	审核人	header	120	参照	90	---V		EMP	员工名称	员工名称			Approved by	
+25	QC_RETURN	报废数量	报废数量	detail	120	小数	100	E-H-								
+26	QC_RETURN	审核时间	审核时间	header	130	文本	140	---V							Approved at	
+27	QC_RETURN	剩余数量	剩余数量	detail	130	小数	100	E-H-								
+28	QC_RETURN	备注	备注	header,detail	140	文本	220	E--V							Remark	
+29	QC_RETURN	附件1	附件1	header	150	附件	220	E--V								
+30	QC_RETURN	附件2	附件2	header	160	附件	220	E--V								
+31	QC_RETURN	附件3	附件3	header	170	附件	220	E--V								
+32	QC_RETURN	附件4	附件4	header	180	附件	220	E--V								
+33	QC_RETURN	附件5	附件5	header	190	附件	220	E--V								
+34	QC_RETURN	附件6	附件6	header	200	附件	220	E--V								
+35	QC_RETURN	批次号	批次号	detail	206	文本	150	---V								
+36	QC_RETURN	ERP单号	ERP单号	header	300	文本	130	---V								
+37	QC_RETURN	是否已转ERP	是否已转ERP	header	310	文本	130	---V								
+38	QC_RETURN	转ERP操作人	转ERP操作人	header	320	文本	130	---V								
+39	QC_RETURN	转ERP时间	转ERP时间	header	330	文本	130	---V								
 1	PURCHASE_IN	存货编码	存货编码	query,detail	10	参照	120	ER-V		INV	存货编码	存货名称			Inventory Code	
 2	PURCHASE_IN	单据日期	单据日期	query,header	10	日期	140	ER-V							Document Date	
 3	PURCHASE_IN	单据编号	单据编号	query,header	20	文本	140	ER-V							Document Number	
