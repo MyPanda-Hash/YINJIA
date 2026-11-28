@@ -2589,6 +2589,7 @@ export default {
     '已添加': 'Added',
     /* 2026-11-28 选单窗按金蝶改成「一张单据多行物料」:状态多了「部分已添加」,并加了本页全选/行灰显提示 */
     '部分已添加': 'Partly added',
+    '可送行数': 'Shippable lines',
     '全选本页可加入的单据': 'Select every addable order on this page',
     '把这张单据的全部明细加入合单': 'Add all lines of this document to the merge',
     '灰显的明细行已经在合单页面里': 'Greyed-out lines are already on the merge sheet',

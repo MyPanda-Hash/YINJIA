@@ -104,7 +104,8 @@
         <el-table-column :label="tt('供应商')" min-width="118" show-overflow-tooltip>
           <template #default="{ row }">{{ supplierOf(row.__doc) }}</template>
         </el-table-column>
-        <el-table-column :label="tt('行数')" width="50" align="right">
+        <!-- 这里数的是**可送行数**(服务端已把"已送完且超送额度用尽"的行滤掉),不是订单总行数 -->
+        <el-table-column :label="tt('可送行数')" width="66" align="right">
           <template #default="{ row }">{{ docLineCount(row.__doc) }}</template>
         </el-table-column>
         <!-- 明细:一行一个物料 -->
