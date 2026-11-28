@@ -1265,6 +1265,8 @@ public class ButtonService {
         ensureBatchNoByDate(def, head, items);
         // 明细「行序」自动补号(2026-11-04,组装物料清单 ASM_BOM 连加两行保存撞唯一索引):见方法注释
         assignNewLineSeq(def, items, no);
+        // 采购订单明细「行号」自动补号(2026-11-28):手工新建的订单行没有 seq,会让下游整条链拿不到行号
+        assignPoLineNo(def, items, no);
         // 误删护栏(2026-11-18,依据实测事故):单表式 BOM 面板(组装/混料物料清单)已有有效子件行,
         // 而本次提交的**明细是空的** ⇒ 拒绝保存。
         // 事故:2026-11-18 15:56 用户在一张组装物料清单上点「提交」,载荷里明细是空的(界面没加载出行),
@@ -2520,9 +2522,52 @@ public class ButtonService {
         }
     }
 
+    /**
+     * 采购订单明细「行号」自动补号(2026-11-28)。
+     *
+     * <p><b>为什么要有</b>:这里的「行号」= 金蝶采购订单的**分录序号 seq** —— 下游
+     * 「送料暂收单 → 来料检验单 → 采购入库单」靠 `行号 → 采购订单行号 → 源单行号` 逐站带下来,
+     * 转ERP 时作 `src_seq` 精确挂到订单行。金蝶同步进来的订单行天然带 seq,但 **MES 手工新建的
+     * 采购订单行「行号」是空的**(测试账套 `PO-2026-11-0013`、正式库 4804 行里有 88 行空)⇒
+     * 整条链一路空到入库行 ⇒ 转ERP 不带 `src_seq`,金蝶只能按物料自己匹配订单行
+     * (同一订单里同物料多行时会挂错行)。
+     *
+     * <p><b>口径</b>:只给**新增行**补号,既有行一律不动;基线 = 该单现有最大行号(查不到时按本次
+     * 载荷里的既有值抬升),不与已占用号重复;补号失败不阻断保存(行号只影响挂单精度)。
+     */
+    private void assignPoLineNo(PanelRegistry.PanelDef def, List<Map<String, Object>> items, String no) {
+        if (def == null || !"PU_ORDER".equals(def.code())) return;
+        if (items == null || items.isEmpty() || no == null || no.isBlank()) return;
+        if (def.lineTable() == null || def.lineTable().isBlank()
+                || def.groupCol() == null || def.groupCol().isBlank()) return;
+        PanelRegistry.FieldDef f = def.byLabel("行号");
+        if (f == null || !tableCols(def.lineTable()).contains(f.col())) return;
+        int max = 0;
+        try {
+            Integer dbMax = jdbc.queryForObject(
+                    "SELECT ISNULL(MAX(TRY_CAST([" + f.col() + "] AS int)), 0) FROM " + def.lineTable()
+                            + " WHERE [" + def.groupCol() + "] = ? AND ISNULL(asp_cancel, 'N') <> 'Y'",
+                    Integer.class, no);
+            max = dbMax == null ? 0 : dbMax;
+        } catch (Exception e) {
+            log.warn("[采购订单行号] 取存量最大值失败 panel={} no={}: {}", def.code(), no, e.getMessage());
+        }
+        for (Map<String, Object> item : items) {
+            if (item == null) continue;
+            Object id = item.get("id");
+            boolean existing = id != null && !String.valueOf(id).isBlank();
+            int shown = intValueOf(item.get(f.label()));
+            if (existing || shown > 0) {
+                max = Math.max(max, shown);       // 既有行/前端已填号:只抬升基线,绝不改写
+            } else {
+                max = max + 1;
+                item.put(f.label(), max);
+            }
+        }
+    }
+
     /** 整数键解析(行序/加工顺序这类):兼容 Integer/Long/Double/String;空白/非法按 0 */
-    private static int intValueOf(Object v) {
-        if (v == null) return 0;
+    private static int intValueOf(Object v) {        if (v == null) return 0;
         if (v instanceof Number n) return n.intValue();
         String s = String.valueOf(v).trim();
         if (s.isEmpty()) return 0;

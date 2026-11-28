@@ -555,6 +555,11 @@ public class KingdeePushService {
         String qcReturnWhCode = isQcReturn ? warehouseCodeByName(str(head.get("仓库"))) : "";
         /** 暂收退料单仓库回落默认仓时的提示(拼进返回 message,见 ⑥ 之后) */
         String qcReturnWhWarn = "";
+        /** 2026-11-28 转ERP 预检留痕:①按物料推导出行号的行(提示"已自动定位到订单分录"),②超收预警 */
+        List<String> poDerivedNotes = new ArrayList<>();
+        List<String> poQuotaNotes = new ArrayList<>();
+        /** 本次各行挂的采购订单分录在金蝶的完成度(**金蝶报错时**拼进人话,别让现场猜哪一行) */
+        List<String> poQuotaSummary = new ArrayList<>();
         int rowNo = 0;
         for (Map<String, Object> line : lines) {
             rowNo++;
@@ -677,6 +682,22 @@ public class KingdeePushService {
                 }
             }
             String batch = str(line.get("批号"));
+            // 采购入库单的批次号(2026-11-28 用户口径「采购入库单不能把我们的批次号推送上去吗」):
+            //   入库行上有**两个**批号列 —— 「批号」(金蝶同步来的值,非批次商品恒 `PC0000` 占位)与
+            //   「批次号」(MES 生单即定号的业务批次,与库存台账 kucun.批号 同源,如 20260922)。
+            //   此前只推「批号」⇒ 金蝶单据行 batch_no 恒空/PC0000,MES 的批次一个都没落到金蝶(实测
+            //   PI-2026-09-0128 → 金蝶 CGRK-20260922-00038 两个行 batch_no 均为空)。
+            //   现在**批次号优先、批号兜底**:金蝶只对「启用批号管理」的商品吃 batch_no
+            //   (真实账套 2463/3991 = 61.7%;YJ-AJ-017 PP棉 是,YJ-KG-JC-B02 / Y-S-T 不是),
+            //   非批次商品金蝶照旧回落 PC0000/空,不影响推送。
+            if (isPur) {
+                String mesBatch = str(line.get("批次号"));
+                if (!mesBatch.isEmpty() && !mesBatch.equals(batch)) {
+                    log.info("采购入库单[{}]第{}行推金蝶批号改用 MES 批次号[{}](行「批号」列是[{}])",
+                            docNo, rowNo, mesBatch, batch);
+                    batch = mesBatch;
+                }
+            }
             // 产品入库单:行上批号为空时退回**表头批次号**(生产链按「工单号+工单行号」收敛时,
             // 批次号写在表头;金蝶 inv_product 的 batch_no 是行级键,实测仅批次管理商品才落库)
             if (isFinIn && batch.isEmpty()) batch = str(head.get("批次号"));
@@ -709,18 +730,22 @@ public class KingdeePushService {
                     e.put("src_bill_type_number", "pur_bill_order");
                     e.put("src_bill_type_name", "采购订单");
                     e.put("src_inter_id", refs.billId());
-                    Integer srcSeq = intOf(lineColumn(line, "源单行号", "采购订单行号"));
+                    // ★ 2026-11-28 选定投哪一行(顺序 = 明确行号 → 按物料唯一匹配),详见 resolveSrcSeq
+                    Integer srcSeq = resolveSrcSeq(refs, line, materialNo, docNo, rowNo, srcPo, poDerivedNotes);
                     if (srcSeq == null) {
-                        log.warn("采购入库单[{}]第{}行无采购订单行号:该行不带 src_seq(金蝶侧按订单号挂单,不定位到具体行)", docNo, rowNo);
+                        // resolveSrcSeq 内部已按情形打好 warn,这里只留一句汇总
+                        log.warn("采购入库单[{}]第{}行未能定位采购订单[{}]的具体分录:该行不带 src_seq(金蝶按订单号挂单,行由金蝶按物料匹配)",
+                                docNo, rowNo, srcPo);
                     } else {
+                        // ★ 2026-11-28 预检:target 分录在金蝶还有没有可关联量 —— 结论拼进提示,
+                        //   失败时由 erpHumanHint 把金蝶原文翻译成人话(附本次各行完成度)。
+                        //   只预警不拦:超送到底吃不吃由金蝶判定,见 warnPoLineQuota 注释。
+                        warnPoLineQuota(docNo, rowNo, materialNo, num(line, qtyKey), srcPo, srcSeq, refs, poQuotaNotes);
+                        e.put("src_seq", srcSeq);
                         String entryId = refs.entryIdBySeq().get(srcSeq);
-                        if (entryId == null) {
-                            log.warn("采购入库单[{}]第{}行 采购订单行号[{}] 在采购订单[{}]分录中不存在:该行不带 src_seq/src_entry_id",
-                                    docNo, rowNo, srcSeq, srcPo);
-                        } else {
-                            e.put("src_seq", srcSeq);
-                            e.put("src_entry_id", entryId);
-                        }
+                        if (entryId != null) e.put("src_entry_id", entryId);
+                        PoLineInfo info = refs.infoBySeq().get(srcSeq);
+                        if (info != null) poQuotaSummary.add(quotaText(docNo, rowNo, materialNo, srcPo, srcSeq, info));
                     }
                 }
             }
@@ -766,7 +791,9 @@ public class KingdeePushService {
         long tPushed = System.currentTimeMillis();
         if (res.path("errcode").asInt(-1) != 0) {
             String err = res.path("description_cn").asText(res.path("description").asText(res.toString()));
-            throw new RuntimeException("金蝶接口失败: " + err);
+            // 2026-11-28:金蝶这句原文(「部分数据已经构建了关联关系」「不允许超量入库」「商品分录已关闭」)
+            // 现场读不懂、也不知道卡哪一行 —— 统一翻译成"哪一行 / 金蝶那边多少 / 该怎么办"。
+            throw new RuntimeException(erpHumanHint(err, poQuotaSummary, poQuotaNotes));
         }
         String erpBillNo = "";
         JsonNode map = res.path("data").path("id_number_map");
@@ -786,7 +813,15 @@ public class KingdeePushService {
         out.put("ERP单号", erpBillNo);
         out.put("转ERP操作人", operator);
         out.put("转ERP时间", now);
-        out.put("message", "已成功转入金蝶ERP，ERP单号: " + erpBillNo + "（请在金蝶界面审核）" + linkWarning + soLinkWarning + qcReturnWhWarn);
+        String extraWarn = "";
+        if (!poDerivedNotes.isEmpty()) {
+            extraWarn += "；提示:" + String.join("；", poDerivedNotes);
+        }
+        if (!poQuotaNotes.isEmpty()) {
+            extraWarn += "；注意(超收风险):" + String.join("；", poQuotaNotes);
+        }
+        out.put("message", "已成功转入金蝶ERP，ERP单号: " + erpBillNo + "（请在金蝶界面审核）"
+                + linkWarning + soLinkWarning + qcReturnWhWarn + extraWarn);
         // 耗时留痕(2026-11-12「转ERP 反应好慢」):拆成"准备(档案/源单解析)"与"金蝶保存"两段,
         // 下次再报慢,直接看日志就知道是本地缓存冷启动还是金蝶侧慢,不用再猜。
         log.info("转ERP[{}] 完成:总 {}ms(准备 {}ms,金蝶保存 {}ms)", docNo,
@@ -800,8 +835,32 @@ public class KingdeePushService {
     private static final String PO_LIST_PATH = "/jdy/v2/scm/pur_order";
     private static final String PO_DETAIL_PATH = "/jdy/v2/scm/pur_order_detail";
 
-    /** 采购订单金蝶内部引用(src_inter_id=单据id;src_entry_id=按分录 seq 查分录id) */
-    private record PoRefs(String billId, Map<Integer, String> entryIdBySeq) {}
+    /**
+     * 采购订单**行**在金蝶侧的完成度(2026-11-28 转ERP 预检用)。
+     *
+     * <p>为什么要有:金蝶对「已入库满/已关闭」的采购订单分录**不允许再构建关联关系**,报的是
+     * {@code 部分数据已经构建了关联关系，无法再构建关联关系。} —— 现场只看到这句原文,既不知道
+     * 卡在哪一行,也不知道该减量还是该去金蝶加量(2026-11-07 / 11-11 / 11-24 三次同根事故)。
+     * 出处 {@code tools/archive/_erp-link-full-20261124/README.md}。
+     *
+     * @param materialNo 金蝶订单行物料编码(在 MES 物料编码体系内一致,用于校验/推导挂哪一行)
+     * @param qty        订单数量
+     * @param inQty      已入库数量({@code in_qty};接口没给 → null)
+     * @param unOutQty   未入库数量({@code un_out_qty};接口没给 → null)
+     * @param closeState 行关闭状态({@code close_state}:C=全部入库 等)
+     * @param ioStatus   行入库状态({@code entry_realio_status}:A/C/Z…)
+     */
+    private record PoLineInfo(String materialNo, double qty, Double inQty, Double unOutQty,
+                              String closeState, String ioStatus) {}
+
+    /**
+     * 采购订单金蝶内部引用(src_inter_id=单据id;src_entry_id=按分录 seq 查分录id)+ 行级完成度。
+     *
+     * @param infoBySeq      分录序号 → 完成度(预检/报错翻译用)
+     * @param seqsByMaterial 物料编码 → 该订单里所有分录序号(行上没有「采购订单行号」时按物料**唯一**推导)
+     */
+    private record PoRefs(String billId, Map<Integer, String> entryIdBySeq,
+                          Map<Integer, PoLineInfo> infoBySeq, Map<String, List<Integer>> seqsByMaterial) {}
 
     /**
      * 转ERP 前置守卫(2026-11-16「金蝶在册核对」配套):**来源采购/销售订单在金蝶已删除或已作废 ⇒ 拒绝转ERP**。
@@ -931,14 +990,24 @@ public class KingdeePushService {
             dp.put("id", billId);
             JsonNode entries = kingdeeGet(PO_DETAIL_PATH, dp).path("material_entity");
             Map<Integer, String> bySeq = new HashMap<>();
+            Map<Integer, PoLineInfo> infoBySeq = new HashMap<>();
+            Map<String, List<Integer>> seqsByMaterial = new HashMap<>();
             if (entries.isArray()) {
                 for (JsonNode e : entries) {
                     int seq = e.path("seq").asInt(-1);
                     String eid = e.path("id").asText("");
-                    if (seq > 0 && !eid.isEmpty()) bySeq.put(seq, eid);
+                    if (seq <= 0) continue;
+                    if (!eid.isEmpty()) bySeq.put(seq, eid);
+                    String mat = e.path("material_number").asText("");
+                    infoBySeq.put(seq, new PoLineInfo(mat, e.path("qty").asDouble(0),
+                            decimalOrNull(e.path("in_qty")), decimalOrNull(e.path("un_out_qty")),
+                            e.path("close_state").asText(""), e.path("entry_realio_status").asText("")));
+                    if (!mat.isEmpty()) {
+                        seqsByMaterial.computeIfAbsent(mat, k -> new ArrayList<>()).add(seq);
+                    }
                 }
             }
-            PoRefs out = new PoRefs(billId, bySeq);
+            PoRefs out = new PoRefs(billId, bySeq, infoBySeq, seqsByMaterial);
             poRefsCache.put(poNo, out);
             log.info("金蝶采购订单[{}] 源单引用已解析:单据id={} 分录 {} 条", poNo, billId, bySeq.size());
             return out;
@@ -947,6 +1016,154 @@ public class KingdeePushService {
                     poNo, e.getMessage());
             return null;
         }
+    }
+
+    /** 金蝶数值键 → Double;缺键/空串/null 一律 null(预检据此"拿不到就不判断") */
+    private static Double decimalOrNull(JsonNode n) {
+        if (n == null || n.isMissingNode() || n.isNull()) return null;
+        if (n.isNumber()) return n.asDouble();
+        String s = n.asText("").trim();
+        if (s.isEmpty()) return null;
+        try { return Double.parseDouble(s); } catch (NumberFormatException e) { return null; }
+    }
+
+    /** 数量显示(去尾零):2000.0 → 2000,10.5 → 10.5 */
+    private static String fmtNum(double d) {
+        return java.math.BigDecimal.valueOf(d).stripTrailingZeros().toPlainString();
+    }
+
+    /**
+     * 定位本行应该挂金蝶采购订单的**哪一条分录**(2026-11-28)。
+     *
+     * <p>顺序:
+     * <ol>
+     *   <li><b>行上的「采购订单行号」</b>(物理列 源单行号;订单→暂收→检验→入库 逐站带下来)——
+     *       但必须与金蝶这一分录的物料对得上,否则说明 MES 的号与金蝶的 seq 并非同一口径
+     *       (手工新建的订单行「行号」可能为空或被改过),此时退化到第 2 步而不是硬挂错行;</li>
+     *   <li><b>按物料唯一匹配</b>:一张采购订单里同一物料通常只有一行,能唯一命中就挂它
+     *       —— 这条路解决了"历史单据行上没有行号 ⇒ 一直不带 src_seq ⇒ 金蝶按物料自己乱匹配";</li>
+     *   <li>都定位不到 → 返回 null(不带 src_seq,行由金蝶按物料匹配,与旧行为一致,不阻断转ERP)。</li>
+     * </ol>
+     * <p>⚠ 绝不因为定位不到而阻断转ERP:本方法只决定"挂得多准",不决定"能不能推"。
+     */
+    private Integer resolveSrcSeq(PoRefs refs, Map<String, Object> line, String materialNo,
+                                 String docNo, int rowNo, String srcPo, List<String> derivedNotes) {
+        Integer declared = intOf(lineColumn(line, "源单行号", "采购订单行号"));
+        if (declared != null) {
+            PoLineInfo info = refs.infoBySeq().get(declared);
+            if (info == null) {
+                log.warn("采购入库单[{}]第{}行 采购订单行号[{}] 在采购订单[{}]分录中不存在:改为按物料匹配",
+                        docNo, rowNo, declared, srcPo);
+            } else if (info.materialNo().isEmpty() || info.materialNo().equals(materialNo)) {
+                return declared;
+            } else {
+                log.warn("采购入库单[{}]第{}行 采购订单行号[{}] 在金蝶订单[{}]上是物料[{}],与本行物料[{}]不符"
+                                + "(MES 行号与金蝶分区序号不同源):改为按物料匹配",
+                        docNo, rowNo, declared, srcPo, info.materialNo(), materialNo);
+            }
+        }
+        List<Integer> cands = refs.seqsByMaterial().get(materialNo);
+        if (cands != null && cands.size() == 1) {
+            int seq = cands.get(0);
+            if (declared == null || declared != seq) {
+                derivedNotes.add("第" + rowNo + "行行上没有可用的采购订单行号,已按物料[" + materialNo
+                        + "]自动定位到采购订单[" + srcPo + "]第" + seq + "行");
+                log.info("采购入库单[{}]第{}行按物料[{}]自动定位采购订单[{}]第{}行", docNo, rowNo, materialNo, srcPo, seq);
+            }
+            return seq;
+        }
+        if (cands != null && cands.size() > 1) {
+            log.warn("采购入库单[{}]第{}行 采购订单[{}]里有 {} 行都是物料[{}],无法唯一确定挂哪一行:该行不带 src_seq",
+                    docNo, rowNo, srcPo, cands.size(), materialNo);
+        }
+        return null;
+    }
+
+    /**
+     * 转ERP 预检:目标采购订单分录在金蝶还有没有可关联量(2026-11-28)。
+     *
+     * <p>只**预警不拦** —— 这是刻意的:金蝶允许超送(实测同一账套里 2000 的订单行被收到 2265),
+     * 而「已经构建了关联关系」只在已经超收/行已关闭时才出现;到底哪一档会被拒,**由金蝶判定**。
+     * MES 若按"未入库≤0 就拒绝",会把金蝶本来肯收的单据自己焊死
+     * (同一个坑 2026-11-26 在库存冲回守卫上踩过:见 AGENTS §2.4)。
+     * ⇒ 预检结论拼进返回消息(成功/失败都带),失败时再由 {@link #erpHumanHint} 翻译金蝶原文。
+     *
+     * <p>拿不到金蝶数量族(旧账套/接口变更)时什么都不做,绝不影响推送。
+     */
+    private void warnPoLineQuota(String docNo, int rowNo, String materialNo, double pushQty,
+                                 String srcPo, int srcSeq, PoRefs refs, List<String> quotaNotes) {
+        PoLineInfo info = refs.infoBySeq().get(srcSeq);
+        if (info == null || info.unOutQty() == null) return;
+        double un = info.unOutQty();
+        String where = "第" + rowNo + "行 " + materialNo + " 挂的采购订单[" + srcPo + "]第" + srcSeq + "行";
+        String line = "已入库 " + fmtNum(info.inQty() == null ? info.qty() - un : info.inQty())
+                + "/订单量 " + fmtNum(info.qty()) + "(未入库 " + fmtNum(un) + ")";
+        if (un < -1e-6) {
+            quotaNotes.add(where + "在金蝶" + line + " —— **已经超收**,再推极可能被拒"
+                    + "(原文:部分数据已经构建了关联关系);如被拒请先在该订单加量或作废本单");
+            log.warn("采购入库单[{}]第{}行 挂的采购订单[{}]第{}行已超收(未入库 {}),本次要收 {},推送可能被金蝶拒",
+                    docNo, rowNo, srcPo, srcSeq, fmtNum(un), fmtNum(pushQty));
+        } else if (un <= 1e-6) {
+            quotaNotes.add(where + "在金蝶" + line + " —— **该行已收满**" + (info.closeState().isEmpty() ? "" : "(行关闭状态 " + info.closeState() + ")")
+                    + ",再挂可能被拒;如被拒请先加量或作废本单");
+            log.warn("采购入库单[{}]第{}行 挂的采购订单[{}]第{}行已收满(未入库 0),本次要收 {},推送可能被金蝶拒",
+                    docNo, rowNo, srcPo, srcSeq, fmtNum(pushQty));
+        } else if (pushQty > un + 1e-6) {
+            quotaNotes.add(where + "金蝶未入库仅 " + fmtNum(un) + ",本次收 " + fmtNum(pushQty)
+                    + "(超出 " + fmtNum(pushQty - un) + ");金蝶允许超送就能过,不允许会报「不允许超量入库」");
+            log.warn("采购入库单[{}]第{}行 超出金蝶未入库量(未入库 {},本次 {}),看金蝶超送设置",
+                    docNo, rowNo, fmtNum(un), fmtNum(pushQty));
+        }
+    }
+
+    /** 一行金蝶订单完成度摘要(拼进报错/成功提示) */
+    private static String quotaText(String docNo, int rowNo, String materialNo,
+                                    String srcPo, int srcSeq, PoLineInfo info) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("第").append(rowNo).append("行 ").append(materialNo)
+                .append(" → 采购订单[").append(srcPo).append("]第").append(srcSeq).append("行:订单量 ")
+                .append(fmtNum(info.qty()));
+        if (info.inQty() != null) sb.append(" / 已入库 ").append(fmtNum(info.inQty()));
+        if (info.unOutQty() != null) sb.append(" / 未入库 ").append(fmtNum(info.unOutQty()));
+        if (!info.closeState().isEmpty()) sb.append(" / 行关闭 ").append(info.closeState());
+        if (!info.ioStatus().isEmpty()) sb.append(" / 入库状态 ").append(info.ioStatus());
+        return sb.toString();
+    }
+
+    /**
+     * 把金蝶的原文错误翻译成"现场能照着做"的话(2026-11-28)。
+     *
+     * <p>只对**已知的三句**做增强(关联关系/超量入库/分录已关闭 —— 2026-11-07、11-11、11-24 三连事故),
+     * 其余原样抛,不掩盖未知错误。增强内容 = 原文 + 本次各行金蝶完成度 + 三条处置建议。
+     */
+    private static String erpHumanHint(String err, List<String> quotaSummary, List<String> quotaNotes) {
+        StringBuilder detail = new StringBuilder();
+        if (quotaSummary != null && !quotaSummary.isEmpty()) {
+            detail.append("\n本次各行在金蝶的完成度:\n· ").append(String.join("\n· ", quotaSummary));
+        }
+        if (quotaNotes != null && !quotaNotes.isEmpty()) {
+            detail.append("\n预检提示:").append(String.join("；", quotaNotes));
+        }
+        String d = detail.toString();
+        if (err.contains("已经构建了关联关系")) {
+            return "金蝶接口失败: " + err
+                    + "\n含义:某条采购订单分录在金蝶已经收满(或超收/已关闭),没有可再关联的数量了。" + d
+                    + "\n怎么办:①减少本单数量;②在金蝶给该采购订单加量或加行(已审核订单需先反审核),再回来重转;"
+                    + "③这批货确实不该再进这张订单 ⇒ 作废本单。";
+        }
+        if (err.contains("不允许超量入库")) {
+            return "金蝶接口失败: " + err
+                    + "\n含义:本次实收数量超过了该采购订单行的未入库量。" + d
+                    + "\n怎么办:把本行数量改到未入库量以内,或先在该订单加量后再转。";
+        }
+        if (err.contains("已关闭") || err.contains("不允许下推")) {
+            // 金蝶对同一件事有三种说法:①商品分录已关闭 ②单据已关闭,不允许下推
+            // ③部分数据已经构建了关联关系 —— 都指"该采购订单行已入库满/已关闭,推不进去"
+            return "金蝶接口失败: " + err
+                    + "\n含义:该采购订单(或其中的分录)在金蝶已关闭(通常是已入库满),不能再下推/挂单。" + d
+                    + "\n怎么办:在金蝶反关闭该分录、或给订单加量/加行之后,再回 MES 重转。";
+        }
+        return "金蝶接口失败: " + err + d;
     }
 
     // ══════════ 销售订单来源引用(2026-10-15) ══════════
