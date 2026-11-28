@@ -127,9 +127,15 @@ test('全选放在勾选列表头(行号前面的格子),不占顶部条', () =>
   assert.ok(head.length > 100, '取不到顶部条,说明 gl-bar / gl-doc 的类名变了')
   assert.ok(!/gl-pick-all|pickAllDocs/.test(dialog), '顶部那颗总全选按用户口径已撤掉,不要再挂回去')
 
-  // 勾选列 = 第一列(宽 42、在「行号」之前),它的 #header 里必须有全选框
-  const firstCol = dialog.slice(dialog.indexOf('<el-table-column width="42"'), dialog.indexOf("prop=\"行号\""))
-  assert.ok(firstCol.length > 80, '取不到勾选列,说明列顺序/宽度变了(全选必须紧挨行号左边)')
+  // 勾选列：以表头全选的 title 为锚点定位 —— 它必须在「行号」列之前。
+  // 列宽随版面压缩调整过（42 → 34），且合单模式在勾选列与行号之间还多一个「删行叉」列，
+  // 所以不能再假设勾选列与行号列紧邻，也不能写死宽度。
+  const rowNoAt = dialog.indexOf('prop="行号"')
+  const pickTitleAt = dialog.indexOf("tt('全选本单的全部明细行')")
+  const firstColAt = pickTitleAt > 0 ? dialog.lastIndexOf('<el-table-column', pickTitleAt) : -1
+  const firstCol = firstColAt > 0 && rowNoAt > firstColAt ? dialog.slice(firstColAt, rowNoAt) : ''
+  assert.ok(firstCol.length > 80 && pickTitleAt < rowNoAt,
+    '取不到勾选列，或全选列不在行号列之前（列顺序变了）')
   assert.match(firstCol, /<template #header>/, '勾选列表头不能是空格子')
   assert.match(firstCol, /tt\('全选本单的全部明细行'\)/, '表头全选要有 title,且走 tt()(英文界面不掉回中文)')
   assert.match(firstCol, /docStats\(doc\)\.all/, '表头勾选框要有"本单已全勾"状态')

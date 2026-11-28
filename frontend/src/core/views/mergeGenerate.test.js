@@ -87,13 +87,16 @@ test('② 选单窗:金蝶口径 —— 已审核+有未送量、勾一张就只
   assert.match(pickDialog, /function selectableRow\(row\)/, '选择列的可用判据要**只**看供应商锁')
   assert.ok(!/if \(addedOf\(row\)\) return false/.test(pickDialog),
     '已在合单里的单也要能再选(用户口径「也可以重新添加」)—— 去重由合单页面按 lineKey 做')
-  // 状态列(2026-11-28):可加入 / 部分已添加 / 已添加,由 docState 一处派生、模板统一过 tt()
-  assert.match(pickDialog, /function docState\(doc\)/, '状态要集中在一处算,别在模板里散着判')
-  for (const s of ["'可加入'", "'部分已添加'", "'已添加'"]) {
-    assert.match(pickDialog, new RegExp(`text: ${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
-      `状态要含 ${s}(客户 2026-11-28 追问「可加入表达什么,还有别的状态吗」)`)
-  }
-  assert.match(pickDialog, /tt\(docState\(row\.__doc\)\.text\)/, '状态文案要走 tt(),不能裸写中文')
+  // 状态列(2026-11-28 第二轮,客户「为什么会出现两个状态,一个状态就够了」):
+  //   改为按**明细行**判的一列三态 —— 已完成(金蝶该行已收满) / 已添加(该行已在合单页面) / 可加入;
+  //   单据级列纵向合并,状态只在明细行这一列,不再另出单据级状态列。
+  assert.match(pickDialog, /row\.__line && row\.__line\.已完成/, '已完成 = 金蝶侧该行已收满')
+  assert.match(pickDialog, /v-else-if="isLineAdded\(row\)"/, '已添加 = 该明细行已在合单页面')
+  assert.match(pickDialog, /tt\('已完成'\)/, '已完成文案要走 tt()(英文界面不掉回中文)')
+  assert.match(pickDialog, /tt\('已添加'\)/, '已添加文案要走 tt()')
+  assert.match(pickDialog, /tt\('可加入'\)/, '可加入文案要走 tt()')
+  assert.ok(!/function docState\(doc\)/.test(pickDialog),
+    '单据级 docState 已由按行状态取代 —— 不要两套状态口径并存')
   assert.match(glDialog, /@confirm="onDocsPicked"/, '合单页面里要能接着选单(用户口径「也可以重新添加」)')
   // 勾了多家供应商当场拦(金蝶选单:必须先按往来单位筛)
   assert.match(pickDialog, /合单生单只能选同一供应商的采购订单，当前勾了/, '混了多家供应商要有一句明确的话')
