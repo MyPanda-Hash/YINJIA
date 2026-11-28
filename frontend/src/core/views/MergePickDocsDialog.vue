@@ -135,18 +135,16 @@
             </span>
           </template>
         </el-table-column>
-        <!-- 行状态(2026-11-28 客户口径「采购订单中已完成的明细,给他标记从可加入变为已完成」):
-             已完成 = 金蝶侧该行已收满(未入库 0),这行**不能再生单** —— 拿它生单转ERP 必被金蝶拒
-             (该分录关联关系已构建完)。行仍列出来,让现场看得见"为什么这行加不进去"。 -->
-        <el-table-column :label="tt('行状态')" width="82" align="center">
+        <!-- 状态(2026-11-28 客户口径「为什么会出现两个状态,一个状态就够了」):
+             两列合并成**一列**、按行判,优先级:
+               已完成 = 金蝶侧该行已收满(未入库 0)⇒ 这行不能再生单(拿它生单转ERP 必被金蝶拒);
+               已添加 = 这一行已经在合单页面上(再选不会重复加);
+               可加入 = 还没进合单,可以勾/补进来。 -->
+        <el-table-column :label="tt('状态')" width="86" align="center">
           <template #default="{ row }">
             <el-tag v-if="row.__line && row.__line.已完成" size="small" type="info">{{ tt('已完成') }}</el-tag>
-            <span v-else>{{ tt('可加入') }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column :label="tt('状态')" width="78" align="center">
-          <template #default="{ row }">
-            <el-tag size="small" :type="docState(row.__doc).type">{{ tt(docState(row.__doc).text) }}</el-tag>
+            <el-tag v-else-if="isLineAdded(row)" size="small" type="success">{{ tt('已添加') }}</el-tag>
+            <el-tag v-else size="small">{{ tt('可加入') }}</el-tag>
           </template>
         </el-table-column>
       </el-table>
@@ -336,27 +334,13 @@ function isLineAdded(row) {
 function rowClassName({ row }) { return isLineAdded(row) ? 'mpd-added-line' : '' }
 
 /**
- * 这张单当前的加入状态(2026-11-28 客户追问「可加入表达什么,还有别的状态吗」):
- *   · 部分已添加 = 明细只有一部分已经在合单页面上(删掉几行再选回来时就是这个状态);
- *   · 已添加     = 明细全在页面上(再选不会重复加);
- *   · 可加入     = 一条都还没进去。
+ * 这张单里**还能加**的明细(2026-11-28:金蝶已收满的行标「已完成」,不再作为可加入明细)。
+ *
+ * <p>状态列已按行展示(已完成 / 已添加 / 可加入),单据级"部分已添加"不再单独出一列
+ * —— 客户口径「为什么会出现两个状态,一个状态就够了」。
  */
-/** 这张单里**还能加**的明细(2026-11-28:金蝶已收满的行标「已完成」,不再作为可加入明细) */
 function usableLinesOf(doc) {
   return itemsOf(doc).filter((it) => !it.已完成)
-}
-
-function docState(doc) {
-  // 全部明细都已完成(金蝶已收满)⇒ 整张单不可再加,状态直接给「已完成」,别显示成"可加入"
-  const usable = usableLinesOf(doc)
-  if (itemsOf(doc).length && !usable.length) return { text: '已完成', type: 'info' }
-  const keys = usable.map((it) => lineKeyOf(doc, it)).filter(Boolean)
-  if (keys.length) {
-    const on = keys.filter((k) => addedKeySet.value.has(k)).length
-    if (on === 0) return { text: '可加入', type: 'success' }
-    return on >= keys.length ? { text: '已添加', type: 'info' } : { text: '部分已添加', type: 'warning' }
-  }
-  return addedOf(doc) ? { text: '已添加', type: 'info' } : { text: '可加入', type: 'success' }
 }
 
 /**
