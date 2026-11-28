@@ -25,6 +25,8 @@ const REQUIRED_METHODS = [
   'printLocationCards',
   'printProductionTask',
   'woQrText',
+  // 出货单(2026-11-28):销售出库单「打印」下拉 → 同一物料合成一行的对外联单(business/shipNote.js)
+  'printShipNote',
   // 采购订单报表打印记录(2026-11-07):打印快照 + 重打/作废;2026-11-09 加记录明细;
   // 2026-11-11 加「需方联系人候选」(打印前弹窗下拉选,可新增)
   'puPrintRecords',

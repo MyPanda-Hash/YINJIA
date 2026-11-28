@@ -111,6 +111,16 @@ const CF_REFRESH_WINDOW_DAYS = 31;
  *  指纹一致即跳过;最坏延迟 1 天。要立刻补某一张:`node sync.mjs --refresh-bill=<单号>`。 */
 const orderDailyStampOnly = (mode, today) => (mode === 'incremental' ? '|D' + today : '');
 
+/**
+ * 金蝶「销售出库单」的业务类型 trans_type → MES「出库类别」字典值(普通销售 / 销售退货)。
+ *
+ * 实测口径:真实账套(2026-11-28)`sal_out_bound` 已审核单据的 `trans_type` **一律 '2'**,
+ * 且 MES 转ERP 推送销售出库单时也是写死 `trans_type='2'`(KingdeePushService:345),
+ * 故 '2' = 普通销售。字典只有两值,其它取值**留空**而不是猜一个 —— 猜错比空更难发现。
+ * (销售退货走另一张单据 `sal_in_bound` / MES `SALE_IN`,不在此列。)
+ */
+const saleOutTypeOf = (v) => (String(v ?? '') === '2' ? '普通销售' : null);
+
 // ---------- 类型注册表 ----------
 // 订单条目:{ code,label,listPath,detailPath,headTable,lineTable,fingerprintOf,mapHead,mapLines }
 // 档案条目:{ code,label,archive:true,listPath,detailPath(可空=仅列表),table,codeCol,
@@ -416,6 +426,70 @@ export const DOCS = [
       }));
     },
   },
+
+  // ══════════ 销售出库单(2026-11-28 接入同步) ══════════
+  // 用户口径:「现在需要同步下拉销售出库单,并且销售出库要打印报表,需求是分批次号的明细,
+  //   根据同一物料成一行来打印。」⇒ 金蝶 `sal_out_bound` **整单 + 明细批号**落进现役面板表
+  //   (bd_sale_out / bl_sale_out),不为它另建镜像表;出货单打印见 frontend/src/business/shipNote.js。
+  // 背景数字(docs/development/MES与金蝶出入库对照.md):金蝶已审核 5,475 张 vs MES 455 张(8.3%),
+  //   2026-10-14 之后 MES 侧几乎空转(11 月 0 张)⇒ 出货单没有数据可打,故必须补这条同步。
+  // 🔴 四条口径(改动前必读 docs/development/销售出库单同步与出货单打印-20261128.md):
+  //   ① **不动库存**:本路径直接写单据表、不经过审核动作,`kucun` 一列都不碰
+  //      (库存数量真源仍是金蝶现存量覆盖,见 AGENTS §2.4)。
+  //   ② `是否已转ERP='是' + ERP单号=bill_no`:这些单据本来就活在金蝶里;不打这个标就会绕过
+  //      KingdeePushService 开头的「是否已转ERP」守卫(行 276)⇒ 现场点一次转ERP 就多一张出库单。
+  //   ③ 行键 = 金蝶分录 `seq`(upsertLines 按「单据编号 + 行号」合并,保住行 identity id);
+  //      老单没有行号时按「存货编码 + 同物料第几次出现」兜底。
+  //   ④ 金蝶「批号」对无批次商品一律是占位值 `PC0000` ⇒ 出货单备注列必须滤掉它(见 shipNote.js),
+  //      否则纸上会印出一堆 PC0000。
+  {
+    code: 'SALE_OUT', label: '销售出库单',
+    listPath: '/jdy/v2/scm/sal_out_bound',
+    detailPath: '/jdy/v2/scm/sal_out_bound_detail',
+    headTable: 'bd_sale_out', lineTable: 'bl_sale_out',
+    lineCodeCol: '存货编码',
+    // 列表级指纹:金蝶列表只回 18 个表头键(实测 id/bill_no/bill_date/bill_status/settle_status/
+    //   delivery_status/customer_*/emp_name/total_amount/material_qty/material_group/ivc_status…),
+    //   **没有明细、没有修改时间** ⇒ 明细变化靠下面的「每日复核日戳」兜底(与订单同一套机制)。
+    fingerprintOf: (r) => [r.bill_status, r.settle_status, r.delivery_status, r.ivc_status,
+      r.bill_date, r.bill_no, r.customer_number, r.emp_name, r.total_amount, r.material_qty]
+      .map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
+    mapHead(d) {
+      return {
+        // ⚠ 单据编号必须是**第一个键**:upsertDoc 用 @p0 定位「外部数据ID 为空 + 单据编号相同」的
+        //   MES 自建单并把它收编(2026-10-14 之前 MES 开过 455 张,单号与金蝶同一套 XSCK-…)。
+        单据编号: str(d.bill_no),
+        单据日期: str(d.bill_date),
+        客户: str(d.customer_name), 客户编码: str(d.customer_number),
+        结算客户: str(d.settle_customer_name),
+        经手人: str(d.emp_name), 部门: str(d.dept_name),
+        单据状态: d.bill_status === 'C' ? '已审核' : '草稿',
+        审核人: str(d.auditor_name), 审核时间: str(d.audit_time),
+        出库类别: saleOutTypeOf(d.trans_type),
+        // 见上面 ②:金蝶侧已存在 ⇒ 标记已转ERP,挡住二次推送
+        是否已转ERP: '是', ERP单号: str(d.bill_no),
+      };
+    },
+    mapLines(d) {
+      return (d.material_entity || []).map((m) => ({
+        单据编号: str(d.bill_no),
+        行号: num(m.seq),
+        存货编码: str(m.material_number), 存货名称: str(m.material_name),
+        规格型号: str(m.material_model),
+        计量单位: str(m.unit_name) || str(m.unit_number),
+        数量: num(m.qty) ?? 0,
+        // 批次号:金蝶键叫 batch_no,MES 物理列叫 批号(label=批次号)
+        批号: str(m.batch_no),
+        仓库: str(m.stock_name),
+        售价: num(m.price), 含税售价: num(m.tax_price),
+        销售金额: num(m.amount), 含税销售金额: num(m.all_amount),
+        '税率%': num(m.cess), 现存量: num(m.inv_qty),
+        // 源单编号/源单行号 = 销售订单号/行号(出货单的「订单编号」列就取它)
+        源单编号: str(m.src_bill_no), 源单行号: num(m.src_seq),
+        备注: str(m.comment),
+      }));
+    },
+  },
 ];
 
 // ---------- 基础 ----------
@@ -651,6 +725,41 @@ export async function upsertLines(doc, tx, mssql, docNo, lines, log = () => {}) 
   return { ins, upd, del, mode };
 }
 
+/**
+ * 表上**真实存在**的列名集合(按表缓存;查不到/表不存在 ⇒ 返回 null = 不过滤,保持历史行为)。
+ *
+ * 【为什么需要】`kingdee-extra-fields.mjs` 的自动映射表是「金蝶接口键 → 面板字段标签」生成的,
+ * 而**标签 ≠ 物理列名**。实测(2026-11-28)销售出库单行表被自动映射了一个不存在的列「仓库名称」
+ * (真列叫 仓库名称_sp_name)—— 这类列一旦进 INSERT/UPDATE,整张单的写入会以「列名无效」失败,
+ * 表现是**整类同步 0 行 + 每张单一条报错**,而源码与面板两头看都对。
+ * ⇒ 写库前按物理列过滤一次,丢弃的列**逐类型告警一次**(不静默吞掉)。
+ */
+const TABLE_COLS_CACHE = new Map();
+async function tableColumns(mssql, pool, table) {
+  if (TABLE_COLS_CACHE.has(table)) return TABLE_COLS_CACHE.get(table);
+  let set = null;
+  try {
+    const rs = await new mssql.Request(pool).query(
+      `SELECT name FROM sys.columns WHERE object_id = OBJECT_ID(N'${table}')`);
+    set = new Set(rs.recordset.map((r) => String(r.name)));
+    if (!set.size) set = null;
+  } catch {
+    set = null;
+  }
+  TABLE_COLS_CACHE.set(table, set);
+  return set;
+}
+/** 只保留表上存在的列(`__` 前缀的元数据键原样留给 upsertDoc 自己处理) */
+function keepKnownCols(obj, cols, dropped) {
+  if (!cols) return obj;
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (k.startsWith('__') || cols.has(k)) out[k] = v;
+    else if (dropped && !dropped.has(k)) dropped.add(k);
+  }
+  return out;
+}
+
 /** 单据落库(通用):头表 upsert + 行表按行号合并 + 审核状态镜像,单事务 */
 async function upsertDoc(doc, mssql, pool, head, lines, fp) {
   const tx = new mssql.Transaction(pool);
@@ -847,7 +956,7 @@ async function pendingPoNos(pool, mssql) {
   return [...out].slice(0, 200);
 }
 
-export async function runCore({ mode, configPath, dryRun = false, probe = false, assumeYes = false, refresh = [], refreshBill = [], noInbound = false, inboundWindowDays = null }) {
+export async function runCore({ mode, configPath, dryRun = false, probe = false, assumeYes = false, refresh = [], refreshBill = [], noInbound = false, inboundWindowDays = null, types = null, windowDays = null }) {
   configPath = configPath || join(HERE, 'config.json');
   if (!existsSync(configPath)) {
     console.error(`✗ 未找到配置文件 ${configPath}\n  请复制 config.example.json 为 config.json 并填入凭证/数据库信息`);
@@ -859,12 +968,17 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
   const s = cfg.sync || {};
   const opt = {
     billStatus: (mode === 'incremental' ? s.billStatus : s.initBillStatus) ?? 'C',
-    windowDays: s.windowDays || 31,
+    // 命令行覆盖优先(config.sync.windowDays 是计划任务的默认窗口):
+    //   `--types=` / `--window-days=` 用于「服务器 config.json 还没登记新类型」时的一次性补拉/回灌,
+    //   例如首次把金蝶历史销售出库单灌进 MES:node sync.mjs --types=SALE_OUT --window-days=1200 --yes
+    windowDays: Number(windowDays) > 0 ? Number(windowDays) : (s.windowDays || 31),
     endBiasMinutes: s.endBiasMinutes === undefined ? 180 : s.endBiasMinutes,
     pageSize: s.pageSize || 100,
     maxPages: s.maxPages || 60,
     maxRecords: s.maxRecordsPerType || 0, // >0=每类最多处理 N 条(测试用;0=不限)
-    types: Array.isArray(s.types) && s.types.length ? s.types : DOCS.map((d) => d.code),
+    types: (Array.isArray(types) && types.length)
+      ? types
+      : (Array.isArray(s.types) && s.types.length ? s.types : DOCS.map((d) => d.code)),
     confirmThreshold: s.confirmThreshold === undefined ? 200 : s.confirmThreshold,
     confirmTimeoutSeconds: s.confirmTimeoutSeconds === undefined ? 5 : s.confirmTimeoutSeconds,
     logRetentionDays: s.logRetentionDays || 365,
@@ -1102,6 +1216,12 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
       log(`【${doc.label}】共 ${rows.length} 条,待写入 ${changedRows.length} 条${skipped ? `,无变化跳过 ${skipped}` : ''}`);
       if (!changedRows.length) continue;
 
+      // 写库前的物理列白名单(见 tableColumns 头注):自动映射表里可能有「面板标签而非物理列」的键,
+      // 不过滤会让整类单据全部写不进去。丢弃的列在下面「完成」那行前统一告警一次。
+      const headCols = doc.archive ? null : await tableColumns(mssql, pool, doc.headTable);
+      const lineCols = doc.archive ? null : (doc.lineTable ? await tableColumns(mssql, pool, doc.lineTable) : null);
+      const droppedCols = new Set();
+
       // 规范:批量写入前按"实际写入量"提示(超阈值),并只备份将被影响的单据前像;未确认则整类跳过。
       // 注:备份范围=待写单(增量)或全量前像(初始化);无变化时不产生备份文件。
       //     档案+init 已在"初始化清污"处完成确认与全量前像备份(archiveInitHandled),此处跳过。
@@ -1156,7 +1276,7 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
               log(`【${doc.label}】${known ? '更新' : '新增'} ${d.number || d.id} ${d.name || ''}`);
             }
           } else {
-            const head = {
+            const head = keepKnownCols({
               ...doc.mapHead(d, ctx),
               ...autoExtra(doc.code, d),
               外部数据ID: str(d.id),
@@ -1166,9 +1286,10 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
               // H=手动关闭(人工终止)→ MES「已中止」;'' / 'C' / 其它 = 未关闭。
               // 只落这个原值,MES 侧状态由它推导;同步不再直接写 stopped(那会覆盖 MES 用户点的中止)。
               __关闭状态: d.bill_close_state === 'S' || d.bill_close_state === 'H' ? d.bill_close_state : null,
-            };
+            }, headCols, droppedCols);
             const lines = doc.mapLines(d)
-              .map((l, i) => ({ ...l, ...autoExtraLines(doc.code, (d.material_entity || [])[i]) })); // 行级全并集合并
+              .map((l, i) => ({ ...l, ...autoExtraLines(doc.code, (d.material_entity || [])[i]) })) // 行级全并集合并
+              .map((l) => keepKnownCols(l, lineCols, droppedCols));
             if (dryRun) {
               console.log(`—— 【${doc.label}】${head.单据编号}(${head[doc.code === 'PU_ORDER' ? '供应商' : '客户']}) 状态=${head.单据状态} 行数=${lines.length}`);
               continue;
@@ -1189,6 +1310,10 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
           failed++;
           log(`✗ 【${doc.label}】单据 ${row.bill_no || row.id} 处理失败: ${e.message}`);
         }
+      }
+      if (droppedCols.size) {
+        log(`⚠ 【${doc.label}】自动映射里有 ${droppedCols.size} 个列在表上不存在,已跳过(不影响其余字段):`
+          + `${[...droppedCols].join('、')} —— 见 docs/development/销售出库单同步与出货单打印-20261128.md`);
       }
       log(`【${doc.label}】完成:新增 ${inserted},更新 ${updated},失败 ${failed}${noCode ? `,缺编码跳过 ${noCode}` : ''}${dup ? `,并发让行 ${dup}` : ''}`);
       totalIn += inserted; totalUp += updated; totalFail += failed;

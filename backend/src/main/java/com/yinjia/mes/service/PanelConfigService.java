@@ -364,8 +364,13 @@ public class PanelConfigService {
                 //   动作名=按钮名(中文数据键,ADR-0001 永不翻译);def.code() 判定保证其它面板下发面 0 变化。
                 if ("SALE_OUT".equals(def.code()) && "打印".equals(g[0])) {
                     // ⚠ panda 数组口径 = {组名, 动作1, 动作2, ...} ⇒ actions 取 subList(1) 再追加
-                    // (动作1 与组名同名「打印」,主按钮仍是「打印」;下拉 = 预览 / 导出 / 生成出厂检验报告)
+                    // (动作1 与组名同名「打印」,主按钮仍是「打印」;
+                    //  下拉 = 预览 / 导出 / 出货单 / 生成出厂检验报告)
+                    // 2026-11-28 加「出货单」(用户口径「销售出库要打印报表,需求是分批次号的明细,
+                    //   根据同一物料成一行来打印」):前端 PanelxList 按动作名本地出纸,
+                    //   版式与合并规则在 frontend/src/business/shipNote.js;后端只负责下发这颗按钮。
                     List<String> acts = new ArrayList<>(List.of(g).subList(1, g.length));
+                    acts.add("出货单");
                     acts.add("生成出厂检验报告");
                     buttonGroups.add(group(g[0], acts));
                     continue;

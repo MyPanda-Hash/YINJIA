@@ -33,6 +33,11 @@
 //                                      当场补某一张,不必等下一轮或全量 --refresh。
 //   node sync.mjs --config=D:\path\config.json
 //   node sync.mjs --no-inbound         跳过「采购入库单驱动订单行刷新」那步(排查时用)
+//   node sync.mjs --types=SALE_OUT --window-days=1200 --yes
+//                                      只跑指定类型 / 自定义回看窗口(2026-11-28):
+//                                      用于「服务器 config.json 的 sync.types 还没登记新类型」时的一次性补拉,
+//                                      典型场景 = 首次把金蝶历史销售出库单灌进 MES
+//                                      (金蝶 5,475 张已审核,按 5 分钟一轮的 32 天窗口追不回来)。
 //   node sync.mjs --inbound-window-days=31 --yes
 //                                      入库单**回看 N 天**(忽略水位线,一次性补扫):
 //                                      用于上线首跑、或同步停了一段时间后把期间的收货补齐。
@@ -84,6 +89,9 @@ try {
     // 2026-11-26 方案二:入库单驱动的订单行刷新(入口仍是本文件,计划任务不需要改参数)
     noInbound: has('no-inbound'),
     inboundWindowDays: Number(argOf('inbound-window-days')) || null,
+    // 2026-11-28:类型/窗口覆盖(一次性补拉/回灌;计划任务不传 = 走 config.json)
+    types: (argOf('types') || '').split(',').map((x) => x.trim()).filter(Boolean),
+    windowDays: Number(argOf('window-days')) || null,
   });
 } catch (e) {
   const line = `[${new Date().toISOString().replace('T', ' ').slice(0, 19)}] ✗ 同步失败: ${e.message}`;

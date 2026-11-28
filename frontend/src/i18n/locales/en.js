@@ -2904,6 +2904,9 @@ export default {
     '产成品入库单': 'Finished goods receipt',
     '其他入库单': 'Other receipt',
     '销售出库单': 'Sales issue',
+    // 出货单(2026-11-28):销售出库单「打印」下拉里的对外联单(同一物料一行、批号进备注)
+    '出货单': 'Delivery Note',
+    '出货日期': 'Delivery Date',
     '生产领料单': 'Production Picking Slip',
     '生产领料': 'Production Picking',
     '其他出库单': 'Other issue',

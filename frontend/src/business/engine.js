@@ -23,6 +23,11 @@ export {
   printPuOrder, printPuOrderNoAmount, printQcReturn,
   printProductCards, printLocationCards, printProductionTask, woQrText,
 } from './print-formats'
+/**
+ * 出货单(2026-11-28):销售出库单的对外联单 —— 同一物料合成一行、批号进「备注」。
+ * 版式与取数在 business/shipNote.js(纯函数 + 单测),这里只做运行时契约的再导出。
+ */
+export { printShipNote, shipNoteRows, shipNoteHtml } from './shipNote'
 
 // 数据访问固定为 SQL 后端：/api/px/* -> Spring Boot -> SQL Server HSDZ_MES（YINJIA-MES）。
 

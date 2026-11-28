@@ -3051,7 +3051,7 @@ const unsavedGuard = useUnsavedStore()
 // ── 纸质单据/标签打印:统一由面板 runtime 下发,本组件不直接依赖 business/print-formats ──
 const {
   printPuOrder, printQcReturn, printProductCards, printLocationCards,
-  printPuOrderNoAmount, woQrText,
+  printPuOrderNoAmount, woQrText, printShipNote,
 } = engine
 
 // 语言热切换:仅重拉面板配置(字段标签/面板名/列别名随 Accept-Language 更新),
@@ -13376,6 +13376,26 @@ async function onButton(action) {
         }))
       if (!rows.length) return ElMessage.warning(tt('当前单据没有可打印的明细行'))
       await printProductCards(rows)
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || tt('打印失败'))
+    }
+    return
+  }
+  // 出货单(2026-11-28 用户口径:「分批次号的明细,根据同一物料成一行来打印」)——
+  //   销售出库单的**对外联单**:明细在库里按批次分行,纸上同一物料合成一行、批号进「备注」。
+  //   取数走 getFormDescriptor(已保存的最新行,与本文件其它「打印XX」先例同源);
+  //   明细要用到隐藏列「源单编号」(= 销售订单号),它虽不在表格里显示,描述符照样按 label 带出来。
+  //   版式/合并规则在 business/shipNote.js(纯函数 + 单测),出纸仍是全系统唯一通道 printInPage。
+  if (action === '出货单' && String(panelCode.value) === 'SALE_OUT') {
+    const cur0 = current.value || {}
+    const no = cur0['单据编号'] || cur0['编号'] || ''
+    if (!no) return ElMessage.warning(tt('请先选择一张单据'))
+    try {
+      const res = await engine.getFormDescriptor({ panelCode: panelCode.value, code: no })
+      const doc = res?.data || {}
+      const lines = Object.values(res?.detailData || {})[0] || []
+      if (!(lines || []).length) return ElMessage.warning(tt('当前单据没有可打印的明细行'))
+      printShipNote(doc, lines)
     } catch (e) {
       ElMessage.error(engine.errMsg(e) || tt('打印失败'))
     }

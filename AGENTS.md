@@ -385,5 +385,6 @@ YINJIA-MES = light-mes 面板引擎(Vue3) + Spring Boot + SQL Server `HSDZ_MES`,
 | 工艺清单归档 → 基础数据清单(组装工艺清单→组装物料清单;烧结/X烧结工艺清单→混料物料清单;唯一归档入口 `markArchived`,表 `bs_mix_bom`/面板 `MIX_BOM`) | `docs/development/工艺清单归档同步基础数据清单-20261118.md` |
 | 出货检验纸面(表观/功能)批号消失与统一居中(2026-11-25;只读态印批号 + 明细五列居中/18px + 手工换行) | `docs/development/出货检验纸面-批次号消失与统一居中-20261125.md` |
 | 扫码出库批次勾选(**2026-11-28**:生产领料明细页 + 其他领料;批次表可勾选、按勾选顺序自动填数量、`PC0000` 固定排最上;纯逻辑 `business/batchAlloc.js`) | `docs/development/扫码出库-批次勾选-PC0000优先-20261128.md` |
+| 销售出库单同步 + 出货单打印(**2026-11-28**:金蝶 `sal_out_bound` 整单增量同步进 `bd_sale_out`/`bl_sale_out`(锚点 `外部数据ID`+`外部指纹`,`是否已转ERP='是'` 挡二次推送、不动 `kucun`);「打印」下拉新增「出货单」= 同一物料一行、批号进备注(`business/shipNote.js`);同步写库前有物理列白名单防护,`sync.mjs` 增 `--types/--window-days`) | `docs/development/销售出库单同步与出货单打印-20261128.md` |
 | 开发与质量踩坑台账(§5.5 前端导出/探针:jsPDF px、html2canvas、`$el` fragment、离屏克隆全宽截图、CJK 键、`char(2)` 尾空格) | `docs/development/开发与质量.md`(**涉 PDF/截图导出/CDP 探针/PS 工具/定长列比较,先读该节**) |
 | 通用设计资产库(供其它项目参考) | `https://github.com/MyPanda-Hash/CHENGXIAO` |
