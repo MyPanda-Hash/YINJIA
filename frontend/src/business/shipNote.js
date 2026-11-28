@@ -45,17 +45,20 @@ export const SHIP_NOTE_HEAD = {
 export const PLACEHOLDER_BATCHES = ['PC0000']
 
 /**
- * 签字行(纸样预印人名;name 为空 = 留横线手签)。
+ * 签字行:`标签：` + (可选)预印人名 + 手签横线 —— **五格都有横线**(用户 2026-11-28 二次口径
+ * 「这3个也有横线」:仓管/财务/品质 也要和物流/客户一样有手签线)。
  *
- * 🔴 2026-11-28 修「横线有问题」:`w` = 手签横线长度(px)。原来固定 70px + `vertical-align:middle`
- * + `height:1px` ⇒ 线**浮在文字中间**、不像下划线,而且「客户」那格留白太大。
- * 现在:线高 1em + `vertical-align:baseline`(线正好压在文字基线上),长度按格宽给(物流 92 / 客户 120)。
+ * - `name` 非空 = 纸样预印人名(印在线的左边,粗体);空 = 只留标签 + 横线手签。
+ * - `w` = 手签横线长度(px),按格宽给:物流 92 / 仓管·财务·品质 76 / 客户 120。
+ *
+ * 🔴 别把线的样式改回 `height:1px + vertical-align:middle`(2026-11-28 用户报的第一版问题):
+ * 那样线会浮在文字中间、不像下划线;现在是 `height:1em + vertical-align:baseline`(压在文字基线上)。
  */
 export const SHIP_NOTE_SIGNERS = [
   { label: '物流', name: '', w: 92 },
-  { label: '仓管', name: '蒋小刚', w: 0 },
-  { label: '财务', name: '叶健乐', w: 0 },
-  { label: '品质', name: '冯敏', w: 0 },
+  { label: '仓管', name: '蒋小刚', w: 76 },
+  { label: '财务', name: '叶健乐', w: 76 },
+  { label: '品质', name: '冯敏', w: 76 },
   { label: '客户', name: '', w: 120 },
 ]
 
@@ -160,9 +163,10 @@ export function shipNoteHtml(doc, lines) {
     + `<td class="c">${esc(r['单位'])}</td>`
     + `<td>${esc(r['备注'])}</td>`
     + '</tr>').join('')
-  const sign = SHIP_NOTE_SIGNERS.map((s) => (s.name
-    ? `<span>${esc(s.label)}：<b>${esc(s.name)}</b></span>`
-    : `<span>${esc(s.label)}：<i class="line" style="width:${Number(s.w) || 90}px"></i></span>`)).join('')
+  // 五格同一套:标签 + (预印人名,粗体)+ 手签横线(2026-11-28 用户口径「这3个也有横线」)
+  const sign = SHIP_NOTE_SIGNERS.map((s) => `<span>${esc(s.label)}：`
+    + (s.name ? `<b>${esc(s.name)}</b>` : '')
+    + `<i class="line" style="width:${Number(s.w) || 90}px"></i></span>`).join('')
   return '<style>'
     + '@page{size:A4 portrait;margin:12mm 10mm}'
     + '.hd{text-align:center}'
@@ -184,7 +188,7 @@ export function shipNoteHtml(doc, lines) {
     + '.note{margin-top:12px;font-size:12px;line-height:1.8}'
     + '.sign{display:flex;align-items:baseline;gap:10px;margin-top:8px;font-size:12px;line-height:1.8}'
     + '.sign span{flex:1;white-space:nowrap}'
-    + '.sign i.line{display:inline-block;height:1em;vertical-align:baseline;border-bottom:1px solid #333}'
+    + '.sign i.line{display:inline-block;height:1em;vertical-align:baseline;border-bottom:1px solid #333;margin-left:4px}'
     + '.copies{margin-top:8px;font-size:11px;line-height:1.6;color:#222}'
     + '</style>'
     + '<div class="hd"><div class="cn">' + esc(SHIP_NOTE_HEAD.name) + '</div>'

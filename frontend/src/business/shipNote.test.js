@@ -115,6 +115,18 @@ test('HTML:抬头/标题/8 列/合计/说明/签字行/五联 齐全,且按物�
   assert.ok(html.includes('第五联'), '五联说明')
 })
 
+test('签字行:五格都有手签横线,预印人名(仓管/财务/品质)印在线左边', () => {
+  const html = shipNoteHtml({ 单据编号: 'XSCK-1' }, [line({ 存货编码: 'A-1', 数量: 1 })])
+  // 每格 = 「标签：」+ 可选粗体人名 + <i class="line" style="width:NNpx">
+  for (const s of SHIP_NOTE_SIGNERS) {
+    const re = new RegExp(`${s.label}：` + (s.name ? `<b>${s.name}</b>` : '') + '<i class="line" style="width:\\d+px">')
+    assert.ok(re.test(html), `${s.label} 要有横线${s.name ? '且人名在线左边' : ''}`)
+    assert.ok(s.w > 0, `${s.label} 的横线长度 w 必须 > 0(否则线不可见)`)
+  }
+  const lineCount = (html.match(/<i class="line"/g) || []).length
+  assert.equal(lineCount, SHIP_NOTE_SIGNERS.length, '横线条数 = 签字格数(5),不能漏印')
+})
+
 test('HTML:没有明细时仍出纸(只有表头 + 合计 0),不抛错', () => {
   const html = shipNoteHtml({ 单据编号: 'XSCK-EMPTY' }, [])
   assert.ok(html.includes('出货单'))
