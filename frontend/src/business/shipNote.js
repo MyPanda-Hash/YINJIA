@@ -45,21 +45,28 @@ export const SHIP_NOTE_HEAD = {
 export const PLACEHOLDER_BATCHES = ['PC0000']
 
 /**
- * 签字行:`标签：` + (可选)预印人名 + 手签横线 —— **五格都有横线**(用户 2026-11-28 二次口径
- * 「这3个也有横线」:仓管/财务/品质 也要和物流/客户一样有手签线)。
+ * 签字行:五格都有一条横线, **有预印人名的格 → 线在名字下面(名字压在下划线上)**;
+ * 没名字的格(物流 / 客户)→ 空白横线,现场手填。
  *
- * - `name` 非空 = 纸样预印人名(印在线的左边,粗体);空 = 只留标签 + 横线手签。
- * - `w` = 手签横线长度(px),按格宽给:物流 92 / 仓管·财务·品质 76 / 客户 120。
+ * 口径沿革(2026-11-28 用户三轮):
+ *   ① 第一版只有 物流/客户 有线,线还浮在字中间 ⇒「这个横线有问题」→ 改贴基线;
+ *   ② 第二轮「这3个也有横线」⇒ 三个具名格补线(当时补在名字**右边**);
+ *   ③ 第三轮「横线是在名字下面的」⇒ 具名格的线改为**名字的下划线**(2026-11-28 定稿)。
  *
- * 🔴 别把线的样式改回 `height:1px + vertical-align:middle`(2026-11-28 用户报的第一版问题):
- * 那样线会浮在文字中间、不像下划线;现在是 `height:1em + vertical-align:baseline`(压在文字基线上)。
+ * - `name` 非空 ⇒ 印成 `<span class="nm">蒋小刚</span>`,`.nm` 带 border-bottom(线跟着名字走,
+ *   并留 `nw` 宽度下限让线比名字略宽,像联单上"名字写在横线上"的样子);
+ * - `name` 为空 ⇒ `<i class="line" style="width:NNpx">` 空白手填线;
+ * - `w` = 空白横线长度 / `nw` = 具名格下划线的最小宽度(px)。
+ *
+ * 🔴 别把线的样式改回 `height:1px + vertical-align:middle`(用户第一轮报的就是那个):
+ * 那样线会浮在文字中间、不像下划线。
  */
 export const SHIP_NOTE_SIGNERS = [
-  { label: '物流', name: '', w: 92 },
-  { label: '仓管', name: '蒋小刚', w: 76 },
-  { label: '财务', name: '叶健乐', w: 76 },
-  { label: '品质', name: '冯敏', w: 76 },
-  { label: '客户', name: '', w: 120 },
+  { label: '物流', name: '', w: 92, nw: 0 },
+  { label: '仓管', name: '蒋小刚', w: 0, nw: 76 },
+  { label: '财务', name: '叶健乐', w: 0, nw: 76 },
+  { label: '品质', name: '冯敏', w: 0, nw: 76 },
+  { label: '客户', name: '', w: 120, nw: 0 },
 ]
 
 /** 说明条款(用户纸样原文) */
@@ -163,10 +170,12 @@ export function shipNoteHtml(doc, lines) {
     + `<td class="c">${esc(r['单位'])}</td>`
     + `<td>${esc(r['备注'])}</td>`
     + '</tr>').join('')
-  // 五格同一套:标签 + (预印人名,粗体)+ 手签横线(2026-11-28 用户口径「这3个也有横线」)
+  // 五格都有线:具名格 = 名字带下划线(线在名字下面),空格 = 空白手签线(2026-11-28 定稿口径)
   const sign = SHIP_NOTE_SIGNERS.map((s) => `<span>${esc(s.label)}：`
-    + (s.name ? `<b>${esc(s.name)}</b>` : '')
-    + `<i class="line" style="width:${Number(s.w) || 90}px"></i></span>`).join('')
+    + (s.name
+      ? `<span class="nm" style="min-width:${Number(s.nw) || 76}px">${esc(s.name)}</span>`
+      : `<i class="line" style="width:${Number(s.w) || 90}px"></i>`)
+    + '</span>').join('')
   return '<style>'
     + '@page{size:A4 portrait;margin:12mm 10mm}'
     + '.hd{text-align:center}'
@@ -189,6 +198,9 @@ export function shipNoteHtml(doc, lines) {
     + '.sign{display:flex;align-items:baseline;gap:10px;margin-top:8px;font-size:12px;line-height:1.8}'
     + '.sign span{flex:1;white-space:nowrap}'
     + '.sign i.line{display:inline-block;height:1em;vertical-align:baseline;border-bottom:1px solid #333;margin-left:4px}'
+    // 具名格:名字压在下划线上(`.nm` 自身带 border-bottom,线跟着名字走、且比名字略宽)
+    + '.sign .nm{display:inline-block;vertical-align:baseline;text-align:center;font-weight:600;'
+    + 'line-height:1.25;padding:0 8px 1px;border-bottom:1px solid #333}'
     + '.copies{margin-top:8px;font-size:11px;line-height:1.6;color:#222}'
     + '</style>'
     + '<div class="hd"><div class="cn">' + esc(SHIP_NOTE_HEAD.name) + '</div>'

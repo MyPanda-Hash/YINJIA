@@ -115,16 +115,27 @@ test('HTML:抬头/标题/8 列/合计/说明/签字行/五联 齐全,且按物�
   assert.ok(html.includes('第五联'), '五联说明')
 })
 
-test('签字行:五格都有手签横线,预印人名(仓管/财务/品质)印在线左边', () => {
+test('签字行:五格都有线 —— 具名格「名字带下划线」,空格留空白手签线', () => {
   const html = shipNoteHtml({ 单据编号: 'XSCK-1' }, [line({ 存货编码: 'A-1', 数量: 1 })])
-  // 每格 = 「标签：」+ 可选粗体人名 + <i class="line" style="width:NNpx">
+  let underlines = 0
   for (const s of SHIP_NOTE_SIGNERS) {
-    const re = new RegExp(`${s.label}：` + (s.name ? `<b>${s.name}</b>` : '') + '<i class="line" style="width:\\d+px">')
-    assert.ok(re.test(html), `${s.label} 要有横线${s.name ? '且人名在线左边' : ''}`)
-    assert.ok(s.w > 0, `${s.label} 的横线长度 w 必须 > 0(否则线不可见)`)
+    if (s.name) {
+      // 具名格:线在**名字下面** ⇒ <span class="nm" style="min-width:NNpx">蒋小刚</span>
+      const re = new RegExp(`${s.label}：<span class="nm" style="min-width:\\d+px">${s.name}</span>`)
+      assert.ok(re.test(html), `${s.label} 的名字要压在下划线上(线在名字下面),不能是名字后面接线段`)
+      assert.ok(s.nw > 0, `${s.label} 的下划线最小宽度 nw 必须 > 0(否则线不可见)`)
+      underlines++
+    } else {
+      // 空格:标签后一条空白手签线
+      const re = new RegExp(`${s.label}：<i class="line" style="width:\\d+px">`)
+      assert.ok(re.test(html), `${s.label} 要有空白手签线`)
+      assert.ok(s.w > 0, `${s.label} 的空白线长度 w 必须 > 0`)
+      underlines++
+    }
   }
-  const lineCount = (html.match(/<i class="line"/g) || []).length
-  assert.equal(lineCount, SHIP_NOTE_SIGNERS.length, '横线条数 = 签字格数(5),不能漏印')
+  assert.equal(underlines, SHIP_NOTE_SIGNERS.length, '五个签字格都要有线')
+  // .nm 的样式必须在(下划线跟着名字走),不能被别的规则覆盖掉
+  assert.ok(html.includes('.sign .nm{') && html.includes('border-bottom:1px solid #333}'), '.nm 下划线样式缺失')
 })
 
 test('HTML:没有明细时仍出纸(只有表头 + 合计 0),不抛错', () => {
