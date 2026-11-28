@@ -5247,3 +5247,12 @@ migrate-close-orphan-qc-catalog-20261126.sql
 #   ④ 检验数据记录新增「不合格品处理单号」隐藏链路列(检验结论=不合格且审批通过时自动落号,
 #      检验结论格可点它跳转)。幂等 + 末尾三态自检。两账套均执行。
 migrate-qc-ng-disposal-20261128.sql
+
+# 2026-11-28 销售出库单接入金蝶同步(用户口径「现在需要同步下拉销售出库单,并且销售出库要打印报表,需求是分批次号的明细,根据同一物料成一行来打印」):
+#   ① bd_sale_out 补同步锚点两列 外部数据ID nvarchar(128) / 外部指纹 nvarchar(1000)(与 bd_so_order 同名同型)
+#      + 唯一过滤索引 ux_bd_sale_out_ext_id + 两列中文注明;
+#   ② 配套 deploy/sync-core.mjs 新增 SALE_OUT 类型(整单 + 明细批号,写进现役面板表 bd_sale_out/bl_sale_out),
+#      deploy/sync.mjs 增 --types / --window-days(历史回灌入口);
+#   ③ 销售出库单面板「打印」下拉新增「出货单」(同一物料一行、批号进备注列)。
+#   幂等(COL_LENGTH / 索引存在性守卫 + 注释 add-or-update);两账套均执行。
+migrate-saleout-sync-cols-20261128.sql
