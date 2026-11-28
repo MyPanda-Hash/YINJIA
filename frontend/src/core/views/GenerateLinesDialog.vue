@@ -84,7 +84,7 @@
           <!-- 勾选列的表头 = **本单全选**(2026-11-18 用户口径「全选按钮在行号前面的格子上就行,
                和生单保持一致」):三态勾选框(全勾 ✓ / 部分勾 ▬ / 全空),口径复用下面的 selectAll ——
                只勾可选行(非已审核单据、已打印隔离行、可生单 = 0 的行都不会被顺手带进来)。 -->
-          <el-table-column width="42" align="center">
+          <el-table-column width="38" align="center">
             <template #header>
               <el-checkbox :model-value="docStats(doc).all" :indeterminate="docStats(doc).some"
                            :disabled="!docStats(doc).total"
@@ -102,20 +102,20 @@
                · **唯一的删除入口**(不再另挂「删除本单 / 操作列」,免得两个删除分不清);
                · 只挂合单模式 —— 批量生单是"逐张各出一张单",删行没有语义。
                删光某张单的行,该单自动撤掉(见 removeLine)。 -->
-          <el-table-column v-if="merge" width="34" align="center">
+          <el-table-column v-if="merge" width="30" align="center">
             <template #default="{ row }">
               <span class="gl-x" :title="tt('删除这一行')" @click.stop="removeLine(doc, row)">✕</span>
             </template>
           </el-table-column>
-          <el-table-column prop="行号" :label="tt('行号')" width="55" />
-          <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="120" show-overflow-tooltip />
-          <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="130" show-overflow-tooltip />
-          <el-table-column prop="规格型号" :label="tt('规格型号')" min-width="90" show-overflow-tooltip />
-          <el-table-column prop="计量单位" :label="tt('单位')" width="64" />
-          <el-table-column v-if="meta.batchFlow" prop="批次号" :label="tt('批次号')" min-width="110" show-overflow-tooltip />
-          <el-table-column prop="数量" :label="tt('数量')" width="90" align="right" />
-          <el-table-column prop="已送数量" :label="tt('已生单')" width="85" align="right" />
-          <el-table-column prop="剩余数量" :label="tt('剩余')" width="85" align="right" />
+          <el-table-column prop="行号" :label="tt('行号')" width="44" />
+          <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="88" show-overflow-tooltip />
+          <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="92" show-overflow-tooltip />
+          <el-table-column prop="规格型号" :label="tt('规格型号')" min-width="80" show-overflow-tooltip />
+          <el-table-column prop="计量单位" :label="tt('单位')" width="52" />
+          <el-table-column v-if="meta.batchFlow" prop="批次号" :label="tt('批次号')" min-width="84" show-overflow-tooltip />
+          <el-table-column prop="数量" :label="tt('数量')" width="72" align="right" />
+          <el-table-column prop="已送数量" :label="tt('已生单')" width="66" align="right" />
+          <el-table-column prop="剩余数量" :label="tt('剩余')" width="66" align="right" />
           <!-- 金蝶行级执行量(2026-11-27 客户口径:「生单界面要加入金蝶的未入库数量,我主要看这个,
                不然它和金蝶不同步」):
                  · 「剩余」= 本系统还能送多少(已生单占用量);
@@ -123,10 +123,8 @@
                别人在金蝶里手工收过货(批号 PC0000)时,两者会差 —— 差的时候照「剩余」生单会超收,
                故这里并排显示,并把"剩余 > 金蝶未入库"的行标黄提示。
                源面板没有这两个字段(销售订单/工单等链路)时整列不出现。 -->
-          <el-table-column v-if="hasKingdee" :label="tt('金蝶已入库')" width="100" align="right">
-            <template #default="{ row }">{{ jdNum(row['金蝶已入库数量']) }}</template>
-          </el-table-column>
-          <el-table-column v-if="hasKingdee" :label="tt('金蝶未入库')" width="100" align="right">
+
+          <el-table-column v-if="hasKingdee" :label="tt('金蝶未入库')" width="84" align="right">
             <template #default="{ row }">
               <span :class="{ 'gl-jd-short': jdShort(row) }"
                     :title="jdShort(row) ? tt('照「剩余」生单会超过金蝶未入库量（多出来的会超收）') : ''">
@@ -137,16 +135,16 @@
           <!-- 仓库 / 仓位(2026-11-13 用户口径「从采购订单生单的时候就开始预填仓库仓位」):
                采购订单这一跳按行选,可以每行不一样;点行头「仓库仓位应用到所有行」把第一个填好的
                仓库+仓位铺满本单所有行。选完随生单提交,沿 暂收 → 检验 → 采购入库 一路带下去。 -->
-          <el-table-column v-if="showWhBin" :label="tt('仓库')" width="130">
+          <el-table-column v-if="showWhBin" :label="tt('仓库')" width="106">
             <template #default="{ row }">
               <el-select v-model="whOf[row.lineKey]" size="small" filterable clearable
                          :disabled="pickRowLocked(picksOfDoc(doc), row.lineKey)"
-                         :placeholder="tt('选择仓库')" style="width: 120px" @change="onWhChange(row)">
+                         :placeholder="tt('选择仓库')" style="width: 96px" @change="onWhChange(row)">
                 <el-option v-for="w in whSrc.warehouses" :key="w.code || w.name" :label="w.name" :value="w.name" />
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column v-if="showWhBin" :label="tt('仓位')" width="130">
+          <el-table-column v-if="showWhBin" :label="tt('仓位')" width="106">
             <template #default="{ row }">
               <el-select v-model="binOf[row.lineKey]" size="small" filterable clearable
                          :disabled="!whOf[row.lineKey] || pickRowLocked(picksOfDoc(doc), row.lineKey)"
@@ -156,22 +154,27 @@
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column :label="tt('可生单')" width="90" align="right">
+          <el-table-column :label="tt('可生单')" width="74" align="right">
             <template #default="{ row }">{{ capOf(row, ratioPct) }}</template>
           </el-table-column>
-          <el-table-column :label="tt('本次数量')" width="140">
+          <el-table-column :label="tt('本次数量')" width="116">
             <template #default="{ row }">
               <el-input-number v-model="qtyOf[row.lineKey]" :min="0" :max="capOf(row, ratioPct)" :controls="false"
                                :precision="2"
                                :disabled="!selectable(doc, row) || pickRowLocked(picksOfDoc(doc), row.lineKey)"
-                               style="width: 120px" />
+                               style="width: 96px" />
             </template>
           </el-table-column>
-          <el-table-column v-if="meta.batchFlow" :label="tt('状态')" width="86" align="center">
+          <!-- 状态(2026-11-28):「已完成」= 采购订单行在金蝶已收满(未入库 0),不能再送 ——
+               该分录关联关系已构建完,拿它生单转ERP 必被金蝶拒;其余仍按打印/生单状态显示 -->
+          <el-table-column :label="tt('状态')" width="78" align="center">
             <template #default="{ row }">
-              <el-tag size="small" :type="isPrintedRow(row) ? (row['已生单'] ? 'info' : 'warning') : 'success'">
+              <el-tag v-if="row.已完成" size="small" type="info">{{ tt('已完成') }}</el-tag>
+              <el-tag v-else-if="meta.batchFlow" size="small"
+                      :type="isPrintedRow(row) ? (row['已生单'] ? 'info' : 'warning') : 'success'">
                 {{ tt(isPrintedRow(row) ? (row['已生单'] ? '已生单' : '已打印') : '未打印') }}
               </el-tag>
+              <span v-else>{{ tt('可加入') }}</span>
             </template>
           </el-table-column>
         </el-table>
@@ -362,6 +365,15 @@ const picksOfDoc = (doc) => picksOf(pickedByDoc[doc.sourceNo])
 /** 未勾选的行置灰(2026-11-17 客户口径):每张来源单一张表,各按自己的勾选集合判;禁填见模板 pickRowLocked */
 const rowClassOfDoc = (doc) => pickRowClass(picksOfDoc(doc))
 
+/**
+ * 「已完成」行不进合单页面(2026-11-28 客户口径:采购订单里已完成的明细标记为已完成,
+ * 避免它影响转ERP —— 金蝶那行已入库满,关联关系已构建完,拿它生单必然被拒)。
+ * 判定值来自后端(行上 已完成 标记,同源于 bl_pu_order.行未执行数量 ≤ 0);
+ * 旧数据没有该字段时原样保留,不影响其它链路。
+ */
+function usableLines(lines) {
+  return (lines || []).filter((r) => r && !r.已完成)
+}
 function isPicked(doc, row) { return picksOfDoc(doc).has(row.lineKey) }
 /** 只读单据(非已审核)整张不可勾;没有可生单量的行也不可勾 */
 function selectable(doc, row) {
@@ -453,7 +465,7 @@ async function load() {
       whSrc.warehouses = src.warehouses
       whSrc.bins = src.bins
     }
-    for (const d of res?.docs || []) adoptDoc({ ...d, lines: d.lines || [] })
+    for (const d of res?.docs || []) adoptDoc({ ...d, lines: usableLines(d.lines) })
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('生单数据加载失败'))
   } finally {
@@ -482,7 +494,7 @@ async function onDocsPicked({ nos }) {
     let newDocs = 0
     let newLines = 0
     for (const d of res?.docs || []) {
-      const src = { ...d, lines: d.lines || [] }
+      const src = { ...d, lines: usableLines(d.lines) }
       if (!src.sourceNo) continue
       const sup = String((src.header || {})['供应商'] || '').trim()
       if (mergeSupplier.value && sup && sup !== mergeSupplier.value) {

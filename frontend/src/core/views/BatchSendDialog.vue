@@ -67,22 +67,22 @@
            灰类见 core/selection/pickRowStyle.js,样式在 styles/index.css) -->
       <el-table ref="tableRef" :data="rows" row-key="lineKey" border size="small"
                 :row-class-name="rowClassRows" @selection-change="onPicked">
-        <el-table-column type="selection" width="42" :selectable="rowSelectable" />
-        <el-table-column prop="行号" :label="tt('行号')" width="55" />
-        <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="规格型号" :label="tt('规格型号')" min-width="100" show-overflow-tooltip />
-        <el-table-column prop="数量" :label="tt('数量')" width="95" align="right">
+        <el-table-column type="selection" width="38" :selectable="rowSelectable" />
+        <el-table-column prop="行号" :label="tt('行号')" width="44" />
+        <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="96" show-overflow-tooltip />
+        <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="规格型号" :label="tt('规格型号')" min-width="82" show-overflow-tooltip />
+        <el-table-column prop="数量" :label="tt('数量')" width="74" align="right">
           <template #default="{ row }">
             <span :title="`${tt('订单数量')} ${row['订单数量']} − ${tt('已打印')} ${row['已打印数量']}`">{{ row['数量'] }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="已送数量" :label="tt('已送')" width="80" align="right" />
-        <el-table-column prop="已退回数量" :label="tt('已退回')" width="80" align="right" />
-        <el-table-column prop="剩余数量" :label="tt('剩余')" width="80" align="right" />
+        <el-table-column prop="已送数量" :label="tt('已送')" width="62" align="right" />
+        <el-table-column prop="已退回数量" :label="tt('已退回')" width="62" align="right" />
+        <el-table-column prop="剩余数量" :label="tt('剩余')" width="62" align="right" />
         <!-- 金蝶行级执行量(2026-11-27 客户口径,与合单生单同一套):剩余 = 本系统还能送多少,
              金蝶未入库 = 金蝶还欠的货;别人在金蝶手工收过货时两者会差,差的时候照剩余送会超收。 -->
-        <el-table-column v-if="hasKingdee" :label="tt('金蝶未入库')" width="100" align="right">
+        <el-table-column v-if="hasKingdee" :label="tt('金蝶未入库')" width="84" align="right">
           <template #default="{ row }">
             <span :class="{ 'bsd-jd-short': jdShort(row) }"
                   :title="jdShort(row) ? tt('照「剩余」生单会超过金蝶未入库量（多出来的会超收）') : ''">
@@ -90,21 +90,21 @@
             </span>
           </template>
         </el-table-column>
-        <el-table-column :label="tt('可送上限')" width="95" align="right">
+        <el-table-column :label="tt('可送上限')" width="76" align="right">
           <template #default="{ row }">{{ capOf(row) }}</template>
         </el-table-column>
         <!-- 仓库 / 仓位(2026-11-13 用户口径「从采购订单生单的时候就开始预填仓库仓位」):
              按行选、可以每行不一样;行头「仓库仓位应用到所有行」把第一行填好的套满本单。 -->
-        <el-table-column v-if="showWhBin" :label="tt('仓库')" width="130">
+        <el-table-column v-if="showWhBin" :label="tt('仓库')" width="106">
           <template #default="{ row }">
             <el-select v-model="whOf[row.lineKey]" size="small" filterable clearable
                        :disabled="pickRowLocked(pickedKeys, row.lineKey)"
-                       :placeholder="tt('选择仓库')" style="width: 120px" @change="onWhChange(row)">
+                       :placeholder="tt('选择仓库')" style="width: 96px" @change="onWhChange(row)">
               <el-option v-for="w in whSrc.warehouses" :key="w.code || w.name" :label="w.name" :value="w.name" />
             </el-select>
           </template>
         </el-table-column>
-        <el-table-column v-if="showWhBin" :label="tt('仓位')" width="130">
+        <el-table-column v-if="showWhBin" :label="tt('仓位')" width="106">
           <template #default="{ row }">
             <el-select v-model="binOf[row.lineKey]" size="small" filterable clearable
                        :disabled="!whOf[row.lineKey] || pickRowLocked(pickedKeys, row.lineKey)"
@@ -113,14 +113,22 @@
             </el-select>
           </template>
         </el-table-column>
-        <el-table-column :label="tt('本次送料数量')" width="150">
+        <el-table-column :label="tt('本次送料数量')" width="116">
           <template #default="{ row }">
             <el-input-number v-model="qtyOf[row.lineKey]" :min="0" :max="capOf(row)" :controls="false"
               :disabled="!(capOf(row) > 0) || pickRowLocked(pickedKeys, row.lineKey)"
-              :precision="precisionOf(row)" style="width: 130px" />
+              :precision="precisionOf(row)" style="width: 96px" />
           </template>
         </el-table-column>
-        <el-table-column prop="计量单位" :label="tt('计量单位')" width="85" />
+        <!-- 状态(2026-11-28):已完成 = 该采购订单行在金蝶已收满(未入库 0),不能再送 ——
+             该分录关联关系已构建完,生单后转ERP 必被金蝶拒 -->
+        <el-table-column :label="tt('状态')" width="76" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.已完成" size="small" type="info">{{ tt('已完成') }}</el-tag>
+            <span v-else-if="row.rowKind === 'order'">{{ tt('可加入') }}</span>
+            <span v-else>{{ tt(row['已生单'] ? '已生单' : '已打印') }}</span>
+          </template>
+        </el-table-column>        <el-table-column prop="计量单位" :label="tt('计量单位')" width="60" />
       </el-table>
       <div class="bsd-foot">
         <span>{{ tt('已选') }} <b>{{ picked.length }}</b> {{ tt('行') }} · {{ tt('本次合计') }}: <b>{{ totalQty }}</b></span>
@@ -139,24 +147,24 @@
         </div>
         <el-table ref="printedRef" :data="printedRows" row-key="lineKey" border size="small"
           :row-class-name="rowClassPrinted" @selection-change="onPrintedPicked">
-          <el-table-column type="selection" width="42" :selectable="rowSelectable" />
-          <el-table-column prop="批次号" :label="tt('批次号')" min-width="150" show-overflow-tooltip />
-          <el-table-column prop="行号" :label="tt('行号')" width="55" />
-          <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="120" show-overflow-tooltip />
-          <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="120" show-overflow-tooltip />
+          <el-table-column type="selection" width="38" :selectable="rowSelectable" />
+          <el-table-column prop="批次号" :label="tt('批次号')" min-width="110" show-overflow-tooltip />
+          <el-table-column prop="行号" :label="tt('行号')" width="44" />
+          <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="96" show-overflow-tooltip />
+          <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="100" show-overflow-tooltip />
           <el-table-column prop="数量" :label="tt('打印数量')" width="95" align="right" />
           <el-table-column prop="已送数量" :label="tt('已生单')" width="90" align="right" />
           <el-table-column prop="剩余数量" :label="tt('未生单')" width="90" align="right" />
-          <el-table-column v-if="showWhBin" :label="tt('仓库')" width="130">
+          <el-table-column v-if="showWhBin" :label="tt('仓库')" width="106">
             <template #default="{ row }">
               <el-select v-model="whOf[row.lineKey]" size="small" filterable clearable
                          :disabled="pickRowLocked(printedKeys, row.lineKey)"
-                         :placeholder="tt('选择仓库')" style="width: 120px" @change="onWhChange(row)">
+                         :placeholder="tt('选择仓库')" style="width: 96px" @change="onWhChange(row)">
                 <el-option v-for="w in whSrc.warehouses" :key="w.code || w.name" :label="w.name" :value="w.name" />
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column v-if="showWhBin" :label="tt('仓位')" width="130">
+          <el-table-column v-if="showWhBin" :label="tt('仓位')" width="106">
             <template #default="{ row }">
               <el-select v-model="binOf[row.lineKey]" size="small" filterable clearable
                          :disabled="!whOf[row.lineKey] || pickRowLocked(printedKeys, row.lineKey)"
@@ -165,11 +173,11 @@
               </el-select>
             </template>
           </el-table-column>
-          <el-table-column :label="tt('本次送料数量')" width="150">
+          <el-table-column :label="tt('本次送料数量')" width="116">
             <template #default="{ row }">
               <el-input-number v-model="qtyOf[row.lineKey]" :min="0" :max="capOf(row)" :controls="false"
                 :disabled="!(capOf(row) > 0) || pickRowLocked(printedKeys, row.lineKey)"
-                :precision="precisionOf(row)" style="width: 130px" />
+                :precision="precisionOf(row)" style="width: 96px" />
             </template>
           </el-table-column>
           <el-table-column :label="tt('状态')" width="90" align="center">
@@ -177,8 +185,8 @@
               <el-tag :type="row.已生单 ? 'info' : 'warning'" size="small">{{ tt(row.已生单 ? '已生单' : '已打印') }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="打印单号" :label="tt('打印单号')" min-width="140" show-overflow-tooltip />
-          <el-table-column prop="打印时间" :label="tt('打印时间')" width="150" show-overflow-tooltip />
+          <el-table-column prop="打印单号" :label="tt('打印单号')" min-width="110" show-overflow-tooltip />
+          <el-table-column prop="打印时间" :label="tt('打印时间')" width="130" show-overflow-tooltip />
         </el-table>
       </div>
     </div>

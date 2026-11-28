@@ -40,7 +40,7 @@
   <el-dialog
     :model-value="modelValue"
     :title="tt('选择采购订单')"
-    width="1180px"
+    width="96vw"
     top="4vh"
     class="mpd-dialog"
     append-to-body
@@ -81,7 +81,7 @@
                 :empty-text="tt('没有可加入的已审核采购订单')" :span-method="spanMethod"
                 :row-class-name="rowClassName" @row-click="onRowClick">
         <!-- 勾选按**单据**合并成一格(勾它 = 这张单的全部明细);表头那颗是本页全选 -->
-        <el-table-column width="42" align="center">
+        <el-table-column width="38" align="center">
           <template #header>
             <el-checkbox :model-value="pageAll" :indeterminate="pageSome" :disabled="!selectableDocs.length"
                          :title="tt('全选本页可加入的单据')" @change="(v) => toggleAllPage(v)" />
@@ -92,50 +92,59 @@
                          @change="(v) => toggleDoc(row.__doc, v)" />
           </template>
         </el-table-column>
-        <el-table-column :label="tt('序号')" width="46" align="center">
+        <el-table-column :label="tt('序号')" width="36" align="center">
           <template #default="{ row }">{{ (pageNo - 1) * pageSize + row.__idx + 1 }}</template>
         </el-table-column>
-        <el-table-column :label="tt('单据编号')" min-width="120" show-overflow-tooltip>
+        <el-table-column :label="tt('单据编号')" min-width="104" show-overflow-tooltip>
           <template #default="{ row }">{{ row.__no }}</template>
         </el-table-column>
-        <el-table-column :label="tt('单据日期')" width="94">
+        <el-table-column :label="tt('单据日期')" width="86">
           <template #default="{ row }">{{ dateOf(row.__doc) }}</template>
         </el-table-column>
-        <el-table-column :label="tt('供应商')" min-width="118" show-overflow-tooltip>
+        <el-table-column :label="tt('供应商')" min-width="96" show-overflow-tooltip>
           <template #default="{ row }">{{ supplierOf(row.__doc) }}</template>
         </el-table-column>
         <!-- 这里数的是**可送行数**(服务端已把"已送完且超送额度用尽"的行滤掉),不是订单总行数 -->
-        <el-table-column :label="tt('可送行数')" width="66" align="right">
+        <el-table-column :label="tt('可送行数')" width="58" align="right">
           <template #default="{ row }">{{ docLineCount(row.__doc) }}</template>
         </el-table-column>
         <!-- 明细:一行一个物料 -->
-        <el-table-column :label="tt('行号')" width="46" align="center">
+        <el-table-column :label="tt('行号')" width="40" align="center">
           <template #default="{ row }">{{ lineNo(row) }}</template>
         </el-table-column>
-        <el-table-column :label="tt('物料编码')" min-width="104" show-overflow-tooltip>
+        <el-table-column :label="tt('物料编码')" min-width="90" show-overflow-tooltip>
           <template #default="{ row }">{{ lineText(row, CODE_KEYS) }}</template>
         </el-table-column>
-        <el-table-column :label="tt('物料名称')" min-width="120" show-overflow-tooltip>
+        <el-table-column :label="tt('物料名称')" min-width="98" show-overflow-tooltip>
           <template #default="{ row }">{{ lineText(row, NAME_KEYS) }}</template>
         </el-table-column>
-        <el-table-column :label="tt('规格型号')" min-width="88" show-overflow-tooltip>
+        <el-table-column :label="tt('规格型号')" min-width="74" show-overflow-tooltip>
           <template #default="{ row }">{{ lineText(row, SPEC_KEYS) }}</template>
         </el-table-column>
-        <el-table-column :label="tt('单位')" width="50" align="center">
+        <el-table-column :label="tt('单位')" width="44" align="center">
           <template #default="{ row }">{{ lineText(row, UNIT_KEYS) }}</template>
         </el-table-column>
-        <el-table-column :label="tt('数量')" width="74" align="right">
+        <el-table-column :label="tt('数量')" width="62" align="right">
           <template #default="{ row }">{{ lineNum(row, '数量') }}</template>
         </el-table-column>
         <!-- 剩余 = 这行还能送多少(生单页面预填的就是它);剩余 0 但还有超送额度 → 标黄说明 -->
-        <el-table-column :label="tt('剩余数量')" width="80" align="right">
+        <el-table-column :label="tt('剩余数量')" width="66" align="right">
           <template #default="{ row }">
             <span :class="{ 'mpd-over': overOnly(row) }" :title="overOnly(row) ? tt('已送完，仍可超送') : ''">
               {{ lineNum(row, '剩余数量') }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column :label="tt('状态')" width="90" align="center">
+        <!-- 行状态(2026-11-28 客户口径「采购订单中已完成的明细,给他标记从可加入变为已完成」):
+             已完成 = 金蝶侧该行已收满(未入库 0),这行**不能再生单** —— 拿它生单转ERP 必被金蝶拒
+             (该分录关联关系已构建完)。行仍列出来,让现场看得见"为什么这行加不进去"。 -->
+        <el-table-column :label="tt('行状态')" width="82" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.__line && row.__line.已完成" size="small" type="info">{{ tt('已完成') }}</el-tag>
+            <span v-else>{{ tt('可加入') }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="tt('状态')" width="78" align="center">
           <template #default="{ row }">
             <el-tag size="small" :type="docState(row.__doc).type">{{ tt(docState(row.__doc).text) }}</el-tag>
           </template>
@@ -332,8 +341,16 @@ function rowClassName({ row }) { return isLineAdded(row) ? 'mpd-added-line' : ''
  *   · 已添加     = 明细全在页面上(再选不会重复加);
  *   · 可加入     = 一条都还没进去。
  */
+/** 这张单里**还能加**的明细(2026-11-28:金蝶已收满的行标「已完成」,不再作为可加入明细) */
+function usableLinesOf(doc) {
+  return itemsOf(doc).filter((it) => !it.已完成)
+}
+
 function docState(doc) {
-  const keys = itemsOf(doc).map((it) => lineKeyOf(doc, it)).filter(Boolean)
+  // 全部明细都已完成(金蝶已收满)⇒ 整张单不可再加,状态直接给「已完成」,别显示成"可加入"
+  const usable = usableLinesOf(doc)
+  if (itemsOf(doc).length && !usable.length) return { text: '已完成', type: 'info' }
+  const keys = usable.map((it) => lineKeyOf(doc, it)).filter(Boolean)
   if (keys.length) {
     const on = keys.filter((k) => addedKeySet.value.has(k)).length
     if (on === 0) return { text: '可加入', type: 'success' }
@@ -349,7 +366,8 @@ function docState(doc) {
  * 已经有的明细就只补没有的行」正是靠这条生效:删掉的行可以再选回来,已在页面上的行不会被重复加。
  */
 function selectableRow(row) {
-  return !lockSupplier.value || supplierOf(row) === lockSupplier.value
+  if (!lockSupplier.value || supplierOf(row) === lockSupplier.value) return usableLinesOf(row).length > 0
+  return false
 }
 const selectableDocs = computed(() => rows.value.filter(selectableRow))
 function isDocPicked(no) { return pickedNos.value.includes(String(no)) }

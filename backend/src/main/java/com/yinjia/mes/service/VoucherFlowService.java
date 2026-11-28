@@ -95,6 +95,22 @@ public class VoucherFlowService {
                 item.put("已退回数量", round(ret));
                 item.put("剩余数量", round(Math.max(0, left)));
                 item.put("可送上限", cap);
+                // 2026-11-28 客户口径:「采购订单中已完成的明细,给他标记从可加入变为已完成,
+                // 这样就可以避免已完成明细影响转erp」。判定 = 金蝶侧该行已收满(行未执行数量 ≤ 0,
+                // 与 PushGenerateHandler.markKdDone / KingdeePushService.warnPoLineQuota 同源)。
+                // 已完成的行进"可送量 0",但**保留在列表里**并打标 —— 现场要看得见"这行为什么不能加了"。
+                Double kdLeft = kdUnInbound(item);
+                boolean done = kdLeft != null && kdLeft <= 0.000001;
+                if (kdLeft != null) {
+                    item.put("已完成", done);
+                    item.put("行状态", done ? "已完成" : "可加入");
+                }
+                if (done) {
+                    item.put("剩余数量", 0.0);
+                    item.put("可送上限", 0.0);
+                    remain.add(item);        // 已完成的行仍然返回(给界面打「已完成」),但没有任何可送量
+                    continue;
+                }
                 // 行保留条件:还有剩余,或超送额度没用完(剩余=0 仍可收 订单数量×比例)
                 if (qty <= 0 || left > 0.000001 || cap > 0.000001) remain.add(item);
             }
@@ -258,6 +274,19 @@ public class VoucherFlowService {
 
     private double round(double v) {
         return Math.round(v * 100.0) / 100.0;
+    }
+
+    /**
+     * 金蝶侧该订单行的**未入库量**(面板标签「金蝶未入库数量」→ 物理列 {@code bl_pu_order.行未执行数量})。
+     *
+     * <p>返回 {@code null} = 没有这项数据(非采购订单来源 / 旧库缺列)⇒ 调用方不做"已完成"判定。
+     * 数据来源:sync-core 与 {@code deploy/inbound-watch.mjs} 按金蝶采购入库单回填的订单行执行量
+     * (客户 2026-11-28 口径「通过采购入库单的回填拉取」指的正是这条链)。
+     */
+    private Double kdUnInbound(Map<String, Object> item) {
+        Object v = item == null ? null : item.get("金蝶未入库数量");
+        if (v == null || String.valueOf(v).isBlank()) return null;
+        try { return Double.parseDouble(String.valueOf(v).trim()); } catch (NumberFormatException e) { return null; }
     }
 
     private String currentUser() {

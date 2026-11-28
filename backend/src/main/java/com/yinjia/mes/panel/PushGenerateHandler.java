@@ -324,6 +324,49 @@ public class PushGenerateHandler implements PanelActionHandler {
         row.put("金蝶未入库数量", it.get("金蝶未入库数量"));
     }
 
+    /**
+     * 该订单行在金蝶是否**已收满**(= 已完成):{@code 行未执行数量}(标签「金蝶未入库数量」)≤ 0。
+     *
+     * <p>2026-11-28 客户口径:「能不能通过采购入库单的回填拉取,采购订单中已完成的明细,给他标记从
+     * 可加入变为已完成。这样就可以避免已完成明细影响转erp的情况了」—— 答案是可以:这些量本来就由
+     * {@code deploy/inbound-watch.mjs} / sync-core 从金蝶采购入库单回填到
+     * {@code bl_pu_order.行已执行/行未执行数量},生单侧直接读它即可。
+     *
+     * <p>返回 {@code null} = 该来源面板没有金蝶行级数据(销售订单/工单等链路)⇒ 不做判定。
+     */
+    private Boolean kdDone(Map<String, Object> it) {
+        Object v = it == null ? null : it.get("金蝶未入库数量");
+        if (v == null || String.valueOf(v).trim().isEmpty()) return null;
+        return numOf(v) <= 0.000001;
+    }
+
+    /**
+     * 把「已完成」落到候选行上并**关掉可送量**:已完成 ⇒ 剩余/可送上限一律 0(不可勾、不可填数量)。
+     *
+     * <p>为什么必须在生单侧拦:金蝶对已入库满的分录不再允许构建关联关系
+     * (报「部分数据已经构建了关联关系 / 单据已关闭,不允许下推」),照它生单 = 造一张永远转不上去的单。
+     * 与 {@code KingdeePushService.warnPoLineQuota} 的判定同源(都以 {@code un_out_qty} 为准)。
+     */
+    private void markKdDone(Map<String, Object> row, Map<String, Object> it) {
+        Boolean done = kdDone(it);
+        if (done == null) return;
+        row.put("已完成", done);
+        row.put("行状态", done ? "已完成" : "可加入");
+        if (done) {
+            row.put("剩余数量", 0d);
+            row.put("可送上限", 0d);
+        }
+    }
+
+    /** 已完成(金蝶已收满)的行不允许再生单 —— 生单只会制造一张永远转不进金蝶的单据 */
+    private void assertNotDone(Map<String, Object> r) {
+        if (Boolean.TRUE.equals(r.get("已完成"))) {
+            throw new IllegalStateException("第 " + r.get("行号") + " 行 " + str(r.get("物料编码"))
+                    + " 在采购订单里**已完成**(金蝶未入库 0):该分录的关联关系已经构建完,再生单转ERP 必被金蝶拒。"
+                    + "请在金蝶给该订单加量/加行,等同步(≤5 分钟)后再送,或改选其它行");
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private List<Map<String, Object>> itemsOf(Map<String, Object> doc) {
         Object d = doc == null ? null : doc.get("detail");
@@ -423,6 +466,7 @@ public class PushGenerateHandler implements PanelActionHandler {
             int rowDecimals = intOf(row.get("小数位数"));
             row.put("可送上限", BatchService.overAllowance(carved, used, ret, ratio, rowDecimals));
             putKingdeeQty(row, it);
+            markKdDone(row, it);          // 2026-11-28:金蝶已收满 ⇒ 已完成(剩余/上限归 0,不可再送)
             rows.add(row);
 
             // 隔离行:每个存活打印记录一行(含已生单的,便于用户看见"这批已经用过了")
@@ -445,6 +489,7 @@ public class PushGenerateHandler implements PanelActionHandler {
                 ir.put("打印时间", lb.get("打印时间"));
                 ir.put("已生单", pending <= 0.000001);
                 putKingdeeQty(ir, it);
+            markKdDone(ir, it);           // 隔离行同一口径:该订单行已完成 ⇒ 这批已打印量也进不了金蝶
                 rows.add(ir);
             }
         }
@@ -649,6 +694,7 @@ public class PushGenerateHandler implements PanelActionHandler {
                         + "(打开弹窗后该订单在金蝶有变动或明细行被重建,请关闭本窗口重新打开后再送料)");
                 Map<String, Object> m = sourceItemOf(srcItems, orderKeyOf(lineKey));
                 if (m == null) throw new IllegalStateException("送料行对应的来源明细已不存在:" + lineKey);
+                assertNotDone(r);   // 2026-11-28:金蝶已收满(已完成)的行直接拒绝,别造一张转不进金蝶的单
                 boolean isolated = isIsolatedKey(lineKey);
                 String resvBatch = isolated ? str(r.get("批次号")) : "";
                 if (isolated) {
@@ -1011,6 +1057,7 @@ public class PushGenerateHandler implements PanelActionHandler {
             row.put("剩余数量", left);
             row.put("可送上限", left);
             putKingdeeQty(row, it); // 采购订单这一跳同样带金蝶行级执行量(其它来源面板没有这两个键 ⇒ null)
+            markKdDone(row, it);    // 2026-11-28:金蝶已收满 ⇒ 已完成(普通链路同样不可再送)
             rows.add(row);
         }
         return rows;
@@ -1113,6 +1160,7 @@ public class PushGenerateHandler implements PanelActionHandler {
                 if (qty <= 0.000001) continue;                   // 本次不生单
                 Map<String, Object> r = byKey.get(lineKey);
                 if (r == null) throw new IllegalStateException("生单行不存在或已失效:" + lineKey);
+            assertNotDone(r);   // 2026-11-28:金蝶已收满(已完成)的行不许再生单
                 double cap = numOf(r.get("可送上限"));
                 if (qty > cap + 0.000001) {
                     // 行号可能为空(部分面板的明细没有 seq),别把提示写成「第 null 行」
@@ -1367,6 +1415,7 @@ public class PushGenerateHandler implements PanelActionHandler {
                         + "(打开弹窗后该订单在金蝶有变动或明细行被重建,请关闭本窗口重新打开后再送料)");
                 Map<String, Object> item = sourceItemOf(srcItems, orderKeyOf(lineKey));
                 if (item == null) throw new IllegalStateException("送料行对应的来源明细已不存在:" + lineKey);
+            assertNotDone(r);   // 2026-11-28:金蝶已收满(已完成)的行不许再生单
                 double cap = isIsolatedKey(lineKey) ? numOf(r.get("剩余数量")) : numOf(r.get("可送上限"));
                 if (qty > cap + 0.000001) {
                     // 行号可能为空(部分面板明细没 seq),别把提示写成「第 null 行」
