@@ -1,0 +1,101 @@
+﻿=== DB=HSDZ_MES ===
+
+① 仓库档案 bs_wh（启用仓位管理 / 停用 / 仓位档案条数）
+  仓库编码 | 仓库名称 | 启用仓位管理 | 停用 | 仓位档案数 | 有效仓位 | 
+  CK00003 | 成品不良品区 | 0 | 0 | 0 | 0 | 
+  CK00005 | 原料不良品仓 | 0 | 0 | 0 | 0 | 
+  CK00006 | 华北工控仓 | 0 | 0 | 0 | 0 | 
+  CK-A | A仓 | (NUL | 0 | 259 | 259 | 
+  CK-A2 | 辅料及配件区A仓 | (NUL | 1 | 0 | 0 | 
+  CK-C | C仓 | (NUL | 0 | 72 | 72 | 
+  CK-D | D仓 | (NUL | 0 | 168 | 168 | 
+  CP-02 | 成品B仓 | 0 | 0 | 180 | 180 | 
+  YCL-01 | 恒亿仓 | 0 | 0 | 0 | 0 | 
+  YJ-08 | 车间仓 | 0 | 0 | 0 | 0 | 
+  ② bs_wh_loc 总行数(全) : =679  
+  ② bs_wh_loc 存活行数 : =679  
+  ② bs_wh_loc 不同仓位编码数 : =679  
+  ③ 启用仓位管理=1 的仓数 : =0  
+  ④ bl_purchase_in.仓位编码 填写情况 : 总行=979  有仓位=0  
+  ④ bl_sale_out.仓位编码 填写情况 : 总行=1198  有仓位=0  
+  ④ bl_material_out.仓位编码 填写情况 : 总行=2109  有仓位=0  
+  ④ bl_pu_order.仓位编码 填写情况 : 总行=5289  有仓位=0  
+  ④ bl_so_order.仓位编码 填写情况 : 总行=857  有仓位=0  
+  ④ bl_transfer.调出仓位编码 填写情况 : 总行=14  有仓位=0  
+  ④ bl_stocktake.仓位编码 填写情况 : 总行=1  有仓位=1  
+  ⑤ bs_inv.默认仓位 有值行数 : =0  
+  ⑤ bs_inv 总行数 : =4007  
+
+⑥ yj_field 里的仓位字段（面板 / label / 物理列 / 参照 / 可见）
+  panel_code | label | col_name | ref_panel | ref_field | place | seq | hidden | visible | 
+  BARCODE_MAT | 仓位 | 仓位 |  |  | detail | 105 | 0 | 1 | 
+  INV | 倒冲仓位名称 | 倒冲仓位名称 |  |  | detail | 900 | 1 | 0 | 
+  INV | 默认仓位 | 默认仓位 | WHLOC | 仓位编码 | detail | 950 | 0 | 1 | 
+  INV | 倒冲仓位id | 倒冲仓位id |  |  | detail | 950 | 1 | 0 | 
+  INV | 倒冲仓位编码 | 倒冲仓位编码 |  |  | detail | 950 | 1 | 0 | 
+  MATERIAL_OUT | 仓库启用仓位管理 | 仓库启用仓位管理 |  |  | detail | 980 | 0 | 1 | 
+  MATERIAL_OUT | 仓位id | 仓位id |  |  | detail | 981 | 1 | 0 | 
+  MATERIAL_OUT | 仓位名称 | 仓位名称 |  |  | detail | 982 | 1 | 0 | 
+  MATERIAL_OUT | 仓位编码 | 仓位编码 |  |  | detail | 983 | 1 | 0 | 
+  MATERIAL_RET | 仓库启用仓位管理 | 仓库启用仓位管理 |  |  | detail | 980 | 1 | 0 | 
+  MATERIAL_RET | 仓位id | 仓位id |  |  | detail | 981 | 1 | 0 | 
+  MATERIAL_RET | 仓位名称 | 仓位名称 |  |  | detail | 982 | 1 | 0 | 
+  MATERIAL_RET | 仓位编码 | 仓位编码 |  |  | detail | 983 | 1 | 0 | 
+  PU_ORDER | 仓库启用仓位管理 | 仓库启用仓位管理 |  |  | detail | 960 | 1 | 0 | 
+  PU_ORDER | 仓位id | 仓位id |  |  | detail | 960 | 1 | 0 | 
+  PU_ORDER | 仓位名称 | 仓位名称 |  |  | detail | 960 | 1 | 0 | 
+  PU_ORDER | 仓位编码 | 仓位编码 |  |  | detail | 960 | 1 | 0 | 
+  PURCHASE_IN | 仓位 | 仓位编码 | WHLOC | 仓位编码 | detail | 195 | 0 | 1 | 
+  PURCHASE_IN | 仓库启用仓位管理 | 仓库启用仓位管理 |  |  | detail | 260 | 1 | 0 | 
+  PURCHASE_IN | 仓位id | 仓位id |  |  | detail | 270 | 1 | 0 | 
+  PURCHASE_IN | 仓位 | 仓位 |  |  | header | 670 | 1 | 0 | 
+  PURCHASE_IN | 仓位编码 | 仓位编码 |  |  | header | 680 | 1 | 0 | 
+  QC_INSP | 仓位 | 仓位编码 | WHLOC | 仓位编码 | detail | 275 | 0 | 1 | 
+  QC_INSP | 仓位名称 | 仓位名称 |  |  | detail | 276 | 1 | 0 | 
+  QC_INSP | 仓位id | 仓位id |  |  | detail | 277 | 1 | 0 | 
+  QC_RECV | 仓位 | 仓位编码 | WHLOC | 仓位编码 | detail | 375 | 0 | 1 | 
+  QC_RECV | 仓位名称 | 仓位名称 |  |  | detail | 376 | 1 | 0 | 
+  QC_RECV | 仓位id | 仓位id |  |  | detail | 377 | 1 | 0 | 
+  SALE_IN | 仓库启用仓位管理 | 仓库启用仓位管理 |  |  | detail | 300 | 1 | 0 | 
+  SALE_IN | 仓位id | 仓位id |  |  | detail | 310 | 1 | 0 | 
+  SALE_IN | 仓位名称 | 仓位名称 |  |  | detail | 320 | 1 | 0 | 
+  SALE_IN | 仓位编码 | 仓位编码 |  |  | detail | 330 | 1 | 0 | 
+  SALE_OUT | 仓库启用仓位管理 | 仓库启用仓位管理 |  |  | detail | 300 | 1 | 0 | 
+  SALE_OUT | 仓位id | 仓位id |  |  | detail | 310 | 1 | 0 | 
+  SALE_OUT | 仓位名称 | 仓位名称 |  |  | detail | 320 | 1 | 0 | 
+  SALE_OUT | 仓位编码 | 仓位编码 |  |  | detail | 330 | 1 | 0 | 
+  SO_ORDER | 仓库启用仓位管理 | 仓库启用仓位管理 |  |  | detail | 260 | 1 | 0 | 
+  SO_ORDER | 仓位id | 仓位id |  |  | detail | 270 | 1 | 0 | 
+  SO_ORDER | 仓位名称 | 仓位名称 |  |  | detail | 280 | 1 | 0 | 
+  SO_ORDER | 仓位编码 | 仓位编码 |  |  | detail | 290 | 1 | 0 | 
+  STOCKTAKE | 仓位 | 仓位编码 | WHLOC | 仓位编码 | detail | 44 | 0 | 1 | 
+  STOCKTAKE_DETAIL | 仓位 | 仓位 |  |  | detail | 145 | 0 | 1 | 
+  STOCKTAKE_STATS | 仓位 | 仓位 |  |  | detail | 25 | 0 | 1 | 
+  SUPPLIER_PU_ORDER | 仓库启用仓位管理 | 仓库启用仓位管理 |  |  | detail | 960 | 1 | 0 | 
+  SUPPLIER_PU_ORDER | 仓位id | 仓位id |  |  | detail | 960 | 1 | 0 | 
+  SUPPLIER_PU_ORDER | 仓位编码 | 仓位编码 |  |  | detail | 960 | 1 | 0 | 
+  SUPPLIER_PU_ORDER | 仓位名称 | 仓位名称 |  |  | detail | 960 | 1 | 0 | 
+  TRANSFER | 调出仓位 | 调出仓位编码 | WHLOC | 仓位编码 | detail | 44 | 0 | 1 | 
+  TRANSFER | 调入仓位 | 调入仓位编码 | WHLOC | 仓位编码 | detail | 54 | 0 | 1 | 
+  TRANSFER_DETAIL | 调出仓位 | 调出仓位 |  |  | detail | 155 | 0 | 1 | 
+  TRANSFER_DETAIL | 调入仓位 | 调入仓位 |  |  | detail | 165 | 0 | 1 | 
+  TRANSFER_STATS | 调出仓位 | 调出仓位 |  |  | detail | 15 | 0 | 1 | 
+  TRANSFER_STATS | 调入仓位 | 调入仓位 |  |  | detail | 25 | 0 | 1 | 
+  WH | 仓位 | 仓位 |  |  | detail | 35 | 0 | 1 | 
+  WH | 启用仓位管理 | 启用仓位管理 |  |  | detail | 900 | 0 | 1 | 
+  WHLOC | 仓位编码 | 仓位编码 |  |  | query,detail | 30 | 0 | 1 | 
+  WHLOC | 仓位地址 | 仓位地址 |  |  | query,detail | 50 | 0 | 1 | 
+
+⑦ WHLOC 面板登记
+  -> 失败: 列名 'code' 无效。
+
+⑦ WH 面板的 启用仓位管理 字段
+  panel_code | label | col_name | data_type | place | seq | hidden | visible | 
+  WH | 仓位 | 仓位 | 文本 | detail | 35 | 0 | 1 | 
+  WH | 启用仓位管理 | 启用仓位管理 | 是否 | detail | 900 | 0 | 1 | 
+
+⑧ kucun 列里带「仓位」的
+  COLUMN_NAME | 
+
+⑧ inh/outh 列里带「仓位」的
+  TABLE_NAME | COLUMN_NAME | 
