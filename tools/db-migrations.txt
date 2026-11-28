@@ -5247,7 +5247,6 @@ migrate-close-orphan-qc-catalog-20261126.sql
 #   ④ 检验数据记录新增「不合格品处理单号」隐藏链路列(检验结论=不合格且审批通过时自动落号,
 #      检验结论格可点它跳转)。幂等 + 末尾三态自检。两账套均执行。
 migrate-qc-ng-disposal-20261128.sql
-
 # 2026-11-28 销售出库单接入金蝶同步(用户口径「现在需要同步下拉销售出库单,并且销售出库要打印报表,需求是分批次号的明细,根据同一物料成一行来打印」):
 #   ① bd_sale_out 补同步锚点两列 外部数据ID nvarchar(128) / 外部指纹 nvarchar(1000)(与 bd_so_order 同名同型)
 #      + 唯一过滤索引 ux_bd_sale_out_ext_id + 两列中文注明;
@@ -5256,3 +5255,13 @@ migrate-qc-ng-disposal-20261128.sql
 #   ③ 销售出库单面板「打印」下拉新增「出货单」(同一物料一行、批号进备注列)。
 #   幂等(COL_LENGTH / 索引存在性守卫 + 注释 add-or-update);两账套均执行。
 migrate-saleout-sync-cols-20261128.sql
+# 2026-12-01 仓位(金蝶 sp)字段接通(用户口径「仓位的单据数据是用我们 mes 上传的」「先把 mes 的补好」):
+#   ① 产品入库 bl_finish_in / 其他入库 bl_other_in / 其他出库 bl_other_out 三张行表补
+#      仓位编码 nvarchar(500) / 仓位id nvarchar(500) / 仓位名称 nvarchar(200) 三列(类型对齐 bl_purchase_in)+ 中文注明;
+#   ② 上述三张面板登记明细「仓位」字段(参照 WHLOC.仓位编码,级联 仓库=$仓库,seq 125/110/100);
+#   ③ 材料出库/销售出库/销售退货/生产退料 四张面板的「仓位编码」字段:隐藏 → 可见参照(标签不动,物理列不动);
+#   ④ 配套代码:deploy/sync-core.mjs 的 BD_STORE 指纹补 is_allow_freight(否则金蝶勾了「启用仓位管理」永远同步不进 MES);
+#      KingdeePushService 转ERP 行级推 sp_id/sp_number(仓位档案无开放接口 ⇒ sp_id 由已同步单据反查);
+#      ButtonService 仓位必填校验同时认「仓位」「仓位编码」两种标签。
+#   幂等(COL_LENGTH / 字段存在性守卫 + 注释 add-or-update + 末尾三态自检);两账套均执行。
+migrate-bin-fields-20261201.sql

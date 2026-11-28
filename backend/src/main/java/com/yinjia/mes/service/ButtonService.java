@@ -1750,8 +1750,11 @@ public class ButtonService {
      * 宁可少拦也不误报(用户还能在仓档上把开关关掉)。
      */
     private void ensureBinRequiredFilled(PanelRegistry.PanelDef def, List<Map<String, Object>> items) {
+        // 标签两种都认(2026-12-01):采购入库/暂收/来料检验的仓位字段 label 叫「仓位」,而
+        //  材料出库/销售出库/销售退货/生产退料 的叫「仓位编码」(物理列都是 仓位编码)。
+        //  只认「仓位」会让那四张单**永远不进必填校验**(开关开了也白开),故两种标签并列。
         PanelRegistry.FieldDef bin = def.fieldsAt("detail").stream()
-                .filter(f -> "仓位".equals(f.label())).findFirst().orElse(null);
+                .filter(f -> "仓位".equals(f.label()) || "仓位编码".equals(f.label())).findFirst().orElse(null);
         if (bin == null) return;                       // 该面板明细没有仓位字段:整段跳过
         for (int i = 0; i < items.size(); i++) {
             Map<String, Object> row = items.get(i);

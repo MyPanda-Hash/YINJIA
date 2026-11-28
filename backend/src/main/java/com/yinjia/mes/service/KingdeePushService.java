@@ -681,6 +681,29 @@ public class KingdeePushService {
                             + "(金蝶 inv_pick 收 stock_id,缺了会报「请填写仓库」)", docNo, rowNo, stock);
                 }
             }
+            // 仓位(2026-12-01 用户口径「仓位的单据数据是用我们 MES 上传的」):行上有仓位编码就带上去。
+            //   · 键名与金蝶行一致:sp_id / sp_number / sp_name(采购订单、采购入库、生产领料等分录实测都有这三个键);
+            //   · 金蝶保存接口只认 *_id(同仓库/单位/商品,见 basedataIdMap 那段实测),而**仓位档案没有开放接口**
+            //     (2026-12-01 实测 /bd/store_space · /bd/space · /bd/stock_place · /bd/storeplace 全 HTTP 519)
+            //     ⇒ sp_id 只能两路取:①本行 仓位id 列(金蝶同步进来的历史单反写)②{@link #spIdOf} 从已同步单据反查;
+            //   · 取不到 id 时**仍带 sp_number**(未知键被静默忽略,不报错)并 warn 一次 —— 宁可留痕,不要静默丢。
+            //   · 采购订单不推(订单无出入库语义,与仓库同口径,见上一个 if)。
+            if (!isOrder) {
+                String binNo = str(line.get("仓位编码"));
+                if (binNo.isEmpty()) binNo = str(line.get("仓位"));   // 个别面板 label 叫「仓位」(STOCKTAKE 族)
+                if (!binNo.isEmpty()) {
+                    e.put("sp_number", binNo);
+                    String spId = str(line.get("仓位id"));
+                    if (spId.isEmpty()) spId = spIdOf(binNo);
+                    if (!spId.isEmpty()) {
+                        e.put("sp_id", spId);
+                    } else {
+                        log.warn("单据[{}]第{}行仓位编码[{}]在 MES 反查不到金蝶 sp_id:本次只带 sp_number"
+                                + "(金蝶若不认 sp_number,该行仓位会落空,请先确认金蝶是否已启用仓位管理并建了该仓位)",
+                                docNo, rowNo, binNo);
+                    }
+                }
+            }
             String batch = str(line.get("批号"));
             // 采购入库单的批次号(2026-11-28 用户口径「采购入库单不能把我们的批次号推送上去吗」):
             //   入库行上有**两个**批号列 —— 「批号」(金蝶同步来的值,非批次商品恒 `PC0000` 占位)与
@@ -1537,6 +1560,77 @@ public class KingdeePushService {
             log.warn("金蝶{}档案加载失败({}):本次不带对应 id 字段", label, e.getMessage());
             return Map.of();
         }
+    }
+
+    // ══════════════════ 仓位(库位 sp):编码 → 金蝶 sp_id ══════════════════
+
+    /**
+     * 可能同时带「仓位编码 + 仓位id」两列的 MES 行表(按"最可能有值"的顺序试)。
+     * 产品入库/其他出入库/暂收退料这几张**目前没有仓位列**,{@link #spIdTables()} 会按
+     * INFORMATION_SCHEMA 实测过滤掉 —— 将来补了列就自动纳入,不用改这里。
+     */
+    private static final String[] SP_ID_TABLES = {"bl_purchase_in", "bl_sale_out", "bl_material_out",
+            "bl_sale_in", "bl_material_ret", "bl_pu_order", "bl_finish_in", "bl_other_in", "bl_other_out",
+            "qc_return_detail"};
+
+    /** 仓位编码 → sp_id 缓存(只缓存命中的;没命中不入缓存,数据补上后下一单就能取到) */
+    private final Map<String, String> spIdCache = new java.util.concurrent.ConcurrentHashMap<>();
+    /** 实测存在「仓位编码 + 仓位id」两列的行表(懒加载,进程内不变) */
+    private volatile List<String> spIdTables;
+
+    /**
+     * MES 仓位编码 → 金蝶仓位 id(sp_id)。
+     *
+     * <p><b>为什么要反查而不是直接拉档案</b>:金蝶**没有开放仓位档案接口**(2026-12-01 实测
+     * {@code /jdy/v2/bd/store_space} · {@code /bd/space} · {@code /bd/stock_place} ·
+     * {@code /bd/storeplace} 全 HTTP 519)。而保存接口只认 {@code *_id}(同仓库/单位/商品,
+     * 见 {@link #basedataIdMap} 那段 2026-10-04 实测:{@code stock_number} 传了被静默忽略)。
+     * 所以 sp_id 只能用**已同步进来的金蝶单据**当映射表反推:金蝶侧只要有一张带仓位的单据
+     * (人工补的、或将来同步回来的),这里就能取到 id。
+     *
+     * <p>取不到返回空串 —— 调用方不写 {@code sp_id}、只带 {@code sp_number} 并 warn,
+     * 绝不让"仓位查不到 id"把整单转ERP 堵死。
+     */
+    private String spIdOf(String binNo) {
+        String code = binNo == null ? "" : binNo.trim();
+        if (code.isEmpty()) return "";
+        String hit = spIdCache.get(code);
+        if (hit != null) return hit;
+        for (String t : spIdTables()) {
+            try {
+                String id = jdbc.queryForObject(
+                        "SELECT TOP 1 RTRIM([仓位id]) FROM dbo." + t
+                                + " WHERE RTRIM([仓位编码]) = ? AND ISNULL([仓位id], N'') <> N''"
+                                + "   AND ISNULL(asp_cancel, 'N') <> 'Y'", String.class, code);
+                if (id != null && !id.isBlank()) {
+                    spIdCache.put(code, id.trim());
+                    return id.trim();
+                }
+            } catch (Exception e) {
+                log.debug("仓位id 反查跳过 {}.{} : {}", t, code, e.getMessage());
+            }
+        }
+        return "";
+    }
+
+    /** 实测哪些行表同时有「仓位编码」「仓位id」两列(缺列的整张跳过,避免 SQL 207 刷屏) */
+    private List<String> spIdTables() {
+        List<String> cached = spIdTables;
+        if (cached != null) return cached;
+        List<String> ok = new ArrayList<>();
+        for (String t : SP_ID_TABLES) {
+            try {
+                Integer n = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = ?"
+                                + "   AND COLUMN_NAME IN (N'仓位编码', N'仓位id')", Integer.class, t);
+                if (n != null && n == 2) ok.add(t);
+            } catch (Exception e) {
+                log.debug("仓位id 反查表探测失败 {} : {}", t, e.getMessage());
+            }
+        }
+        spIdTables = ok;
+        log.info("仓位id 反查可用行表 {} 张: {}", ok.size(), ok);
+        return ok;
     }
 
     /**

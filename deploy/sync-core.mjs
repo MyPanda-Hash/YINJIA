@@ -238,7 +238,12 @@ export const DOCS = [
     code: 'BD_STORE', label: '仓库', archive: true,
     listPath: '/jdy/v2/bd/store', detailPath: '/jdy/v2/bd/store_detail',
     table: 'bs_wh', codeCol: '仓库编码',
-    fingerprintOf: (r) => [r.number, r.name, r.enable, r.address, r.storekeeper_name].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
+    // 指纹必须含 is_allow_freight：它映射到 bs_wh.启用仓位管理，是"这个仓要不要填仓位"的总闸门
+    //   (ButtonService.ensureBinRequiredFilled / StockLedgerService.ensureBinValid 都只看这一列)。
+    //   漏进指纹的后果(2026-12-01 实测)：在金蝶仓库档案里勾了「启用仓位管理」，列表行指纹没变 ⇒
+    //   永久判"无变化跳过"，MES 永远 0，转ERP 也就永远不校验/不带仓位。
+    fingerprintOf: (r) => [r.number, r.name, r.enable, r.address, r.storekeeper_name,
+      r.is_allow_freight, r.allow_negative].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
     mapArchive(d) {
       return { 仓库编码: str(d.number), 仓库名称: str(d.name), 仓库地址: str(d.address),
         负责人: str(d.storekeeper_name), 仓库管理员编码: str(d.storekeeper_number),

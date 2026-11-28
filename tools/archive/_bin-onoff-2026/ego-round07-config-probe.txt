@@ -1,0 +1,153 @@
+﻿ego-browser : {
+所在位置 行:1 字符: 172
++ ... d-20261201; ego-browser nodejs -e "await import('file:///C:/Users/Len ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ({:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  "OTHER_IN": {
+    "panelName": "其他入库单",
+    "found": [
+      {
+        "path": ".detail.tabs[0].fields[26]",
+        "dataName": "仓位",
+        "dataType": "参照",
+        "refPanel": "WHLOC",
+        "refField": "仓位编码",
+        "filter": {
+          "仓库": "$仓库"
+        },
+        "isRequired": false
+      }
+    ]
+  },
+  "OTHER_OUT": {
+    "panelName": "其他出库单",
+    "found": [
+      {
+        "path": ".detail.tabs[0].fields[23]",
+        "dataName": "仓位",
+        "dataType": "参照",
+        "refPanel": "WHLOC",
+        "refField": "仓位编码",
+        "filter": {
+          "仓库": "$仓库"
+        },
+        "isRequired": false
+      }
+    ]
+  },
+  "FINISH_IN": {
+    "panelName": "产成品入库单",
+    "found": [
+      {
+        "path": ".detail.tabs[0].fields[28]",
+        "dataName": "仓位",
+        "dataType": "参照",
+        "refPanel": "WHLOC",
+        "refField": "仓位编码",
+        "filter": {
+          "仓库": "$仓库"
+        },
+        "isRequired": false
+      }
+    ]
+  },
+  "MATERIAL_OUT": {
+    "panelName": "生产领料单",
+    "found": [
+      {
+        "path": ".detail.tabs[0].fields[27]",
+        "dataName": "仓位编码",
+        "dataType": "参照",
+        "refPanel": "WHLOC",
+        "refField": "仓位编码",
+        "filter": {
+          "仓库": "$仓库"
+        },
+        "isRequired": false
+      }
+    ]
+  },
+  "SALE_OUT": {
+    "panelName": "销售出库单",
+    "found": [
+      {
+        "path": ".detail.tabs[0].fields[33]",
+        "dataName": "仓位编码",
+        "dataType": "参照",
+        "refPanel": "WHLOC",
+        "refField": "仓位编码",
+        "filter": {
+          "仓库": "$仓库"
+        },
+        "isRequired": false
+      }
+    ]
+  },
+  "SALE_IN": {
+    "panelName": "销售退货单",
+    "found": [
+      {
+        "path": ".detail.tabs[0].fields[24]",
+        "dataName": "仓位编码",
+        "dataType": "参照",
+        "refPanel": "WHLOC",
+        "refField": "仓位编码",
+        "filter": {
+          "仓库": "$仓库"
+        },
+        "isRequired": false
+      }
+    ]
+  },
+  "MATERIAL_RET": {
+    "panelName": "生产退料单",
+    "found": [
+      {
+        "path": ".detail.tabs[0].fields[29]",
+        "dataName": "仓位编码",
+        "dataType": "参照",
+        "refPanel": "WHLOC",
+        "refField": "仓位编码",
+        "filter": {
+          "仓库": "$仓库"
+        },
+        "isRequired": false
+      }
+    ]
+  },
+  "PURCHASE_IN": {
+    "panelName": "采购入库单",
+    "found": [
+      {
+        "path": ".dataSchema.fields[64]",
+        "dataName": "仓位",
+        "dataType": "文本",
+        "hidden": true,
+        "visible": false,
+        "isRequired": false
+      },
+      {
+        "path": ".dataSchema.fields[65]",
+        "dataName": "仓位编码",
+        "dataType": "文本",
+        "hidden": true,
+        "visible": false,
+        "isRequired": false
+      },
+      {
+        "path": ".detail.tabs[0].fields[19]",
+        "dataName": "仓位",
+        "dataType": "参照",
+        "refPanel": "WHLOC",
+        "refField": "仓位编码",
+        "filter": {
+          "仓库": "$仓库"
+        },
+        "isRequired": false
+      }
+    ]
+  }
+}
+
