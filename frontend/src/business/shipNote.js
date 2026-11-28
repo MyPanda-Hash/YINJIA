@@ -44,13 +44,19 @@ export const SHIP_NOTE_HEAD = {
 /** 占位批号:金蝶无批次商品统一填这个值,印在联单上没有意义 */
 export const PLACEHOLDER_BATCHES = ['PC0000']
 
-/** 签字行(纸样预印人名;空串 = 留横线手签) */
+/**
+ * 签字行(纸样预印人名;name 为空 = 留横线手签)。
+ *
+ * 🔴 2026-11-28 修「横线有问题」:`w` = 手签横线长度(px)。原来固定 70px + `vertical-align:middle`
+ * + `height:1px` ⇒ 线**浮在文字中间**、不像下划线,而且「客户」那格留白太大。
+ * 现在:线高 1em + `vertical-align:baseline`(线正好压在文字基线上),长度按格宽给(物流 92 / 客户 120)。
+ */
 export const SHIP_NOTE_SIGNERS = [
-  { label: '物流', name: '' },
-  { label: '仓管', name: '蒋小刚' },
-  { label: '财务', name: '叶健乐' },
-  { label: '品质', name: '冯敏' },
-  { label: '客户', name: '' },
+  { label: '物流', name: '', w: 92 },
+  { label: '仓管', name: '蒋小刚', w: 0 },
+  { label: '财务', name: '叶健乐', w: 0 },
+  { label: '品质', name: '冯敏', w: 0 },
+  { label: '客户', name: '', w: 120 },
 ]
 
 /** 说明条款(用户纸样原文) */
@@ -156,7 +162,7 @@ export function shipNoteHtml(doc, lines) {
     + '</tr>').join('')
   const sign = SHIP_NOTE_SIGNERS.map((s) => (s.name
     ? `<span>${esc(s.label)}：<b>${esc(s.name)}</b></span>`
-    : `<span>${esc(s.label)}：<i class="line"></i></span>`)).join('')
+    : `<span>${esc(s.label)}：<i class="line" style="width:${Number(s.w) || 90}px"></i></span>`)).join('')
   return '<style>'
     + '@page{size:A4 portrait;margin:12mm 10mm}'
     + '.hd{text-align:center}'
@@ -173,11 +179,13 @@ export function shipNoteHtml(doc, lines) {
     + 'th{background:#f4f4f4;font-weight:600;text-align:center}'
     + 'td.r{text-align:right}td.c{text-align:center}'
     + 'tr.sum td{font-weight:600}'
-    + '.note{margin-top:8px;font-size:12px;line-height:1.7}'
-    + '.sign{display:flex;gap:8px;margin-top:6px;font-size:12px}'
+    // 页脚三段(说明 / 签字行 / 五联):各留一点间距,不再挤成一坨;
+    // 手签横线用 `height:1em + vertical-align:baseline` 压在文字基线上(原来 1px+middle 会浮在字中间)
+    + '.note{margin-top:12px;font-size:12px;line-height:1.8}'
+    + '.sign{display:flex;align-items:baseline;gap:10px;margin-top:8px;font-size:12px;line-height:1.8}'
     + '.sign span{flex:1;white-space:nowrap}'
-    + '.sign i.line{display:inline-block;border-bottom:1px solid #333;width:70px;height:1px;vertical-align:middle}'
-    + '.copies{margin-top:10px;font-size:11px;color:#222}'
+    + '.sign i.line{display:inline-block;height:1em;vertical-align:baseline;border-bottom:1px solid #333}'
+    + '.copies{margin-top:8px;font-size:11px;line-height:1.6;color:#222}'
     + '</style>'
     + '<div class="hd"><div class="cn">' + esc(SHIP_NOTE_HEAD.name) + '</div>'
     + `<div class="en">${esc(SHIP_NOTE_HEAD.en)}</div>`
