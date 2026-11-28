@@ -199,6 +199,7 @@
       :target-panel="meta.targetPanel"
       :source-name="meta.sourceName"
       :added-nos="addedNos"
+      :added-line-keys="addedLineKeys"
       :supplier="mergeSupplier"
       @confirm="onDocsPicked"
     />
@@ -261,8 +262,14 @@ const failed = ref([])
    选单弹窗只回"单据号",明细仍由 /px/push/lines 取(与首次打开时同一份行契约),
    于是"补进来的行"与"本来就在的行"字段、上限、仓库仓位默认值完全同源。 */
 const pickVisible = ref(false)
-/** 已在页面上的单据号:选单弹窗据此把这几张标「已添加」并禁止再选 */
+/** 已在页面上的单据号:选单弹窗据此把这几张标「已添加」 */
 const addedNos = computed(() => docs.value.map((d) => d.sourceNo))
+/**
+ * 已在页面上的**明细行键**(2026-11-28):选单弹窗按它把状态分成
+ * 「可加入 / 部分已添加 / 已添加」,并把已进去的那几行灰显 —— 用户一眼看出"这张单我只补哪几行"。
+ * 行键与来源侧同一套约定(`单号#行id`,隔离行另有 `@打印行id`),选单接口下发的 `_lineKey` 同源。
+ */
+const addedLineKeys = computed(() => docs.value.flatMap((d) => (d.lines || []).map((r) => r.lineKey)))
 /** 合单锁定的供应商(取第一张单据):换一家=不能合,弹窗只列这一家的订单 */
 const mergeSupplier = computed(() => String((docs.value[0]?.header || {})['供应商'] || '').trim())
 

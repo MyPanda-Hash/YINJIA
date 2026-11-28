@@ -74,7 +74,7 @@ test('② 选单窗:金蝶口径 —— 已审核+有未送量、勾一张就只
   // 「勾选后一个后只出现同一供应商」——锁上就**重查**(不是把别家涂灰),并且保住刚勾的那张
   assert.match(pickDialog, /if \(sup && sup !== chosenSupplier\.value\) \{[\s\S]{0,200}?load\(1, \{ keepPicked: true \}\)/,
     '勾第一张就把列表收窄到这家供应商(keepPicked 保住这一勾)')
-  assert.match(pickDialog, /const keepNos = keepPicked \? \(picked\.value \|\| \[\]\)\.map\(noOf\) : \[\]/,
+  assert.match(pickDialog, /const keepNos = keepPicked \? \[\.\.\.pickedNos\.value\] : \[\]/,
     '重查后要按单号回填勾选,否则"勾了一下就没了"')
   // 「支持模糊搜索」——关键字走服务端 broad-OR(单号/供应商/物料名),不再只按单号查
   assert.match(pickDialog, /keyword: String\(keyword\.value \|\| ''\)\.trim\(\)/, '关键字要透传给 /px/voucherFlow/sources')
@@ -87,10 +87,41 @@ test('② 选单窗:金蝶口径 —— 已审核+有未送量、勾一张就只
   assert.match(pickDialog, /function selectableRow\(row\)/, '选择列的可用判据要**只**看供应商锁')
   assert.ok(!/if \(addedOf\(row\)\) return false/.test(pickDialog),
     '已在合单里的单也要能再选(用户口径「也可以重新添加」)—— 去重由合单页面按 lineKey 做')
-  assert.match(pickDialog, /tt\('已添加'\)/, '列表里要标出哪几张已经在合单页面里了')
+  // 状态列(2026-11-28):可加入 / 部分已添加 / 已添加,由 docState 一处派生、模板统一过 tt()
+  assert.match(pickDialog, /function docState\(doc\)/, '状态要集中在一处算,别在模板里散着判')
+  for (const s of ["'可加入'", "'部分已添加'", "'已添加'"]) {
+    assert.match(pickDialog, new RegExp(`text: ${s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`),
+      `状态要含 ${s}(客户 2026-11-28 追问「可加入表达什么,还有别的状态吗」)`)
+  }
+  assert.match(pickDialog, /tt\(docState\(row\.__doc\)\.text\)/, '状态文案要走 tt(),不能裸写中文')
   assert.match(glDialog, /@confirm="onDocsPicked"/, '合单页面里要能接着选单(用户口径「也可以重新添加」)')
   // 勾了多家供应商当场拦(金蝶选单:必须先按往来单位筛)
   assert.match(pickDialog, /合单生单只能选同一供应商的采购订单，当前勾了/, '混了多家供应商要有一句明确的话')
+})
+
+test('②-金蝶式明细:一张单据拆成多行物料,单据级列合并单元格(2026-11-28 客户口径)', () => {
+  // 客户原话:「物料罗列在一起,不好看是总共有哪些物料,改成和金蝶一样,一个单据,多个物料分行罗列出来」
+  // ⇒ 一张单 = 一组行,组内一行一个物料;原来那种「前两个物料名用、拼一格」的摘要必须消失
+  assert.ok(!/names\.join\('、'\)/.test(pickDialog), '不许再把多个物料拼进一格(那正是客户说"不好看"的写法)')
+  assert.ok(!/function itemsText/.test(pickDialog), '物料摘要函数已由逐行明细取代')
+  assert.match(pickDialog, /const flatRows = computed\(\(\) => \{/, '表格数据 = 单据 × 明细行摊平')
+  assert.match(pickDialog, /__span: i === 0 \? items\.length : 0/, '组内第一行带整组的 rowspan,其余 0')
+  assert.match(pickDialog, /:span-method="spanMethod"/, '单据级列靠 span-method 纵向合并')
+  assert.match(pickDialog, /function spanMethod\(\{ row, columnIndex \}\)/, 'spanMethod 要能认列号')
+  for (const col of ['行号', '物料编码', '物料名称', '规格型号', '单位', '数量', '剩余数量']) {
+    assert.match(pickDialog, new RegExp(`tt\\('${col}'\\)`), `明细列要逐行显示「${col}」`)
+  }
+  assert.match(pickDialog, /function lineKeyOf\(row, item\)/, '明细行键要能和合单页面的 lineKey 对上')
+  assert.match(pickDialog, /item\?\.\['_lineKey'\]/, '行键取服务端下发的 _lineKey(docNo#行id)')
+  assert.match(glDialog, /:added-line-keys="addedLineKeys"/, '合单页面要把已加入的行键传给选单窗')
+  assert.match(glDialog, /const addedLineKeys = computed\(\(\) => docs\.value\.flatMap/,
+    '已加入行键 = 页面上各单明细的 lineKey 合起来')
+  assert.match(pickDialog, /function isLineAdded\(row\)/, '已加入的那几行要能单独识别(灰显)')
+  assert.match(pickDialog, /mpd-added-line/, '灰显靠行类名,样式在 scoped 里')
+  // 勾选仍按单据(合单页面才是逐行挑),并有本页全选
+  assert.match(pickDialog, /function toggleDoc\(doc, on\)/, '勾选按单据开着走')
+  assert.match(pickDialog, /function toggleAllPage\(on\)/, '表头那颗 = 本页全选')
+  assert.match(pickDialog, /const pickedNos = ref\(\[\]\)/, '选中态就是单据号清单')
 })
 
 test('③ 后端:合单也校验同一供应商,且**先**校验供应商再校验数量', () => {
@@ -180,7 +211,10 @@ test('多语言:合单 + 选单相关文案都有英文译文', () => {
     '把这张单据整单从合单页面移除', '把这一行从本次合单里移除',
     // 2026-11-24 第二轮:模糊搜索 + 勾一张就只剩同一供应商
     '关键字：单号/供应商/物料', '列表已只显示这一家的单据，可用关键字继续模糊搜索',
-    '选单加入合单：已加入的明细只补还没进来的行，不会重复']) {
+    '选单加入合单：已加入的明细只补还没进来的行，不会重复',
+    // 2026-11-28 金蝶式明细行 + 第三种状态
+    '部分已添加', '全选本页可加入的单据', '把这张单据的全部明细加入合单',
+    '灰显的明细行已经在合单页面里', '已送完，仍可超送']) {
     const rx = new RegExp(`'${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}':\\s*'([^']*)'`)
     const m = en.match(rx)
     assert.ok(m, `en.js 缺词条:${k}`)
