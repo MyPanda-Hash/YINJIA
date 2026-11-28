@@ -104,6 +104,26 @@ test('批次行:默认不勾选、数量为 0', () => {
   assert.equal(rows.every((b) => b.qty === 0 && b.checked === false), true)
 })
 
+// 2026-11-28 用户口径:「并且把 PC0000 放在最上面」——
+// 金蝶对不分批商品统一填默认批号 PC0000,它取不到批号日期,按 FIFO 会被排到最后。
+test('批次行:PC0000 排最上面,其余仍按批号日期先进先出', () => {
+  const rows = makeBatchRows([
+    ...ROWS,
+    { 存货编码: 'M1', 存货名称: '料一', 计量单位: 'KG', 批号: 'PC0000', 仓库: '原料仓', 仓库编码: 'CK01', 现存量: 99 },
+  ])
+  assert.deepEqual(rows.map((b) => b.lot), ['PC0000', 'TL-20260901', 'TL-20260915', 'TL-20261001'])
+})
+
+test('先进先出判定:默认批号 PC0000 优先扣不算跳批', () => {
+  // PC0000 先扣 5,再扣 0901 的 2 —— 按批号日期看是"跳过了 PC0000 的一部分",
+  // 但 PC0000 本来就是默认批、用户口径要求先扣它,不该报「不是先进先出」。
+  const rows = makeBatchRows([
+    { 存货编码: 'M1', 批号: 'PC0000', 仓库: '原料仓', 现存量: 99 },
+    { 存货编码: 'M1', 批号: 'TL-20260901', 仓库: '原料仓', 现存量: 10 },
+  ]).map((b) => (b.lot === 'PC0000' ? { ...b, qty: 5, checked: true } : { ...b, qty: 2, checked: true }))
+  assert.equal(isNonFifo(rows), false)
+})
+
 test('默认分配:领 15 → 先扣 0901 的 10,再扣 0915 的 5', () => {
   const rows = autoAllocateFifo(makeBatchRows(ROWS), 15)
   assert.deepEqual(rows.map((b) => b.qty), [10, 5, 0])

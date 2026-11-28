@@ -150,10 +150,22 @@
             <el-button size="large" @click="cancelLock">{{ tt('取消') }}</el-button>
           </div>
 
-          <!-- 批次:领料沿用先进先出拆批;退料按原领料批号回退 -->
+          <!-- 批次勾选(2026-11-28 用户口径:「可勾选,按勾选的批次号再进行自动填入和排序,
+               自动填入数量,按顺序扣批次号。并且把 PC0000 放在最上面」):
+               · **只有勾上的批次参与本次出库**,数量由「本次」按顺序自动填(PC0000 → 日期在前);
+               · 取消勾选就重算,勾选不够本次数量时提示「还差 X」,可再勾别的批次;
+               · PC0000(金蝶不分批商品的默认批号)固定排最上面 —— 现场真正的货压在这一批上。 -->
           <div v-if="batchRows.length && !returnMode" class="mp-batches">
             <div class="mp-batches-head">
-              <span class="mp-bh-lot">{{ tt('批号') }}</span>
+              <span class="mp-bh-lot">
+                <el-checkbox
+                  :model-value="batchAllOn === true"
+                  :indeterminate="batchAllOn === 'indeterminate'"
+                  :title="tt('全选')"
+                  @change="onBatchCheckAll"
+                />
+                <span>{{ tt('批号') }}</span>
+              </span>
               <span class="mp-bh-wh">{{ tt('仓库') }}</span>
               <span class="mp-bh-avail">{{ tt('可用') }}</span>
               <span class="mp-bh-qty">{{ tt('本次') }}</span>
@@ -162,10 +174,14 @@
               v-for="(b, i) in batchRows"
               :key="i"
               class="mp-batch-row"
-              :class="{ 'is-checked': b.qty > 0, 'is-scanned': b.scanned }"
+              :class="{ 'is-checked': b.checked, 'is-scanned': b.scanned }"
             >
               <span class="mp-bh-lot">
+                <el-checkbox :model-value="b.checked" @change="(v) => onBatchCheck(i, v)" />
                 <span class="mp-batch-lot" :class="{ mono: !!b.lot }">{{ b.lot || tt('无批次') }}</span>
+                <span v-if="isDefaultLot(b.lot)" class="mp-batch-default" :title="tt('默认批（金蝶不分批商品的批号）')">
+                  {{ tt('默认批') }}
+                </span>
                 <span v-if="b.scanned" class="mp-batch-scan">{{ tt('扫到') }}</span>
               </span>
               <span class="mp-bh-wh">{{ b.warehouse || '—' }}</span>
@@ -174,6 +190,7 @@
             </div>
             <div v-if="shortage > 0" class="mp-warn">
               {{ tt('库存不够') }}:{{ tt('还差') }} {{ fmtQty(shortage) }} {{ cur.单位 }}
+              · {{ tt('可再勾选别的批次') }}
             </div>
             <div v-else-if="nonFifo" class="mp-warn">{{ tt('当前不是先进先出,已写进明细备注') }}</div>
           </div>
@@ -304,7 +321,8 @@ import request from '@core/request'
 import { tt } from '@/i18n'
 import { parseMaterialCode } from '@/business/scanCode'
 import { focusScanNow } from '@/business/scanFocus'
-import { makeBatchRows, allocateScannedFirst, allocateForQty, pickProgress, fmtQty, round4, isNonFifo } from '@/business/mobilePick'
+import { makeBatchRows, allocateScannedFirst, reallocate, pickProgress, fmtQty, round4, isNonFifo } from '@/business/mobilePick'
+import { isDefaultLot, checkAll, allCheckedState } from '@/business/batchAlloc'
 import { printWoQr } from '@/business/print-formats'
 import { printSlip } from '@/business/slipPrintFlow'
 import { queueToPrintStation, PRINT_TYPE_PICK_SLIP } from '@/business/printStation'
@@ -425,6 +443,8 @@ const hasReturn = computed(() => isDone.value
 const progress = computed(() => pickProgress(pickRows.value))
 const rows = computed(() => pickRows.value)
 const shortage = computed(() => round4((Number(curQty.value) || 0) - batchRows.value.reduce((s, b) => s + round4(b.qty), 0)))
+/** 表头「全选批次」勾选框状态:全勾 true / 全不勾 false / 一半 indeterminate */
+const batchAllOn = computed(() => allCheckedState(batchRows.value))
 const nonFifo = computed(() => isNonFifo(batchRows.value))
 /** 本次退料合计 */
 const returnTotal = computed(() => round4(Object.values(returnQty.value).reduce((s, v) => s + (Number(v) || 0), 0)))
@@ -684,7 +704,8 @@ async function scanMaterial(scanBatch) {
     const need = cur.value.BOM用量 > 0 ? cur.value.BOM用量 : cur.value.上限
     const preset = cur.value.当前数量 > 0 ? cur.value.当前数量 : need
     curQty.value = round4(Math.min(Math.max(0, preset), cur.value.上限))
-    onQtyChange(curQty.value)
+    // 扫完物料先按规则**默认勾选**(够本次数量为止;码里带批号 ⇒ 那一批最先),再按顺序填数量
+    autoSelectBatches()
   } catch (e) {
     errText.value = errMsgOf(e) || tt('查询物料失败')
   } finally {
@@ -695,7 +716,13 @@ async function scanMaterial(scanBatch) {
   }
 }
 
-/** 领料:数量变化 → 重算拆批(沿用先进先出) */
+/**
+ * 领料:数量变化 → **按当前勾选**重算拆批(2026-11-28)。
+ *
+ * <p>用户口径:「可勾选,按勾选的批次号再进行自动填入和排序,自动填入数量,按顺序扣批次号」。
+ * 所以这里**不再自动改勾选**(自动勾选只在扫到物料那一刻做一次,见 {@link autoSelectBatches})——
+ * 现场特意取消掉的批次不能在改数量时被自动勾回来。
+ */
 function onQtyChange(v) {
   if (returnMode.value) {
     // 退料:不拆批(按原领料批号回退),只更新本次退料表
@@ -706,10 +733,38 @@ function onQtyChange(v) {
     }
     return
   }
-  const need = round4(Number(v) || 0)
-  const scanned = batchRows.value.some((b) => b.scanned)
-  const r = scanned ? allocateScannedFirst(batchRows.value, need) : allocateForQty(batchRows.value, need)
+  recalcBatches()
+}
+
+/**
+ * 扫到物料后的**默认勾选**:按顺序勾到「够本次数量」为止(不够就有货的全勾)。
+ * 码里带了批号 ⇒ 那一批排最前(用户扫的就是这一批)。
+ */
+function autoSelectBatches() {
+  const r = allocateScannedFirst(batchRows.value, curQty.value)
   batchRows.value = r.rows
+}
+
+/** 勾选 / 数量变了 → 按顺序重算「本次」,勾选状态保持不变 */
+function recalcBatches() {
+  const firstLot = String((batchRows.value.find((b) => b.scanned) || {}).lot || '').trim()
+  const r = reallocate(batchRows.value, round4(Number(curQty.value) || 0), { firstLot })
+  batchRows.value = r.rows
+}
+
+/** 勾 / 取消勾某一批:整行参与或退出本次出库,数量随即重算 */
+function onBatchCheck(i, on) {
+  const next = batchRows.value.slice()
+  if (!next[i]) return
+  next[i] = { ...next[i], checked: !!on }
+  batchRows.value = next
+  recalcBatches()
+}
+
+/** 表头全选 / 全不选(批次多的物料不用一行行点) */
+function onBatchCheckAll(on) {
+  batchRows.value = checkAll(batchRows.value, !!on)
+  recalcBatches()
 }
 
 /** 写入(领料:落库;退料:只是记在本次退料表里,提交时才落库) */
@@ -1018,10 +1073,16 @@ async function submit() {
 .mp-batch-row.is-checked { background: var(--el-color-primary-light-9); }
 .mp-batch-row.is-scanned { box-shadow: inset 3px 0 0 var(--el-color-warning); }
 .mp-bh-lot { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; }
+.mp-bh-lot :deep(.el-checkbox) { height: auto; margin-right: 2px; }
 .mp-batch-lot { min-width: 0; word-break: break-all; }
 .mp-batch-scan {
   flex: none; padding: 0 4px; border-radius: 3px; font-size: 10px;
   background: var(--el-color-warning-light-8); color: var(--el-color-warning-dark-2);
+}
+/* 默认批号 PC0000(2026-11-28):金蝶不分批商品统一用它,固定排最上面,给个淡标签让人一眼认出 */
+.mp-batch-default {
+  flex: none; padding: 0 4px; border-radius: 3px; font-size: 10px;
+  background: var(--el-color-primary-light-9); color: var(--el-color-primary);
 }
 .mp-bh-wh { flex: none; width: 62px; color: var(--el-text-color-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mp-bh-avail { flex: none; width: 52px; text-align: right; }

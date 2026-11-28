@@ -18,6 +18,7 @@
 import {
   makeBatchRows, autoAllocateFifo, isNonFifo, selectedBatchRows, parseWorkOrderCode,
 } from './scanCode.js'
+import { checkByNeed, allocateChecked } from './batchAlloc.js'
 
 /** 四位小数取整(与后端 decimal(18,4) 同口径) */
 export function round4(n) {
@@ -93,64 +94,65 @@ export function maxQtyOf(batchRows, side = 'pick', picked = 0) {
 }
 
 /**
- * 把「本次要填的数量」拆到批次上 —— **沿用既有先进先出**,并处理"超出自动拆到下一批"。
+ * 把「本次要填的数量」拆到批次上 —— **只在勾选的批次里、按顺序扣**。
  *
- * 用户 2026-10-30 二次确认:「该物料库存总量(跨批次合计),超出自动拆到下一批」。
- * 即:用户填的数 > 当前勾选那一批的数量时,不是报错,而是按日期在前的批次依次补满。
+ * 用户口径(2026-11-28):「可勾选,按勾选的批次号再进行自动填入和排序,自动填入数量,
+ * 按顺序扣批次号」⇒
+ *   · 本函数**先按规则自动勾选**({@link autoSelect} → 勾够本次数量为止),再按顺序扣;
+ *   · 用户手动改过勾选后,页面改用 {@link reallocate}(保留他的勾选,只重算数量);
+ *   · 扫到的码里带批号 ⇒ 那一批排最前(用 opts.firstLot 传)。
  *
- * @param {any[]} batchRows makeBatchRows 结果(已按 FIFO 排序)
+ * @param {any[]} batchRows makeBatchRows 结果(PC0000 已在最前,其余按 FIFO)
  * @param {number} need 本次要填的总量
+ * @param {{ firstLot?: string }} [opts] firstLot = 码里带的批号(那一批优先扣)
  * @returns {{rows: any[], allocated: number, shortage: number, nonFifo: boolean}}
  */
-export function allocateForQty(batchRows, need) {
-  const want = round4(Math.max(0, Number(need) || 0))
-  const rows = autoAllocateFifo(batchRows, want)
-  const allocated = round4(rows.reduce((s, b) => s + round4(b.qty), 0))
+export function allocateForQty(batchRows, need, opts = {}) {
+  const checked = checkByNeed(batchRows, need, opts)
+  const r = allocateChecked(checked, need, opts)
   return {
-    rows,
-    allocated,
-    shortage: round4(Math.max(0, want - allocated)),
-    nonFifo: isNonFifo(rows),
+    rows: r.rows,
+    allocated: r.allocated,
+    shortage: r.shortage,
+    nonFifo: isNonFifo(r.rows),
+  }
+}
+
+/**
+ * 重算数量,**保留现场手动的勾选**(勾选一变 / 数量一变就调它)。
+ *
+ * <p>与 {@link allocateForQty} 的差别只有一个:不重新自动勾选 ——
+ * 现场特意取消掉的批次不能再被"自动勾回来"。
+ *
+ * @param {any[]} batchRows 已带 checked 的批次行
+ * @param {number} need 本次总量
+ * @param {{ firstLot?: string }} [opts]
+ */
+export function reallocate(batchRows, need, opts = {}) {
+  const r = allocateChecked(batchRows, need, opts)
+  return {
+    rows: r.rows,
+    allocated: r.allocated,
+    shortage: r.shortage,
+    nonFifo: isNonFifo(r.rows),
   }
 }
 
 /**
  * 扫到物料码后,把「扫到的那一批」优先填满(其余按先进先出补)。
  *
- * 口径与 2026-10-21 版一致(用户口径「批次处理也保留之前的」):
- *   · 码里带了批次 ⇒ 先填那一批(最多填到它的可用量),不够再按 FIFO 往后面的批补;
- *   · 码里没带批次 ⇒ 纯先进先出。
+ * 口径(2026-10-21 定,2026-11-28 起走批号优先 + 勾选分配这一套):
+ *   · 码里带了批次 ⇒ 先填那一批(最多填到它的可用量),不够再按顺序往后面的批补;
+ *   · 码里没带批次 ⇒ 纯先进先出(PC0000 在最前)。
  *
  * @param {any[]} batchRows makeBatchRows 结果(scanned 标记已由 makeBatchRows 置好)
  * @param {number} need 本次要填的量
  */
 export function allocateScannedFirst(batchRows, need) {
-  let left = round4(Math.max(0, Number(need) || 0))
-  if (left <= 0) return { rows: (batchRows || []).map((b) => ({ ...b, qty: 0, checked: false })), allocated: 0, shortage: 0, nonFifo: false }
-  const out = (batchRows || []).map((b) => ({ ...b }))
-  // ① 先扫到的那一批
-  const hit = out.find((b) => b.scanned && b.avail > 0)
-  if (hit) {
-    const take = round4(Math.min(hit.avail, left))
-    hit.qty = take
-    hit.checked = take > 0
-    left = round4(left - take)
-  }
-  // ② 剩余按先进先出补(跳过已填的批)
-  if (left > 0) {
-    for (const b of out) {
-      if (left <= 0) break
-      if (b === hit) continue
-      if (b.avail <= 0) continue
-      const take = round4(Math.min(b.avail, left))
-      const base = round4(b.qty || 0)
-      b.qty = round4(base + take)
-      b.checked = b.qty > 0
-      left = round4(left - take)
-    }
-  }
-  const allocated = round4(out.reduce((s, b) => s + round4(b.qty), 0))
-  return { rows: out, allocated, shortage: round4(left), nonFifo: isNonFifo(out) }
+  const hit = (Array.isArray(batchRows) ? batchRows : []).find((b) => b && b.scanned)
+  const firstLot = String(hit?.lot || '').trim()
+  if (firstLot) return allocateForQty(batchRows, need, { firstLot })
+  return allocateForQty(batchRows, need)
 }
 
 /**

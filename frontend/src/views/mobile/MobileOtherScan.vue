@@ -72,25 +72,75 @@
     />
 
     <div v-if="candidates.length" class="mo-card">
-      <div
-        v-for="(c, i) in candidates"
-        :key="i"
-        class="mo-cand"
-        :class="{ picked: i === candIndex }"
-        @click="pickCand(i)"
-      >
-        <div class="mo-cand-main">
-          <div class="mo-cand-name">{{ c['存货名称'] || c['存货编码'] }}</div>
-          <div class="mo-cand-meta">{{ c['存货编码'] }} · {{ c['规格型号'] || '—' }} · {{ c['计量单位'] || '—' }}</div>
-          <div class="mo-cand-meta">
-            {{ tt(isReturn ? '库存仓' : '仓库') }}：{{ c['仓库'] || c['仓库编码'] || '—' }} · {{ tt('批号') }}：{{ c['批号'] || tt('无批次') }}
+      <!-- ══════════ 领料:批次勾选(2026-11-28)══════════
+           用户口径:「扫码出库是需要连带出批次号。可勾选,按勾选的批次号再进行自动填入和排序,
+           自动填入数量,按顺序扣批次号。并且把 PC0000 放在最上面」
+           · 扫物料码 ⇒ 列出该物料**全部批次**(PC0000 最前,其余按批号日期先进先出);
+           · 勾上哪些批次,本次数量就只在这几批里按顺序扣;一批不够自动落到下一批;
+           · 勾选不够本次数量 ⇒ 提示「还差 X」,可再勾别的批次(不硬拦,库存以金蝶为准)。 -->
+      <template v-if="!isReturn && selRows.length">
+        <!-- 物料抬头:批次表只列批号,把「这是什么料」摆一行,现场不用回头看扫码框 -->
+        <div class="mo-mat">
+          <span class="mo-mat-name">{{ current?.['存货名称'] || current?.['存货编码'] || '' }}</span>
+          <span class="mo-mat-meta">
+            {{ current?.['存货编码'] || '' }} · {{ current?.['规格型号'] || '—' }} · {{ current?.['计量单位'] || '—' }}
+          </span>
+        </div>
+        <div class="mo-batch-head">
+          <el-checkbox
+            :model-value="batchAllOn === true"
+            :indeterminate="batchAllOn === 'indeterminate'"
+            :title="tt('全选')"
+            @change="onBatchCheckAll"
+          />
+          <span class="mo-bh-lot">{{ tt('批号') }}</span>
+          <span class="mo-bh-wh">{{ tt('仓库') }}</span>
+          <span class="mo-bh-avail">{{ tt('可用') }}</span>
+          <span class="mo-bh-qty">{{ tt('本次') }}</span>
+        </div>
+        <div
+          v-for="(b, i) in selRows"
+          :key="i"
+          class="mo-batch-row"
+          :class="{ 'is-checked': b.checked, 'is-scanned': b.scanned }"
+        >
+          <el-checkbox :model-value="b.checked" @change="(v) => onBatchCheck(i, v)" />
+          <span class="mo-bh-lot">
+            <span class="mono">{{ b.lot || tt('无批次') }}</span>
+            <span v-if="isDefaultLot(b.lot)" class="mo-batch-default" :title="tt('默认批（金蝶不分批商品的批号）')">
+              {{ tt('默认批') }}
+            </span>
+            <span v-if="b.scanned" class="mo-batch-scan">{{ tt('扫到') }}</span>
+          </span>
+          <span class="mo-bh-wh">{{ b.warehouse || '—' }}</span>
+          <span class="mo-bh-avail num">{{ fmt(b.avail) }}</span>
+          <span class="mo-bh-qty num">{{ b.qty > 0 ? fmt(b.qty) : '—' }}</span>
+        </div>
+        <div class="mo-batch-tip">{{ tt('勾选的批次按顺序自动填入本次数量（PC0000 最先）') }}</div>
+      </template>
+
+      <!-- ══════════ 退料:候选批次卡(点一行选中,数量按这一批算)══════════ -->
+      <template v-else>
+        <div
+          v-for="(c, i) in candidates"
+          :key="i"
+          class="mo-cand"
+          :class="{ picked: i === candIndex }"
+          @click="pickCand(i)"
+        >
+          <div class="mo-cand-main">
+            <div class="mo-cand-name">{{ c['存货名称'] || c['存货编码'] }}</div>
+            <div class="mo-cand-meta">{{ c['存货编码'] }} · {{ c['规格型号'] || '—' }} · {{ c['计量单位'] || '—' }}</div>
+            <div class="mo-cand-meta">
+              {{ tt(isReturn ? '库存仓' : '仓库') }}：{{ c['仓库'] || c['仓库编码'] || '—' }} · {{ tt('批号') }}：{{ c['批号'] || tt('无批次') }}
+            </div>
+          </div>
+          <div class="mo-cand-stock">
+            <div class="mo-stock-num">{{ fmt(c['现存量']) }}</div>
+            <div class="mo-stock-cap">{{ tt('可用量') }}</div>
           </div>
         </div>
-        <div class="mo-cand-stock">
-          <div class="mo-stock-num">{{ fmt(c['现存量']) }}</div>
-          <div class="mo-stock-cap">{{ tt('可用量') }}</div>
-        </div>
-      </div>
+      </template>
 
       <!-- 退料到哪个仓(2026-11-19 用户口径「手机扫码的其他退料,改为可以选择退料的仓库」):
            库存里查得到就默认它所在的仓,现场随时可改成别的仓 —— 退的是手上这批货,
@@ -111,8 +161,8 @@
       </div>
 
       <div class="mo-qty">
-        <span class="mo-qty-label">{{ tt('本次数量') }}</span>
-        <el-input-number v-model="qty" :min="0" :precision="2" :step="1" size="large" />
+        <span class="mo-qty-label">{{ isReturn ? tt('本次数量') : tt('本次出库数量') }}</span>
+        <el-input-number v-model="qty" :min="0" :precision="2" :step="1" size="large" @change="onQtyChange" />
         <span class="mo-qty-unit">{{ current?.['计量单位'] || '' }}</span>
         <el-button type="primary" size="large" :disabled="!canAdd" @click="addLine">{{ tt('加入清单') }}</el-button>
       </div>
@@ -211,6 +261,9 @@ import { tt } from '@/i18n'
 import { useUserStore } from '@/stores/user'
 import { queryFormDataList, callButton, errMsg } from '@/business/engine'
 import { parseBarcode, matchPickRows } from '@/business/scanPick'
+import { makeBatchRows } from '@/business/scanCode'
+import { isDefaultLot, checkAll, allCheckedState, round4 } from '@/business/batchAlloc'
+import { allocateScannedFirst, reallocate } from '@/business/mobilePick'
 import {
   SIDE_RET, isRet, panelOfSide, titleOfSide, checkQty, mergeLine, buildForm,
   doneMessageKey, toWarehouseOptions, defaultWarehouseCode, withWarehouse,
@@ -248,6 +301,15 @@ const scanning = ref(false)         // 相机扫码进行中(与页面里 probin
 const saving = ref(false)
 const errText = ref('')
 const candidates = ref([])
+/**
+ * 领料侧的**批次勾选行**(2026-11-28 用户口径「扫码出库是需要连带出批次号。可勾选,
+ * 按勾选的批次号再进行自动填入和排序,自动填入数量,按顺序扣批次号。并且把 PC0000 放在最上面」)。
+ *
+ * <p>与 `candidates` 的关系:候选行还是同一批库存行(`v_stock_pick` 的 物料×仓库×批号),
+ * 但页面用它渲染成**可勾选表** —— checked 决定这次从哪几批出,qty 是按顺序自动填出来的量。
+ * 退料侧不勾选(退的是手上这批货),仍走原来的候选卡 + 点选。
+ */
+const selRows = ref([])
 const candIndex = ref(0)
 const qty = ref(1)
 const lines = ref([])
@@ -310,9 +372,20 @@ const whOptions = computed(() => {
 })
 const canAdd = computed(() => {
   if (!current.value) return false
-  if (showWh.value && !warehouseCode.value) return false
-  return checkQty(props.side, qty.value, Number(current.value['现存量'])).ok
+  if (isReturn.value) {
+    if (showWh.value && !warehouseCode.value) return false
+    return checkQty(props.side, qty.value, Number(current.value['现存量'])).ok
+  }
+  // 领料:至少要有一批被自动填上数量才能加入清单
+  return selRows.value.some((b) => round4(b.qty) > 0)
 })
+
+/** 表头「全选批次」勾选框状态 */
+const batchAllOn = computed(() => allCheckedState(selRows.value))
+/** 领料:已按勾选分配到各批次的合计 */
+const pickAllocated = computed(() => round4(selRows.value.reduce((s, b) => s + round4(b.qty), 0)))
+/** 领料:本次数量还没被勾选批次覆盖的缺口 */
+const pickShortage = computed(() => round4(Math.max(0, (Number(qty.value) || 0) - pickAllocated.value)))
 
 /**
  * 库存提示(2026-11-26 用户口径「移动端给提示就行不拦截」)。
@@ -323,6 +396,14 @@ const canAdd = computed(() => {
  */
 const qtyWarn = computed(() => {
   if (!current.value) return ''
+  // 领料:勾选批次的可用量不够本次数量 ⇒ 提示还差多少(不硬拦,库存以金蝶为准)
+  if (!isReturn.value) {
+    if (pickShortage.value > 0) {
+      return `${tt('勾选批次的可用量不够')},${tt('还差')} ${fmt(pickShortage.value)} ${current.value['计量单位'] || ''}`
+        + ` — ${tt('可再勾选别的批次')}`
+    }
+    return ''
+  }
   const c = checkQty(props.side, qty.value, Number(current.value['现存量']))
   if (!c.warn) return ''
   return c.reason === 'exceed'
@@ -373,6 +454,7 @@ const reasonText = (reason) => ({
   'no-stock': tt('该批号可用量为 0'),
   exceed: tt('数量超过了该批号的可用量'),
   'no-cand': tt('请先扫码选中一个物料'),
+  'no-batch': tt('请先勾选要出库的批次'),
   'no-warehouse': tt('请选择退到哪个仓库'),
   'no-docno': tt('请扫描单据二维码或输入单号'),
 }[reason] || '')
@@ -418,6 +500,7 @@ async function onScan() {
   lastDoc.value = ''
   candidates.value = []
   candIndex.value = 0
+  selRows.value = []
   // 本页的扫码框**只认物料码**(2026-11-16 第三轮:补打印改走查询,不再扫单据码)
   const parsed = parseBarcode(scanText.value)
   if (!parsed.ok) {
@@ -441,7 +524,15 @@ async function onScan() {
       candidates.value = hits
       candIndex.value = 0
       syncWarehouse()
-      qty.value = isReturn.value ? 1 : (Number(hits[0]['现存量']) || 1)
+      if (isReturn.value) {
+        qty.value = 1
+        return
+      }
+      // 领料(2026-11-28):把该物料**全部批次**列成可勾选表 —— PC0000 最前,其余按批号日期先进先出;
+      // 码里带批号的那一批标「扫到」并优先扣。默认数量 = 第一批的可用量(与旧行为一致)。
+      selRows.value = makeBatchRows(hits, parsed.batch)
+      qty.value = Number(selRows.value[0]?.avail) || 1
+      autoSelectBatches()
       return
     }
     if (!isReturn.value) {
@@ -533,10 +624,68 @@ async function loadWarehouses() {
   }
 }
 
+/**
+ * 领料:扫到物料后的**默认勾选** —— 按顺序勾到够本次数量为止(不够就有货的全勾),
+ * 码里带批号 ⇒ 那一批最先扣(与生产领料同一套,见 business/batchAlloc)。
+ */
+function autoSelectBatches() {
+  const r = allocateScannedFirst(selRows.value, qty.value)
+  selRows.value = r.rows
+}
+
+/** 领料:数量 / 勾选变了 → **保留现场勾选**按顺序重算(不再自动勾回) */
+function recalcBatches() {
+  const firstLot = String((selRows.value.find((b) => b.scanned) || {}).lot || '').trim()
+  const r = reallocate(selRows.value, qty.value, { firstLot })
+  selRows.value = r.rows
+}
+
+/** 本次数量变化(领料 = 总量,退料 = 这一行的数量) */
+function onQtyChange() {
+  if (isReturn.value) return
+  recalcBatches()
+}
+
+/** 勾 / 取消勾某一批 */
+function onBatchCheck(i, on) {
+  const next = selRows.value.slice()
+  if (!next[i]) return
+  next[i] = { ...next[i], checked: !!on }
+  selRows.value = next
+  recalcBatches()
+}
+
+/** 表头全选 / 全不选 */
+function onBatchCheckAll(on) {
+  selRows.value = checkAll(selRows.value, !!on)
+  recalcBatches()
+}
+
 function addLine() {
+  // ── 领料(2026-11-28):勾了几批就按顺序拆成几行,一次扫一条物料全部落进清单 ──
+  if (!isReturn.value) {
+    const alloc = selRows.value.filter((b) => round4(b.qty) > 0)
+    if (!alloc.length) {
+      errText.value = reasonText('no-batch')
+      return
+    }
+    let next = lines.value
+    for (const b of alloc) {
+      const res = mergeLine(next, b.row, b.qty, props.side)
+      if (!res.ok) {
+        errText.value = reasonText(res.reason)
+        return
+      }
+      next = res.lines
+    }
+    lines.value = next
+    clearScan()
+    return
+  }
+  // ── 退料:仍按选中的那一行走(退的是手上这批货,不存在多批分摊)──
   const c = current.value
   if (!c) return
-  // 退料的仓库以现场选择为准(合键/落库都按这个仓);领料仍用库存行自带的仓
+  // 退料的仓库以现场选择为准(合键/落库都按这个仓)
   if (showWh.value && !warehouseCode.value) {
     errText.value = reasonText('no-warehouse')
     return
@@ -550,8 +699,15 @@ function addLine() {
     return
   }
   lines.value = res.lines
+  clearScan()
+}
+
+/** 加完一条 / 提交后:清掉扫码区(下一条直接扫) */
+function clearScan() {
   scanText.value = ''
   candidates.value = []
+  candIndex.value = 0
+  selRows.value = []
   errText.value = ''
   nextTick(() => scanInput.value?.focus?.())
 }
@@ -566,6 +722,8 @@ function reset() {
   lines.value = []
   scanText.value = ''
   candidates.value = []
+  candIndex.value = 0
+  selRows.value = []
   errText.value = ''
   // 清空 = 开始另一张单:带着上一张选的仓进去只会把货记错仓,一并复位
   warehouseCode.value = ''
@@ -714,6 +872,30 @@ async function submit() {
 .mo-cand-stock { text-align: right; flex: none; }
 .mo-stock-num { font-size: 20px; font-weight: 600; color: var(--el-color-primary); font-variant-numeric: tabular-nums; }
 .mo-stock-cap { font-size: 11px; color: var(--el-text-color-secondary); }
+/* 批次勾选表(2026-11-28 扫码出库):PC0000 最前、按顺序扣;一行 44px 命中区 */
+.mo-mat { display: flex; align-items: baseline; gap: 8px; padding: 10px 12px; background: var(--el-fill-color-lighter); border-bottom: 1px solid var(--el-border-color-lighter); }
+.mo-mat-name { font-size: 14px; font-weight: 600; }
+.mo-mat-meta { font-size: 12px; color: var(--el-text-color-secondary); word-break: break-all; }
+.mo-batch-head, .mo-batch-row {
+  display: flex; align-items: center; gap: 8px; padding: 8px 12px; font-size: 12px;
+}
+.mo-batch-head { background: var(--el-fill-color-light); color: var(--el-text-color-secondary); }
+.mo-batch-row { border-top: 1px solid var(--el-border-color-lighter); font-size: 13px; }
+.mo-batch-row.is-checked { background: var(--el-color-primary-light-9); }
+.mo-batch-row.is-scanned { box-shadow: inset 3px 0 0 var(--el-color-warning); }
+.mo-bh-lot { flex: 1; min-width: 0; display: flex; align-items: center; gap: 4px; word-break: break-all; }
+.mo-bh-wh { flex: none; width: 66px; color: var(--el-text-color-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mo-bh-avail { flex: none; width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
+.mo-bh-qty { flex: none; width: 62px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mo-batch-default {
+  flex: none; padding: 0 4px; border-radius: 3px; font-size: 10px;
+  background: var(--el-color-primary-light-9); color: var(--el-color-primary);
+}
+.mo-batch-scan {
+  flex: none; padding: 0 4px; border-radius: 3px; font-size: 10px;
+  background: var(--el-color-warning-light-8); color: var(--el-color-warning-dark-2);
+}
+.mo-batch-tip { padding: 6px 12px 10px; font-size: 11px; color: var(--el-text-color-secondary); }
 .mo-wh { display: flex; align-items: center; gap: 10px; padding: 12px; border-top: 1px solid var(--el-border-color-lighter); }
 .mo-wh-sel { flex: 1; min-width: 0; }
 .mo-wh-hint { flex: none; font-size: 12px; color: var(--el-color-warning); }

@@ -5332,6 +5332,14 @@ export default {
     '未按先进先出': 'Not FIFO',
     '批次': 'Lots',
     '未选批次': 'No lot selected',
+    // ── 扫码出库 · 批次勾选(2026-11-28:PC0000 最前、勾选批次按顺序扣)──
+    '默认批': 'Default lot',
+    '默认批（金蝶不分批商品的批号）': 'Default lot (the batch No. Kingdee uses for items without batch control)',
+    '勾选批次的可用量不够': 'The checked lots do not cover the quantity',
+    '可再勾选别的批次': 'check more lots',
+    '请先勾选要出库的批次': 'Check the lots to issue first',
+    '本次出库数量': 'Issue qty',
+    '勾选的批次按顺序自动填入本次数量（PC0000 最先）': 'The checked lots are filled in order (PC0000 first)',
     // ── 手机扫码 · 其他领料 / 其他退料(/panelx/list/MOBILE_OTHER_*;2026-11-17 补译名 + 相机扫码按钮)──
     '扫描或输入物料码（存货编码|批号）': 'Scan or enter material code (item code|batch no.)',
     '请扫描或输入物料码': 'Scan or enter the material code first',

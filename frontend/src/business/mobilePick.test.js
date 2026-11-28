@@ -16,6 +16,8 @@ import {
   parseUsage, toRows, maxQtyOf, allocateForQty, allocateScannedFirst,
   pickProgress, backIsEmpty, round4, printJobsOf, locateQueryOf,
 } from './mobilePick.js'
+import { reallocate } from './mobilePick.js'
+import { checkAll, checkByNeed } from './batchAlloc.js'
 
 // ─── ① BOM 用量解析 ───────────────────────────────────────────────
 
@@ -128,6 +130,46 @@ test('allocateScannedFirst:数量 0 ⇒ 全部清零', () => {
   const r = allocateScannedFirst(scannedRows, 0)
   assert.equal(r.allocated, 0)
   assert.ok(r.rows.every((b) => b.qty === 0))
+})
+
+// ─── 批次勾选(2026-11-28 用户口径「可勾选……按顺序扣批次号」)─────────
+
+const boxRows = [
+  { lot: 'PC0000', warehouse: 'W', avail: 5, qty: 0, checked: false, scanned: false },
+  { lot: '20260901', warehouse: 'W', avail: 10, qty: 0, checked: false, scanned: false },
+  { lot: '20261001', warehouse: 'W', avail: 30, qty: 0, checked: false, scanned: false },
+]
+
+test('reallocate:只扣勾选的批次(取消 PC0000 后一分都不从它扣)', () => {
+  const rows = boxRows.map((b) => ({ ...b, checked: b.lot !== 'PC0000' }))
+  const r = reallocate(rows, 8)
+  assert.equal(r.rows[0].qty, 0, 'PC0000 没勾 ⇒ 0')
+  assert.equal(r.rows[1].qty, 8, '按顺序从下一批扣')
+  assert.equal(r.allocated, 8)
+  assert.equal(r.shortage, 0)
+})
+
+test('reallocate:勾选不够本次数量 ⇒ shortage(页面提示还差多少)', () => {
+  const rows = boxRows.map((b) => ({ ...b, checked: b.lot === 'PC0000' }))
+  const r = reallocate(rows, 8)
+  assert.equal(r.allocated, 5)
+  assert.equal(r.shortage, 3)
+})
+
+test('reallocate:保留现场勾选,不会被自动勾回来', () => {
+  const rows = checkByNeed(boxRows, 8)          // 默认会勾 PC0000 + 20260901
+  assert.deepEqual(rows.map((b) => b.checked), [true, true, false])
+  const off = rows.map((b, i) => (i === 0 ? { ...b, checked: false } : b))
+  const r = reallocate(off, 8)
+  assert.equal(r.rows[0].checked, false, '取消的勾不能被重算改回去')
+  assert.equal(r.rows[1].qty, 8, '缺口全部落到还勾着的批次上')
+})
+
+test('reallocate:全选后按顺序扣满', () => {
+  const rows = checkAll(boxRows, true)
+  const r = reallocate(rows, 20)
+  assert.deepEqual(r.rows.map((b) => b.qty), [5, 10, 5], 'PC0000 先扣满,再按日期顺序')
+  assert.equal(r.shortage, 0)
 })
 
 // ─── ③ 全部领完判定 ──────────────────────────────────────────────

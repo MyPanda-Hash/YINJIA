@@ -18,6 +18,7 @@
  */
 
 import { fifoSort, batchDate } from './scanPick.js'
+import { defaultLotFirst, isDefaultLot } from './batchAlloc.js'
 
 /** 四位小数取整(与后端 decimal(18,4) 同口径) */
 function round4(n) {
@@ -106,16 +107,21 @@ export function parseMaterialCode(raw) {
  *
  * 每行结构:`{ row, lot, warehouse, avail, qty, checked, scanned }`
  *   avail   该(物料,仓库,批号)的现存量
- *   qty     本次从这一批领多少(用户可直接改)
- *   checked qty > 0
+ *   qty     本次从这一批领多少(按勾选顺序自动填)
+ *   checked 是否勾选(只有勾上的批次参与本次出库)
  *   scanned 是否就是扫到的那一批(页面标亮)
+ *
+ * <p>🔴 2026-11-28 用户口径:「并且把 PC0000 放在最上面」——
+ * 金蝶对不分批商品统一填默认批号 `PC0000`,现场真正的货压在这一批上;
+ * 按批号日期排(FIFO)它取不到日期会被排到最后,现场要翻到表格最下面才勾得到。
+ * ⇒ 排序改成 **PC0000 最前 → 其余按批号日期先进先出**(见 batchAlloc.defaultLotFirst)。
  *
  * @param {any[]} rows v_stock_pick 行
  * @param {string} [scannedBatch] 码里带的批次号(没有则空)
  */
 export function makeBatchRows(rows, scannedBatch = '') {
   const want = String(scannedBatch || '').trim()
-  return fifoSort(rows).map((row) => {
+  return defaultLotFirst(fifoSort(rows)).map((row) => {
     const lot = String(row['批号'] || '').trim()
     const avail = round4(Number(row['现存量']) || 0)
     return {
@@ -159,12 +165,17 @@ export function autoAllocateFifo(batchRows, need) {
  * 后面还有行被领了 ⇒ 就是跳批,属于违反。
  * 全部只领最前面的一/几批、且最后一批是部分领取 ⇒ 合规。
  *
+ * <p>2026-11-28:默认批号 `PC0000`(金蝶不分批商品的批号)**不算跳批** ——
+ * 用户口径是它排最上面、先扣它;若不排除,几乎每张含 PC0000 的单都会被判成
+ * 「不是先进先出」,那句提示就成了噪音。
+ *
  * @param {any[]} batchRows 已按 FIFO 排序的行
  * @returns {boolean} true = 违反(需要在备注里写明)
  */
 export function isNonFifo(batchRows) {
   let skipped = false
   for (const b of (Array.isArray(batchRows) ? batchRows : [])) {
+    if (isDefaultLot(b?.lot)) continue
     const qty = round4(b.qty)
     if (qty > 0) {
       if (skipped) return true
